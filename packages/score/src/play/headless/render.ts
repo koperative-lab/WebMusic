@@ -6,6 +6,7 @@
 // and faster than real time. This closes the loop: load/build → play → export.
 // ============================================================================
 
+import {createOfflineModuleEnvironment} from '@webmusic/kernel/module';
 import {
   type Score,
 } from '../../core';
@@ -63,7 +64,12 @@ export async function renderScoreToBuffer(score: Score, options: RenderOptions =
   if (!OfflineCtor) {
     throw new Error('OfflineAudioContext is not available in this environment.');
   }
-  const context = new OfflineCtor(channels, length, sampleRate);
+  // The same offline module environment that module graphs render in (DEC-068).
+  const offline = createOfflineModuleEnvironment({
+    channels, sampleRate, length,
+    create: (count, frames, rate) => new OfflineCtor(count, frames, rate),
+  });
+  const context = offline.context;
 
   const output = context.createGain();
   const suppliedSynth = options.synth;

@@ -187,8 +187,40 @@ only for explicit playback. Offset defaults 0 and positive position scale 1.
 | `prepare()` | Explicitly prepare the shared audio environment/engine and admit its output once. |
 | `inserts` | Prepared live `InsertChain`, otherwise undefined. |
 | `getPort('main')` / `getPort('output')` | Prepared `AudioOutputPort`, otherwise undefined. |
+| `ports()` | Audio `main` once prepared, note input `notes`, source `source`, the scope's borrowed `transport`, and control `params` when the synth has parameters. |
+| `notes` | `NoteInputPort`: each connected producer's occurrences reach their own voices; releasing the connection cancels only those. Velocity 0–1 maps to MIDI 1–127. |
+| `source` | `SourcePublisher` with schema `webmusic.score` publishing the player's `playback` source. |
+| `retarget(context)` | Follow a republished scope in place: a destination-only change re-routes the prepared output and keeps the engine, Session membership and voices; returns `false` when the change needs a rebind. |
+| `setDocumentSource(source)` | Play a borrowed document in place of the constructed score; the engine and clock stay. |
 | `subscribe(listener)` | Observe capability readiness/replacement; discovery itself allocates nothing. |
-| `dispose()` | Release registration, participant and route; dispose only an engine the module created. |
+| `dispose()` | Release registration, participant, route and ports; dispose only an engine the module created. |
+
+The Session participant reports `ScorePlayer.sessionTiming`: `shared-anchor`
+when the synth schedules and cancels attacks on the audio clock (the default
+oscillator does), otherwise `callback`.
+
+### Note sources and sinks
+
+`new MidiNoteSource(input, {id?, channel?})` turns a Web MIDI input's note-on and
+note-off messages into occurrences on its `notes` output port (axis
+`performance-seconds`, from the message time stamp); a repeated note-on closes
+the earlier occurrence first, and `dispose()` cancels held notes and restores the
+input's previous handler. `new MidiNoteSink(output, {id?, channel?})` sends the
+events connected to its `notes` input port to a Web MIDI output and releases held
+notes on disposal; device timing stays external to any Session.
+`recordNoteOutput(recorder, notes)` captures a note output into a
+`ScoreRecorderSession` take and returns a lease that stops capturing.
+
+```ts
+import {MidiNoteSource, type MidiInputLike, type ScorePlayerModule} from '@webmusic/score/play/headless';
+
+declare const input: MidiInputLike; // a Web MIDI input from requestMIDIAccess()
+declare const module: ScorePlayerModule; // already in a ModuleContext
+
+const keys = new MidiNoteSource(input);
+const lease = module.notes.connect(keys.notes);
+// Teardown: lease.release(); keys.dispose();
+```
 
 The native `ScorePlayer` additionally exposes `preparedContext`, `inserts`,
 `audioOutput`, its `effect` recipe and `setEffect(effect)`. `configureAudio(context)`

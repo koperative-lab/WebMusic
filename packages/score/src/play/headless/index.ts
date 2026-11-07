@@ -12,6 +12,7 @@
 export type {PlaybackListenerError, PlaybackOperationError} from './playback-events';
 
 export {SCORE_NOTE_INPUT, NoteInputController, type NoteInputControllerOptions} from './note-input';
+export {MidiNoteSource, MidiNoteSink, recordNoteOutput, type MidiNoteSourceOptions, type MidiNoteSinkOptions} from './note-modules';
 export type {NoteInputOccurrence, NoteInputTarget} from '../core/note-input-model';
 
 export {

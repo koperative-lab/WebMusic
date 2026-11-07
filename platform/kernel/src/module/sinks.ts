@@ -166,8 +166,10 @@ export class CaptureSink extends AudioSink {
 
 export interface OfflineEnvironmentOptions {
   sampleRate: number;
-  /** Rendered length in seconds. */
-  durationSeconds: number;
+  /** Rendered length in seconds; ignored when `length` is given. */
+  durationSeconds?: number;
+  /** Rendered length in sample frames. */
+  length?: number;
   channels?: number;
   /** Injected constructor for environments without `OfflineAudioContext`. */
   create?: (channels: number, length: number, sampleRate: number) => OfflineAudioContext;
@@ -190,8 +192,13 @@ export function createOfflineModuleEnvironment(options: OfflineEnvironmentOption
   const channels = options.channels ?? 2;
   if (!Number.isInteger(channels) || channels < 1) throw new RangeError('channels must be a positive integer');
   if (!Number.isFinite(options.sampleRate) || options.sampleRate <= 0) throw new RangeError('sampleRate must be positive');
-  if (!Number.isFinite(options.durationSeconds) || options.durationSeconds <= 0) throw new RangeError('durationSeconds must be positive');
-  const length = Math.ceil(options.durationSeconds * options.sampleRate);
+  let length = options.length;
+  if (length === undefined) {
+    const seconds = options.durationSeconds;
+    if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) throw new RangeError('durationSeconds must be positive');
+    length = Math.ceil(seconds * options.sampleRate);
+  }
+  if (!Number.isInteger(length) || length < 1) throw new RangeError('length must be a positive integer number of frames');
   const create = options.create ?? ((count: number, frames: number, rate: number) => {
     const Offline = (globalThis as {OfflineAudioContext?: typeof OfflineAudioContext}).OfflineAudioContext;
     if (!Offline) throw new Error('OfflineAudioContext is unavailable in this environment');

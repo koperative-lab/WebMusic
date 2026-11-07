@@ -1,15 +1,24 @@
 import {
   ModuleCapabilities,
+  NoteInputPort,
+  SOURCE_SCHEMAS,
+  SourcePublisher,
+  createControlPort,
+  moduleScopeChange,
   routeModuleOutput,
   type ConnectionLease,
+  type ControlPort,
   type ModuleContext,
   type ModuleHandle,
+  type ModulePort,
   type AudioOutputPort,
+  type NoteEvent,
 } from '@webmusic/kernel/module';
 import type {InsertChain} from '@webmusic/kernel/effect';
 import type {ModuleSession} from '@webmusic/kernel/session';
 import type {SyncFollowerTransport} from '@webmusic/kernel/sync';
-import type {Score} from '../../core';
+import type {Score, ScoreDocumentSource, ScorePlaybackSource} from '../../core';
+import type {NoteInputTarget} from '../core/note-input-model';
 import type {ScorePlayerOptions} from './audio-contracts';
 import {ScorePlayer} from './score-player';
 import {SCORE_NOTE_INPUT} from './note-input';
@@ -27,14 +36,27 @@ export interface ScorePlayerModuleOptions extends ScorePlayerOptions {
   positionScale?: number;
 }
 
-/** One real score engine attached to a module scope and optional Session. */
+/**
+ * One real score engine attached to a module scope and optional Session. Its
+ * ports: audio `main` (once prepared), note input `notes`, source `source`
+ * (the player's `webmusic.score` playback source), the scope's borrowed
+ * `transport`, and control `params` when the synth has parameters.
+ */
 export class ScorePlayerModule implements ModuleHandle {
   readonly id: string;
   readonly player: ScorePlayer;
   readonly capabilities: ModuleCapabilities;
+  /** Note input; events reach this player's exact voices. */
+  readonly notes: NoteInputPort;
+  /** Source port publishing the player's playback source. */
+  readonly source: SourcePublisher<ScorePlaybackSource>;
   private readonly heldNotes = new Set<string>();
+  private readonly portNotes = new Map<string, {active: boolean}>();
+  private readonly noteTarget: NoteInputTarget;
   private readonly ownsPlayer: boolean;
-  private readonly context: ModuleContext;
+  private context: ModuleContext;
+  private control?: ControlPort;
+  private portList: readonly ModulePort[] = Object.freeze([]);
   private readonly onError?: (error: unknown) => void;
   private readonly listeners = new Set<() => void>();
   private readonly registration: ConnectionLease;
@@ -49,7 +71,7 @@ export class ScorePlayerModule implements ModuleHandle {
     this.onError = options.onError;
     this.ownsPlayer = !options.player;
     this.player = options.player ?? new ScorePlayer(score, options);
-    this.capabilities = new ModuleCapabilities().with(SCORE_NOTE_INPUT, {
+    this.noteTarget = {
       prepare: async () => {
         await this.prepare();
         const audio = this.player.preparedContext!;
@@ -66,7 +88,12 @@ export class ScorePlayerModule implements ModuleHandle {
         if (!this.heldNotes.delete(id)) return;
         this.player.noteOffOccurrence(id);
       },
-    });
+    };
+    this.capabilities = new ModuleCapabilities().with(SCORE_NOTE_INPUT, this.noteTarget);
+    this.notes = new NoteInputPort({accept: (event) => this.acceptNote(event)}, {id: 'notes'});
+    this.source = new SourcePublisher<ScorePlaybackSource>(SOURCE_SCHEMAS.score, {id: 'source'});
+    this.source.ready(this.player.playback);
+    this.refreshPorts();
     this.registration = this.context.registry.register(this);
     try {
       const session = this.context.session;
@@ -106,9 +133,80 @@ export class ScorePlayerModule implements ModuleHandle {
       }
     } catch (error) {
       this.registration.release();
+      this.notes.dispose();
+      this.source.dispose();
       if (this.ownsPlayer) this.player.dispose();
       throw error;
     }
+  }
+
+  ports(): readonly ModulePort[] { return this.portList; }
+
+  /**
+   * Follow a republished scope in place (DEC-065): when only the destination
+   * resolver changed, re-route the prepared output and keep the engine, its
+   * Session membership and its voices. Returns false when the change needs a
+   * rebind (a new Session, registry, admission or environment).
+   */
+  retarget(next: ModuleContext): boolean {
+    if (this.disposed) throw new Error('Score module has been disposed.');
+    const change = moduleScopeChange(this.context, next);
+    if (change === 'scope') return false;
+    this.context = next;
+    if (change === 'destination' && this.route) {
+      const port = this.player.audioOutput!;
+      const previous = this.route;
+      this.route = undefined;
+      previous.release();
+      this.route = routeModuleOutput(next, this, port);
+      this.notify();
+    }
+    return true;
+  }
+
+  /** Play a borrowed document in place of the constructed score; the engine and clock stay. */
+  setDocumentSource(source: ScoreDocumentSource | undefined): void {
+    if (this.disposed) throw new Error('Score module has been disposed.');
+    this.player.setDocumentSource(source);
+    this.source.ready(this.player.playback);
+    this.notify();
+  }
+
+  private acceptNote(event: NoteEvent): void {
+    if (this.disposed) return;
+    const id = `${event.sourceId}:${event.occurrenceId}`;
+    if (event.gate === 'on') {
+      if (this.portNotes.has(id)) return;
+      const held = {active: true};
+      this.portNotes.set(id, held);
+      const velocity = Math.max(1, Math.min(127, Math.round(event.velocity * 127)));
+      void this.noteTarget.prepare().then(() => {
+        if (!held.active || this.disposed) return;
+        this.noteTarget.noteOn({id, midi: Math.round(event.pitch.midi), velocity});
+        // A release that arrived during the start already removed the record.
+        if (!held.active) this.noteTarget.noteOff(id);
+      }, (error) => {
+        if (this.portNotes.get(id) === held) this.portNotes.delete(id);
+        try { this.onError?.(error); } catch { /* Report only. */ }
+      });
+      return;
+    }
+    const held = this.portNotes.get(id);
+    if (held) { held.active = false; this.portNotes.delete(id); }
+    this.noteTarget.noteOff(id);
+  }
+
+  private refreshPorts(): void {
+    const ports: ModulePort[] = [];
+    const audio = this.player.audioOutput;
+    if (audio && this.route) ports.push(audio);
+    ports.push(this.notes, this.source);
+    const transport = this.context.transport;
+    if (transport) ports.push(transport);
+    const params = this.player.params;
+    if (params && this.control?.params !== params) this.control = createControlPort(params);
+    if (params && this.control) ports.push(this.control);
+    this.portList = Object.freeze(ports);
   }
 
   get inserts(): InsertChain | undefined { return this.player.inserts; }
@@ -148,10 +246,11 @@ export class ScorePlayerModule implements ModuleHandle {
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => { this.listeners.delete(listener); };
   }
 
   private notify(): void {
+    this.refreshPorts();
     for (const listener of [...this.listeners]) {
       if (this.disposed) break;
       try { listener(); } catch (error) {
@@ -165,8 +264,12 @@ export class ScorePlayerModule implements ModuleHandle {
     this.disposed = true;
     let failure: unknown;
     const clean = (callback: () => void) => { try { callback(); } catch (error) { failure ??= error; } };
+    for (const held of this.portNotes.values()) held.active = false;
+    this.portNotes.clear();
     for (const id of this.heldNotes) clean(() => this.player.noteOffOccurrence(id));
     this.heldNotes.clear();
+    clean(() => this.notes.dispose());
+    clean(() => this.source.dispose());
     clean(() => this.participant?.release());
     clean(() => this.route?.release());
     clean(() => this.registration.release());
