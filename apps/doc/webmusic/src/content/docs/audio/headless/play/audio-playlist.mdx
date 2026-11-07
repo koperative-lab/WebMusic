@@ -52,6 +52,11 @@ Session participant of its own. Every entry plays into one queue bus, so the
 queue has one stable output: `outputPort` (an `AudioOutputPort` with ID
 `output`, prepared on first read) and `peekOutputPort()` (without preparing).
 `onTrackChange(notify)` is the queue capability a borrowing player reads.
+`preload()` loads the selected entry and builds its player without starting it
+(rejecting with the entry's error when it failed), and
+`adoptAudioContext(context)` makes the queue play in a borrowed context before
+it builds audio; an `AudioPlayer` with a `moduleContext` calls both while it
+prepares, so the queue shares the scope's clock.
 
 An [`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition)
 facade borrows the queue with `setTransport(queue)`; that facade's `.module`

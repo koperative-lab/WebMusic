@@ -2,7 +2,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   getModulePort, ModuleAudioEnvironment, ModuleContext, NoteOutputPort,
-  type ModuleHandle, type NoteEvent,
+  type ModuleHandle, type NoteEvent, type NoteInputPort,
 } from '@webmusic/kernel/module';
 import {provideModuleContext} from '@webmusic/kernel/element';
 import {NoteInputElement} from '../../src/play/element/score-note-input';
@@ -42,7 +42,7 @@ describe('score-note-input as a note Source module', () => {
   it('publishes every press and release on its notes output port', () => {
     const input = keys('keys');
     document.body.append(input);
-    const port = getModulePort(input.module, 'notes', 'note', 'output')!;
+    const port = getModulePort(input.module, 'notes', 'note', 'output') as NoteOutputPort;
     const seen: NoteEvent[] = [];
     releases.push(port.subscribe((value) => seen.push(value)));
     key(input, true);
@@ -89,7 +89,7 @@ describe('score-recorder in a module scope (DEC-068)', () => {
   it('is a note Sink whose input port captures delivered events while armed', () => {
     const take = recorder();
     document.body.append(take);
-    const port = getModulePort(take.module, 'notes', 'note', 'input')!;
+    const port = getModulePort(take.module, 'notes', 'note', 'input') as NoteInputPort;
     const notes = new NoteOutputPort({id: 'notes'});
     const lease = port.connect(notes);
     notes.emit(event('idle', 'on'));

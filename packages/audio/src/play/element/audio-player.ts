@@ -458,8 +458,14 @@ export class AudioPlayerElement extends WebMusicElement {
    */
   async play(when?: number): Promise<void> {
     this.assertSourceAvailable();
-    if (this.sessionDriven) await this.moduleContext!.session!.play(when);
-    else await this._player?.play(when);
+    if (this.sessionDriven) {
+      try { await this.moduleContext!.session!.play(when); } catch (error) {
+        // A queue entry that failed to load is shown as the player's load
+        // error, as a direct queue start reports it; the Session stays paused.
+        const queue = this._player?.transport;
+        if (!queue?.onTrackChange || !queue.loadError) throw error;
+      }
+    } else await this._player?.play(when);
     this.notifyUI();
   }
 
@@ -566,12 +572,14 @@ export class AudioPlayerElement extends WebMusicElement {
   /**
    * Whether transport commands go to the Session: this element's player (owned
    * or borrowed) is a Session participant, or a source-free owner conducts
-   * nested members. A player selecting an external transport keeps its own
+   * nested members. A borrowed queue is a Session participant too, so its
+   * commands also go through the Session; a borrowed mix keeps its own
    * commands (DEC-068).
    */
   private get sessionDriven(): boolean {
     const session = this.moduleContext?.session;
-    if (!session || this._player?.transport) return false;
+    const transport = this._player?.transport;
+    if (!session || (transport && !(transport.onTrackChange && this.participant?.active))) return false;
     // A nested player always commands the shared Session it borrows.
     return !this.ownedSession || !!this.participant?.active || this.aggregate;
   }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {AudioOutputPort, getModulePort} from '@webmusic/kernel/module';
+import {AudioOutputPort, getModulePort, ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
 import {createAudioClip, type AudioClip} from '../../src/core';
 import {AudioPlaylist} from '../../src/play/headless/playlist';
 import {AudioPlayer} from '../../src/play/headless/audio-player';
@@ -76,7 +76,7 @@ describe('a group backend publishes its output through the borrowing player (DEC
     const mixer = new AudioMixer({audioContext: context});
     const source = new AudioOutputPort(context.createGain() as unknown as AudioNode);
     const lease = mixer.admitAudio('lead', source);
-    const tap = getModulePort(mixer.module, 'channel:lead', 'audio', 'output')!;
+    const tap = getModulePort(mixer.module, 'channel:lead', 'audio', 'output') as AudioOutputPort;
     expect(tap.id).toBe('channel:lead');
     expect(mixer.module.getPort!('channel:lead')).toBe(tap);
     expect(mixer.transport.peekOutputPort!()).toBe(mixer.outputPort);
@@ -87,6 +87,31 @@ describe('a group backend publishes its output through the borrowing player (DEC
     expect(mixer.module.getPort!('channel:lead')).toBeUndefined();
     expect(tap.disposed).toBe(true);
     mixer.dispose();
+  });
+});
+
+describe('a borrowed queue shares the scope clock', () => {
+  it('adopts the module scope AudioContext before it builds audio, and refuses to migrate later', async () => {
+    const scopeContext = new StubAudioContext() as unknown as AudioContext;
+    const moduleContext = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context: scopeContext})});
+    const queue = new AudioPlaylist({entries: [{id: 'a', clip: clip()}]});
+    const player = new AudioPlayer(undefined, {moduleContext});
+    player.setTransport(queue);
+    // Preparation adopts the scope's context, then builds the entry and the queue bus in it.
+    await player.preload();
+    expect(queue.peekOutputPort()!.context).toBe(scopeContext);
+    expect(() => queue.adoptAudioContext(new StubAudioContext() as unknown as AudioContext)).toThrow(/another AudioContext/);
+    queue.dispose();
+    player.dispose();
+  });
+
+  it('fails preparation over an entry that did not load, so a Session never starts on it', async () => {
+    const failure = new Error('decode failed');
+    const queue = new AudioPlaylist({audioContext: new StubAudioContext() as unknown as AudioContext, skipFailed: false,
+      entries: [{id: 'a', src: '/a.wav'}], loadEntry: () => Promise.reject(failure)});
+    await expect(queue.preload()).rejects.toBe(failure);
+    expect(queue.loadError).toBe(failure);
+    queue.dispose();
   });
 });
 
@@ -109,6 +134,13 @@ describe('<audio-player> over a nested playlist is one Session queue source', ()
     expect(session.participantCount).toBe(1);
     expect(list.playlist!.index).toBe(1);
     expect(element.module!.getPort!('output')).toBe(list.playlist!.peekOutputPort());
+    // The player's own controls command the Session, which drives the queue.
+    element.pause();
+    await vi.waitFor(() => expect(session.snapshot.paused).toBe(true));
+    expect(list.playing).toBe(false);
+    await element.play();
+    expect(session.snapshot.paused).toBe(false);
+    expect(list.playing).toBe(true);
     element.remove();
   });
 });

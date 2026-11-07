@@ -26,6 +26,8 @@ export interface AudioPlayerTransport {
   peekOutputPort?(): AudioOutputPort | undefined;
   /** Queue capability: the selected entry changed (DEC-068 queue source). */
   onTrackChange?(notify: () => void): () => void;
+  /** Play in a scope's AudioContext so the group and its Session share one clock. */
+  adoptAudioContext?(context: AudioContext): void;
   readonly clock?: TransportClockReader;
   readonly timingCapabilities?: PlaybackTimingCapabilities;
   readonly schedulingMode?: PlaybackSchedulingMode;
@@ -470,6 +472,9 @@ export class AudioPlayer {
   }
   async preload(): Promise<void> {
     if (this.disposed) return;
+    const scope = this.options.moduleContext;
+    // A borrowed group plays in the scope's context, whose clock the Session reads.
+    if (this.borrowed?.adoptAudioContext && scope) this.borrowed.adoptAudioContext(scope.audio.prepare() as AudioContext);
     await (this.borrowed ?? this.ensureEngine())?.preload?.();
   }
   setRate(rate: number): void {

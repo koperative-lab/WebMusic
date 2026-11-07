@@ -62,9 +62,10 @@ editor document registers its engine once as a participant on the
 timing; the media-element engine and document sequences report
 `media-follower`. A source-free outer player conducts its nested members. A player
 over a borrowed queue registers the queue once as a queue source on the
-`queue-entry-seconds` axis: each entry change re-anchors the Session at 0 and
-the Session ends with the queue. A borrowed queue or mix keeps its own rate and
-loop. `play(when)` defers the Session start to `when`.
+`queue-entry-seconds` axis: its controls command the Session, each entry
+change re-anchors the Session at 0, and the Session ends with the queue. A
+borrowed mix keeps its own commands; a borrowed queue or mix keeps its own rate
+and loop. `play(when)` defers the Session start to `when`.
 
 Play, pause, stop, seek and rate commands delegate to the Session in Session
 seconds; a failed command, preparation or activation is reported as

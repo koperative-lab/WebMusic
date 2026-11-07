@@ -506,7 +506,7 @@ change rebinds. Rounds 3–6.
 | `MidiPlayerController` and `Player` aliases, `bindClock` | `PlayerController` (kept for `.controller`), `ScorePlayer`, a `Metronome` driving `advance()` |
 | Kernel `/sync` public entry, `MirrorClockMaster` | `TransportGroup` is a Session internal; the clockless fallback is removed because the Session clock is always readable |
 | Bridge `ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`, `clipAsMaster`, `scoreAsFollower` | One Session with Score and Audio modules; Bridge supplies axis mappings, for example from a beat grid |
-| Separate render graphs in `renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence` | Offline realization of the module graph |
+| Separate render graphs as the only offline path (`renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence`) | Kernel `renderModuleGraph()` realizes a whole graph offline with its own Session (round 15); the three functions stay as single-source data renders |
 
 The [0.3.0 release notes](../release/0.3.0.md#breaking-changes-from-02-dec-068-mod-15) list every removal with its replacement. Elements keep
 their tag names. `score-player`'s `.rack` (an explicit Rack) and `.controller` (a
@@ -514,6 +514,30 @@ borrowed controller) stay, implemented on the module path (round 5 choice in
 DEC-068); the Headless `Rack`, `createRack` and `PlayerController` therefore
 stay as their object types. A `score-rack-control` with an assigned `.rack` is
 backed by that Rack; without one it is a module Rack.
+
+### Companion, queue and offline contracts (rounds 11–15)
+
+- **Companions.** Score views and analysis share one follower in Score core;
+  Kernel `observeCompanionInput` resolves `.inputModule`, then `input`, then
+  containment. A `port` attribute on a Score companion follows that module's
+  `webmusic.score` source port instead of the owner element; on an Audio
+  companion `port` keeps naming the audio tap.
+- **Note graph.** `score-note-input` publishes a `notes` note output;
+  `score-recorder` records a selected note output (`input`, `port`,
+  `.inputModule`) and is a note Sink with a `notes` input. In a provider its
+  audition is a Session-free scope member.
+- **Groups.** A playlist has one queue bus `output`; a mixer lists
+  `channel:<id>` taps; a player over either lists the group's output as its
+  own, observed and never rerouted. A borrowed queue is one Session participant
+  on `queue-entry-seconds`: each entry change re-anchors the Session at 0 and
+  the Session ends with the queue.
+- **In-place replacement.** `.score` and `.sound` keep a mounted Score engine,
+  its route and Session membership; a sound that changes the Session timing
+  class rebuilds. `SessionParticipantLease.refresh()` republishes a member's
+  changed duration.
+- **Offline.** `renderModuleGraph()` builds in an offline scope with its own
+  Session; the offline environment presents its context as live until
+  rendering and ticks lookahead schedulers in rendered time.
 
 ## Acceptance
 

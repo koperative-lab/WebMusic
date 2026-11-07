@@ -2942,6 +2942,30 @@ source. An outermost `score-rack-control` owns a Session like an outermost
 and the unused `MirrorClockMaster` are removed. The architecture check rejects
 the retired attributes, markup and exports (MC-27).
 
+**Rounds 11–16 choices (2026-11-07):** Score views and analysis share one
+companion follower in Score core; Kernel `/element` owns companion discovery
+(`observeCompanionInput`: explicit `.inputModule`, then `input`, then
+containment, with a `port` attribute moving it onto a module's `webmusic.score`
+source port), which Audio's companion helper also uses with its `port`
+attribute reserved for audio taps. `score-note-input` is a note Source with a
+`notes` output port and `score-recorder` a note Sink that records a selected
+note output; inside a provider the recorder auditions a take as a Session-free
+scope member, so the audition is routed like the scope without moving its
+transport. A playlist plays into one queue bus with a stable `output` port, a
+mixer lists `channel:<id>` taps, and a player over either lists that group's
+output as its own (observed, never rerouted). A borrowed queue is one Session
+participant on `queue-entry-seconds`, commanded through the Session by its
+player and playing in the scope's AudioContext: Session time is the selected entry's time,
+an entry change re-anchors the Session at 0 in one committed seek, and the
+Session ends with the queue — we chose this over a cumulative queue axis because
+unloaded entries have no known length. `.score` and `.sound` replace a mounted
+Score engine in place (a score restarts the Session at 0; a sound that changes
+the Session timing class still rebuilds), and `SessionParticipantLease.refresh()`
+republishes a member whose duration changed in place. `renderModuleGraph()`
+renders a whole graph offline with its own Session; the offline environment
+presents its context as live until rendering and ticks lookahead schedulers in
+rendered time.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

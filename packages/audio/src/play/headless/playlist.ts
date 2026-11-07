@@ -238,6 +238,37 @@ export class AudioPlaylist {
     return request.promise;
   }
 
+  /**
+   * Play in a borrowed AudioContext (a module scope's), so the queue and the
+   * Session clock share one reference time. Accepted before the queue has
+   * built audio; an unused owned context is released. A queue already playing
+   * in another context cannot migrate and throws.
+   */
+  adoptAudioContext(context: AudioContext): void {
+    if (this.disposed || this.context === context) return;
+    if (this.context && (this.player || this.bus || !this.ownsContext)) {
+      throw new Error('The playlist already plays in another AudioContext.');
+    }
+    const previous = this.context;
+    this.context = context;
+    this.ownsContext = false;
+    if (previous) void previous.close().catch(() => {});
+  }
+
+  /**
+   * Load the selected entry and build its player without starting it, the
+   * preparation a Session runs before a shared start. A failed entry keeps its
+   * error; the next play request may retry it.
+   */
+  async preload(): Promise<void> {
+    if (this.disposed || this.states.length === 0) return;
+    if (this.currentIndex < 0) this.currentIndex = 0;
+    await this.ensurePlayer();
+    // A Session must not start over an entry that failed to load.
+    const error = this.loadError;
+    if (error && !this.player) throw error;
+  }
+
   pause(): void {
     this.generation++;
     this.wantsPlayback = false;
