@@ -513,7 +513,7 @@ that registers every element and creates `window.WebScorePlay`), and `/demos`.
 
 ### `@webscore/play/headless` — code-only components and actions
 
-- **Engines** — `ScorePlayer` (`Player`, `createScorePlayer`,
+- **Engines** — `ScorePlayer` (`createScorePlayer`,
   `createScorePlayerFromUrl`), `InteractivePlayer` (`createInteractivePlayer`)
 - **Direct actions** — `playScore` / `playScoreFromUrl` start and return a
   controllable `ScorePlayer`; `renderScoreToBuffer` / `renderScoreToWav` /
@@ -522,7 +522,7 @@ that registers every element and creates `window.WebScorePlay`), and `/demos`.
   synchronised, individually-mixed ensemble; `effect` / `setEffect()` read and
   hot-swap its summed master-bus chain, while `RackAddOptions.effect` remains
   per member
-- **Live inputs** — `Metronome`, `bindClock` (steady pull-engine clock),
+- **Live inputs** — `Metronome` (steady pull-engine clock),
   `bindMidiInput` (Web MIDI → `InteractivePlayer`)
 - **Timbres** — `Sound` (`oscillator` / `samples` / `sfz` / `soundfont2` / `fm` /
   `wavetable` / `noise` / `layer` / `midiOut` / `from` / `custom`),

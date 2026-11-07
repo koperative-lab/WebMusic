@@ -2,7 +2,7 @@ import {InsertChain, type Effect} from '../effect-chain';
 import {AudioOutputPort} from './audio-port';
 import {createControlPort, type ControlPort} from './control-port';
 import type {ModuleContext} from './context';
-import {routeModuleOutput} from './context';
+import {moduleScopeChange, routeModuleOutput} from './context';
 import {createConnectionLease, type ConnectionLease} from './lease';
 import {ParamHandle, ParamSurface} from './parameter';
 import {ModuleRegistry, type ModuleHandle, type ModulePort} from './registry';
@@ -54,7 +54,7 @@ export class RackModule implements ModuleHandle {
   readonly id: string;
   /** Scope for members: this Rack's registry and admission, the upstream Session. */
   readonly context: ModuleContext;
-  readonly #upstream: ModuleContext;
+  #upstream: ModuleContext;
   readonly #registry = new ModuleRegistry();
   readonly #registration: ConnectionLease;
   readonly #channels = new Map<string, Channel>();
@@ -168,6 +168,26 @@ export class RackModule implements ModuleHandle {
     } finally {
       this.#preparing = false;
     }
+  }
+
+  /**
+   * Follow a republished upstream scope in place (DEC-065): a destination-only
+   * change re-routes the prepared master and keeps every channel, level and
+   * member. Returns false when the change needs a rebind.
+   */
+  retarget(next: ModuleContext): boolean {
+    this.#assertActive();
+    const change = moduleScopeChange(this.#upstream, next);
+    if (change === 'scope') return false;
+    this.#upstream = next;
+    if (change === 'destination' && this.#route && this.#port) {
+      const previous = this.#route;
+      this.#route = undefined;
+      previous.release();
+      this.#route = routeModuleOutput(next, this, this.#port);
+      this.#notify();
+    }
+    return true;
   }
 
   /** Give a module's output its own channel. The lease removes only that channel. */

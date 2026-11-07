@@ -567,7 +567,7 @@ export class ScorePlayerScheduler {
    * {@link retune}: only the commitments the edit actually invalidates are
    * dropped. Releasing every voice would retrigger each sounding note's
    * envelope and churn a spurious noteOff/noteOn pair through the public
-   * events — and LoopPlayer's loopIn/loopOut setters land here on every drag.
+   * events — and a loop editor's in/out handles land here on every drag.
    */
   private rebuildAfterLoopChange(): void {
     if (!this.playing) return;

@@ -1,6 +1,6 @@
 import React from 'react';
 import {noteMidi, noteOnsetSeconds, type Score} from '../core';
-import type {Player} from '../play/headless';
+import type {ScorePlayer} from '../play/headless';
 import {
   bindPlayerToVisualizer,
   renderPianoRollVisualizer,
@@ -19,7 +19,7 @@ const transportSurfaceStyle = componentSurfaceStyle('transport');
  * via the shared `bindPlayerToVisualizer` helper. Returns an unbind function
  * that also clears any remaining highlight.
  */
-function bindPlayer(rendered: RenderedScoreVisualizer, player: Player, score: Score): () => void {
+function bindPlayer(rendered: RenderedScoreVisualizer, player: ScorePlayer, score: Score): () => void {
   return bindPlayerToVisualizer(rendered, ({noteOn, end}) => {
     const offNoteOn = player.on('noteOn', (note) =>
       noteOn(noteMidi(note), noteOnsetSeconds(note, score)),
@@ -191,9 +191,9 @@ export function PlayerControls({className}: {className?: string}) {
   const [playbackState, setPlaybackState] = React.useState(() => ({player, playing: false}));
   const playerOwnership = React.useMemo(() => ({active: true, player}), [player]);
   const playRequestGeneration = React.useRef(0);
-  // During a Player replacement, old state can survive until the ownership
+  // During a ScorePlayer replacement, old state can survive until the ownership
   // effect runs. Render from the replacement immediately, and tag every
-  // asynchronous update with the Player that owns it.
+  // asynchronous update with the ScorePlayer that owns it.
   const playing =
     playbackState.player === player ? playbackState.playing : (player.isPlaying?.() ?? false);
   const transportDuration = Math.max(player.duration, 0.001);

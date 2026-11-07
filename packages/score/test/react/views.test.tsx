@@ -72,7 +72,7 @@ vi.mock('../../src/play/headless', () => {
       for (const listener of this.listeners.get(event) ?? []) listener(payload);
     }
   }
-  return {Player};
+  return {ScorePlayer: Player};
 });
 
 vi.mock('../../src/view/render', () => ({

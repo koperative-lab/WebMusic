@@ -21,9 +21,9 @@ const rawInputs = new Set([
 // owning pages retain the actual import/API examples and link to live demos.
 const demoComponents = new Set([
   'QuickStartPlayerDemo', 'ProgrammaticRackDemo', 'ProgrammaticPlayerControllerDemo',
-  'ProgrammaticLoopPlayerDemo', 'ScorePlayerPlayground', 'ProgrammaticMetronomeDemo',
+  'ScorePlayerPlayground', 'ProgrammaticMetronomeDemo',
   'ProgrammaticInteractivePlayerDemo', 'ScoreWindowPlayground', 'PlaybackFollowersPlayground',
-  'ProgrammaticAbPlayerDemo', 'ProgrammaticEffectDemo', 'ProgrammaticSoundDemo',
+  'ProgrammaticEffectDemo', 'ProgrammaticSoundDemo',
   'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',

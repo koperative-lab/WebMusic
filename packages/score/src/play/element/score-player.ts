@@ -29,7 +29,7 @@ import type {Effect} from '../headless/effects';
 import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/base';
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
 import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
-import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
 import {ScorePlayerModule} from '../headless/score-module';
 import {ScorePlayer} from '../headless/score-player';
@@ -205,12 +205,15 @@ export class ScorePlayerElement extends WebMusicElement {
   private readonly moduleListeners = new Set<() => void>();
   private readonly moduleFacade: ModuleHandle = (() => {
     const source = () => this.moduleSource;
+    // The module ID is the DOM id when present (DEC-068), fixed per engine.
+    const id = () => this.moduleSource?.id ?? (this.id || this.moduleId);
     return {
-    id: this.moduleId,
+    get id() { return id(); },
     get params() { return source()?.params; },
     get inserts() { return source()?.inserts; },
     get capabilities() { return source()?.capabilities; },
     getPort: (name) => this.moduleSource?.getPort(name),
+    ports: () => this.moduleSource?.ports() ?? [],
     prepare: () => this.moduleSource?.prepare(),
     subscribe: (listener) => {
       this.moduleListeners.add(listener);
@@ -308,8 +311,12 @@ export class ScorePlayerElement extends WebMusicElement {
     // Session, nested ones borrow it. Binding the scope requests the render.
     this.own(provideModuleContext(this, () => this.moduleContext));
     this.own(observeModuleContext(this, (upstream, state) => {
-      if (sameModuleScope(upstream, this.moduleUpstream)) { this.moduleUpstream = upstream; return; }
+      const change = moduleScopeChange(this.moduleUpstream, upstream);
+      if (change === 'none') { this.moduleUpstream = upstream; return; }
       if (!upstream && state === 'missing' && this.moduleAudio && this.moduleContext) return;
+      // A new default destination re-routes in place (DEC-065): the engine,
+      // its Session membership and nested members keep sounding.
+      if (change === 'destination' && upstream && this.moduleContext && this.followDestination(upstream)) return;
       this.bindModularContext(upstream, state);
     }));
   }
@@ -541,13 +548,17 @@ export class ScorePlayerElement extends WebMusicElement {
         return;
       }
       if (routeChanged) {
-        // A new resolver identity revokes descendant default routes as well.
-        this.moduleContext = new ModuleContext({
+        // A new resolver identity re-routes this player and its descendants in
+        // place (DEC-065); the engine and Session membership stay.
+        const next = new ModuleContext({
           id: `${this.moduleId}:context`, audio: this.moduleAudio,
           registry: this.moduleContext.registry, session: this.moduleContext.session,
           destination: () => this.explicitDestination, target: this.moduleFacade,
         });
+        const kept = this.moduleSource ? this.moduleSource.retarget(next) : false;
+        this.moduleContext = next;
         notifyModuleContext(this);
+        if (kept) { this.publishModuleChange(); return; }
       }
     }
     this.requestRender();
@@ -1203,7 +1214,7 @@ export class ScorePlayerElement extends WebMusicElement {
       // participant. A custom mount's engine stays outside the Session and
       // keeps receiving its own commands.
       try {
-        const source = new ScorePlayerModule(score, {id: this.moduleId, context, player: candidate.player,
+        const source = new ScorePlayerModule(score, {id: this.id || this.moduleId, context, player: candidate.player,
           onError: (error) => this.reportPlaybackError(error)});
         this.moduleSource = source;
         this.moduleUnsubscribe = source.subscribe(() => this.publishModuleChange());
@@ -1549,6 +1560,19 @@ export class ScorePlayerElement extends WebMusicElement {
     if (this.ownedSession) this.applyRate(false);
     notifyModuleContext(this);
     this.requestRender();
+  }
+
+  /** Re-derive this scope for a new upstream destination and re-route this player's output. */
+  private followDestination(upstream: ModuleContext): boolean {
+    const current = this.moduleContext!;
+    const next = upstream.derive({id: current.id, session: current.session, target: this.moduleFacade});
+    if (this.moduleSource && !this.moduleSource.retarget(next)) return false;
+    this.moduleUpstream = upstream;
+    this.moduleContext = next;
+    // Nested providers see the same destination-only change and follow it too.
+    notifyModuleContext(this);
+    this.publishModuleChange();
+    return true;
   }
 
   private get moduleControlsVisible(): boolean {

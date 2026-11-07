@@ -501,10 +501,10 @@ change rebinds. Rounds 3–6.
 |---|---|
 | `composition` attribute, descendant-Rack selection, `AudioPlayerConnection` | Containment and module context |
 | `player=` on views, analysis, recorder and playlist; `source=` on live view | `input` and `port` |
-| `LoopPlayer` | Session loop region with a repeat count |
-| `AbPlayer` | Named source variants on the interactive Score source; selecting keeps Session position |
-| `TonePlayer` | Removed; external engines join as `external` participants |
-| `MidiPlayerController` and `Player` aliases, `bindClock` | `PlayerController` (kept for `.controller`), transport port commands and the Session |
+| `LoopPlayer` | The player's `loop` (a Session loop region); finite repeat counts are application logic over Session wraps |
+| `AbPlayer` | `InteractivePlayer.select()` over named sources, driven by a `Metronome` |
+| `TonePlayer` | Removed with Bridge's sync family in round 8; external engines join as `external` participants |
+| `MidiPlayerController` and `Player` aliases, `bindClock` | `PlayerController` (kept for `.controller`), `ScorePlayer`, a `Metronome` driving `advance()` |
 | Kernel `/sync` public entry | `TransportGroup` and `MirrorClockMaster` become Session internals |
 | Bridge `ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`, `clipAsMaster`, `scoreAsFollower` | One Session with Score and Audio modules; Bridge supplies axis mappings, for example from a beat grid |
 | Separate render graphs in `renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence` | Offline realization of the module graph |

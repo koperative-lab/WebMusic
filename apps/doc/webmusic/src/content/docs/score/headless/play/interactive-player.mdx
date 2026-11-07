@@ -222,48 +222,30 @@ session; cancel unfinished takes and detach the caller's input listeners.
 
 ### Clock input
 
-The `bindClock` helper advances an `InteractivePlayer` one written beat at a time. It borrows the player and owns its tick source until cleanup.
+A `Metronome` advances an `InteractivePlayer` one written beat at a time. The caller borrows the player and owns the metronome's tick source until it stops it.
 
 #### Clock input Import
 
 ```ts
-import {bindClock, InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+import {InteractivePlayer, Metronome, Sound} from '@webmusic/score/play/headless';
 
 const player = new InteractivePlayer();
 player.addVoice('main', Sound.oscillator(), {synthOwnership: 'owned'});
 player.addSource('piece', score);
 await player.preload();
-const unbind = bindClock(player, {bpm: 100}); // starts immediately
+const clock = new Metronome((secondsPerBeat) => player.advance({secondsPerBeat}), {bpm: 100}).start();
 
-unbind(); // stop external beats first
+clock.stop(); // stop external beats first
 player.dispose();
 ```
 
-The source contract is `bindClock(player: InteractivePlayer, options?:
-ClockOptions): () => void`. It borrows the player and owns a
-`Metronome`/tick source until cleanup. The tick callback supplies
-`secondsPerBeat = 60 / bpm` to `player.advance()`. It neither creates a
-player nor prepares/resumes audio on its behalf.
-
-
-**Input and options**
-
-| Member | Default / contract |
-| --- | --- |
-| `player` | Required borrowed `InteractivePlayer`, ready for synchronous `advance()`. |
-| `ClockOptions.bpm` | `120`; finite beats per minute, effective minimum `1`. |
-| `ClockOptions.createTickSource(intervalMs)` | Kernel tick-source factory, worker-backed where available. The returned source is owned by this binding. |
-
-**Lifecycle and notifications**
-
-`bindClock()` starts immediately and returns an idempotent unbind function
-that stops and disposes its metronome's current tick source. It does not
-dispose the player or release already sounding notes. Call
-`player.allNotesOff()` if stopping the binding must silence them immediately.
-There is no binding state getter or event emitter; observe
-`player.on('beat', ...)`. Use `Metronome` directly if a caller needs live
-`setBpm()` or reusable start/stop control.
-
+The tick callback receives `secondsPerBeat = 60 / bpm` and passes it to
+`player.advance()`. The metronome neither creates a player nor prepares or
+resumes audio on its behalf. `stop()` stops and disposes its current tick
+source; it does not dispose the player or release sounding notes — call
+`player.allNotesOff()` to silence them. Observe `player.on('beat', ...)`;
+[Metronome](/score/headless/play/metronome/) documents `setBpm()`, start and
+stop.
 
 ### Web MIDI input
 
@@ -272,10 +254,9 @@ There is no binding state getter or event emitter; observe
 plays the next beat of the selected score, regardless of the pressed pitch.
 An `onNote` callback can replace that action with a custom response.
 
-`MidiPlayerController` is an alias of
-[`PlayerController`](/score/headless/play/player-controller/). It wraps a
-`ScorePlayer`; its name does not mean it requests MIDI access, subscribes to
-MIDI transport messages, or sends MIDI output. For output timbres, use
+[`PlayerController`](/score/headless/play/player-controller/) wraps a
+`ScorePlayer`; it does not request MIDI access, subscribe to MIDI transport
+messages, or send MIDI output. For output timbres, use
 [`Sound.midiOut()`](/score/headless/play/sound/).
 
 #### MIDI input Import
@@ -336,15 +317,13 @@ from attaching a listener. It does not close the device or dispose/silence the p
 
 There are no helper state getters or emitted events. Without Web MIDI and
 without an explicit input, the helper warns and returns a harmless cleanup;
-automatic access rejection is swallowed. `MidiPlayerController` has the
-construction, commands, state, events and `destroy()` lifecycle documented
-on the [PlayerController page](/score/headless/play/player-controller/).
+automatic access rejection is swallowed.
 
 
 #### MIDI input Related
 
 - [InteractivePlayer](/score/headless/play/interactive-player/) — note commands and source beats.
-- [PlayerController](/score/headless/play/player-controller/) — the exact `MidiPlayerController` alias contract.
+- [PlayerController](/score/headless/play/player-controller/) — an event-driven command path over a `ScorePlayer`.
 - [Sound](/score/headless/play/sound/) — MIDI output backend.
 - [Live trackers](/score/headless/analyze/live-trackers/) — analyze actual MIDI pitches from custom input handling.
 

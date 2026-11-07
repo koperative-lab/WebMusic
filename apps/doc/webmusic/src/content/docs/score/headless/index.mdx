@@ -42,10 +42,8 @@ is on [`@webmusic/score/play`](/score/api/play/).
 
 | Export | Kind | Page |
 | --- | --- | --- |
-| `ScorePlayer` · `Player` · `createScorePlayer` · `createScorePlayerFromUrl` · `playScore` · `playScoreFromUrl` | class · alias · factories | [ScorePlayer](/score/headless/play/score-player/) |
+| `ScorePlayer` · `createScorePlayer` · `createScorePlayerFromUrl` · `playScore` · `playScoreFromUrl` | class · alias · factories | [ScorePlayer](/score/headless/play/score-player/) |
 | `InteractivePlayer` · `createInteractivePlayer` | class · factory | [InteractivePlayer](/score/headless/play/interactive-player/) |
-| `LoopPlayer` · `createLoopPlayer` | class · factory | [LoopPlayer](/score/headless/play/loop-player/) |
-| `AbPlayer` · `createAbPlayer` | class · factory | [AbPlayer](/score/headless/play/ab-player/) |
 | `TonePlayer` | class | [Tone.js](/score/headless/play/score-player/#toneplayer) |
 | `Metronome` | class | [Metronome](/score/headless/play/metronome/) |
 
@@ -79,7 +77,6 @@ is on [`@webmusic/score/play`](/score/api/play/).
 | Export | Kind | Page |
 | --- | --- | --- |
 | `PlayerController` | class | [PlayerController](/score/headless/play/player-controller/) |
-| `MidiPlayerController` | `PlayerController` alias | [PlayerController](/score/headless/play/player-controller/) — [MIDI binding distinction](/score/headless/play/interactive-player/#web-midi-input) |
 | `TempoController` · `appendTap` · `tapBpm` · `TAP_WINDOW` · `TAP_RESET_GAP` | class · tap helpers | [Metronome](/score/headless/play/metronome/) |
 | `LfoController` · `createLfoController` · `lfoWave` · `LFO_SHAPES` | class · factory · helpers | [Synth backends](/score/headless/play/sound/#synth-backends) |
 | `NoteInputController` · `SCORE_NOTE_INPUT` | class · capability key | [Live note occurrences](/score/headless/play/score-player/#live-note-occurrences); `NoteInputTarget` and `NoteInputOccurrence` define the borrowed target and paired gate. |
@@ -101,7 +98,6 @@ is on [`@webmusic/score/play`](/score/api/play/).
 
 | Export | Kind | Page |
 | --- | --- | --- |
-| `bindClock` | driver | [Transport drivers](/score/headless/play/interactive-player/#clock-input) |
 | `bindMidiInput` | driver | [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) |
 
 Option, event, state and structural interface types belong with their object

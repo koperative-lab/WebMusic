@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {type Score, type TimePosition} from '../core';
-import {Player, type PlayerOptions} from '../play/headless';
+import {ScorePlayer, type PlayerOptions} from '../play/headless';
 
 export interface ScoreProviderProps {
   score: Score;
@@ -9,10 +9,10 @@ export interface ScoreProviderProps {
 }
 
 const ScoreContext = createContext<Score | null>(null);
-const PlayerContext = createContext<Player | null>(null);
+const PlayerContext = createContext<ScorePlayer | null>(null);
 const CursorContext = createContext<TimePosition | null>(null);
 
-// Player construction is a side effect, so it must not run during render:
+// ScorePlayer construction is a side effect, so it must not run during render:
 // React may invoke render twice (StrictMode) or discard a render entirely,
 // leaking never-disposed instances — and StrictMode's mount → cleanup →
 // remount cycle must end with a live player, not the disposed one a
@@ -30,7 +30,7 @@ const useIsomorphicLayoutEffect = typeof document !== 'undefined' ? useLayoutEff
  */
 interface ProvidedPlayback {
   score: Score;
-  player: Player;
+  player: ScorePlayer;
 }
 
 export function ScoreProvider({score, playerOptions, children}: ScoreProviderProps) {
@@ -42,7 +42,7 @@ export function ScoreProvider({score, playerOptions, children}: ScoreProviderPro
   // to apply new options.
   const playerOptionsRef = useRef(playerOptions);
   const [provided, setProvided] = useState<ProvidedPlayback | null>(null);
-  const [cursorState, setCursorState] = useState<{player: Player; cursor: TimePosition} | null>(
+  const [cursorState, setCursorState] = useState<{player: ScorePlayer; cursor: TimePosition} | null>(
     null,
   );
 
@@ -50,11 +50,11 @@ export function ScoreProvider({score, playerOptions, children}: ScoreProviderPro
   // effect creates is disposed by exactly this effect's cleanup, which is what
   // makes the StrictMode remount cycle safe (the remounted setup constructs a
   // fresh player instead of resubscribing to the disposed one). The active
-  // flag prevents a callback already queued by the old Player from publishing
+  // flag prevents a callback already queued by the old ScorePlayer from publishing
   // after a score replacement. Unsubscribe before stop/dispose because
   // transport teardown itself may synchronously emit a final cursor event.
   useIsomorphicLayoutEffect(() => {
-    const player = new Player(score, playerOptionsRef.current);
+    const player = new ScorePlayer(score, playerOptionsRef.current);
     let active = true;
     const offCursor = player.on('cursor', (nextCursor) => {
       if (active) setCursorState({player, cursor: nextCursor});
@@ -72,15 +72,15 @@ export function ScoreProvider({score, playerOptions, children}: ScoreProviderPro
     };
   }, [score]);
 
-  // Children need a live Player synchronously during their render (controls
+  // Children need a live ScorePlayer synchronously during their render (controls
   // read transport fields, useCursor reads the initial cursor), so rather than
   // widening every hook to a nullable seam, withhold children for the single
   // pre-effect commit. The layout effect above then provides the player and
   // synchronously re-renders before the browser paints.
   if (!provided) return null;
 
-  // State from the previous Player may still exist during the render that
-  // replaces it. Derive the public cursor from the new Player immediately;
+  // State from the previous ScorePlayer may still exist during the render that
+  // replaces it. Derive the public cursor from the new ScorePlayer immediately;
   // the owned state catches up on its first cursor event.
   const cursor =
     cursorState && cursorState.player === provided.player
@@ -109,7 +109,7 @@ export function useScore(): Score {
   return score;
 }
 
-export function usePlayer(): Player {
+export function usePlayer(): ScorePlayer {
   const player = useContext(PlayerContext);
   if (!player) {
     throw new Error('usePlayer must be used inside ScoreProvider');

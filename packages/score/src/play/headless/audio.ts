@@ -2,7 +2,6 @@
 // are split by responsibility; existing imports keep the same surface.
 export {
   ScorePlayer,
-  ScorePlayer as Player,
   createScorePlayer,
   createScorePlayerFromUrl,
   playScore,

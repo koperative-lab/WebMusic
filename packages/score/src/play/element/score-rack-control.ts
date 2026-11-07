@@ -11,7 +11,7 @@ import {
 } from "./internal/rack-part";
 import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
 import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
-import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {ScoreRackModule} from '../headless/score-rack-module';
 import {ScorePlayerModule} from '../headless/score-module';
 
@@ -453,6 +453,13 @@ export class RackControlElement extends WebMusicElement {
   private bindModuleRack(upstream: ModuleContext | undefined, state: 'ready' | 'pending' | 'missing'): void {
     if (!upstream && state === 'missing' && this.fallbackAudio && this.modularUpstream) return;
     if (sameModuleScope(upstream, this.modularUpstream) && (this.moduleRack || this.assignedRack)) { this.modularUpstream = upstream; return; }
+    // A destination-only change re-routes the desk master in place (DEC-065):
+    // channels, levels, mute/solo and members stay.
+    if (upstream && this.moduleRack && this.modularUpstream && moduleScopeChange(this.modularUpstream, upstream) === 'destination' &&
+      this.moduleRack.retarget(upstream)) {
+      this.modularUpstream = upstream;
+      return;
+    }
     this.releaseModuleRack();
     if (this.assignedRack) { notifyModuleContext(this); return; }
     if (!upstream && state === 'missing') {
@@ -500,8 +507,9 @@ export class RackControlElement extends WebMusicElement {
         }
         previous?.module.dispose();
         this.moduleParts.delete(part);
+        // The declared part id is the module and channel ID (DEC-068).
         const module = new ScorePlayerModule(declaration.score, {
-          context, synth: declaration.sound, onError: (error) => this.reportError(error),
+          id: declaration.id, context, synth: declaration.sound, onError: (error) => this.reportError(error),
         });
         this.moduleParts.set(part, {declaration, module});
         notifyModuleChange(part);

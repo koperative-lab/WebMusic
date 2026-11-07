@@ -8,6 +8,7 @@ import {ScoreRackModule, type HeadlessSynth} from '../../src/play/headless';
 import {defineScorePlayerElement, ScorePlayerElement} from '../../src/play/element/score-player';
 import {defineRackControlElement, RackControlElement} from '../../src/play/element/score-rack-control';
 import {defineRackPartElement, RackPartElement} from '../../src/play/element/score-rack-part';
+import {defineScoreEffectElement} from '../../src/play/element/score-effect';
 
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: vi.fn()}));
 
@@ -121,6 +122,46 @@ describe('Score modular scope and source lifecycle', () => {
     expect(b.session.snapshot.participantCount).toBe(1);
   });
 
+  it('uses declared DOM ids as module and channel IDs', async () => {
+    const f = fixture();
+    const root = document.createElement('score-player') as ScorePlayerElement;
+    root.audioContext = f.context;
+    const desk = document.createElement('score-rack-control') as RackControlElement;
+    const part = document.createElement('score-rack-part') as RackPartElement;
+    part.id = 'bass'; part.score = score(); part.sound = f.synth;
+    const lead = document.createElement('score-player') as ScorePlayerElement;
+    lead.id = 'lead'; lead.score = score(); lead.sound = f.synth;
+    desk.append(part, lead); root.append(desk); document.body.append(root); await settle();
+    await root.sessionTransport!.preload(); await settle();
+    const rack = desk.module as unknown as ScoreRackModule;
+    expect(rack.list().map(channel => channel.id).sort()).toEqual(['bass', 'lead']);
+    expect(rack.context.registry.get('bass')).toBe(part.module);
+    expect(lead.module!.id).toBe('lead');
+    expect(rack.getPort('channel:lead')).toBeDefined();
+    cleanups.push(() => f.session.dispose());
+  });
+
+  it('places an effect written inside a Rack part on that part channel', async () => {
+    defineScoreEffectElement();
+    const f = fixture();
+    const root = document.createElement('score-player') as ScorePlayerElement;
+    root.audioContext = f.context;
+    const desk = document.createElement('score-rack-control') as RackControlElement;
+    const part = document.createElement('score-rack-part') as RackPartElement;
+    part.id = 'lead'; part.score = score(); part.sound = f.synth;
+    const channelEffect = document.createElement('score-effect');
+    channelEffect.setAttribute('type', 'gain');
+    const masterEffect = document.createElement('score-effect');
+    masterEffect.setAttribute('type', 'gain');
+    part.append(channelEffect);
+    desk.append(part, masterEffect); root.append(desk); document.body.append(root); await settle();
+    await root.sessionTransport!.preload(); await settle();
+    const rack = desk.module as unknown as ScoreRackModule;
+    expect(rack.channelInserts('lead')!.instances).toHaveLength(1);
+    expect(rack.inserts!.instances.filter(instance => instance.slotId !== '$compat')).toHaveLength(1);
+    cleanups.push(() => f.session.dispose());
+  });
+
   it('revokes old playback data when its provider becomes pending', async () => {
     const f = fixture(); let scope: ModuleContext | undefined = f.scope;
     const host = document.createElement('div'); host.setAttribute('composition', 'modules');
@@ -222,7 +263,7 @@ describe('Score modular scope and source lifecycle', () => {
     expect(f.context.close).not.toHaveBeenCalled();
   });
 
-  it('rebinds descendant buses to a changed root route and reference context', async () => {
+  it('re-routes descendant buses in place on a changed root route and rebinds on a new reference context', async () => {
     const f = fixture(), g = fixture(); f.session.dispose(); g.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
     root.setAttribute('composition', 'modules'); root.audioContext = f.context;
@@ -232,11 +273,21 @@ describe('Score modular scope and source lifecycle', () => {
     const firstSession = root.sessionTransport!;
     await firstSession.preload();
     const firstOutput = desk.module!.getPort!('output')!;
+    const rack = desk.module as unknown as ScoreRackModule;
+    const channel = rack.list()[0]!.id;
+    rack.setVolume(channel, 0.3);
+    rack.mute(channel, true);
+    const firstLeaf = leaf.module;
     const destination = f.context.createGain(); root.destination = destination; await settle();
     await root.sessionTransport!.preload();
+    // A destination-only change re-routes in place (DEC-065, MOD-13): the desk
+    // output, its channel levels and mute, and the leaf engine all stay.
     expect(root.sessionTransport).toBe(firstSession);
-    expect(firstOutput.disposed).toBe(true);
-    expect(desk.module!.getPort!('output')!.defaultDestination).toBe(destination);
+    expect(firstOutput.disposed).toBe(false);
+    expect(desk.module!.getPort!('output')).toBe(firstOutput);
+    expect(firstOutput.defaultDestination).toBe(destination);
+    expect(rack.list()[0]).toMatchObject({id: channel, volume: 0.3, muted: true});
+    expect(leaf.module).toBe(firstLeaf);
     root.destination = undefined; root.audioContext = g.context; await settle();
     await root.sessionTransport!.preload();
     expect(root.sessionTransport).not.toBe(firstSession);

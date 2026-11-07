@@ -7,7 +7,7 @@ sidebar:
 
 import ProgrammaticMetronomeDemo from '../../../../../components/programmatic/ProgrammaticMetronomeDemo.astro';
 
-`Metronome` is a beat callback driven by the kernel tick source, using a worker where available and a timer fallback otherwise. Driving an `InteractivePlayer` with it (`bindClock(player)`) gives the pull engine an external beat clock; here it just ticks and flashes on each beat. Its cadence is a rounded millisecond timer interval, not sample-accurate audio scheduling.
+`Metronome` is a beat callback driven by the kernel tick source, using a worker where available and a timer fallback otherwise. Driving an `InteractivePlayer`'s `advance()` with it gives the pull engine an external beat clock; here it just ticks and flashes on each beat. Its cadence is a rounded millisecond timer interval, not sample-accurate audio scheduling.
 
 <ProgrammaticMetronomeDemo />
 
@@ -50,7 +50,7 @@ There is no audio context, score, UI, event emitter or `dispose()` method.
 
 **Lifecycle** — call `stop()` on unmount. It can later restart; it does not
 release anything owned by `onTick`. For a clock bound to a player, use the
-cleanup returned by [bindClock](/score/headless/play/interactive-player/#clock-input).
+cleanup of a metronome that drives a player (see [Clock input](/score/headless/play/interactive-player/#clock-input)).
 
 </details>
 
@@ -123,6 +123,5 @@ returns rounded BPM or `null`; neither retains resources.
 
 ## Related
 
-- [Transport drivers](/score/headless/play/interactive-player/#clock-input) — `bindClock` cleanup.
+- [Transport drivers](/score/headless/play/interactive-player/#clock-input) — driving `advance()` from a metronome.
 - [InteractivePlayer](/score/headless/play/interactive-player/) — conducted beats.
-- [AbPlayer](/score/headless/play/ab-player/) — arrangement switching on an owned metronome.

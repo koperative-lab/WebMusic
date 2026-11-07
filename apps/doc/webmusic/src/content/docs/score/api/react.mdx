@@ -376,9 +376,9 @@ WaterfallView  -> div
 | `SimpleWaterfall` | Preset | Render `ScoreProvider` + `WaterfallView` from a `score` prop. |
 | `SimpleScoreWorkspace` | Preset | Render controls, optional analysis, and score views from a `score` prop. |
 | `AnalysisSummary` | Component | Render a compact key/chord/roman/motif/voice-leading summary. |
-| `ScoreProvider` | Provider | Provide `Score`, `Player`, and cursor state to child components. |
+| `ScoreProvider` | Provider | Provide `Score`, `ScorePlayer`, and cursor state to child components. |
 | `useScore()` | Hook | Read the current `Score` from context. |
-| `usePlayer()` | Hook | Read the shared `Player` instance from context. |
+| `usePlayer()` | Hook | Read the shared `ScorePlayer` instance from context. |
 | `useCursor()` | Hook | Read the latest `{ tick, seconds, measure, beat }` cursor position. |
 | `useScoreAnalysis(options?)` | Hook | Read key, chord, roman, motif, and voice-leading analysis from context. |
 | `useScoreAnalysisAsync(options?)` | Hook | The same analysis off the main thread in a Web Worker: `{ result, pending }`. |

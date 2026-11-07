@@ -70,7 +70,8 @@ afterEach(() => {
 describe('headless audio module boundaries', () => {
   it('keeps the historical audio module as a stable compatibility facade', () => {
     expect(audioFacade.ScorePlayer).toBe(ScorePlayer);
-    expect(audioFacade.Player).toBe(ScorePlayer);
+    // The `Player` alias is retired (DEC-068).
+    expect('Player' in audioFacade).toBe(false);
     expect(audioFacade.createScorePlayer).toBe(createScorePlayer);
     expect(audioFacade.createScorePlayerFromUrl).toBe(createScorePlayerFromUrl);
     expect(audioFacade.playScore).toBe(playScore);

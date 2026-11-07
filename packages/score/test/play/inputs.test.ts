@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
-import {InteractivePlayer, Metronome, bindClock, bindMidiInput, Sound, type MidiInputLike} from '../../src/play/headless';
+import {InteractivePlayer, Metronome, bindMidiInput, Sound, type MidiInputLike} from '../../src/play/headless';
 
 function buildScore(pitches: string[]) {
   const b = new ScoreBuilder();
@@ -18,7 +18,7 @@ function buildScore(pitches: string[]) {
   return b.build();
 }
 
-describe('Metronome / bindClock', () => {
+describe('Metronome', () => {
   afterEach(() => vi.useRealTimers());
 
   it('fires once per beat at the configured BPM', () => {
@@ -70,16 +70,16 @@ describe('Metronome / bindClock', () => {
     expect(disposed).toBe(2);
   });
 
-  it('bindClock advances the player each beat and unbinds', () => {
+  it('a metronome advances the player each beat and stops', () => {
     vi.useFakeTimers();
     const player = new InteractivePlayer();
     player.addSource('s', buildScore(['C4', 'D4', 'E4', 'F4']));
     const beats: number[] = [];
     player.on('beat', (b) => beats.push(b.beat));
 
-    const unbind = bindClock(player, {bpm: 240}); // 0.25s per beat
+    const metronome = new Metronome((secondsPerBeat) => player.advance({secondsPerBeat}), {bpm: 240}).start(); // 0.25s per beat
     vi.advanceTimersByTime(800); // ~3 beats
-    unbind();
+    metronome.stop();
     vi.advanceTimersByTime(800); // no more after unbind
     expect(beats).toEqual([0, 1, 2]);
   });

@@ -116,8 +116,24 @@ export class ScoreEffectElement extends WebMusicElement {
     else if (this.hasAttribute('target')) {
       ownResolution(observeModuleTarget(this, this.getAttribute('target') ?? '', bind));
     } else {
-      ownResolution(observeModuleContext(this, (context) => bind(context?.target)));
+      ownResolution(observeModuleContext(this, (context) => bind(this.channelTarget(context?.target))));
     }
+  }
+
+  /**
+   * Inside a Rack part, or with `slot="channel"` there, the effect belongs to
+   * that part's post-fader channel inserts rather than the desk master
+   * (DEC-068). `slot="master"` keeps the desk master.
+   */
+  private channelTarget(target: ModuleHandle | undefined): ModuleHandle | undefined {
+    const desk = target as (ModuleHandle & {channelInserts?(id: string): InsertChain | undefined}) | undefined;
+    const part = this.parentElement as (Element & {module?: ModuleHandle; rackPartDeclaration?: unknown}) | null;
+    if (!desk?.channelInserts || this.getAttribute('slot') === 'master' || !part || typeof part.rackPartDeclaration !== 'function') return target;
+    return {
+      id: `${desk.id}:channel`,
+      get inserts() { const id = part.module?.id; return id ? desk.channelInserts!(id) : undefined; },
+      subscribe: (listener) => desk.subscribe?.(listener) ?? (() => {}),
+    };
   }
 
   private reconcile(): void {

@@ -55,7 +55,7 @@ vi.mock('../../src/play/headless', () => {
     }
   }
 
-  return {Player};
+  return {ScorePlayer: Player};
 });
 
 import {ScoreProvider, useCursor, usePlayer, useScore} from '../../src/react/context';

@@ -60,14 +60,14 @@ tap.onclick = async () => {
 };
 document.body.append(tap);`;
 
-export const liveInputCode = `import { InteractivePlayer, Sound, bindClock, bindMidiInput } from '@webmusic/score/play/headless';
+export const liveInputCode = `import { InteractivePlayer, Metronome, Sound, bindMidiInput } from '@webmusic/score/play/headless';
 
 const player = new InteractivePlayer();
 player.addVoice('lead', Sound.oscillator({ type: 'triangle' }));
 // player.addSource('lead', score);
 
 // Drive the pull engine at a steady tempo:
-const stopClock = bindClock(player, { bpm: 110 });
+const clock = new Metronome((secondsPerBeat) => player.advance({ secondsPerBeat }), { bpm: 110 }).start();
 
 // …or let a MIDI keyboard advance beats (each key press = next beat):
 const stopMidi = bindMidiInput(player, { mode: 'note' });
@@ -276,8 +276,7 @@ Every stateful object this capability publishes lives on
 [`Sound`](/score/headless/play/sound/),
 [`Effect`](/score/headless/play/effect/),
 [`Rack`](/score/headless/play/rack/),
-[`Metronome`](/score/headless/play/metronome/), the
-[ready-made transports](/score/headless/play/loop-player/),
+[`Metronome`](/score/headless/play/metronome/),
 [`PlayerController`](/score/headless/play/player-controller/), the
 [synth backends](/score/headless/play/sound/#synth-backends) — `LfoController`,
 `EqController` and the meter controller among them — and the
@@ -463,13 +462,11 @@ sources do not implicitly acquire document editing.
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `createScorePlayer` / `ScorePlayer` / `Player` | Engine | Timeline engine with an autonomous clock or borrowed Session scheduling binding. `ScoreSchedulingCapabilities` declares native/callback timing. |
+| `createScorePlayer` / `ScorePlayer` | Engine | Timeline engine with an autonomous clock or borrowed Session scheduling binding. `ScoreSchedulingCapabilities` declares native/callback timing. |
 | `createScorePlayerFromUrl(url, opts?)` | Engine | Load a file and build a `ScorePlayer`. |
 | `playScore(score, opts?)` / `playScoreFromUrl(url, opts?)` | Headless action | Create, start and return a caller-controlled `ScorePlayer`; failed startup disposes owned resources. |
 | `InteractivePlayer` / `createInteractivePlayer` | Engine | Event-driven pull engine: voices, sources, mixing, live score swap. |
 | `Rack` / `createRack` | Ensemble | Compose single-instrument players into a synced, individually-mixed group; `.effect` / `setEffect()` replace the summed master-bus chain. |
-| `LoopPlayer` / `createLoopPlayer` | Transport | A–B loop region over a `ScorePlayer`, with finite-repeat counting. |
-| `AbPlayer` / `createAbPlayer` | Transport | Live zero-latency switching between named arrangements (built on `InteractivePlayer`). |
 | `LfoController` / `createLfoController`, `lfoWave` | Modulation | DOM-free LFO state, scheduling and borrowed-target modulation; pure waveform helper. |
 | `NoteInputController`, `SCORE_NOTE_INPUT`, `NoteInputTarget`, `NoteInputOccurrence` | Class / key / types (`@webmusic/score/play/headless`) | [Occurrence-safe live note input](/score/headless/play/score-player/#live-note-occurrences) with source-owned cleanup and explicit target preparation. |
 | `ParamLfoController`, `getParamLfoController`, `ParameterMacroController`, `getParameterMacroController` | Classes / shared-controller accessors (`@webmusic/score/play/headless`) | [Native LFO and macros over shared parameter handles](/score/headless/play/sound/#shared-parameter-controllers). `ParamLfoConfig`, `ParamLfoState`, `ParameterMacroTarget`, `ParameterMacroConfig` and `ParameterMacroState` describe their inputs/readback. |
@@ -483,7 +480,7 @@ sources do not implicitly acquire document editing.
 | `Effect` | Effect | `reverb` / `delay` / `filter` / `distortion` / `compressor` / `gain` / `chain` / `custom`. |
 | `insertEffect`, `resolveEffect` | Effect helpers | Wire an effect into a custom graph. |
 | `bindScroll`, `bindPointer`, `bindOrientation`, `bindValue` | Driver (`@webmusic/score/play/drivers`) | Bind scroll / pointer / orientation / value to a `PlaybackTransport` (e.g. a `ScorePlayer`). |
-| `Metronome`, `bindClock`, `bindMidiInput` | Live input | Drive the pull engine's `advance()` from a clock or Web MIDI. |
+| `Metronome`, `bindMidiInput` | Live input | Drive the pull engine's `advance()` from a clock or Web MIDI. |
 | `defineScorePlayerElement`, `ScorePlayerElement` | Web Component | Register / the class behind `<score-player>`. |
 | `defineRackControlElement`, `defineScoreRecorderElement` | Web Component | Register `<score-rack-control>` (Rack mixer with a master `.effect` proxy) / `<score-recorder>`. |
 | `defineNoteInputElement`, `defineSynthPanelElement` | Web Component | Register `<score-note-input>` / `<score-synth-panel>`. |

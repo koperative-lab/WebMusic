@@ -39,8 +39,6 @@ export type {
   AdvanceOptions,
 } from '../headless/interactive/contracts';
 export type {RackAddOptions, RackEvents, RackOptions} from '../headless/rack/contracts';
-export type {LoopPlayerOptions} from '../headless/loop-player';
-export type {AbPlayerOptions} from '../headless/ab-player';
 
 // Stateless note-surface mappings shared by Elements and custom renderers.
 export {

@@ -28,7 +28,6 @@ export {
   createScorePlayerFromUrl,
   playScore,
   playScoreFromUrl,
-  Player,
   type ScorePlayerOptions,
   type ScorePlayerEvents,
   type PlayerOptions,
@@ -57,7 +56,6 @@ export {
 // ---- Live input drivers for the pull engine (clock + Web MIDI) ----
 export {
   Metronome,
-  bindClock,
   bindMidiInput,
   type ClockOptions,
   type MidiInputOptions,
@@ -99,7 +97,6 @@ export {
 
 // ---- Transport controllers driven by external input ----
 export {
-  MidiPlayerController,
   PlayerController,
   type ControllerEvent,
   type ControllerEvents,
@@ -232,12 +229,6 @@ export {
   type SynthPanelAudioOptions,
   type SynthPanelSection,
 } from './synth-panel-audio';
-
-// ---- Loop player (A–B loop region over a ScorePlayer) ----
-export {LoopPlayer, createLoopPlayer, type LoopPlayerOptions} from './loop-player';
-
-// ---- A/B player (live switching between named arrangements) ----
-export {AbPlayer, createAbPlayer, type AbPlayerOptions} from './ab-player';
 
 // ---- Modular composition over the same native engines and audio buses ----
 export {ScorePlayerModule, type ScorePlayerModuleOptions} from './score-module';

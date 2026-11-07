@@ -5,7 +5,7 @@ import {
   type TimePosition,
 } from '../../core';
 import type {PlayerTimeUpdate} from './audio-contracts';
-import {ScorePlayer as Player} from './score-player';
+import {ScorePlayer} from './score-player';
 import {
   emitPlaybackEvent,
   reportPlaybackOperationFailure,
@@ -51,7 +51,7 @@ export class PlayerController {
   private seekGeneration = 0;
   private rateGeneration = 0;
 
-  constructor(private readonly player: Player, score: Score) {
+  constructor(private readonly player: ScorePlayer, score: Score) {
     this.baseTempo = score.timeMap.tempi[0]?.bpm ?? 120;
     this.unsubscribes.push(
       player.on('cursor', (cursor) => this.emit('cursor', cursor)),
@@ -188,4 +188,4 @@ export class PlayerController {
   }
 }
 
-export const MidiPlayerController = PlayerController;
+

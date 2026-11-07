@@ -2,7 +2,7 @@
 title: 'PlayerController'
 description: 'An event-driven transport controller over a ScorePlayer.'
 sidebar:
-  order: 9
+  order: 7
 ---
 
 import ProgrammaticPlayerControllerDemo from '../../../../../components/programmatic/ProgrammaticPlayerControllerDemo.astro';
@@ -13,8 +13,7 @@ binding to your own transport buttons. `transportchange` fires synchronously
 when code calls the controller's play/pause commands, so presenters do not need to poll.
 Its `error` event is an operational `play()` failure;
 `listenerError` independently reports a subscriber that threw or rejected, so
-application bugs never masquerade as engine failures. `MidiPlayerController`
-is an alias of this class; it does not install MIDI listeners.
+application bugs never masquerade as engine failures. It does not install MIDI listeners.
 
 <ProgrammaticPlayerControllerDemo />
 
@@ -36,7 +35,7 @@ player.dispose();
 The source contract is `PlayerController`, `ControllerEvents`,
 `ControllerEvent` and `PlayerTransportState` at
 `@webmusic/score/play/headless`. The constructor specifically takes a
-`ScorePlayer` (also exported as `Player`) and its `Score`. It borrows both
+`ScorePlayer` and its `Score`. It borrows both
 and owns only event subscriptions and controller state. It creates no
 musical clock. All numeric seek/current/duration values below use the
 player's rate-scaled transport seconds; `currentPosition` is musical time.
@@ -50,7 +49,7 @@ before asynchronous audio preparation completes.
 <summary>API</summary>
 
 **Construction** — `new PlayerController(player: ScorePlayer, score: Score)`;
-no options. `new MidiPlayerController(player, score)` is the same constructor.
+no options.
 
 **Commands**
 

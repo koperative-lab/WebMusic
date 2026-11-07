@@ -3,7 +3,7 @@
 //
 // Where `./drivers` binds scroll / pointer / orientation / value to a
 // ScorePlayer's continuous timeline, these drive the discrete beat signal:
-//   • Metronome / bindClock — advance one beat at a steady BPM
+//   • Metronome — advance one beat at a steady BPM
 //   • bindMidiInput          — a MIDI keyboard or MIDI clock advances beats
 // ============================================================================
 
@@ -26,8 +26,7 @@ function beatIntervalMs(bpm: number): number {
  * A simple steady clock that fires a callback once per beat.
  *
  * The cadence comes from the kernel tick source rather than a bare
- * `setInterval`. This clock is the musical time base for {@link bindClock}
- * and for AbPlayer's playback, and main-thread timers are throttled to >=1s
+ * `setInterval`. Main-thread timers are throttled to >=1s
  * in background tabs (to once a minute under intensive throttling) — which
  * would audibly drag a performance the moment the tab is hidden. The source's
  * interval IS the beat period, so beat placement keeps the fidelity of the
@@ -77,12 +76,6 @@ export class Metronome {
     source?.dispose();
     return this;
   }
-}
-
-/** Drive a player's `advance()` at a steady BPM. Returns an unbind function. */
-export function bindClock(player: InteractivePlayer, options: ClockOptions = {}): () => void {
-  const metronome = new Metronome((secondsPerBeat) => player.advance({secondsPerBeat}), options).start();
-  return () => metronome.stop();
 }
 
 /** Structural shape of a Web MIDI input (avoids depending on lib.dom WebMIDI types). */

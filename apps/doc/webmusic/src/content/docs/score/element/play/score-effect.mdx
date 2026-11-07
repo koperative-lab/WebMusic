@@ -29,8 +29,9 @@ Register the target owner and Score panel through their owning entries as in
 [the runnable composition](/bridge/modular-composition/). The target must expose
 an `InsertChain`; an explicit missing target stays pending. Without `target`,
 the nearest module context supplies the owner: a player owns its local insert,
-a rack/mixer supplies its master insert. Ordinary HTML `slot` has no routing
-semantics here.
+and a rack/mixer supplies its master insert. An effect written inside a
+`<score-rack-part>` belongs to that part's post-fader channel inserts instead;
+`slot="master"` keeps it on the desk master.
 
 <details class="component-section">
 <summary>API</summary>
