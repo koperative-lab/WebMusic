@@ -10,7 +10,7 @@
 import {numAttr} from './internal/base';
 import {HTMLElementBase, upgradeProperties} from './internal/base';
 import {observeModuleContext, observeModuleTarget} from '@webmusic/kernel/element';
-import type {ModuleHandle} from '@webmusic/kernel/module';
+import {NoteOutputPort, type ModuleHandle, type ModulePort} from '@webmusic/kernel/module';
 import {NoteInputController, SCORE_NOTE_INPUT} from '../headless/note-input';
 import {
   mountNoteSurface,
@@ -119,7 +119,7 @@ export class NoteInputElement extends HTMLElementBase {
   private octaveShift = 0;
   private renderRevision = 0;
   private dispatching = false;
-  private readonly noteQueue: Array<{detail: NoteInputDetail; on: boolean}> = [];
+  private readonly noteQueue: Array<{detail: NoteInputDetail & {id: string}; on: boolean}> = [];
   private readonly held = new Map<number, NoteInputDetail & {id: string}>();
   private readonly controller = new NoteInputController({onError: error => this.reportError(error)});
   private explicitModuleTarget?: ModuleHandle | null;
@@ -127,6 +127,18 @@ export class NoteInputElement extends HTMLElementBase {
   private targetRelease?: () => void;
   private noteTarget?: NoteInputTarget;
   private bindingGeneration = 0;
+  private static nextModuleId = 0;
+  private readonly moduleId = `score-note-input-${++NoteInputElement.nextModuleId}`;
+  /** Every press and release, as note events on the module's `notes` output port. */
+  private readonly noteOutput = new NoteOutputPort({id: 'notes'});
+  private readonly noteModule: ModuleHandle = createModuleFacade(() => this.id || this.moduleId, Object.freeze([this.noteOutput]));
+
+  /**
+   * This surface as a note **Source** module (DEC-068): its `notes` output
+   * port carries every press and release, so a recorder, a MIDI sink or a
+   * project edge can consume it without DOM events.
+   */
+  get module(): ModuleHandle { return this.noteModule; }
 
   /** Explicit borrowed module; null deliberately disables automatic routing. */
   get moduleTarget(): ModuleHandle | null | undefined { return this.explicitModuleTarget; }
@@ -366,6 +378,15 @@ export class NoteInputElement extends HTMLElementBase {
     return next !== this.octaveShift;
   }
 
+  private emitNote(detail: NoteInputDetail & {id: string}, on: boolean): void {
+    const time = (globalThis.performance?.now() ?? Date.now()) / 1000;
+    this.noteOutput.emit({
+      occurrenceId: detail.id, sourceId: this.noteModule.id, pitch: {midi: detail.midi},
+      velocity: Math.max(0, Math.min(1, detail.velocity / 127)), gate: on ? 'on' : 'off',
+      axis: 'performance-seconds', time, epoch: 0,
+    });
+  }
+
   private fire(midi: number, on: boolean): void {
     const revision = this.renderRevision;
     let detail: NoteInputDetail & {id: string};
@@ -401,6 +422,7 @@ export class NoteInputElement extends HTMLElementBase {
       for (let index = 0; index < this.noteQueue.length; index += 1) {
         const next = this.noteQueue[index];
         try {
+          this.emitNote(next.detail, next.on);
           this.dispatchEvent(new CustomEvent(next.on ? 'webscore:noteon' : 'webscore:noteoff', {
             detail: next.detail, bubbles: true, composed: true,
           }));
@@ -423,4 +445,12 @@ export function defineNoteInputElement(tag = 'score-note-input'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
     customElements.define(tag, NoteInputElement);
   }
+}
+
+/** A frozen module handle whose ID follows the element's DOM id (DEC-068). */
+function createModuleFacade(id: () => string, ports: readonly ModulePort[]): ModuleHandle {
+  return Object.freeze({
+    get id() { return id(); },
+    ports: () => ports,
+  });
 }

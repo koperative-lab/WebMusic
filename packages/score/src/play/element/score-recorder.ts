@@ -19,6 +19,16 @@ import {
   type ScoreRecorderRecordedDetail,
 } from '../headless/recorder';
 import {mountRecorder, type RecorderHandle} from '@webmusic/ui/recorder';
+import {observeModuleContext, observeModuleInput} from '@webmusic/kernel/element';
+import {
+  NoteInputPort,
+  type ModuleContext,
+  type ModuleHandle,
+  type ModulePort,
+  type NoteEvent,
+  type NoteOutputPort,
+} from '@webmusic/kernel/module';
+import {ScorePlayerModule} from '../headless/score-module';
 
 export type {ScoreRecorderRecordedDetail} from '../headless/recorder';
 
@@ -56,12 +66,27 @@ const RECORDER_COMPATIBILITY_STYLE = `
 
 /**
  * `<score-recorder>` attributes: `bpm` (default 120) and `quantize` (grid in
- * quarters; 0 preserves performed timing). Both values are NaN-safe.
+ * quarters; 0 preserves performed timing). Both values are NaN-safe. `input`
+ * and `port` select a note output port to record (DEC-068).
  */
 export class ScoreRecorderElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['bpm', 'quantize'];
+    return ['bpm', 'quantize', 'input', 'port'];
   }
+
+  private static nextModuleId = 0;
+  private readonly moduleId = `score-recorder-${++ScoreRecorderElement.nextModuleId}`;
+  /** Note sink: events delivered to this port are captured while armed. */
+  private readonly noteInput = new NoteInputPort({accept: (event) => this.captureNote(event)}, {id: 'notes', multiplicity: 'sum'});
+  private readonly recorderModule: ModuleHandle = createModuleFacade(() => this.id || this.moduleId, Object.freeze([this.noteInput]));
+  private readonly portNotes = new Map<string, number>();
+  private scope?: ModuleContext;
+  private stopScope?: () => void;
+  private stopInput?: () => void;
+  private stopInputNotes?: () => void;
+  private assignedInput?: ModuleHandle | null;
+  private auditionModule?: ScorePlayerModule;
+  private auditionSequence = 0;
 
   private root?: ShadowRoot;
   private ui?: RecorderHandle;
@@ -106,7 +131,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
   };
 
   connectedCallback(): void {
-    upgradeProperties(this, ['sound', 'source', 'audioContext', 'bpm', 'quantize']);
+    upgradeProperties(this, ['sound', 'source', 'audioContext', 'inputModule', 'bpm', 'quantize']);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
     this.render();
     if (!this.selfListening) {
@@ -115,9 +140,15 @@ export class ScoreRecorderElement extends HTMLElementBase {
       this.selfListening = true;
     }
     this.attachSource();
+    this.bindScope();
+    this.bindInput();
   }
 
   disconnectedCallback(): void {
+    this.releaseInput();
+    this.stopScope?.();
+    this.stopScope = undefined;
+    this.scope = undefined;
     if (this.selfListening) {
       this.removeEventListener('webscore:noteon', this.onNoteEvent);
       this.removeEventListener('webscore:noteoff', this.onNoteEvent);
@@ -132,8 +163,93 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.ui = undefined;
   }
 
-  attributeChangedCallback(): void {
+  attributeChangedCallback(name: string): void {
     // bpm / quantize are read lazily when the current take stops.
+    if ((name === 'input' || name === 'port') && this.isConnected) this.bindInput();
+  }
+
+  /**
+   * This recorder as a note **Sink** module (DEC-068): its `notes` input port
+   * captures delivered events while a take is armed.
+   */
+  get module(): ModuleHandle { return this.recorderModule; }
+
+  /**
+   * Explicit module input: record this module's note output port (`notes`,
+   * or the one `port` names) instead of the `input` selector or the
+   * enclosing scope's target. `null` disables module input.
+   */
+  get inputModule(): ModuleHandle | null | undefined { return this.assignedInput; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    if (value === this.assignedInput) return;
+    this.assignedInput = value;
+    if (this.isConnected) this.bindInput();
+  }
+
+  private bindScope(): void {
+    this.stopScope?.();
+    this.stopScope = observeModuleContext(this, (context) => {
+      if (context === this.scope) return;
+      this.scope = context;
+      // The monitor and audition follow the new scope's AudioContext and route.
+      if (this.explicitContext) return;
+      this.stopPlayback();
+      this.live?.dispose();
+      this.live = undefined;
+    });
+  }
+
+  private bindInput(): void {
+    this.releaseInput();
+    const assigned = this.assignedInput;
+    // Without an explicit object or selector there is no note source to find
+    // by containment: an enclosing player's notes port is an input.
+    if (assigned === undefined && !this.hasAttribute('input') && !this.hasAttribute('port')) return;
+    this.stopInput = observeModuleInput(this, {family: 'note', direction: 'output', port: 'notes', assigned}, (state) => {
+      this.stopInputNotes?.();
+      this.stopInputNotes = undefined;
+      this.releasePortNotes();
+      const port = state.port as NoteOutputPort | undefined;
+      if (port) this.stopInputNotes = port.subscribe((event) => this.captureNote(event));
+    });
+  }
+
+  private releaseInput(): void {
+    const notes = this.stopInputNotes;
+    const input = this.stopInput;
+    this.stopInputNotes = this.stopInput = undefined;
+    try { notes?.(); } finally { input?.(); }
+    this.releasePortNotes();
+  }
+
+  private releasePortNotes(): void {
+    // An input that goes away mid-take must not leave a press open.
+    if (this.portNotes.size === 0) return;
+    this.portNotes.clear();
+    this.session.discardPending();
+  }
+
+  private captureNote(event: NoteEvent): void {
+    const midi = Math.round(event.pitch.midi);
+    if (event.gate === 'on') {
+      this.portNotes.set(event.occurrenceId, midi);
+      if (this.session.capture(midi, Math.max(1, Math.round(event.velocity * 127)), true)) this.refresh();
+      return;
+    }
+    if (!this.portNotes.has(event.occurrenceId)) return;
+    this.portNotes.delete(event.occurrenceId);
+    if (event.gate === 'cancel') {
+      this.session.discardPending();
+      return;
+    }
+    if (this.session.capture(midi, 0, false)) this.refresh();
+  }
+
+  /** The AudioContext and route monitoring and auditions use: explicit, else the scope's. */
+  private audioRoute(): {context?: AudioContext; destination?: AudioNode} {
+    if (this.explicitContext || !this.scope) return {context: this.explicitContext};
+    const context = this.scope.audio.prepare() as AudioContext;
+    return {context, destination: this.scope.destination?.() ?? undefined};
   }
 
   get bpm(): number {
@@ -238,7 +354,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
   private ensureLive(): InteractivePlayer {
     if (this.playback) this.stopPlayback();
     if (!this.live) {
-      this.live = new InteractivePlayer({audioContext: this.explicitContext});
+      const route = this.audioRoute();
+      this.live = new InteractivePlayer({audioContext: route.context, ...(route.destination ? {destination: route.destination} : {})});
       const sound = this.soundRef ??
         Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
       this.live.addVoice(
@@ -279,10 +396,24 @@ export class ScoreRecorderElement extends HTMLElementBase {
 
     const generation = ++this.playbackGeneration;
     this.playbackFailure = undefined;
-    const playback = new ScorePlayer(this.takeScore, {
-      synth: this.soundRef,
-      audioContext: this.explicitContext,
-    });
+    let playback: ScorePlayer;
+    if (this.scope && !this.explicitContext) {
+      // In a module scope the take auditions as a Session-free member of that
+      // scope, so it lands on the scope's route (a Rack channel, a desk or the
+      // device) without moving the scope's transport.
+      const id = `${this.recorderModule.id}:take-${++this.auditionSequence}`;
+      const module = new ScorePlayerModule(this.takeScore, {
+        synth: this.soundRef, id,
+        context: this.scope.derive({id: `${id}:context`, session: null, transport: null, target: null}),
+      });
+      this.auditionModule = module;
+      playback = module.player;
+    } else {
+      playback = new ScorePlayer(this.takeScore, {
+        synth: this.soundRef,
+        audioContext: this.explicitContext,
+      });
+    }
     this.playback = playback;
     this.playbackOff = playback.on('end', () => {
       if (this.playback === playback && generation === this.playbackGeneration) {
@@ -292,7 +423,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.playing = true;
     this.playbackPending = true;
     this.refresh();
-    void playback.play().then(() => {
+    const audition = this.auditionModule;
+    void (audition ? audition.prepare().then(() => playback.play()) : playback.play()).then(() => {
       if (this.playback !== playback || generation !== this.playbackGeneration) return;
       this.playbackPending = false;
       this.refresh();
@@ -314,7 +446,10 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.playbackGeneration += 1;
     this.playbackOff?.();
     this.playbackOff = undefined;
-    this.playback?.dispose();
+    const audition = this.auditionModule;
+    this.auditionModule = undefined;
+    if (audition) audition.dispose();
+    else this.playback?.dispose();
     this.playback = undefined;
     this.playing = false;
     this.playbackPending = false;
@@ -368,4 +503,12 @@ export function defineScoreRecorderElement(tag = 'score-recorder'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
     customElements.define(tag, ScoreRecorderElement);
   }
+}
+
+/** A frozen module handle whose ID follows the element's DOM id (DEC-068). */
+function createModuleFacade(id: () => string, ports: readonly ModulePort[]): ModuleHandle {
+  return Object.freeze({
+    get id() { return id(); },
+    ports: () => ports,
+  });
 }
