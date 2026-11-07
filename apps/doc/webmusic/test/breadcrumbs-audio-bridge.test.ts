@@ -41,13 +41,13 @@ describe('Audio and Bridge documentation breadcrumbs', () => {
     const sidebar = [group('Bridge', [
       page('Playback composition', '/bridge/composition/'),
       page('@webmusic/bridge', '/bridge/api/'),
-      group('Headless', [page('ScoreAudioSync', '/bridge/headless/score-audio-sync/')]),
+      group('Headless', [page('createScoreAudioSession', '/bridge/headless/score-audio-session/')]),
     ])];
-    expect(getBreadcrumbs({pathname: '/WebMusic/bridge/headless/score-audio-sync/', base, title: 'ScoreAudioSync', sidebar})).toEqual([
+    expect(getBreadcrumbs({pathname: '/WebMusic/bridge/headless/score-audio-session/', base, title: 'createScoreAudioSession', sidebar})).toEqual([
       {label: 'WebMusic', href: base},
       {label: 'Bridge', href: `${base}bridge/`},
       {label: 'Headless', href: `${base}bridge/headless/`},
-      {label: 'ScoreAudioSync'},
+      {label: 'createScoreAudioSession'},
     ]);
     expect(getBreadcrumbs({pathname: '/WebMusic/bridge/headless/', base, title: 'Bridge Headless'})).toEqual([
       {label: 'WebMusic', href: base},

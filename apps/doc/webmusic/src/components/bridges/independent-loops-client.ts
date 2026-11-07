@@ -1,37 +1,11 @@
-import { TransportClock } from "@webmusic/kernel/transport";
 import {
-  TransportGroup,
+  SessionTransport,
   type SyncFollowerTransport,
-  type SyncMasterTransport,
   type TransportCommand,
-} from "@webmusic/kernel/sync";
+} from "@webmusic/kernel/session";
 import { AudioClipPlayer } from "@webmusic/audio/play/headless";
 import type { DemoScope } from "../demo-lifecycle";
 import { loadArabesqueAudioExcerpt } from "../headless/arabesque-audio";
-
-/** App-owned continuous master: only TransportGroup delegates mutations to it. */
-function continuousMaster(context: AudioContext): SyncMasterTransport {
-  const now = () => context.currentTime;
-  const clock = new TransportClock(now);
-  return {
-    clock,
-    get position() {
-      return clock.position;
-    },
-    play: (when = now()) => clock.startAt(when, clock.position),
-    pause: () => clock.pause(now()),
-    stop: () => {
-      clock.pause(now());
-      clock.seekTo(0, now());
-    },
-    seekPosition: (position, when = now()) => {
-      if (clock.paused) clock.seekTo(position, now());
-      else clock.startAt(when, position);
-    },
-    setRate: (rate) => clock.setRate(rate, now()),
-    dispose: () => clock.pause(now()),
-  };
-}
 
 function follower(player: AudioClipPlayer): SyncFollowerTransport {
   return {
@@ -49,7 +23,6 @@ function follower(player: AudioClipPlayer): SyncFollowerTransport {
     stop: () => player.stop(),
     seek: (position) => player.seek(position),
     setRate: (rate) => player.setRate(rate),
-    dispose: () => player.dispose(),
   };
 }
 
@@ -69,7 +42,8 @@ export function mountIndependentLoops(
   const bars = [...root.querySelectorAll<HTMLProgressElement>("progress")];
   const periods = [1, 1.5];
   let context: AudioContext | undefined;
-  let group: TransportGroup | undefined;
+  // One Session conducts both loops; each player keeps its own native loop.
+  let group: SessionTransport | undefined;
   let players: AudioClipPlayer[] = [];
   const unregistered = new Set<AudioClipPlayer>();
   let busy = false;
@@ -100,7 +74,8 @@ export function mountIndependentLoops(
       report(error);
     }
     group = undefined;
-    for (const player of unregistered) {
+    // The Session borrows the players; this demo owns and releases them.
+    for (const player of new Set([...players, ...unregistered])) {
       try {
         player.dispose();
       } catch (error) {
@@ -139,8 +114,7 @@ export function mountIndependentLoops(
           // ignores a load that settles afterwards, and the next one reuses it.
           const source = await loadArabesqueAudioExcerpt(Math.max(...periods));
           if (!scope.active || expected !== generation) return;
-          group = new TransportGroup(
-            continuousMaster(sessionContext),
+          group = new SessionTransport(
             () => sessionContext.currentTime,
             { onOperationError: (_operation, error) => report(error) },
           );
@@ -155,7 +129,11 @@ export function mountIndependentLoops(
             );
             players.push(player);
             unregistered.add(player);
-            group.addFollower(follower(player), {
+            group.register(follower(player), {
+              axis: "clip-seconds",
+              identity: player,
+              // Looping members never end the Session on their own.
+              durationSeconds: Infinity,
               loop: { startSeconds: 0, endSeconds: period },
             });
             unregistered.delete(player);
@@ -172,7 +150,7 @@ export function mountIndependentLoops(
         expected === generation &&
         result?.status === "committed"
       ) {
-        status.textContent = `${command.type} applied at master ${result.snapshot.position.toFixed(2)} s.`;
+        status.textContent = `${command.type} applied at Session ${result.snapshot.position.toFixed(2)} s.`;
       }
     } catch (error) {
       if (scope.active && expected === generation) {
@@ -203,7 +181,7 @@ export function mountIndependentLoops(
       bars.forEach((bar, index) => {
         bar.value = phases[index] ?? 0;
       });
-      timeline.textContent = `Master ${snapshot.position.toFixed(2)} s · 1 s loop ${phases[0]?.toFixed(2)} s · 1.5 s loop ${phases[1]?.toFixed(2)} s`;
+      timeline.textContent = `Session ${snapshot.position.toFixed(2)} s · 1 s loop ${phases[0]?.toFixed(2)} s · 1.5 s loop ${phases[1]?.toFixed(2)} s`;
     }
     frame = requestAnimationFrame(draw);
   };

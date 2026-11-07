@@ -3,11 +3,8 @@ import { defineScoreViewElement } from "@webmusic/score/view/element";
 import { defineChordAnalysisElement } from "@webmusic/score/analyze/element";
 import { computePeaks } from "@webmusic/audio/analyze";
 import { renderWaveformVisualizer } from "@webmusic/audio/view/render";
-import {
-  createSyncedPlayback,
-  renderScoreToClip,
-  type TransportCommand,
-} from "@webmusic/bridge";
+import { createScoreAudioSession, renderScoreToClip } from "@webmusic/bridge";
+import type { TransportCommand } from "@webmusic/kernel/session";
 import { mountTransport } from "@webmusic/ui/transport";
 import type { DemoScope } from "../demo-lifecycle";
 import {
@@ -16,7 +13,7 @@ import {
 } from "../headless/arabesque-score";
 
 let nextOwner = 0;
-type Pair = ReturnType<typeof createSyncedPlayback>;
+type Pair = ReturnType<typeof createScoreAudioSession>;
 type Waveform = ReturnType<typeof renderWaveformVisualizer>;
 type PlaybackHost = HTMLElement & { playback?: ScorePlaybackSource };
 
@@ -67,8 +64,8 @@ export function mountBridgeComposition(
   const refresh = () => {
     const unavailable = !pair || loading;
     if (pair && !loading) {
-      rate.value = String(pair.sync.snapshot.rate);
-      loop.checked = !!pair.sync.snapshot.loop;
+      rate.value = String(pair.session.snapshot.rate);
+      loop.checked = !!pair.session.snapshot.loop;
     }
     replace.disabled = unavailable;
     attach.disabled = unavailable;
@@ -118,7 +115,7 @@ export function mountBridgeComposition(
       detachViews,
       previousSubscription,
       () => previousWave?.dispose(),
-      () => previous?.sync.dispose(),
+      () => previous?.dispose(),
     ]) {
       try {
         release?.();
@@ -152,7 +149,7 @@ export function mountBridgeComposition(
     if (input.type === "play") await context?.resume();
     if (!scope.active || expected !== generation || current !== pair) return;
     try {
-      const result = await current.sync.dispatch(input);
+      const result = await current.session.dispatch(input);
       if (!scope.active || expected !== generation || current !== pair) return;
       if (result.status === "committed") {
         message(`${input.type} applied; revision ${result.revision}.`);
@@ -165,7 +162,7 @@ export function mountBridgeComposition(
     query("[data-transport]"),
     {
       snapshot: () => {
-        const snapshot = pair?.sync.snapshot;
+        const snapshot = pair?.session.snapshot;
         const seconds = snapshot?.position ?? 0;
         return {
           playing: !!snapshot && !snapshot.paused,
@@ -201,7 +198,7 @@ export function mountBridgeComposition(
       context ??= new AudioContext();
       await context.resume(); // invoked in the Load / Replace gesture
       if (!scope.active || expected !== generation) return;
-      if (pair) await pair.sync.dispatch({ type: "pause" });
+      if (pair) await pair.session.dispatch({ type: "pause" });
       if (!scope.active || expected !== generation) return;
       const source = await loadArabesqueScore("midi");
       if (!scope.active || expected !== generation) return;
@@ -215,7 +212,7 @@ export function mountBridgeComposition(
         baseSamplesPerPeak: 512,
       });
       const candidateOwner: { pair?: Pair } = {};
-      candidate = createSyncedPlayback(score, clip, {
+      candidate = createScoreAudioSession(score, clip, {
         context,
         onOperationError: (operation, error) => {
           if (scope.active && pair === candidateOwner.pair)
@@ -223,7 +220,7 @@ export function mountBridgeComposition(
         },
       });
       candidateOwner.pair = candidate;
-      candidate.scorePlayer.setVolume(0); // only the rendered clip sounds
+      candidate.scoreModule.player.setVolume(0); // only the rendered clip sounds
       // Render the candidate before replacing the old working composition.
       const candidateHost = document.createElement("div");
       waveHost.append(candidateHost);
@@ -244,15 +241,15 @@ export function mountBridgeComposition(
       waveHost.replaceChildren(candidateHost);
       wave = candidateWave;
       duration =
-        pair.scorePlayer.playback.snapshot().nominalDurationSeconds ??
+        pair.scoreModule.player.playback.snapshot().nominalDurationSeconds ??
         clip.duration;
       const observedPair = pair;
       owner.playback = {
-        snapshot: () => observedPair.scorePlayer.playback.snapshot(),
+        snapshot: () => observedPair.scoreModule.player.playback.snapshot(),
         subscribe: (listener) =>
-          observedPair.scorePlayer.playback.subscribe(listener),
+          observedPair.scoreModule.player.playback.subscribe(listener),
         seekNominal: async (seconds) => {
-          const result = await observedPair.sync.dispatch({
+          const result = await observedPair.session.dispatch({
             type: "seek",
             position: seconds,
           });
@@ -265,7 +262,7 @@ export function mountBridgeComposition(
       extended = nextExtended;
       rate.value = "1";
       loop.checked = false;
-      offSync = pair.sync.subscribe((event) => {
+      offSync = pair.session.subscribe((event) => {
         if (!scope.active || pair !== observedPair) return;
         if (event.type === "commit") {
           appendEvent(
@@ -281,7 +278,7 @@ export function mountBridgeComposition(
         `Arabesque No. 1 opening (${extended ? 24 : 16} quarter-note beats) ready. Click Play, then attach views.`,
       );
     } catch (error) {
-      candidate?.sync.dispose();
+      candidate?.dispose();
       if (scope.active && expected === generation) {
         const reason = error instanceof Error ? error.message : String(error);
         report(
@@ -330,7 +327,7 @@ export function mountBridgeComposition(
     if (!scope.active) return;
     if (pair && now - lastPaint >= 80) {
       lastPaint = now;
-      const snapshot = pair.sync.snapshot;
+      const snapshot = pair.session.snapshot;
       wave?.redraw(pair.clipPlayer.seconds, true);
       position.textContent = `${snapshot.position.toFixed(2)} score s · ${pair.clipPlayer.seconds.toFixed(2)} clip s · ${snapshot.rate}×`;
       notify();

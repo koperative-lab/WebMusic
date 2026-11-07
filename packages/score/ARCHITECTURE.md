@@ -180,7 +180,6 @@ musical positions and the player's reported seconds have different meanings.
 | Engine | Clock | Role |
 |---|---|---|
 | `ScorePlayer` (`play/headless/score-player.ts`) | Owns a kernel `TransportClock` over `AudioContext.currentTime`, exposed read-only as `TransportClockReader` | The primary engine |
-| `TonePlayer` (`play/headless/tone-player.ts`) | No Kernel clock reader — runs on the injected Tone transport | The documented **clockless fallback** for callers already living in Tone.js |
 
 `ScorePlayer` deliberately splits into three files, and the split is the
 design:
@@ -423,7 +422,7 @@ picked for its dependency:
 |---|---|
 | `@webmusic/ui`, `react` | Statically imported, but only from the enumerated opt-in entries (`*/element/index.ts`, `play/element/auto.ts`, `play/demos/index.ts`, `react/index.tsx`). Importing `/headless` never reaches them. |
 | `spessasynth_lib` | A literal dynamic import loads the optional 4.x peer only when a SoundFont route connects. Consumer bundlers can resolve it into a lazy module; applications separately supply the AudioWorklet URL or registration callback. |
-| `tone` | Not imported at all. `TonePlayer` takes the Tone namespace as a constructor option — the caller who already has Tone hands it over. Injection, not loading. |
+| `tone` | Not imported at all. `Sound.from()` takes the Tone instrument — the caller who already has Tone hands it over. Injection, not loading. |
 
 The model, I/O and Headless paths do not require opt-in visual, React or external
 synth peers merely to import them. Actual bundle contents still depend on chosen

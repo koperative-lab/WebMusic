@@ -53,7 +53,7 @@ function makeClip(seconds = 2, sampleRate = 1000) {
   });
 }
 
-// CONTRACTUAL — @webmusic/bridge depends on this behavior: ScoreAudioSync's
+// CONTRACTUAL — Session participant adapters (Bridge's registerAudioParticipant) depend on this behavior; the former ScoreAudioSync's
 // sample-accurate join schedules `play(when)` and assumes the position
 // parks at the seek offset through the pre-roll (its drift monitor holds
 // off until `when`). Behavioral changes here require a matching bridge

@@ -166,44 +166,9 @@ caller-supplied `secondsPerBeat` remains authoritative for live pulse timing.
 
 ### Tone.js integration
 
-`TonePlayer` is the optional injected `Tone.Transport` adapter, for projects
-that already own a Tone.js clock and audio graph. It shares `ScorePlayer`'s
-performed `ScoreTimeline`, including ties, grace-note skipping, part
-transposition, and performed tails. Its intentionally smaller event contract
-is `cursor`, `noteOn`, `noteOff`, and `end`, plus the shared `operationError`
-and `listenerError` diagnostics: it has no `timeupdate` event or loop controls,
-so use `ScorePlayer` when a widget needs that full lifecycle.
-Each fired Tone callback retains the exact synth and voice handle that created
-it. Pausing, stopping, seeking, changing rate/tempo, swapping synths, or
-disposing releases (or cancels) that original voice before this player's own
-transport entries are rebuilt; it never sends an old handle to a replacement
-synth or clears another Tone user's schedule.
-An injected synth is borrowed by default, whether supplied in the constructor
-or through `setSynth(synth, ownership)`; pass `'owned'` explicitly when this
-player should dispose that backend.
-
-`Tone.Transport` itself is global. To preserve the historic self-contained
-behaviour, `TonePlayer` defaults to `transportOwnership: 'owned'`, so its
-transport methods start, pause, stop, and rewind the injected Transport. For a
-project that already owns a Tone clock, pass `transportOwnership: 'shared'`:
-`play()` then arms this score against the caller's current transport position
-but never changes that transport. In shared mode, seeking and rate changes
-rebuild only this player's future entries, including a clipped attack when
-seeking into a sustained note.
-
-When the injected transport exposes Tone's `start` / `pause` / `stop` events,
-`TonePlayer` observes them: a host pause or stop releases only this player's
-voices, clears only its schedule ids, and stops its cursor — it never calls a
-host transport method. A global `cancel()` or direct `transport.seconds` seek
-has no portable observation hook. After either, call
-`await player.rearmSharedTransport(localSeconds?)` to rebuild only this
-player's future segment at the host's current position. Supply `localSeconds`
-when the host seek maps to a chosen point in this score; otherwise the current
-local score position is preserved. A custom injected transport without
-`on`/`off` remains usable, but the host must use that explicit rearm step after
-its lifecycle changes as well.
-
----
+Play a Tone.js instrument as a synth with `Sound.from(toneInstrument)`. The
+former `TonePlayer` adapter over Tone's own Transport is removed in 0.3.0
+(DEC-068): transport time belongs to the Session.
 
 ## Transport surface + input drivers
 
@@ -236,7 +201,7 @@ Timing/lifecycle events use snapshot delivery: one synchronous listener throw
 or async rejection does not block later listeners, note release, loop/end, or
 cleanup. Subscribe to `listenerError` for the structured
 `{kind, source, event, mode, error}` diagnostic. ScorePlayer, InteractivePlayer,
-Rack, and TonePlayer also expose contained backend/cleanup failures as
+and Rack also expose contained backend/cleanup failures as
 `operationError` with `{kind, source, operation, error}`; when nobody observes
 that event, the same deferred, rate-limited console fallback remains active.
 `PlayerController.error` stays separate and means its caller-visible `play()`

@@ -852,3 +852,33 @@ describe('owned project restoration', () => {
     expect(registry.get('mutable', '1')).toBeUndefined();
   });
 });
+
+describe('native note connections (DEC-068)', () => {
+  it('connects note ports between project modules and cancels delivered notes on disconnect', async () => {
+    const {NoteInputPort, NoteOutputPort} = await import('../src/module/note-port');
+    const context = new Context(), plugins = new ProjectPluginRegistry();
+    const accepted: string[] = [];
+    let output: InstanceType<typeof NoteOutputPort> | undefined;
+    plugins.register({id: 'keys', version: '1', create: (request) => {
+      const notes = new NoteOutputPort({id: 'notes'});
+      output = notes;
+      return {module: {id: request.record.id, ports: () => [notes]}, ports: [{id: 'notes', kind: 'note', direction: 'output'}],
+        dispose: () => notes.dispose()};
+    }});
+    plugins.register({id: 'synth', version: '1', create: (request) => {
+      const notes = new NoteInputPort({accept: (event) => accepted.push(`${event.occurrenceId}:${event.gate}`)}, {id: 'notes'});
+      return {module: {id: request.record.id, ports: () => [notes]}, ports: [{id: 'notes', kind: 'note', direction: 'input'}],
+        dispose: () => notes.dispose()};
+    }});
+    const runtime = new ModuleProjectRuntime({audio: new ModuleAudioEnvironment({context: context.native}), plugins}); runtimes.push(runtime);
+    await runtime.restore(parseModuleProject({schema: 'webmusic.module-project', version: 1, id: 'notes', contexts: [{id: 'root'}],
+      modules: [{id: 'keys', contextId: 'root', plugin: {id: 'keys', version: '1'}, config: {}},
+        {id: 'synth', contextId: 'root', plugin: {id: 'synth', version: '1'}, config: {}}],
+      connections: [{id: 'play', kind: 'note', from: {moduleId: 'keys', port: 'notes'}, to: {moduleId: 'synth', port: 'notes'}}]}));
+    output!.emit({occurrenceId: 'a', sourceId: 'keys', pitch: {midi: 60}, velocity: 1, gate: 'on', axis: 'performance-seconds', time: 0, epoch: 0});
+    expect(accepted).toEqual(['a:on']);
+    expect(runtime.exportProject().connections.map((connection) => connection.id)).toEqual(['play']);
+    runtime.disconnect('play');
+    expect(accepted).toEqual(['a:on', 'a:cancel']);
+  });
+});

@@ -355,7 +355,7 @@ describe('agent context release and output contracts', () => {
       source: ['agent-context/source/packages/audio/src/view/headless/audio-clip-editor.ts.txt'], styles: [],
     });
     expect(catalog.components.some(({id}) => id === 'element/audio-document' || id === 'element/score-document')).toBe(false);
-    expect(catalog.components.find(({id}) => id === 'headless/bridge/score-audio-sync').docs).toEqual(['agent-context/bridge/headless/score-audio-sync.md']);
+    expect(catalog.components.find(({id}) => id === 'headless/bridge/score-audio-session').docs).toEqual(['agent-context/bridge/headless/score-audio-session.md']);
     expect(catalog.components.some(({id}) => id === 'headless/envelope-controller')).toBe(false);
     expect(catalog.components.find(({id}) => id === 'element/audio-view').docs).toEqual(['agent-context/audio/element/view/audio-view.md']);
     expect(catalog.components.find(({id}) => id === 'element/audio-meter')).toMatchObject({

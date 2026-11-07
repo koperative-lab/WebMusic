@@ -379,6 +379,8 @@ WaterfallView  -> div
 | `ScoreProvider` | Provider | Provide `Score`, `ScorePlayer`, and cursor state to child components. |
 | `useScore()` | Hook | Read the current `Score` from context. |
 | `usePlayer()` | Hook | Read the shared `ScorePlayer` instance from context. |
+| `useSessionSnapshot(session)` | Hook | Read a borrowed Session's committed `SessionTransportSnapshot`; subscribes while mounted, never commands or disposes it (DEC-068). |
+| `useModulePorts(module)` | Hook | Read a borrowed module's current `ports()`, refreshed on its change notifications. |
 | `useCursor()` | Hook | Read the latest `{ tick, seconds, measure, beat }` cursor position. |
 | `useScoreAnalysis(options?)` | Hook | Read key, chord, roman, motif, and voice-leading analysis from context. |
 | `useScoreAnalysisAsync(options?)` | Hook | The same analysis off the main thread in a Web Worker: `{ result, pending }`. |

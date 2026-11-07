@@ -173,11 +173,12 @@ async function checkKernelReexports() {
           }
         }
       }
-      const sync = await load('./sync');
-      const mirror = new sync.MirrorClockMaster({position: 0, play() {}, pause() {}, stop() {}, seekPosition() {}}, () => 0);
-      if (!(mirror.clock instanceof namespace.TransportClock) || namespace.TransportClock.prototype.positionAt.call(mirror.clock, 0) !== 0) {
-        errors.push(`@webmusic/kernel ${condition}: MirrorClockMaster uses a different TransportClock class.`);
+      // The Session's internal group must share the public TransportClock chunk.
+      const session = new (await load('./session')).SessionTransport(() => 0);
+      if (namespace.TransportClock.prototype.positionAt.call(new namespace.TransportClock(() => 0), 0) !== 0 || session.position !== 0) {
+        errors.push(`@webmusic/kernel ${condition}: SessionTransport and TransportClock disagree on the shared clock.`);
       }
+      session.dispose();
     } catch (error) {
       errors.push(`@webmusic/kernel ${condition}: re-export identity check failed (${message(error)}).`);
     }

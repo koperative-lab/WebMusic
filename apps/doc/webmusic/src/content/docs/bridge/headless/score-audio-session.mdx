@@ -1,0 +1,90 @@
+---
+title: 'createScoreAudioSession'
+description: 'One Session that conducts a Score engine and an Audio clip player as two participants, each with an explicit mapping onto its own time axis.'
+sidebar:
+  order: 1
+---
+
+import ScoreAudioSessionDemo from '../../../../components/bridges/ScoreAudioSessionDemo.astro';
+
+`createScoreAudioSession(score, clip, options?)` composes a Score and an Audio
+clip under one `SessionTransport` — the single command authority of
+[modular composition](/bridge/modular-composition/) (DEC-068). The Score engine
+joins as a `ScorePlayerModule` participant on `score-nominal-seconds`; the clip
+player joins on `clip-seconds`, the same axis `<audio-player>` uses. There is no
+master/follower pair: play, pause, stop, seek, rate and loop go to the Session,
+which schedules both engines from one anchor.
+
+<ScoreAudioSessionDemo />
+
+## Import
+
+```ts
+import {createScoreAudioSession, renderScoreToClip} from '@webmusic/bridge';
+
+const clip = await renderScoreToClip(score, {tailSeconds: 0});
+const composition = createScoreAudioSession(score, clip);
+composition.scoreModule.player.setVolume(0); // the clip is the sounding source
+
+await composition.session.play();
+await composition.session.seek(12.5);
+// Keep the composition until the owning view is removed.
+const dispose = () => composition.dispose();
+```
+
+## Ownership
+
+The composition owns its Session, both engines and their routes. Without
+`options.context` it creates a lazy audio environment and closes that context on
+`dispose()`; a supplied context stays open for its owner. Nothing is allocated
+until the Session prepares or plays.
+
+## Ports and composition
+
+`composition.context` is the `ModuleContext` both engines live in: its
+`registry` holds the Score module as `score`, its `transport` is the Session's
+transport port, and further modules (a Rack, effects, analysers) can join it.
+Each participant's mapping is `local = session × scale + offset`; set
+`scoreOffsetSeconds`/`scorePositionScale` and
+`clipOffsetSeconds`/`clipPositionScale` to align material that does not start
+or run together. Derive mappings between musical and audio time with
+[`beatGridFromTimeMap` and `timeMapFromBeatGrid`](/bridge/api/).
+
+`registerAudioParticipant(session, player, options)` is the adapter the
+composition and the project plugins use to register any Headless Audio engine on
+the shared `clip-seconds` axis.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createScoreAudioSession(score: Score, clip: AudioClip, options?)`.
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `context` | created lazily | Borrowed `AudioContext`; never closed by the composition. |
+| `synth` | oscillator | Score synth backend. |
+| `scoreOffsetSeconds` · `scorePositionScale` | `0` · `1` | Session seconds → nominal Score seconds. |
+| `clipOffsetSeconds` · `clipPositionScale` | `0` · `1` | Session seconds → clip seconds. |
+| `leadInSeconds` | Session default | Lead-in before a shared start. |
+| `onOperationError(operation, error)` | none | Reports Session and Score operation failures. |
+
+**Result**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `session` | `SessionTransport` | The only command authority; `dispatch`, `play(when?)`, `pause`, `stop`, `seek`, `setRate`, `setLoop`, `snapshot`, `subscribe`. |
+| `context` | `ModuleContext` | Shared scope of both participants. |
+| `scoreModule` | `ScorePlayerModule` | The Score engine (`scoreModule.player`) and its ports. |
+| `clipPlayer` | `AudioPlayer` | The clip engine. |
+| `dispose()` | method | Releases both participants and routes, then the Session and an owned context. Idempotent. |
+
+**`registerAudioParticipant(session, player, {prepare, offsetSeconds?, positionScale?})`**
+returns the `SessionParticipantLease`. `player` is any `AudioParticipantPlayer`
+(`AudioPlayer` or `AudioClipPlayer`); native buffer playback attaches the
+shared scheduling anchor, other engines follow Session commands.
+
+</details>
+
+## Related
+
+[Modular composition](/bridge/modular-composition/) · [ScorePlayer](/score/headless/play/score-player/) · [AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Bridge conversions](/bridge/api/) · [Kernel contracts](/kernel/api/)

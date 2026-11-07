@@ -8,5 +8,4 @@ export * from './module';
 export * from './meter';
 export * from './transport';
 export * from './tick';
-export * from './sync';
 export * from './session';

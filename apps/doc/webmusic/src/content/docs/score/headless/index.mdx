@@ -9,7 +9,7 @@ engines, sessions, controllers and their supporting helpers imported from
 
 | Capability | Contents |
 | --- | --- |
-| [Play](#play) | `ScorePlayer`, `TonePlayer`, controllers, rack, tempo. |
+| [Play](#play) | `ScorePlayer`, controllers, rack, tempo. |
 | [Analyze](#analyze) | Analysis sessions, playback followers, live trackers, workers and presentation prediction. |
 | [View](#view) | Score windows, map navigation, current-pitch views, held-note tracking and the `ScoreEditor` document owner with its URL loader. |
 
@@ -44,7 +44,6 @@ is on [`@webmusic/score/play`](/score/api/play/).
 | --- | --- | --- |
 | `ScorePlayer` · `createScorePlayer` · `createScorePlayerFromUrl` · `playScore` · `playScoreFromUrl` | class · alias · factories | [ScorePlayer](/score/headless/play/score-player/) |
 | `InteractivePlayer` · `createInteractivePlayer` | class · factory | [InteractivePlayer](/score/headless/play/interactive-player/) |
-| `TonePlayer` | class | [Tone.js](/score/headless/play/score-player/#toneplayer) |
 | `Metronome` | class | [Metronome](/score/headless/play/metronome/) |
 
 **Timbres and synths**
@@ -102,8 +101,7 @@ is on [`@webmusic/score/play`](/score/api/play/).
 
 Option, event, state and structural interface types belong with their object
 or helper. Examples include `ScorePlayerOptions`, `ScoreSchedulingCapabilities`, `PlayerTimeUpdate`,
-`RenderOptions`, `InteractivePlayerEvents`, `HeadlessSynth`,
-`TonePlayerOptions` and `TonePlayerEvents`. Use the linked references for
+`RenderOptions`, `InteractivePlayerEvents` and `HeadlessSynth`. Use the linked references for
 their fields and ownership rules; a value-name coverage check is not a type
 reference audit.
 

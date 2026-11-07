@@ -236,7 +236,7 @@ It does not render notation, piano rolls, analysis, or framework views — those
 `npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
 
 The root model, I/O, and playback capabilities ship in that one package. `tone` and
-`spessasynth_lib` are **optional** peers used by `TonePlayer` and SF2 playback.
+`spessasynth_lib` are **optional** peers used by `Sound.from(toneInstrument)` and SF2 playback.
 
 The `@webmusic/score/play` root is the **stateless playback API**. The stateful, DOM-free **Headless Components** — engines, `Sound`, `Rack`, synths and `Effect` — live on `/headless`; browser transport adapters live on `/drivers`; styled custom elements live on `/element`. The root therefore tree-shakes free of both engine and DOM code.
 
@@ -280,7 +280,6 @@ Every stateful object this capability publishes lives on
 [`PlayerController`](/score/headless/play/player-controller/), the
 [synth backends](/score/headless/play/sound/#synth-backends) — `LfoController`,
 `EqController` and the meter controller among them — and the
-[Tone](/score/headless/play/score-player/#toneplayer) and
 [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) adapters.
 
 [`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph)
@@ -455,8 +454,8 @@ outcomes. See the [complete Headless contract](/score/headless/play/score-player
 for position maps, failed preparation, resource ownership and repeat fallback.
 The [Element binding](/score/element/play/score-player/#play-an-editable-document)
 adds a borrowing `.editor` property without copying edited data into a second owner.
-This contract belongs to the native player; Rack, controller and TonePlayer
-sources do not implicitly acquire document editing.
+This contract belongs to the native player; Rack and controller sources do not
+implicitly acquire document editing.
 
 ## API Reference
 

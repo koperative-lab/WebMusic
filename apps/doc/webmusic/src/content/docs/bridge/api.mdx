@@ -24,24 +24,29 @@ here is only the work that needs *both*.
 | Subpath | Form | What is there |
 | --- | --- | --- |
 | `@webmusic/bridge` | root · the whole API | Everything below. |
-| — | [Headless](/bridge/headless/) | `ScoreAudioSync` and its two factories are root exports, documented under the headless contract because they are constructed and disposed rather than called. |
+| — | [Headless](/bridge/headless/) | `createScoreAudioSession` and `registerAudioParticipant` are root exports, documented under the headless contract because the composition is constructed and disposed rather than called. |
 
 There is no `/headless` subpath, no `/element`, and no `/auto`: the bridge
 ships no Web Components. It gets none until it has one to ship.
 
-## Synchronized playback
+## Session composition
 
-The stateful half of the package. `ScoreAudioSync` drives a master and a
-follower transport as one unit, and the two factories build both players on a
-shared `AudioContext` first. All three are documented on
-[its page](/bridge/headless/score-audio-sync/) rather than here, because
-construction, commands, state and disposal are what a reader needs and a
-function list cannot carry them.
+The stateful half of the package. `createScoreAudioSession` puts a Score engine
+and an Audio clip player under one Session — the single command authority of
+modular composition (DEC-068) — each mapped onto its own axis
+(`score-nominal-seconds`, `clip-seconds`). `registerAudioParticipant` is the
+adapter it uses to register any Headless Audio engine on the shared
+`clip-seconds` axis. Both are documented on
+[their page](/bridge/headless/score-audio-session/). The former
+`ScoreAudioSync` master/follower family and its factories and adapters are
+removed in 0.3.0.
 
-`clipAsMaster` and `scoreAsFollower` are the role adapters underneath: they
-wrap a clip player and a score player in the `SyncMasterTransport` /
-`SyncFollowerTransport` shapes the sync consumes. Reach for them when you are
-assembling a pairing by hand instead of through a factory.
+## Modules and data functions
+
+`createScoreAudioSession` and the project plugins create modules. The timeline
+conversions, `renderScoreToClip` and `scoreFromTranscription` are data
+functions: their results feed modules (a rendered clip becomes an
+`<audio-player>` source; a transcribed `Score` becomes a `<score-player>` source).
 
 ## Timeline conversions
 
@@ -89,19 +94,14 @@ data, own no running transport or audio resources, and need no disposal.
 
 `renderScoreToClip(score, options?)` plays a score into an `OfflineAudioContext`
 and returns the result as an `AudioClip` — a matched backing track, without a
-speaker or a user gesture. This is what lets the sync demo make the clip the
-sounding source while a silent score transport drives the visuals.
+speaker or a user gesture. This is what lets the composition demo make the clip
+the sounding source while a muted Score engine drives the visuals.
 
-The renderer includes an effect/release tail by default. Use the
-audio-mastered pairing to play that tail through the clip's end. The live
-Score-mastered demo renders with `tailSeconds: 0`; passing a Bridge-rendered
-clip with a positive tail back to `createSyncedPlayback` is rejected before
-creating players. Both pair factories require the original Score instance used
-for that render. A `tempo` override that differs from the Score's base tempo
-changes the clip's time axis; neither pair factory accepts that rendered clip.
-Render at the Score's base tempo for synchronized playback and change speed with
-`sync.setRate()`. These guards recognize the original AudioClip object from
-one render call; copying or serializing it loses that in-memory provenance.
+The renderer includes an effect/release tail by default; render with
+`tailSeconds: 0` when the clip must end with the score. A `tempo` override that
+differs from the Score's base tempo changes the clip's time axis: set
+`clipPositionScale` on `createScoreAudioSession` accordingly, or render at the
+base tempo and change speed with the Session's `setRate()`.
 
 For repeated notation, call `expandRepeats(score)` first, then render and pair
 the expanded Score instance. Passing `scoreOptions.expandRepeats` with a
@@ -208,11 +208,8 @@ Every export of the root, exactly once.
 
 | Export | Kind | Use it for |
 | --- | --- | --- |
-| `ScoreAudioSync` | class | [Synchronized playback](/bridge/headless/score-audio-sync/) — the transport pair as one unit. |
-| `createSyncedPlayback` | factory | [Score as master](/bridge/headless/score-audio-sync/#score-as-master) — builds both players and the sync. |
-| `createAudioMasteredPlayback` | factory | [Audio as master](/bridge/headless/score-audio-sync/#audio-as-master) — the same, with the recording driving. |
-| `clipAsMaster` | adapter | Wrap a clip player as the sync's master role. |
-| `scoreAsFollower` | adapter | Wrap a score player as the sync's follower role. |
+| `createScoreAudioSession` | factory | [createScoreAudioSession](/bridge/headless/score-audio-session/) — one Session over a Score engine and an Audio clip. |
+| `registerAudioParticipant` | adapter | Register a Headless Audio engine with a Session on `clip-seconds`. |
 | `beatGridFromTimeMap` | function | Sample a score's exact tempo map onto an audio `BeatGrid`. |
 | `timeMapFromBeatGrid` | function | Carry a detected beat grid into a score `TimeMap`. |
 | `renderScoreToClip` | function | Render a score offline into an `AudioClip`. |
@@ -221,17 +218,7 @@ Every export of the root, exactly once.
 | `DEFAULT_MAX_MAPPED_BEATS` | constant | The beat ceiling `beatGridFromTimeMap` will not exceed. |
 | `DEFAULT_MAX_TRANSCRIPTION_MEASURES` | constant | Measure ceiling for one assembly. |
 | `DEFAULT_MAX_TRANSCRIPTION_NOTES` | constant | Note ceiling for one assembly. |
-| `TransportCommand`, `TransportCommit`, `TransportEvent`, `TransportSnapshot` | types | Re-exported Kernel command/observation contracts used by `ScoreAudioSync`; see [session commands](/kernel/api/#session-commands-and-observation). |
-| `ScoreAudioSyncOptions` | type | Construction options for the sync. |
-| `CreateSyncedPlaybackOptions` | type | Options for the score-as-master factory. |
-| `CreateAudioMasteredPlaybackOptions` | type | Options for the audio-as-master factory. |
-| `AudioMasterAdapterOptions` | type | Offset options for `scoreAsFollower`. |
+| `CreateScoreAudioSessionOptions` · `ScoreAudioSession` | types | Options and result of `createScoreAudioSession`. |
+| `AudioParticipantOptions` · `AudioParticipantPlayer` | types | Options and engine surface of `registerAudioParticipant`. |
 | `BeatGridFromTimeMapOptions` | type | Options for `beatGridFromTimeMap`. |
 | `ScoreFromTranscriptionOptions` | type | Options for `scoreFromTranscription`. |
-| `SyncScoreTransport` | type | The score side of a pairing. |
-| `SyncClipTransport` | type | The clip side of a pairing. |
-| `SyncMasterTransport` | type | The clock-owning role. |
-| `SyncFollowerTransport` | type | The following role. |
-| `SyncTransportClockView` | type | Read-only view of the master clock. |
-| `SyncLoopRegion` | type | A loop region in master seconds. |
-| `SyncTransportContract` | type | The structural contract both roles satisfy. |

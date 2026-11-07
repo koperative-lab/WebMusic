@@ -85,15 +85,6 @@ export {
 // (`Sound.soundfont2` builds one from a source). ----
 export {SpessaSynthSynth} from './synth';
 
-// ---- Tone.js-backed player adapter ----
-export {
-  TonePlayer,
-  type ToneLike,
-  type ToneTransportLike,
-  type ToneTransportOwnership,
-  type TonePlayerEvents,
-  type TonePlayerOptions,
-} from './tone-player';
 
 // ---- Transport controllers driven by external input ----
 export {

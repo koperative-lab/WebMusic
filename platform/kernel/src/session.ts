@@ -1,6 +1,8 @@
 import type {ConnectionLease} from './module/lease';
 import {SessionSchedulingAuthority, type SessionSchedulingBinding} from './session-scheduling';
 export type {SessionSchedulingBinding, SessionSchedulingSnapshot, SessionSchedulingEvent, SessionScheduleSegment} from './session-scheduling';
+// TransportGroup is a Session internal (DEC-068); its participant contracts are public here.
+export type {FollowerOptions, SyncFollowerTransport, SyncLoopRegion, TransportCommand, TransportCommit, TransportEvent, TransportSnapshot} from './sync';
 import {TransportClock, type TransportClockReader} from './transport';
 import {
   TransportGroup,

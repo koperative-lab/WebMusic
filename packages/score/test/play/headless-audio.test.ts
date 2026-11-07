@@ -372,7 +372,7 @@ describe('ScorePlayer transport surface (rate / progress / scrub / seekFraction)
   });
 });
 
-// CONTRACTUAL — @webmusic/bridge depends on this surface: ScoreAudioSync
+// CONTRACTUAL — Session participant adapters depend on this surface (formerly Bridge ScoreAudioSync)
 // anchors by reading `clock` (nominal axis), reads `nominalSeconds` for the
 // settled position, and awaits `seekNominal` before re-joining the clip
 // (bridges/score-audio/src/sync.ts, pinned by SyncTransportContract).
@@ -443,7 +443,7 @@ describe('ScorePlayer transport clock surface (clock / nominalSeconds / seekNomi
   });
 });
 
-// CONTRACTUAL — @webmusic/bridge depends on this surface: ScoreAudioSync
+// CONTRACTUAL — Session participant adapters depend on this surface (formerly Bridge ScoreAudioSync)
 // proposes a shared armed origin through play(when) and reads the pre-roll
 // through `clock.holding` / `clock.state.originTime` to join the clip at the
 // exact same audio-clock instant (bridges/score-audio/src/sync.ts).

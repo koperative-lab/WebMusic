@@ -164,7 +164,7 @@ Current rules link to source/configuration. Package-local legacy notes, expansio
 | [apps/doc/webmusic/src/content/docs/bridge/api.mdx](<../apps/doc/webmusic/src/content/docs/bridge/api.mdx>) | Public reference / orientation; page type governed by dev templates |
 | [apps/doc/webmusic/src/content/docs/bridge/composition.mdx](<../apps/doc/webmusic/src/content/docs/bridge/composition.mdx>) | Public reference / orientation; page type governed by dev templates |
 | [apps/doc/webmusic/src/content/docs/bridge/headless/index.mdx](<../apps/doc/webmusic/src/content/docs/bridge/headless/index.mdx>) | Public reference / orientation; page type governed by dev templates |
-| [apps/doc/webmusic/src/content/docs/bridge/headless/score-audio-sync.mdx](<../apps/doc/webmusic/src/content/docs/bridge/headless/score-audio-sync.mdx>) | Public reference / orientation; page type governed by dev templates |
+| [apps/doc/webmusic/src/content/docs/bridge/headless/score-audio-session.mdx](<../apps/doc/webmusic/src/content/docs/bridge/headless/score-audio-session.mdx>) | Public reference / orientation; page type governed by dev templates |
 | [apps/doc/webmusic/src/content/docs/bridge/index.mdx](<../apps/doc/webmusic/src/content/docs/bridge/index.mdx>) | Public reference / orientation; page type governed by dev templates |
 | [apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx](<../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx>) | Public reference / orientation; page type governed by dev templates |
 | [apps/doc/webmusic/src/content/docs/index.mdx](<../apps/doc/webmusic/src/content/docs/index.mdx>) | Public reference / orientation; page type governed by dev templates |

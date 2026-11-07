@@ -7,32 +7,22 @@ sidebar:
 ---
 
 `@webmusic/bridge` has no `/headless` subpath — everything is a root export.
-This section exists because its stateful object is documented under the
-**headless** contract rather than the API one: it is something you construct,
-drive and dispose, not a function you call.
-
-The object has no DOM or styles. A directly constructed sync calls each
-participant's optional dispose() method when released; it does not automatically
-borrow participants without cleanup. Factories own the players they create and
-close only contexts they create. A supplied context remains caller-owned.
+This section documents the stateful composition you construct, drive and
+dispose, rather than a function you call. It has no DOM or styles; it owns the
+engines and Session it creates and leaves a supplied context open.
 
 ## Exports documented here
 
 | Export | Kind | Page |
 | --- | --- | --- |
-| `ScoreAudioSync` | class | [ScoreAudioSync](/bridge/headless/score-audio-sync/) |
-| `createSyncedPlayback` | factory | on the same page — a class and its factories share a page |
-| `createAudioMasteredPlayback` | factory | on the same page |
-| `clipAsMaster` · `scoreAsFollower` | protocol adapters | [ScoreAudioSync](/bridge/headless/score-audio-sync/) — state/axis and disposer forwarding |
+| `createScoreAudioSession` | factory | [createScoreAudioSession](/bridge/headless/score-audio-session/) |
+| `registerAudioParticipant` | adapter | on the same page |
 
 ## Type ownership
 
-`ScoreAudioSyncOptions`, `CreateSyncedPlaybackOptions`,
-`CreateAudioMasteredPlaybackOptions`, `AudioMasterAdapterOptions`,
-`SyncScoreTransport`, `SyncClipTransport`, `SyncMasterTransport`,
-`SyncFollowerTransport`, `SyncTransportClockView`, `SyncLoopRegion` and
-`SyncTransportContract` are explained with
-[ScoreAudioSync](/bridge/headless/score-audio-sync/).
+`CreateScoreAudioSessionOptions`, `ScoreAudioSession`, `AudioParticipantOptions`
+and `AudioParticipantPlayer` are explained with
+[createScoreAudioSession](/bridge/headless/score-audio-session/).
 
 The remaining root values, constants and their options belong to the
 [Bridge API](/bridge/api/): timeline conversions, renderScoreToClip and

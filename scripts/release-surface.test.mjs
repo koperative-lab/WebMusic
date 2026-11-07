@@ -5,7 +5,7 @@ import {manifestBoundaryProblems, unpublishedWorkspacePackage} from './release-s
 const release = ['@webmusic/kernel', '@webmusic/ui', '@webmusic/score'];
 
 test('first-release consumers accept Score, Kernel and standalone UI presenter imports', () => {
-  for (const specifier of ['@webmusic/score', '@webmusic/score/play/headless', '@webmusic/kernel/sync', '@webmusic/ui/minimap']) {
+  for (const specifier of ['@webmusic/score', '@webmusic/score/play/headless', '@webmusic/kernel/session', '@webmusic/ui/minimap']) {
     assert.equal(unpublishedWorkspacePackage(specifier, release), undefined);
   }
 });

@@ -1,5 +1,14 @@
 # Bridge integration contracts
 
+> **2026-11-07 (DEC-068, MOD-15 round 8):** Bridge's master/follower sync family
+> (`ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`,
+> `clipAsMaster`, `scoreAsFollower`, `transport-contracts.ts`), Score's `TonePlayer`
+> and Kernel's public `@webmusic/kernel/sync` entry are removed. Score and Audio now
+> play together under one Session — `createScoreAudioSession` in code, nested
+> players and Racks in markup. Sections below that describe `TransportGroup`,
+> `MirrorClockMaster` and the pair factories are a historical record of the 0.2
+> design; the [modular composition contract](../dev/design/MODULAR-COMPOSITION.md) is current.
+
 The reusable integration layer between `@webmusic/score` and `@webmusic/audio`.
 The package at [`score-audio`](score-audio/) is named **`@webmusic/bridge`**.
 Applications may also compose both domains through public entries; within the

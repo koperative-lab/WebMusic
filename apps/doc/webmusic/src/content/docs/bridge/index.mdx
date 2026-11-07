@@ -13,10 +13,9 @@ time has exactly one home, and this is it.
 
 These jobs need both domains:
 
-- **Play a score and a recording together**, using one shared `AudioContext`
-  reference, one group command authority and drift correction —
-  `ScoreAudioSync` and its two factories. Each engine still owns its transport
-  clock.
+- **Play a score and a recording together** under one Session, the single
+  command authority of modular composition — `createScoreAudioSession`. Each
+  engine is a Session participant with an explicit mapping onto its own axis.
 - **Restore a mixed modular project**, with trusted Score, Audio, Rack, effect
   and Session-LFO factories — `createWebMusicProjectPlugins`. Kernel owns the
   shared scheduling/project protocol; your application supplies assets and storage.
@@ -44,16 +43,16 @@ borrowed lifetime. Bridge publishes after both families.
 ## The smallest example
 
 ```ts
-import { createSyncedPlayback } from "@webmusic/bridge";
+import { createScoreAudioSession } from "@webmusic/bridge";
 
-const { sync } = createSyncedPlayback(score, clip);
-await sync.play();
-// … sync.seek(seconds), sync.setLoop({startSeconds, endSeconds})
-sync.dispose();
+const { session, dispose } = createScoreAudioSession(score, clip);
+await session.play();
+// … session.seek(seconds), session.setLoop({startSeconds, endSeconds})
+dispose();
 ```
 
-One call builds both players on one shared context and returns them alongside
-the sync that owns them. What each option does, and what `dispose()` releases, is on the
+One call builds both engines in one module scope and returns the Session that
+conducts them. What each option does, and what `dispose()` releases, is on the
 pages below.
 
 ## Documentation
@@ -62,7 +61,7 @@ pages below.
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | [Playback composition](/bridge/composition/)           | A runnable score/audio session, borrowed views, source replacement and independent native loops.             |
 | [Modular composition and projects](/bridge/modular-composition/) | Shared Session scheduling, nested buses, parameters, recoverable project files and accessible patch editing. |
-| [`ScoreAudioSync`](/bridge/headless/score-audio-sync/) | The stateful sync object: construction, commands, state, the error channel, and what it owns versus borrows. |
+| [`createScoreAudioSession`](/bridge/headless/score-audio-session/) | One Session over a Score engine and an Audio clip: construction, mappings, ownership and the shared participant adapter. |
 | [`@webmusic/bridge`](/bridge/api/)                     | The entry reference — every root export, including the stateless conversion and rendering functions.         |
 
 ## What's next here

@@ -1,3 +1,4 @@
+import {registerAudioParticipant} from './audio-participant';
 import {Score} from '@webmusic/score';
 import {Effect, ScorePlayerModule, ScoreRackModule, Sound} from '@webmusic/score/play/headless';
 import {AudioClip} from '@webmusic/audio';
@@ -79,17 +80,10 @@ async function createAudio(request: ProjectFactoryRequest): Promise<ProjectModul
   };
   try {
     registration = context.registry.register(module);
-    participant = context.session?.register({
-      play: when => player.play(when), pause: () => player.pause(), stop: () => player.stop(),
-      seek: seconds => player.seek(seconds), setRate: rate => player.setRate(rate),
-      get position() { return player.seconds; }, get running() { return player.playing; },
-      get clock() { return player.clock; },
-    }, {
-      axis: 'audio-clip-seconds', identity: player, durationSeconds: clip.duration, endPolicy: 'position',
+    participant = context.session ? registerAudioParticipant(context.session, player, {
       offsetSeconds: number(record.config, 'offsetSeconds', 0), positionScale: number(record.config, 'positionScale', 1),
-      prepare: () => module.prepare!(), activate: () => player.activateScheduling(),
-      ...(player.timingCapabilities.sharedSessionClock && {attachScheduling: binding => player.attachScheduling(binding)}),
-    });
+      prepare: () => module.prepare!(),
+    }) : undefined;
   } catch (error) { try { dispose(); } catch { /* Preserve creation failure. */ } throw error; }
   return {module, ports: audioOutput, childContext: child => child.derive({id: child.id, target: module}),
     exportConfig: () => record.config, dispose};

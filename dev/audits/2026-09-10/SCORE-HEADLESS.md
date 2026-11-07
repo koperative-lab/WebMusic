@@ -82,7 +82,7 @@ Additional root-owned Play regressions are in
   the original frequency axis. Independent cascade magnitudes `0.5` and `2`
   sum to zero dB. At 48,000 Hz the normal 64-sample response remains intact.
 
-The separate [Tone regression suite](../../../packages/score/test/play/tone-player.test.ts)
+The separate Tone regression suite (`packages/score/test/play/tone-player.test.ts`, removed with `TonePlayer` on 2026-11-07)
 covers callback-driven seek/play/dispose, pending unlock compatibility and
 both owned/shared transport modes. Multi-note replay cases additionally require
 every old handle to be released and exactly one fresh schedule to remain;

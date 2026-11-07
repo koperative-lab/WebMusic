@@ -414,7 +414,6 @@ the beat's notes, so the same pull signal can drive lights or robotics.
 | Multiple instruments, each its own score / sound / effect | `Rack` |
 | Progress bar / scrub / rate control | `ScorePlayer` + `@webmusic/score/play/drivers` |
 | Drop a player widget on the page | `<score-player>` |
-| A project that already owns a Tone.js clock | `TonePlayer` (optional `tone` peer) |
 
 ### Sounds
 
@@ -820,7 +819,7 @@ The core install stays lean; each optional peer unlocks one capability:
 | Peer | Version | Unlocks |
 |---|---|---|
 | `spessasynth_lib` | `^4.0.0` | `Sound.soundfont2()` — `.sf2` / `.sf3` SoundFont playback (see the `workletUrl` recipe above). |
-| `tone` | `>=14.0.0` | `TonePlayer` — playback on an injected `Tone.Transport`, and `Sound.from(toneInstrument)`. |
+| `tone` | `>=14.0.0` | `Sound.from(toneInstrument)` — play a Tone.js instrument as a synth. |
 | `react` | `>=18` | `@webmusic/score/react` hooks and components. |
 | `@webmusic/ui` | `^0.3.0` | `/element`, `/auto`, visible analysis elements and default Web Component presenters. |
 

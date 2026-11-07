@@ -1,3 +1,4 @@
+import type {NoteInputPort, NoteOutputPort} from './note-port';
 import {attachSessionAutomation, SessionTransport, type SessionAutomationLease} from '../session';
 import type {TransportCommit} from '../sync';
 import type {AudioOutputPort} from './audio-port';
@@ -6,7 +7,7 @@ import {createConnectionLease, type ConnectionLease} from './lease';
 import {ParamMacro} from './param-macro';
 import type {ParamMapping} from './param-audio';
 import type {ParamHandle} from './parameter';
-import {createModuleHandle, ModuleRegistry, type ModuleHandle} from './registry';
+import {createModuleHandle, getModulePort, ModuleRegistry, type ModuleHandle} from './registry';
 import {parseModuleProject} from './project-schema';
 import type {
   ModuleProject, ProjectConnectionRecord, ProjectContextRecord, ProjectDiagnostic,
@@ -489,6 +490,13 @@ export class ModuleProjectRuntime {
         return createConnectionLease(() => { try { replacement.release(); } finally { silence.disconnect(); } });
       }
       return undefined;
+    }
+    if (connection.kind === 'note' && from && to) {
+      // Note edges are native Kernel ports (DEC-068); a released lease cancels
+      // only the occurrences it delivered.
+      const source = getModulePort(from.module, connection.from.port, 'note', 'output') as NoteOutputPort | undefined;
+      const target = getModulePort(to.module, connection.to.port, 'note', 'input') as NoteInputPort | undefined;
+      if (source && target) return target.connect(source);
     }
     if (from && to && this.#options.connect) {
       const lease = await abortable(this.#options.connect({connection, from, to, context: graph.context, signal: graph.controller.signal}), graph.controller.signal, value => this.#retire(value));

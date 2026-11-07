@@ -18,7 +18,6 @@ take exactly what they use.
 | [`/meter`](#meter--webmusickernelmeter) | Shared analyser meter contract and implementation |
 | [`/transport`](#transport--webmusickerneltransport) | `TransportClock` affine anchor math, `TimelineMapping`, tempo grids and `TempoClock` |
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
-| [`/sync`](#sync--webmusickernelsync) | Transport grouping, timeline mapping and drift coordination |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
 
@@ -814,6 +813,158 @@ sources with lookahead, not a callback-driven parameter write. Scheduling stalls
 longer than the prepared horizon can underrun. For independent audio-clock
 modulation use [`ControlLFO`](#control-generators) instead.
 
+### Command authority and participants
+
+Under each `SessionTransport` a command group drives the participants on a
+shared lead-in, checks drift on a cadence and re-seeks a follower that has
+slipped past tolerance. It is a Session internal: the former public
+Kernel `sync` entry (`TransportGroup`, `MirrorClockMaster`) is removed
+in 0.3.0 (DEC-068), and its participant and command contracts —
+`SyncFollowerTransport`, `FollowerOptions`, `SyncLoopRegion`,
+`TransportCommand`, `TransportCommit`, `TransportEvent`, `TransportSnapshot` —
+are exported from `@webmusic/kernel/session`. Commands are serialized, so a
+late async settlement cannot reorder state.
+
+A continuous shared-anchor master receives an optional `isCurrent()` callback
+as the third argument of `seekPosition(position, when?, isCurrent?)` and the
+second argument of `loopChanged(loop, isCurrent?)`. Apply queued state changes
+in order, but publish native scheduling work only while that callback returns
+true: a newer command may already own the invalidation epoch. Other masters
+can continue implementing the shorter signatures.
+
+#### Session commands and observation
+
+The group is one command authority on the master's **stable position axis**.
+`dispatch()` uses the same participant engines as the existing controls; it
+creates no second player or writable clock. Commands should go through the group
+while those participants form a session. Direct engine changes cannot receive a
+group revision until observed reconciliation detects them.
+
+| Member | Contract |
+| --- | --- |
+| `dispatch(command: TransportCommand)` | Returns `Promise<TransportCommit>`. Play, seek and rate wait for participant preparation/re-entry; pause/stop take effect immediately and await late-start reconciliation. Invalid commands throw before changing revision. Current-operation failure rejects, publishes `error`, and attempts to pause participants after partial application. Cleanup continues if an adapter throws; a superseded failure cannot override a newer command. |
+| `snapshot` | `TransportSnapshot` read at one reference instant: `revision`, `referenceTime`, stable `position`, `rate`, `paused`, pre-roll `holding`, `loop`, `pending`, `disposed`. This is a frozen value, not a ticking event source. |
+| `subscribe(listener)` | Registers before synchronously delivering `{type: 'snapshot', snapshot}`; returns an idempotent unsubscribe function. An initial listener failure removes its subscription; subsequent listener failures are contained. Detaching leaves playback alive. |
+| `TransportCommand` | `{type: 'play'}`, `{type: 'pause'}`, `{type: 'stop'}`, `{type: 'seek', position}`, `{type: 'rate', rate}`, or `{type: 'loop', loop}`. Positions/bounds use the master's content axis; rate is finite and positive. `loop` is `{startSeconds, endSeconds}` or `null`; bounds must be finite, nonnegative and ordered. |
+| `TransportCommit` | `{revision, command, status, snapshot}`. `status` is `committed` or `superseded`: a newer command, background reconciliation or disposal prevents old work claiming the current authority. Settlement describes the adapters' work, not proof of audible output. |
+| `TransportEvent` | Initial/disposal `snapshot`; `invalidate` before a command with its revision/command/snapshot; `commit` with its result/snapshot; `error` with revision/command/error/snapshot; background `reconcile` with operation, `invalidate` or `settled` phase and snapshot; `operation-error` with operation/error/snapshot. |
+
+`dispatch({type: 'rate', rate})` checks accepted rates where readers expose them;
+transports without observable rate state cannot prove they honored a request.
+A master that remains paused after a running seek is a rejected dispatch, even
+when its adapter resolves instead of throwing. Older `play`, `pause`, `stop`,
+`seek`, `setRate` and `setLoop` methods retain their signatures and compatibility
+behavior, including best-effort optional rate matching. Their changes also pass
+through the observation surface; use `dispatch` when command failure must be
+awaited. Background errors are visible through both `operation-error` events and
+the optional `onOperationError` construction callback.
+
+Use `snapshot.position` or `clock.positionAt(referenceTime)` for moving display
+positions. Subscription events describe state transitions rather than animation
+frames. Invalidation precedes engine commands: engines cancel and re-arm through
+their existing methods. It is not a callback enabling unrelated engines to share
+a writable `TransportClock`. Disposal publishes a final snapshot, removes
+observers and invokes registered optional participant disposers; its snapshot
+retains the last readable position and is not a continuing playback observation.
+
+#### Participant-local time and native loops
+
+`addFollower(transport, options?)` accepts `FollowerOptions`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `offsetSeconds` | `0` | Finite nonnegative local position at master zero. |
+| `positionScale` | `1` | Finite positive scale; local position is `offset + masterPosition × scale`, local rate is `masterRate × scale`. A non-unit scale requires `setRate`. |
+| `loop` | absent | `{startSeconds, endSeconds}` in the follower's local seconds, for a participant **already configured to loop natively**. This option maps phase; it does not enable a loop on the transport. |
+
+Before the local loop end, intro positions pass through. At/past the end, local
+positions fold into `[startSeconds, endSeconds)`. Scheduled joins and seeks use
+this mapped phase; drift reads normalize wrapped or unwrapped clocks and compare
+shortest circular phase error, converted back to master units for the tolerance.
+Several followers may have different periods while the master remains continuous.
+All mappings and loops are copied on registration; remove/re-add to change them.
+`removeFollower` leaves that participant's current playback/resources with its
+caller, while group disposal invokes the disposers of remaining members.
+
+These mappings support affine scaling and native-loop phase. They do not consume
+arbitrary nonlinear `TimelineMapping`, implement audio warping, or make tick-watched
+**group** loops sample accurate. A native-loop adapter must expose consistent
+local seconds, rate and scheduling behavior; incorrect metadata can produce
+incorrect alignment even when its shape is valid.
+
+`MirrorClockMaster` adapts a transport that has **no readable clock** into the
+master role: it dead-reckons a mirror `TransportClock` across the command
+surface and reconciles it against the transport's real position at drift checks
+or periodic lifecycle samples when drift checks are disabled. Once forward
+motion has established an observed position step, a long enough stationary
+interval can report `stalled`; before any observed motion, repeated positions
+alone are inconclusive. A moving transport that diverged re-anchors the mirror.
+This is the one home of the sampled fallback
+the bridge used to interleave through its clocked path.
+
+#### Element target discovery
+
+`observeElementTarget(host, selector, listener)` is exported from
+`@webmusic/kernel/element`. It resolves one unique target within the host's current
+Document or ShadowRoot and calls `listener(target, state)` immediately. The exported
+`ElementTargetState` is `ready`, `missing`, `invalid` or `ambiguous`; unsuccessful
+resolution supplies `undefined`, never an arbitrary matching element.
+
+Discovery follows insertion, removal, relevant attribute changes, replacement and
+late custom-element definition while attached. A target changing a non-reflected
+source property can dispatch a bubbling `webmusic:sourcechange` event to request a
+fresh connection. The helper contains no musical models or playback policy.
+
+The returned idempotent cleanup stops observation and ignores pending upgrade
+callbacks. Call it on host disconnection, selector changes or moving the host to
+another root; create a new observation after reconnecting. An initial listener
+exception releases the observer before being rethrown. This helper never disposes
+the selected target or grants authority to its commands.
+
+#### Borrowed Element sources
+
+`observeElementSource<T>(host, options, listener)` adapts an explicit object or
+a selected element's public property to `ElementSourceResolution<T>`. It builds
+on `observeElementTarget`; it does not subscribe to or dispose the domain source.
+The consumer supplies a type guard and owns any content/state subscriptions.
+
+| `ElementSourceOptions<T>` field | Contract |
+|---|---|
+| `source?: unknown` | Explicit source takes precedence. Only `undefined` enables selector lookup; invalid explicit values never fall back. |
+| `selector?: string` | One unique target in the host Document/ShadowRoot. Missing/empty selector reports `missing`. |
+| `property: string` | Public property to read from the selected target, such as `editor`. |
+| `accepts(value): value is T` | Domain validation. A false result or exception reports `invalid`; Kernel supplies no domain-specific check. |
+
+The listener receives the current resolution synchronously, then selector
+replacement, late upgrade or `webmusic:sourcechange` updates. The exported
+`ElementSourceState` is `ready | missing | invalid | ambiguous | unavailable`.
+`ElementSourceResolution<T>` contains `state`, optional validated `source`,
+optional selected `target`, and optional `error`. A target with an undefined
+property is `unavailable`; malformed or throwing property reads are `invalid`.
+Invalid CSS and ambiguous targets retain the discovery states above.
+
+The helper captures its options for one binding. Its idempotent cleanup stops
+discovery; call it and create a new binding when properties/selectors change or
+the host reconnects in another root. Listener exceptions propagate; an initial
+exception cleans up discovery. Source disposal is the domain owner's job, and
+runtime readiness still comes from that domain's snapshots.
+
+```ts
+import {observeElementSource} from '@webmusic/kernel/element';
+import {isScoreDocumentSource} from '@webmusic/score';
+
+// A custom application element that discovers a sibling exposing `.editor`.
+const host = document.querySelector('my-score-panel');
+if (host) {
+  const stop = observeElementSource(host, {
+    selector: '#editor-host', property: 'editor', accepts: isScoreDocumentSource,
+  }, ({state, source}) => {
+    console.log(state, source?.getSnapshot().documentRevision);
+  });
+  // Retain stop for this host's teardown or configuration change.
+  stop();
+}
+```
 ## meter — @webmusic/kernel/meter
 
 `AnalyserMeter` owns the transparent `input → analyser → output` tap both
@@ -927,153 +1078,3 @@ ticks.start(() => schedulerPass());
 // later: ticks.stop() to pause, ticks.dispose() to release the worker
 ```
 
-## sync — @webmusic/kernel/sync
-
-`TransportGroup` drives one master transport and any number of followers on a
-shared lead-in, checking drift on a cadence and re-seeking a follower that has
-slipped past tolerance. `SyncMasterTransport` and `SyncFollowerTransport` are
-the structural ports it accepts, so anything exposing that surface can join —
-which is how the [bridge](/bridge/) synchronizes a Score player against an
-Audio clip without either package importing the other. Commands are
-serialized, so a late async settlement cannot reorder state.
-
-A continuous shared-anchor master receives an optional `isCurrent()` callback
-as the third argument of `seekPosition(position, when?, isCurrent?)` and the
-second argument of `loopChanged(loop, isCurrent?)`. Apply queued state changes
-in order, but publish native scheduling work only while that callback returns
-true: a newer command may already own the invalidation epoch. Other masters
-can continue implementing the shorter signatures.
-
-### Session commands and observation
-
-The group is one command authority on the master's **stable position axis**.
-`dispatch()` uses the same participant engines as the existing controls; it
-creates no second player or writable clock. Commands should go through the group
-while those participants form a session. Direct engine changes cannot receive a
-group revision until observed reconciliation detects them.
-
-| Member | Contract |
-| --- | --- |
-| `dispatch(command: TransportCommand)` | Returns `Promise<TransportCommit>`. Play, seek and rate wait for participant preparation/re-entry; pause/stop take effect immediately and await late-start reconciliation. Invalid commands throw before changing revision. Current-operation failure rejects, publishes `error`, and attempts to pause participants after partial application. Cleanup continues if an adapter throws; a superseded failure cannot override a newer command. |
-| `snapshot` | `TransportSnapshot` read at one reference instant: `revision`, `referenceTime`, stable `position`, `rate`, `paused`, pre-roll `holding`, `loop`, `pending`, `disposed`. This is a frozen value, not a ticking event source. |
-| `subscribe(listener)` | Registers before synchronously delivering `{type: 'snapshot', snapshot}`; returns an idempotent unsubscribe function. An initial listener failure removes its subscription; subsequent listener failures are contained. Detaching leaves playback alive. |
-| `TransportCommand` | `{type: 'play'}`, `{type: 'pause'}`, `{type: 'stop'}`, `{type: 'seek', position}`, `{type: 'rate', rate}`, or `{type: 'loop', loop}`. Positions/bounds use the master's content axis; rate is finite and positive. `loop` is `{startSeconds, endSeconds}` or `null`; bounds must be finite, nonnegative and ordered. |
-| `TransportCommit` | `{revision, command, status, snapshot}`. `status` is `committed` or `superseded`: a newer command, background reconciliation or disposal prevents old work claiming the current authority. Settlement describes the adapters' work, not proof of audible output. |
-| `TransportEvent` | Initial/disposal `snapshot`; `invalidate` before a command with its revision/command/snapshot; `commit` with its result/snapshot; `error` with revision/command/error/snapshot; background `reconcile` with operation, `invalidate` or `settled` phase and snapshot; `operation-error` with operation/error/snapshot. |
-
-`dispatch({type: 'rate', rate})` checks accepted rates where readers expose them;
-transports without observable rate state cannot prove they honored a request.
-A master that remains paused after a running seek is a rejected dispatch, even
-when its adapter resolves instead of throwing. Older `play`, `pause`, `stop`,
-`seek`, `setRate` and `setLoop` methods retain their signatures and compatibility
-behavior, including best-effort optional rate matching. Their changes also pass
-through the observation surface; use `dispatch` when command failure must be
-awaited. Background errors are visible through both `operation-error` events and
-the optional `onOperationError` construction callback.
-
-Use `snapshot.position` or `clock.positionAt(referenceTime)` for moving display
-positions. Subscription events describe state transitions rather than animation
-frames. Invalidation precedes engine commands: engines cancel and re-arm through
-their existing methods. It is not a callback enabling unrelated engines to share
-a writable `TransportClock`. Disposal publishes a final snapshot, removes
-observers and invokes registered optional participant disposers; its snapshot
-retains the last readable position and is not a continuing playback observation.
-
-### Participant-local time and native loops
-
-`addFollower(transport, options?)` accepts `FollowerOptions`:
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `offsetSeconds` | `0` | Finite nonnegative local position at master zero. |
-| `positionScale` | `1` | Finite positive scale; local position is `offset + masterPosition × scale`, local rate is `masterRate × scale`. A non-unit scale requires `setRate`. |
-| `loop` | absent | `{startSeconds, endSeconds}` in the follower's local seconds, for a participant **already configured to loop natively**. This option maps phase; it does not enable a loop on the transport. |
-
-Before the local loop end, intro positions pass through. At/past the end, local
-positions fold into `[startSeconds, endSeconds)`. Scheduled joins and seeks use
-this mapped phase; drift reads normalize wrapped or unwrapped clocks and compare
-shortest circular phase error, converted back to master units for the tolerance.
-Several followers may have different periods while the master remains continuous.
-All mappings and loops are copied on registration; remove/re-add to change them.
-`removeFollower` leaves that participant's current playback/resources with its
-caller, while group disposal invokes the disposers of remaining members.
-
-These mappings support affine scaling and native-loop phase. They do not consume
-arbitrary nonlinear `TimelineMapping`, implement audio warping, or make tick-watched
-**group** loops sample accurate. A native-loop adapter must expose consistent
-local seconds, rate and scheduling behavior; incorrect metadata can produce
-incorrect alignment even when its shape is valid.
-
-`MirrorClockMaster` adapts a transport that has **no readable clock** into the
-master role: it dead-reckons a mirror `TransportClock` across the command
-surface and reconciles it against the transport's real position at drift checks
-or periodic lifecycle samples when drift checks are disabled. Once forward
-motion has established an observed position step, a long enough stationary
-interval can report `stalled`; before any observed motion, repeated positions
-alone are inconclusive. A moving transport that diverged re-anchors the mirror.
-This is the one home of the sampled fallback
-the bridge used to interleave through its clocked path.
-
-### Element target discovery
-
-`observeElementTarget(host, selector, listener)` is exported from
-`@webmusic/kernel/element`. It resolves one unique target within the host's current
-Document or ShadowRoot and calls `listener(target, state)` immediately. The exported
-`ElementTargetState` is `ready`, `missing`, `invalid` or `ambiguous`; unsuccessful
-resolution supplies `undefined`, never an arbitrary matching element.
-
-Discovery follows insertion, removal, relevant attribute changes, replacement and
-late custom-element definition while attached. A target changing a non-reflected
-source property can dispatch a bubbling `webmusic:sourcechange` event to request a
-fresh connection. The helper contains no musical models or playback policy.
-
-The returned idempotent cleanup stops observation and ignores pending upgrade
-callbacks. Call it on host disconnection, selector changes or moving the host to
-another root; create a new observation after reconnecting. An initial listener
-exception releases the observer before being rethrown. This helper never disposes
-the selected target or grants authority to its commands.
-
-### Borrowed Element sources
-
-`observeElementSource<T>(host, options, listener)` adapts an explicit object or
-a selected element's public property to `ElementSourceResolution<T>`. It builds
-on `observeElementTarget`; it does not subscribe to or dispose the domain source.
-The consumer supplies a type guard and owns any content/state subscriptions.
-
-| `ElementSourceOptions<T>` field | Contract |
-|---|---|
-| `source?: unknown` | Explicit source takes precedence. Only `undefined` enables selector lookup; invalid explicit values never fall back. |
-| `selector?: string` | One unique target in the host Document/ShadowRoot. Missing/empty selector reports `missing`. |
-| `property: string` | Public property to read from the selected target, such as `editor`. |
-| `accepts(value): value is T` | Domain validation. A false result or exception reports `invalid`; Kernel supplies no domain-specific check. |
-
-The listener receives the current resolution synchronously, then selector
-replacement, late upgrade or `webmusic:sourcechange` updates. The exported
-`ElementSourceState` is `ready | missing | invalid | ambiguous | unavailable`.
-`ElementSourceResolution<T>` contains `state`, optional validated `source`,
-optional selected `target`, and optional `error`. A target with an undefined
-property is `unavailable`; malformed or throwing property reads are `invalid`.
-Invalid CSS and ambiguous targets retain the discovery states above.
-
-The helper captures its options for one binding. Its idempotent cleanup stops
-discovery; call it and create a new binding when properties/selectors change or
-the host reconnects in another root. Listener exceptions propagate; an initial
-exception cleans up discovery. Source disposal is the domain owner's job, and
-runtime readiness still comes from that domain's snapshots.
-
-```ts
-import {observeElementSource} from '@webmusic/kernel/element';
-import {isScoreDocumentSource} from '@webmusic/score';
-
-// A custom application element that discovers a sibling exposing `.editor`.
-const host = document.querySelector('my-score-panel');
-if (host) {
-  const stop = observeElementSource(host, {
-    selector: '#editor-host', property: 'editor', accepts: isScoreDocumentSource,
-  }, ({state, source}) => {
-    console.log(state, source?.getSnapshot().documentRevision);
-  });
-  // Retain stop for this host's teardown or configuration change.
-  stop();
-}
-```

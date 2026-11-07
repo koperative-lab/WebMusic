@@ -8,6 +8,7 @@ export {
   type UseScoreAnalysisOptions,
 } from './analysis';
 export {ScoreProvider, useCursor, useOptionalScore, usePlayer, useScore, type ScoreProviderProps} from './context';
+export {useModulePorts, useSessionSnapshot} from './modules';
 export {
   SimplePianoRoll,
   SimpleScorePlayer,

@@ -27,7 +27,7 @@ vi.mock("@webmusic/audio/view/render", () => ({
   renderWaveformVisualizer: boundaries.waveform,
 }));
 vi.mock("@webmusic/bridge", () => ({
-  createSyncedPlayback: boundaries.pair,
+  createScoreAudioSession: boundaries.pair,
   renderScoreToClip: boundaries.render,
 }));
 vi.mock("@webmusic/ui/transport", async (importOriginal) => {
@@ -92,17 +92,22 @@ function newPair() {
     ),
     dispose: vi.fn(),
   };
-  return {
-    sync,
-    scorePlayer: {
-      setVolume: vi.fn(),
-      playback: {
-        snapshot: vi.fn(() => scoreSnapshot),
-        subscribe: vi.fn(() => vi.fn()),
-        seekNominal: vi.fn(),
-      },
+  const scorePlayer = {
+    setVolume: vi.fn(),
+    playback: {
+      snapshot: vi.fn(() => scoreSnapshot),
+      subscribe: vi.fn(() => vi.fn()),
+      seekNominal: vi.fn(),
     },
+  };
+  // createScoreAudioSession's shape; `sync`/`scorePlayer` alias it for assertions.
+  return {
+    session: sync,
+    sync,
+    scoreModule: { player: scorePlayer },
+    scorePlayer,
     clipPlayer: { seconds: 0 },
+    dispose: sync.dispose,
   };
 }
 

@@ -14,7 +14,7 @@ const headlessSources = {
   'play/player-controller': ['controller'],
   'play/metronome': ['inputs', 'tempo'],
   'play/effect': ['effects'],
-  'play/score-player': ['score-player', 'tone-player', 'score-module'],
+  'play/score-player': ['score-player', 'score-module', 'note-modules'],
   'play/rack': ['rack', 'score-rack-module'],
   'analyze/analysis-session': ['session', 'report'],
   'analyze/analysis-follower': ['follower', 'transport-clock'],

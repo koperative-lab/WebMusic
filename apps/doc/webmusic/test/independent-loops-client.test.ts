@@ -9,7 +9,7 @@ vi.mock('@webmusic/audio/play', () => ({loadClipFromUrl: boundaries.loadClip}));
 vi.mock('@webmusic/audio/play/headless', () => ({AudioClipPlayer: class {
   constructor(...args: unknown[]) { return boundaries.players(...args); }
 }}));
-vi.mock('@webmusic/kernel/sync', () => ({TransportGroup: class {
+vi.mock('@webmusic/kernel/session', () => ({SessionTransport: class {
   constructor(...args: unknown[]) { return boundaries.groups(...args); }
 }}));
 
@@ -102,7 +102,7 @@ describe('independent loop composition lifecycle', () => {
     expect(boundaries.groups).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledOnce();
     boundaries.players.mockImplementation(follower);
-    boundaries.groups.mockReturnValue({addFollower: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
+    boundaries.groups.mockReturnValue({register: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
       dispatch: vi.fn(async () => ({status: 'committed', snapshot: {position: 0}}))});
     root.querySelector<HTMLButtonElement>('[data-start]')!.click(); await flush();
     expect(boundaries.loadClip).toHaveBeenCalledOnce();
@@ -119,7 +119,7 @@ describe('independent loop composition lifecycle', () => {
     expect(root.querySelector('[data-status]')!.textContent).toBe('offline');
     expect(close).toHaveBeenCalledOnce();
     boundaries.players.mockImplementation(follower);
-    boundaries.groups.mockReturnValue({addFollower: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
+    boundaries.groups.mockReturnValue({register: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
       dispatch: vi.fn(async () => ({status: 'committed', snapshot: {position: 0}}))});
     root.querySelector<HTMLButtonElement>('[data-start]')!.click(); await flush();
     expect(boundaries.loadClip).toHaveBeenCalledTimes(2);
@@ -131,11 +131,7 @@ describe('independent loop composition lifecycle', () => {
     boundaries.players.mockReturnValueOnce(first).mockImplementationOnce(() => {
       throw new Error('second follower failed');
     });
-    const members: Array<{dispose(): void}> = [];
-    const group = {
-      addFollower: vi.fn((member) => { members.push(member); }),
-      dispose: vi.fn(() => { for (const member of members) member.dispose(); }),
-    };
+    const group = {register: vi.fn(), dispose: vi.fn()};
     boundaries.groups.mockReturnValue(group);
     const root = mount();
     root.querySelector<HTMLButtonElement>('[data-start]')!.click(); await flush();
@@ -158,9 +154,9 @@ describe('independent loop composition lifecycle', () => {
     expect(boundaries.groups).not.toHaveBeenCalled();
   });
 
-  it('configures native loops and matching group metadata without looping the master', async () => {
+  it('configures native loops and matching Session participant loops without a Session range', async () => {
     boundaries.players.mockImplementation(follower);
-    const group = {addFollower: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
+    const group = {register: vi.fn(), subscribe: vi.fn(() => vi.fn()), dispose: vi.fn(),
       dispatch: vi.fn(async () => ({status: 'committed', snapshot: {position: 0}}))};
     boundaries.groups.mockReturnValue(group);
     const root = mount();
@@ -168,10 +164,11 @@ describe('independent loop composition lifecycle', () => {
     expect(boundaries.players).toHaveBeenCalledTimes(2);
     expect(boundaries.players.mock.calls[0][1]).toMatchObject({loop: {start: 0, end: 1}, engine: 'buffer'});
     expect(boundaries.players.mock.calls[1][1]).toMatchObject({loop: {start: 0, end: 1.5}, engine: 'buffer'});
-    expect(group.addFollower.mock.calls.map((call) => call[1])).toEqual([
-      {loop: {startSeconds: 0, endSeconds: 1}}, {loop: {startSeconds: 0, endSeconds: 1.5}},
+    expect(group.register.mock.calls.map((call) => call[1])).toEqual([
+      expect.objectContaining({axis: 'clip-seconds', loop: {startSeconds: 0, endSeconds: 1}}),
+      expect.objectContaining({axis: 'clip-seconds', loop: {startSeconds: 0, endSeconds: 1.5}}),
     ]);
-    expect(boundaries.groups.mock.calls[0][2]).not.toHaveProperty('loop');
+    expect(boundaries.groups.mock.calls[0][1]).not.toHaveProperty('loop');
     root.querySelector<HTMLButtonElement>('[data-seek]')!.click(); await flush();
     expect(group.dispatch).toHaveBeenLastCalledWith({type: 'seek', position: 4.25});
     root.remove(); await flush();

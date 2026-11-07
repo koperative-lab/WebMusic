@@ -4,33 +4,17 @@ export {
   timeMapFromBeatGrid,
   type BeatGridFromTimeMapOptions,
 } from './mapping';
+export {renderScoreToClip} from './render';
 export {
-  ScoreAudioSync,
-  createSyncedPlayback,
-  renderScoreToClip,
-  type ScoreAudioSyncOptions,
-  type CreateSyncedPlaybackOptions,
-  type SyncScoreTransport,
-  type SyncClipTransport,
-  type SyncMasterTransport,
-  type SyncFollowerTransport,
-  type SyncTransportClockView,
-  type SyncLoopRegion,
-} from './sync';
-export {
-  clipAsMaster,
-  createAudioMasteredPlayback,
-  scoreAsFollower,
-  type AudioMasterAdapterOptions,
-  type CreateAudioMasteredPlaybackOptions,
-} from './audio-master';
+  createScoreAudioSession,
+  type CreateScoreAudioSessionOptions,
+  type ScoreAudioSession,
+} from './session';
+export {registerAudioParticipant, type AudioParticipantOptions, type AudioParticipantPlayer} from './audio-participant';
 export {
   DEFAULT_MAX_TRANSCRIPTION_MEASURES,
   DEFAULT_MAX_TRANSCRIPTION_NOTES,
   scoreFromTranscription,
   type ScoreFromTranscriptionOptions,
 } from './transcription';
-export type {SyncTransportContract} from './transport-contracts';
 export {createWebMusicProjectPlugins} from './project';
-
-export type {TransportCommand, TransportCommit, TransportEvent, TransportSnapshot} from '@webmusic/kernel/sync';

@@ -90,7 +90,7 @@ export const audioBridgeContext = Object.freeze({
     'AudioClipEditorHeadlessDemo', 'AudioClipViewDemo',
     'AudioLiveViewPlayground', 'AudioMeterDemo', 'AudioMixerDemo',
     'AudioPlaylistPlayground', 'AudioViewDemo', 'AudioWorkbenchDemo',
-    'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSyncDemo',
+    'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSessionDemo',
   ],
   componentInventories: ['/audio/element/', '/audio/headless/'],
   sourceScope: 'Selected owning implementation files from the identified source snapshot. Package version labels do not establish release compatibility; imports and internal selectors are not public entries.',
@@ -102,7 +102,7 @@ export const audioBridgeContext = Object.freeze({
   },
   components(pages, record) {
     return pages.flatMap((page) => {
-      if (page.route === '/bridge/headless/score-audio-sync/') return [record('headless/bridge/score-audio-sync', 'headless', page, ['sync', 'audio-master'].map((name) => `bridges/score-audio/src/${name}.ts`), {styles: false})];
+      if (page.route === '/bridge/headless/score-audio-session/') return [record('headless/bridge/score-audio-session', 'headless', page, ['session', 'audio-participant'].map((name) => `bridges/score-audio/src/${name}.ts`), {styles: false})];
       const match = /^\/audio\/headless\/(play|analyze|view)\/([^/]+)\/$/.exec(page.route);
       if (!match) return [];
       const [, family, name] = match;

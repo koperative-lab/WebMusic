@@ -16,7 +16,7 @@ import {
 } from '@webmusic/kernel/module';
 import type {InsertChain} from '@webmusic/kernel/effect';
 import type {ModuleSession} from '@webmusic/kernel/session';
-import type {SyncFollowerTransport} from '@webmusic/kernel/sync';
+import type {SyncFollowerTransport} from '@webmusic/kernel/session';
 import type {Score, ScoreDocumentSource, ScorePlaybackSource} from '../../core';
 import type {NoteInputTarget} from '../core/note-input-model';
 import type {ScorePlayerOptions} from './audio-contracts';
