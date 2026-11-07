@@ -84,7 +84,7 @@ export function bindAnalysisPlayer(
   // Resolve the owner before tapping so its first reading selects the target
   // and the tap that follows does not count as a second source change.
   let detachOwner: (() => void) | undefined;
-  const stopOwner = assigned !== undefined ? () => undefined : observeCompanionTarget(host, ['input'], (element, state) => {
+  const stopOwner = assigned !== undefined ? () => undefined : observeCompanionTarget(host, (element, state) => {
     detachOwner?.(); detachOwner = undefined;
     owner = element as AnalysisPlayerTarget | undefined;
     ownerState = owner ? state : host.hasAttribute('input') ? state : 'unbound';

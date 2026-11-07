@@ -1,21 +1,16 @@
-import {observeElementTarget, observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
+import {observeCompanionInput, type ElementTargetState} from '@webmusic/kernel/element';
 import {AUDIO_PLAYER_OWNER} from '../../../core/player-owner';
 
 /**
- * Resolve the element an Audio companion (view or analyser) follows (DEC-068): the first present
- * selector attribute (`input`), or — with
- * none — the enclosing `<audio-player>` scope by containment.
+ * Resolve the element an Audio companion (view or analyser) follows (DEC-068):
+ * the `input` selector's target or, with none, the enclosing `<audio-player>`
+ * scope by containment. Discovery is Kernel's shared companion resolution; an
+ * Audio `port` attribute names an audio tap, so it never selects a source port.
  */
 export function observeCompanionTarget(
   host: Element,
-  attributes: readonly string[],
   callback: (target: Element | undefined, state: ElementTargetState) => void,
 ): () => void {
-  const attribute = attributes.find((name) => host.getAttribute(name) !== null);
-  const selector = attribute ? host.getAttribute(attribute) : null;
-  if (selector) return observeElementTarget(host, selector, callback);
-  return observeModuleContext(host, (context) => {
-    const owner = context?.capabilities.get(AUDIO_PLAYER_OWNER) as Element | undefined;
-    callback(owner, owner ? 'ready' : 'missing');
-  });
+  return observeCompanionInput(host, {capability: AUDIO_PLAYER_OWNER, portAttribute: false},
+    (input) => callback(input.element, input.state === 'pending' ? 'missing' : input.state));
 }

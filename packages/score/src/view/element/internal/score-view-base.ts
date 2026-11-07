@@ -1,16 +1,17 @@
 import {
   bindViewPlayer, readViewPlayerScore, readViewPlayerSnapshot,
-  type ViewPlayerNote, type ViewPlayerSnapshot,
+  type ViewPlayerNote, type ViewPlayerOwner, type ViewPlayerSnapshot,
 } from './player-binding';
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {isScoreEditorPort, type Score, type ScoreEditorPort, type ScoreInteractionSession,
-  type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../../core';
+  type ScorePlaybackSnapshot} from '../../../core';
 import {observeElementSource} from '@webmusic/kernel/element';
 import {createScoreViewEditing, scoreDocumentPlaybackCompatible, type ScoreViewEditing} from '../../headless/score-editing';
 import {HTMLElementBase, cssSizeAttr} from '../base';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 /** Attributes every score View Element observes for its data, playback and size. */
-export const SCORE_VIEW_BASE_ATTRIBUTES = Object.freeze(['src', 'format', 'input', 'width', 'height']);
+export const SCORE_VIEW_BASE_ATTRIBUTES = Object.freeze(['src', 'format', 'input', 'port', 'width', 'height']);
 
 /**
  * Data, playback and editor binding shared by the score View Elements. A
@@ -31,7 +32,8 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
   protected resolvedScore?: Score;
   private loadToken = 0;
   private loadController?: AbortController;
-  protected boundPlayer?: Element;
+  protected boundPlayer?: ViewPlayerOwner;
+  private assignedInputModule?: ModuleHandle | null;
   private playerUnbind?: () => void;
   protected lastSnapshot?: ViewPlayerSnapshot;
   protected status?: StatusHandle;
@@ -87,12 +89,24 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
 
   /** Handle a shared attribute; returns false for subclass attributes. */
   protected handleBaseAttribute(name: string): boolean {
-    if (name === 'input') this.bindPlayer();
+    if (name === 'input' || name === 'port') this.bindPlayer();
     // In editor mode only an added or removed src (a conflict) matters; format alone keeps the session.
     else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) { if (name === 'src') this.bindEditor(); } else void this.refresh(); }
     else if (name === 'width' || name === 'height') this.applyHostSize();
     else return false;
     return true;
+  }
+
+  /**
+   * Explicit module input (DEC-068): follow this module's `source` port (or
+   * the one `port` names) instead of the `input` selector or the enclosing
+   * scope. `null` unbinds; `undefined` returns to discovery.
+   */
+  get inputModule(): ModuleHandle | null | undefined { return this.assignedInputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    if (value === this.assignedInputModule) return;
+    this.assignedInputModule = value;
+    if (this.isConnected) this.bindPlayer();
   }
 
   /** Assign a pre-loaded score programmatically (overrides `src`). */
@@ -155,7 +169,7 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
     if (token !== this.loadToken || !this.isConnected) return; // superseded or detached
     this.loading = false;
     this.resolvedScore = score;
-    const native = (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot();
+    const native = this.boundPlayer?.playback?.snapshot();
     if (native && native.readiness !== 'unavailable' && native.score && score !== native.score) {
       this.lastSnapshot = undefined;
       this.setAttribute('data-player-state', 'mismatched');
@@ -182,7 +196,7 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
     }
     // An editor-bound view renders document content; its player contributes time only.
     const native = !this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')
-      ? (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot()
+      ? this.boundPlayer?.playback?.snapshot()
       : undefined;
     if (this.loading || native?.readiness === 'loading') {
       if (owner) this.showStatus('loading', 'Loading score');
@@ -301,7 +315,7 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
         this.endPresentationPlayback();
         if (!readViewPlayerSnapshot(this.boundPlayer)) this.playheadSeconds = 0;
       },
-    });
+    }, this.assignedInputModule);
     if (!this.playerUnbind && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
   }
 

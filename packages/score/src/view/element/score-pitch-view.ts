@@ -16,6 +16,7 @@ import {
   type PitchReadoutSpelling,
 } from '../core/pitch-readout';
 import {createPitchView} from '../headless/pitch-view';
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {bindViewPlayer} from './internal/player-binding';
 import {HTMLElementBase, defineOnce, numAttr, boolAttr, upgradeProperty} from './base';
 
@@ -31,7 +32,7 @@ const FRETBOARD_GEOMETRY_ATTRIBUTES = ['fret-width', 'string-spacing', 'string-w
  */
 export class PitchViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'direction', 'input', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
+    return ['type', 'direction', 'input', 'port', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
   }
 
   #notes = createPitchView();
@@ -113,9 +114,22 @@ export class PitchViewElement extends HTMLElementBase {
   /** Number of fret spaces visible. Defaults to 12, clamped to 1–24. */
   get frets(): number { return Math.max(1, Math.min(24, Math.round(numAttr(this, 'frets', 12)))); }
 
+  #inputModule?: ModuleHandle | null;
+  /**
+   * Explicit module input (DEC-068): follow this module's `source` port (or
+   * the one `port` names). `null` unbinds; `undefined` returns to discovery.
+   */
+  get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    if (value === this.#inputModule) return;
+    this.#inputModule = value;
+    if (this.isConnected) this.#bindPlayer();
+  }
+
   connectedCallback(): void {
     upgradeProperty(this, 'type');
     upgradeProperty(this, 'direction');
+    upgradeProperty(this, 'inputModule');
     this.#mountHostStyle();
     this.#status = mountStatus(this, {snapshot: () => this.#statusState}, {parts: {root: 'pitch-status', indicator: 'pitch-status-indicator', message: 'pitch-status-message'}});
     this.#render();
@@ -140,7 +154,7 @@ export class PitchViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected || !this.#hostStyle) return;
-    if (name === 'input') this.#bindPlayer();
+    if (name === 'input' || name === 'port') this.#bindPlayer();
     else if (name === 'type' || name === 'density' || name === 'scheme'
       || (this.type === 'keyboard' && (name === 'direction' || name === 'follow' || name === 'scroll' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
       || (this.type === 'fretboard' && FRETBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof FRETBOARD_GEOMETRY_ATTRIBUTES[number]))) this.#render();
@@ -254,7 +268,7 @@ export class PitchViewElement extends HTMLElementBase {
       },
       noteOn: ({midi}) => { this.#notes.noteOn(midi); },
       noteOff: ({midi}) => { this.#notes.noteOff(midi); },
-    });
+    }, this.#inputModule);
   }
 }
 

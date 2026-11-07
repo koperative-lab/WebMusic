@@ -58,14 +58,15 @@ never registers with or creates a Session.
 | --- | --- | --- |
 | Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
 | Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit module | `.inputModule = module` | Follows that module's `source` port (`webmusic.score`), or the one `port` names; `null` unbinds |
+| Module port | `port="source"` with `input` or containment | Follows the named source port on the selected or enclosing module instead of the owner element |
 | Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
 
-Playback resolves the explicit selector, then containment, then nothing. An
+Playback resolves `.inputModule`, then the explicit selector, then containment, then nothing; a `port` attribute moves the selector or containment onto that module's source port. Views and analysis share one follower, so they see the same notes, position and readiness. An
 `input` that is missing, invalid or ambiguous stays unbound, reported by
 `data-player-state`, and never falls back to the enclosing scope. Inside a
 source-free outer player, nest the view in the member that plays or name that
-member with `input`. This tag reads no `port` attribute and has no input
-object property.
+member with `input`.
 
 ```html
 <score-player src="/mxl/Arabesque%20No.1.mxl">
@@ -154,6 +155,7 @@ while its applied document matches the editor's committed revision, as for
 | --- | --- | --- | --- |
 | `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
 | `input` | attribute | containment | Unique selector of a player or Rack part to follow; without other data the sheet borrows its score. |
+| `port` | attribute | owner element | Follow this named `webmusic.score` source port on the input (or enclosing) module instead of the owner element; also names the port of `.inputModule` (default `source`). |
 | `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. |
 | `layout` / `.layout` | attribute / property | `page` | `page` or `flow`; other values read as `page`. |
 | `zoom` / `.zoom` | attribute / property | fit (`0`) | Staff size factor clamped to 0.5–3. Absent, zero or invalid fits a page to the width (page) or uses 1 (flow). |
@@ -162,6 +164,7 @@ while its applied document matches the editor's committed revision, as for
 | `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `pitch`, `input`, `duration`, `tie`, `accidental`, `delete`, `history`, `zoom`. Unknown tokens are ignored; the getter returns them in that order. |
 | `note-color` / `active-note-color` | attributes | sheet tokens | Notation ink and sounding ink as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`. |
 | `.score` | writable property | none | Assign a loaded Score; overrides `src` and borrowed input data. Throws while `.editor` is assigned. |
+| `.inputModule` | writable property | none | Explicit module input; follows its `source` port, or the one `port` names, before `input` and containment. `null` unbinds, `undefined` returns to discovery. |
 | `.editor` | writable property | none | Borrow any `ScoreEditorPort`; never disposed. `undefined` detaches it. |
 | `.interactionSession` | writable property | sheet-owned session | Borrow a same-document session to share selection and drafts, for example with a grid. |
 | `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |

@@ -51,7 +51,7 @@ export class ScoreGridViewElement extends ScoreViewElementBase {
   private reflecting = false;
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'editor', 'interactionSession', 'editable', 'tools', 'tool', 'snap', 'velocityLane', 'pixelsPerQuarter', 'noteHeight']);
+    upgradeProperties(this, ['score', 'inputModule', 'editor', 'interactionSession', 'editable', 'tools', 'tool', 'snap', 'velocityLane', 'pixelsPerQuarter', 'noteHeight']);
     super.connectedCallback();
   }
 

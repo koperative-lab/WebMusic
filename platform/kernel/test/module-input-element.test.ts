@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-  createModuleHandle, ModuleAudioEnvironment, ModuleContext, SOURCE_SCHEMAS, SourcePublisher,
+  createCapabilityKey, createModuleHandle, ModuleAudioEnvironment, ModuleCapabilities, ModuleContext, SOURCE_SCHEMAS, SourcePublisher,
   type ModuleHandle, type ModulePort,
 } from '../src/module';
-import {notifyModuleChange, observeModuleInput, provideModuleContext, type ModuleInputState} from '../src/elements';
+import {
+  notifyModuleChange, observeCompanionInput, observeModuleInput, provideModuleContext,
+  type CompanionInput, type ModuleInputState,
+} from '../src/elements';
 
 const cleanups: Array<() => void> = [];
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -84,5 +87,68 @@ describe('observeModuleInput', () => {
     const update = vi.fn();
     cleanups.push(observeModuleInput(host, {family: 'audio', port: 'output', assigned: module}, update));
     expect(update).toHaveBeenLastCalledWith({module, error: failure});
+  });
+});
+
+describe('observeCompanionInput', () => {
+  const OWNER = createCapabilityKey<object>('test.owner');
+
+  it('follows an explicit module source port and rejects another schema', () => {
+    const host = document.createElement('div');
+    host.setAttribute('input', '#ignored');
+    document.body.append(host);
+    const lead = sourceModule('lead');
+    const states: CompanionInput[] = [];
+    cleanups.push(observeCompanionInput(host, {capability: OWNER, assigned: lead.module, schemaId: SOURCE_SCHEMAS.score}, (input) => states.push(input)));
+    expect(states.at(-1)).toMatchObject({module: lead.module, state: 'ready'});
+    expect(states.at(-1)!.port!.schemaId).toBe(SOURCE_SCHEMAS.score);
+    lead.replace([new SourcePublisher(SOURCE_SCHEMAS.audioClip, {id: 'source'})]);
+    expect(states.at(-1)).toMatchObject({module: lead.module, state: 'invalid'});
+    expect(String(states.at(-1)!.error)).toContain(SOURCE_SCHEMAS.audioClip);
+    lead.replace([]);
+    expect(states.at(-1)).toEqual({module: lead.module, state: 'pending'});
+  });
+
+  it('resolves the input selector to its element and containment to the lent owner', async () => {
+    const provider = document.createElement('section');
+    const contained = document.createElement('div');
+    provider.append(contained);
+    const selected = document.createElement('div');
+    selected.setAttribute('input', '#owner');
+    const owner = document.createElement('div');
+    owner.id = 'owner';
+    document.body.append(provider, selected, owner);
+    const audio = new ModuleAudioEnvironment({create() { throw new Error('Discovery must not allocate audio'); }});
+    const lent = {name: 'lent'};
+    cleanups.push(provideModuleContext(provider, () => new ModuleContext({id: 'root', audio,
+      capabilities: new ModuleCapabilities().with(OWNER, lent)})));
+    const byContainment = vi.fn();
+    cleanups.push(observeCompanionInput(contained, {capability: OWNER}, byContainment));
+    expect(byContainment).toHaveBeenLastCalledWith({element: lent, state: 'ready'});
+    const bySelector = vi.fn();
+    cleanups.push(observeCompanionInput(selected, {capability: OWNER}, bySelector));
+    expect(bySelector).toHaveBeenLastCalledWith({element: owner, state: 'ready'});
+    owner.remove();
+    await flush();
+    expect(bySelector).toHaveBeenLastCalledWith({state: 'missing'});
+  });
+
+  it('takes the module path for a port attribute unless the caller opts out', () => {
+    const provider = document.createElement('section');
+    const host = document.createElement('div');
+    host.setAttribute('port', 'source');
+    provider.append(host);
+    document.body.append(provider);
+    const lead = sourceModule('lead');
+    const audio = new ModuleAudioEnvironment({create() { throw new Error('Discovery must not allocate audio'); }});
+    const lent = {name: 'lent'};
+    cleanups.push(provideModuleContext(provider, () => new ModuleContext({id: 'root', audio, target: lead.module,
+      capabilities: new ModuleCapabilities().with(OWNER, lent)})));
+    const viaPort = vi.fn();
+    cleanups.push(observeCompanionInput(host, {capability: OWNER}, viaPort));
+    expect(viaPort.mock.lastCall![0]).toMatchObject({module: lead.module, state: 'ready'});
+    const viaOwner = vi.fn();
+    cleanups.push(observeCompanionInput(host, {capability: OWNER, portAttribute: false}, viaOwner));
+    expect(viaOwner).toHaveBeenLastCalledWith({element: lent, state: 'ready'});
   });
 });

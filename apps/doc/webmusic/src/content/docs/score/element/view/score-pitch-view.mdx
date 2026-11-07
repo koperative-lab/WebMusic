@@ -46,14 +46,15 @@ never registers with or creates a Session.
 | --- | --- | --- |
 | Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
 | Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit module | `.inputModule = module` | Follows that module's `source` port (`webmusic.score`), or the one `port` names; `null` unbinds |
+| Module port | `port="source"` with `input` or containment | Follows the named source port on the selected or enclosing module instead of the owner element |
 | Note events | `input="#id"` on a note source | Any element dispatching `webscore:noteon` / `webscore:noteoff`, such as [`<score-note-input>`](/score/element/play/score-note-input/) |
 
-Playback resolves the explicit selector, then containment, then nothing. An
+Playback resolves `.inputModule`, then the explicit selector, then containment, then nothing; a `port` attribute moves the selector or containment onto that module's source port. Views and analysis share one follower, so they see the same notes, position and readiness. An
 `input` that is missing, invalid or ambiguous stays unbound, reported by
 `data-player-state`, and never falls back to the enclosing scope. Inside a
 source-free outer player, nest the view in the member that plays or name that
-member with `input`. The view has no `src` or `.score`. This tag reads no `port` attribute and has no input
-object property.
+member with `input`. The view has no `src` or `.score`.
 
 ```html
 <score-player src="/midi/Arabesque%20No.1.mid">
@@ -144,6 +145,7 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | `type` | `keyboard` | All | `keyboard`, `staff` or `fretboard`; unknown values use keyboard. |
 | `direction` | `down` | Keyboard | Key-front direction: `up`, `down`, `left` or `right`; invalid values use `down`. Low pitches stay left or bottom. |
 | `input` | absent | All | Explicit input: unique selector for a player, Rack part or note-event source. Absent, the enclosing player or Rack part is followed by containment. |
+| `port` | absent | All | Follow this named `webmusic.score` source port on the input (or enclosing) module instead of the owner element; also names the port of `.inputModule` (default `source`). |
 | `low` / `high` | `48` / `71` | Keyboard | Requested lowest/highest MIDI key, rounded. |
 | `system` | `grand` | Staff | `grand`, `treble` or `bass`. |
 | `spelling` | `sharp` | All | `sharp` or `flat`; no key inference. |

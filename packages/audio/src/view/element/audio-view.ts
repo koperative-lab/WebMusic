@@ -1110,7 +1110,7 @@ export class AudioViewElement extends WebMusicElement {
       generation === this.playerTargetGeneration && this.getAttribute('input') === selector;
     let initial = true;
     // `input` aliases `player`; with neither, the enclosing player scope is followed.
-    const cleanup = observeCompanionTarget(this, ['input'], (target, state) => {
+    const cleanup = observeCompanionTarget(this, (target, state) => {
       if (!current()) return;
       const changed = target !== this.boundPlayer;
       const previousError = this.playerSelectionError?.message;

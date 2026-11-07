@@ -1,7 +1,9 @@
 import type {ModuleContext} from './module/context';
 import type {PortDirection, PortFamily} from './module/port';
 import {getModulePort, type ModuleHandle, type ModulePortMap} from './module/registry';
-import {observeElementTarget} from './element-target';
+import {observeElementTarget, type ElementTargetState} from './element-target';
+import type {CapabilityKey} from './module/capability';
+import type {SourcePort} from './module/source-port';
 
 const requestEvent = 'webmusic-context-request';
 const contextEvent = 'webmusic:contextchange';
@@ -463,4 +465,65 @@ export function observeModuleInput<F extends PortFamily>(
     throw error;
   }
   return dispose;
+}
+
+/** What a companion (a view or analysis that borrows a player) currently follows. */
+export interface CompanionInput {
+  /** Owner element: the `input` selector's target, or the owner a provider lends by containment. */
+  readonly element?: Element;
+  /** Module whose named source port is followed (explicit object or a `port` attribute). */
+  readonly module?: ModuleHandle;
+  /** The resolved source port, once its module publishes it. */
+  readonly port?: SourcePort<unknown>;
+  /** `pending`: a module was found but has not published the port yet. */
+  readonly state: ElementTargetState | 'pending';
+  readonly error?: unknown;
+}
+
+export interface ObserveCompanionInputOptions {
+  /** Capability a provider scope lends to companions found by containment. */
+  readonly capability: CapabilityKey<unknown>;
+  /** Explicit object binding: a module binds its source port, null unbinds, undefined discovers. */
+  readonly assigned?: ModuleHandle | null;
+  /** Schema the followed source port must publish. */
+  readonly schemaId?: string;
+  /** Source port name when the host has no `port` attribute. */
+  readonly port?: string;
+  /** False when the host's `port` attribute names another family (an audio tap), so it never selects the source path. */
+  readonly portAttribute?: boolean;
+  readonly isCurrent?: () => boolean;
+}
+
+/**
+ * Resolve what a companion follows, in the DEC-068 order: an explicit module
+ * (its named source port), then the `input` selector, then the owner the
+ * nearest provider lends. A `port` attribute selects the module path for a
+ * selector or containment too: the companion follows that module's source
+ * port instead of the owner element. Only discovery is owned here.
+ */
+export function observeCompanionInput(
+  host: Element,
+  options: ObserveCompanionInputOptions,
+  update: (input: CompanionInput) => void,
+): () => void {
+  if (options.assigned !== undefined || (options.portAttribute !== false && host.getAttribute('port') !== null)) {
+    return observeModuleInput(host, {
+      family: 'source', direction: 'output', port: options.port ?? 'source',
+      assigned: options.assigned, isCurrent: options.isCurrent,
+    }, (state) => {
+      const {module, error} = state;
+      const port = state.port as SourcePort<unknown> | undefined;
+      if (error !== undefined) update({module, state: 'invalid', error});
+      else if (!port) update(module ? {module, state: 'pending'} : {state: 'missing'});
+      else if (options.schemaId && port.schemaId !== options.schemaId) {
+        update({module, state: 'invalid', error: new TypeError(`Port ${port.id} publishes ${port.schemaId}, not ${options.schemaId}.`)});
+      } else update({module, port, state: 'ready'});
+    });
+  }
+  const selector = host.getAttribute('input');
+  if (selector) return observeElementTarget(host, selector, (element, state) => update(element ? {element, state} : {state}));
+  return observeModuleContext(host, (context) => {
+    const owner = context?.capabilities.get(options.capability);
+    update(owner && typeof owner === 'object' ? {element: owner as Element, state: 'ready'} : {state: 'missing'});
+  });
 }

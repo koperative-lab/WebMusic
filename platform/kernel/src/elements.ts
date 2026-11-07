@@ -25,10 +25,13 @@ export {
   notifyModuleContext,
   observeModuleTarget,
   observeModuleInput,
+  observeCompanionInput,
   notifyModuleChange,
   type ModuleContextState,
   type ModuleInputState,
   type ObserveModuleInputOptions,
+  type CompanionInput,
+  type ObserveCompanionInputOptions,
 } from './element-module';
 
 /** Cleanup owned by one connected lifetime of a {@link WebMusicElement}. */

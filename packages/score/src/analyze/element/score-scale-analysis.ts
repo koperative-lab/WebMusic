@@ -5,7 +5,7 @@ import {defineOnce} from './base';
 /** Compare authored pitches with an explicitly chosen tonic and scale. */
 export class ScaleAnalysisElement extends AnalysisComponentElement {
   static get observedAttributes(): string[] {
-    return ['src', 'format', 'input', 'density', 'scheme', 'motion', 'window', 'part', 'voice', 'tonic', 'scale', 'pitch-mode'];
+    return ['src', 'format', 'input', 'port', 'density', 'scheme', 'motion', 'window', 'part', 'voice', 'tonic', 'scale', 'pitch-mode'];
   }
   get tonic(): string | undefined { return this.getAttribute('tonic') ?? undefined; }
   set tonic(value: string | undefined) {

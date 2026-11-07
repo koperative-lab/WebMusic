@@ -168,7 +168,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
     this.sourceTarget = undefined;
     this.sourceError = undefined;
     // `input` names the player; without it, the enclosing player scope is followed.
-    this.stopSourceObservation = observeCompanionTarget(this, ['input'], (element, state) => {
+    this.stopSourceObservation = observeCompanionTarget(this, (element, state) => {
       this.detachSource?.();
       this.detachSource = undefined;
       this.sourceTarget = element as AnalyserSource | undefined;

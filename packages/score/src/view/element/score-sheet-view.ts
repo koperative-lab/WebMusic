@@ -50,7 +50,7 @@ export class SheetViewElement extends ScoreViewElementBase {
   private reflecting = false;
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'editor', 'interactionSession', 'editable', 'tools', 'layout', 'zoom', 'followCursor']);
+    upgradeProperties(this, ['score', 'inputModule', 'editor', 'interactionSession', 'editable', 'tools', 'layout', 'zoom', 'followCursor']);
     super.connectedCallback();
   }
 

@@ -67,14 +67,15 @@ never registers with or creates a Session.
 | --- | --- | --- |
 | Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
 | Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit module | `.inputModule = module` | Follows that module's `source` port (`webmusic.score`), or the one `port` names; `null` unbinds |
+| Module port | `port="source"` with `input` or containment | Follows the named source port on the selected or enclosing module instead of the owner element |
 | Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
 
-Playback resolves the explicit selector, then containment, then nothing. An
+Playback resolves `.inputModule`, then the explicit selector, then containment, then nothing; a `port` attribute moves the selector or containment onto that module's source port. Views and analysis share one follower, so they see the same notes, position and readiness. An
 `input` that is missing, invalid or ambiguous stays unbound, reported by
 `data-player-state`, and never falls back to the enclosing scope. Inside a
 source-free outer player, nest the view in the member that plays or name that
-member with `input`. This tag reads no `port` attribute and has no input
-object property.
+member with `input`.
 
 ```html
 <score-player src="/midi/Arabesque%20No.1.mid">
@@ -235,6 +236,7 @@ Numeric attributes ignore missing or non-numeric values and use their defaults.
 | --- | --- | --- | --- |
 | `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
 | `input` | attribute | containment | Unique selector of a player or Rack part to follow; without other data the grid borrows its score. |
+| `port` | attribute | owner element | Follow this named `webmusic.score` source port on the input (or enclosing) module instead of the owner element; also names the port of `.inputModule` (default `source`). |
 | `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. A fixed height scrolls a taller grid inside the host. |
 | `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
 | `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`. The getter returns them in that order; the setter writes the attribute and throws `RangeError` for an unknown name. |
@@ -246,6 +248,7 @@ Numeric attributes ignore missing or non-numeric values and use their defaults.
 | `min-pitch` / `max-pitch` | attributes | MIDI 48–84, widened to two semitones beyond the notes | Integer MIDI rows 0–127; values outside are ignored. A single bound limits the computed opposite bound. A crossing range shows an error status. |
 | `note-color` / `active-note-color` | attributes | Score View tokens | Idle and sounding note fills as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`; they replace the token defaults. |
 | `.score` | writable property | none | Assign a loaded Score; overrides `src` and borrowed input data. Throws while `.editor` is assigned. |
+| `.inputModule` | writable property | none | Explicit module input; follows its `source` port, or the one `port` names, before `input` and containment. `null` unbinds, `undefined` returns to discovery. |
 | `.editor` | writable property | none | Borrow any `ScoreEditorPort`, such as a `ScoreEditor`; never disposed. `undefined` detaches it. Throws `TypeError` for other values and an `Error` on a source conflict. |
 | `.interactionSession` | writable property | grid-owned session | Borrow a same-document `ScoreInteractionSession` to share selection and drafts. The getter returns the supplied or grid-created session. |
 | `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |

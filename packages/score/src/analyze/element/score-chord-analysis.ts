@@ -4,7 +4,7 @@ import {defineOnce} from './base';
 /** One musical display, composed alongside other player-bound elements. */
 export class ChordAnalysisElement extends AnalysisComponentElement {
   static get observedAttributes(): string[] {
-    return ['src', 'format', 'input', 'density', 'scheme', 'motion', 'window', 'mode', 'grouping', 'beat-groups', 'spelling', 'key', 'pitch-mode', 'alternates', 'stability-ms'];
+    return ['src', 'format', 'input', 'port', 'density', 'scheme', 'motion', 'window', 'mode', 'grouping', 'beat-groups', 'spelling', 'key', 'pitch-mode', 'alternates', 'stability-ms'];
   }
 
   /** Score inspection or the currently held notes; changes never command playback. */

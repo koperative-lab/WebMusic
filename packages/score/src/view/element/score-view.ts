@@ -160,7 +160,7 @@ export class ScoreViewElement extends ScoreViewElementBase {
   private stage?: StageHandle;
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'options', 'type', 'direction', 'editor', 'interactionSession']);
+    upgradeProperties(this, ['score', 'inputModule', 'options', 'type', 'direction', 'editor', 'interactionSession']);
     super.connectedCallback();
   }
 

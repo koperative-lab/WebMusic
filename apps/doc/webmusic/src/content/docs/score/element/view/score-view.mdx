@@ -44,14 +44,15 @@ never registers with or creates a Session.
 | --- | --- | --- |
 | Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
 | Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit module | `.inputModule = module` | Follows that module's `source` port (`webmusic.score`), or the one `port` names; `null` unbinds |
+| Module port | `port="source"` with `input` or containment | Follows the named source port on the selected or enclosing module instead of the owner element |
 | Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
 
-Playback resolves the explicit selector, then containment, then nothing. An
+Playback resolves `.inputModule`, then the explicit selector, then containment, then nothing; a `port` attribute moves the selector or containment onto that module's source port. Views and analysis share one follower, so they see the same notes, position and readiness. An
 `input` that is missing, invalid or ambiguous stays unbound, reported by
 `data-player-state`, and never falls back to the enclosing scope. Inside a
 source-free outer player, nest the view in the member that plays or name that
-member with `input`. This tag reads no `port` attribute and has no input
-object property.
+member with `input`.
 
 ```html
 <score-player src="/mxl/Arabesque%20No.1.mxl">
@@ -368,6 +369,7 @@ while playback catches up.
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
 | `input` | attribute | Explicit source/position input: a unique player or Rack part selector; explicit score input retains precedence. Absent, the enclosing player or Rack part is followed by containment. |
+| `port` | attribute | Follow this named `webmusic.score` source port on the input (or enclosing) module instead of the owner element; also names the port of `.inputModule` (default `source`). |
 | `.editor` | writable property | Follow an editor from `loadScoreEditor`/`createScoreEditor` (any `ScoreEditorPort`) read-only; borrowed, never disposed. `undefined` detaches it. Cannot coexist with independent `.score` or `src`. There is no `editor` attribute. |
 | `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession` whose draft the view draws; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff` or `waterfall`; unknown or removed values (such as `map` or `thumbnail`) use piano-roll. |
@@ -386,6 +388,7 @@ while playback catches up.
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and borrowed input data, cancelling obsolete loads. |
+| `.inputModule` | writable property | Explicit module input; follows its `source` port, or the one `port` names, before `input` and containment. `null` unbinds, `undefined` returns to discovery. |
 | `data-editor-state` | reflected state | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`. `unavailable` (a disposed or not-ready editor) is pending: the view shows no stale content and a polite waiting status. `invalid` (the editing binding could not be created) and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
 | `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. A draft does not make the player binding `mismatched`; the player is compared with committed document content. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys (including `showAnnotations` outside `staff`) throw `TypeError` before changing the view. |

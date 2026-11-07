@@ -308,7 +308,7 @@ export class AudioClipViewElement extends HTMLElementBase {
     const generation = ++this.playerGeneration;
     this.unbindPlayer();
     // `input` aliases `player`; with neither, the enclosing player scope is followed.
-    const cleanup = observeCompanionTarget(this, ['input'], (target, state) => {
+    const cleanup = observeCompanionTarget(this, (target, state) => {
       if (generation !== this.playerGeneration || !this.isConnected) return;
       this.connectPlayer(state === 'ready' ? target : undefined);
     });

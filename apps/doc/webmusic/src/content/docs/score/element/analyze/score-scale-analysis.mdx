@@ -39,15 +39,16 @@ never registers with, creates or commands a Session directly.
 | --- | --- | --- |
 | Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
 | Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit module | `.inputModule = module` | Follows that module's `source` port (`webmusic.score`), or the one `port` names; `null` unbinds |
+| Module port | `port="source"` with `input` or containment | Follows the named source port on the selected or enclosing module instead of the owner element |
 | Standalone data | `.score`, `src` | Inspection without playback; takes precedence over borrowed data |
 
-Playback resolves the explicit selector, then containment, then nothing. An
+Playback resolves `.inputModule`, then the explicit selector, then containment, then nothing; a `port` attribute moves the selector or containment onto that module's source port. Views and analysis share one follower, so they see the same notes, position and readiness. An
 `input` that is missing, invalid or ambiguous stays unbound, reported by
 `data-player-state`, and never falls back to the enclosing scope. Inside a
 source-free outer player, nest the tool in the member that plays or name that
 member with `input`. Seek requests go to the borrowed owner, which commits them
-on its Session. This tag reads no `port` attribute and has no input object
-property.
+on its Session.
 
 ```html
 <score-player src="/mxl/Arabesque%20No.1.mxl">
@@ -85,6 +86,7 @@ The component owns its URL request, analysis projection, target observer, subscr
 | `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed input data. |
 | `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
 | `input` | selector, absent | Explicit input: borrow one player's or Rack part's available Score, position and note activity in the current Document or ShadowRoot. Absent, the enclosing player or Rack part is borrowed by containment. |
+| `port` | name, absent | Follow this named `webmusic.score` source port on the input (or enclosing) module instead of the owner element; also names the port of `.inputModule` (default `source`). |
 | `density` | `comfortable` / `compact`, `comfortable` | Typography and spacing for this surface. |
 | `scheme` | `light` / `dark`, inherited | Pin the surface palette; removal follows the page. |
 | `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Auto follows a `data-motion` ancestor and reduced-motion preference. |
@@ -102,6 +104,7 @@ Unknown presentation values fall back to their documented defaults. Invalid musi
 | Property | Type | Behavior |
 | --- | --- | --- |
 | `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed input data. |
+| `.inputModule` | `ModuleHandle \| null \| undefined` | Explicit module input; follows its `source` port, or the one `port` names, before `input` and containment. `null` unbinds, `undefined` returns to discovery. |
 | `.selection` | read-only `AnalysisSelection \| undefined` | Local selected band/passage: `id`, `startQuarters`, `endQuarters`. |
 | `.analysis` | read-only `AnalysisInspection \| undefined` | Selected `kind`, `selection`, `headline`, `detail`, `evidence` and `candidates`; full provenance remains available beyond the compact lane readout. |
 | `.density` | `comfortable \| compact` | Reflected density. |

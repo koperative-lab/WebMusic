@@ -1,4 +1,4 @@
-import {Rational, Pitch, type Score, type ScorePlaybackSource} from '../../../core';
+import {Rational, Pitch, type Score} from '../../../core';
 import {
   spellChord,
   inspectChordPitches,
@@ -30,7 +30,8 @@ import {
   type ViewRecipe,
 } from './index';
 import {HTMLElementBase, upgradeProperties} from '../base';
-import {seekAnalysisPlayer, type AnalysisTimeUpdate} from './player-binding';
+import {seekAnalysisPlayer, type AnalysisPlayerOwner, type AnalysisTimeUpdate} from './player-binding';
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {
   mountFlowLane,
   mountNameplate,
@@ -193,7 +194,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #error?: string;
   #loading = false;
   #unbind?: () => void;
-  #player?: Element;
+  #player?: AnalysisPlayerOwner;
+  #inputModule?: ModuleHandle | null;
   /** `window`, resolved once per (spec, score) — `auto` allocates Rationals. */
   #windowCache?: {raw: string | null; score?: Score; seconds?: number};
   #selection?: AnalysisSelection;
@@ -234,8 +236,24 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   });
 
 
+  /**
+   * Explicit module input (DEC-068): follow this module's `source` port (or
+   * the one `port` names) instead of the `input` selector or the enclosing
+   * scope. `null` unbinds; `undefined` returns to discovery.
+   */
+  get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    if (value === this.#inputModule) return;
+    this.#inputModule = value;
+    if (!this.isConnected) return;
+    this.#bindPlayer();
+    if (!this.#source.score && !this.getAttribute('src')) void this.#refresh();
+    else this.#apply();
+  }
+
   connectedCallback(): void {
     upgradeProperties(this, [
+      'inputModule',
       'score',
       'density',
       'scheme',
@@ -272,7 +290,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       void this.#refresh();
       return;
     }
-    if (name === 'input') {
+    if (name === 'input' || name === 'port') {
       this.#bindPlayer();
       if (!this.#source.score && !this.getAttribute('src')) void this.#refresh();
       else this.#apply();
@@ -653,7 +671,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.#clearChordChange();
       this.#lastEmittedChord = undefined;
     }
-    const native = (this.#player as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot();
+    const native = this.#player?.playback?.snapshot();
     if (native && native.readiness !== 'unavailable' && native.score && score && score !== native.score) {
       this.#resetPlayerState();
       this.setAttribute('data-player-state', 'mismatched');
@@ -726,7 +744,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const selectedBand = lane.bands.find((band) => band.id === this.#selection?.id);
     const index = material.index;
     const native = !recipe.needsScore || (!this.#source.score && !this.getAttribute('src'))
-      ? (this.#player as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot()
+      ? this.#player?.playback?.snapshot()
       : undefined;
     const loading = this.#loading || native?.readiness === 'loading';
     const waiting = recipe.needsScore ? !score
@@ -1203,10 +1221,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const request = ++this.#seekRequest;
     const timeRevision = this.#timeRevision;
     const quarters = score.timeMap.secondsToQuarters(seconds).toFloat();
-    const player = this.#player as (Element & {
-      seek?: (seconds: number) => void | Promise<void>;
-      seekNominal?: (seconds: number) => void | Promise<void>;
-    }) | undefined;
+    const player = this.#player;
     const current = () => this.#revision === revision && this.#seekRequest === request
       && this.#player === player && Boolean(this.#workbench);
     const failed = (error: unknown): void => {
@@ -1286,7 +1301,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
         this.#highlight.clear();
         this.#apply();
       },
-    });
+    }, this.#inputModule);
   }
 
   #followTime(update: AnalysisTimeUpdate): void {

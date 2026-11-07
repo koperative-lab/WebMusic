@@ -578,7 +578,7 @@ export class AudioMeterElement extends WebMusicElement {
     if (this.usesModuleInput()) {
       if (this.assignedModule === undefined) {
         let detach: (() => void) | undefined;
-        const stop = observeCompanionTarget(this, ['input'], (element) => {
+        const stop = observeCompanionTarget(this, (element) => {
           detach?.(); detach = undefined;
           if (revision !== this.bindingRevision) return;
           this.ownerTarget = element as AudioMeterElement['ownerTarget'];
