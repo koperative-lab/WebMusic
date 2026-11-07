@@ -527,3 +527,32 @@ describe('source-free SessionTransport', () => {
     expect(w.session.snapshot).toMatchObject({disposed: true, pendingSourceCount: 0});
   });
 });
+
+describe('participant timing reports', () => {
+  const leafTransport = () => {
+    const clock = new TransportClock(() => 0);
+    return {play: () => {}, pause: () => {}, stop: () => {}, seek: () => {}, get position() { return 0; }, get running() { return false; }, clock};
+  };
+  it('never reports shared-anchor for a callback-timed participant and counts each timing', () => {
+    const session = new SessionTransport(() => 0, {driftCheckIntervalMs: 0});
+    const attach = () => createConnectionLease(() => {});
+    expect(session.snapshot.schedulingMode).toBe('shared-anchor');
+    session.register(leafTransport(), {axis: 'native-seconds', durationSeconds: 1, attachScheduling: attach});
+    expect(session.snapshot.schedulingMode).toBe('shared-anchor');
+    const callback = session.register(leafTransport(), {axis: 'callback-seconds', durationSeconds: 1, attachScheduling: attach, timing: 'callback'});
+    expect(session.snapshot.schedulingMode).toBe('mixed');
+    session.register(leafTransport(), {axis: 'media-seconds', durationSeconds: 1});
+    session.register(leafTransport(), {axis: 'midi-seconds', durationSeconds: 1, timing: 'external'});
+    expect(session.snapshot.participantTiming).toEqual({'shared-anchor': 1, callback: 1, 'media-follower': 1, external: 1});
+    callback.release();
+    expect(session.snapshot.participantTiming.callback).toBe(0);
+    session.dispose();
+  });
+
+  it('rejects an unknown timing and shared-anchor without scheduling', () => {
+    const session = new SessionTransport(() => 0, {driftCheckIntervalMs: 0});
+    expect(() => session.register(leafTransport(), {axis: 'a', durationSeconds: 1, timing: 'shared-anchor'})).toThrow(/must attach Session scheduling/);
+    expect(() => session.register(leafTransport(), {axis: 'a', durationSeconds: 1, timing: 'tight' as never})).toThrow(/Unknown participant timing/);
+    session.dispose();
+  });
+});

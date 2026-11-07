@@ -173,7 +173,9 @@ describe('Score module graph and Session integration', () => {
     const channel = inner.channelInserts('voice')!;
     channel.setCompatibility(Effect.gain(0.4));
     inner.setEffect(Effect.gain(0.6));
-    expect(edges.get(player.audioOutput!.defaultDestination!)?.has(channel.input)).toBe(true);
+    // Channel strip: fader -> pan -> post-fader inserts.
+    const panner = [...edges.get(player.audioOutput!.defaultDestination!)!][0];
+    expect(edges.get(panner)?.has(channel.input)).toBe(true);
     const master = [...edges.get(channel.output)!][0];
     expect(edges.get(master)?.has(inner.inserts!.input)).toBe(true);
     expect(player.inserts!.instances).toHaveLength(0);

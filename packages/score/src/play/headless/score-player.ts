@@ -35,6 +35,7 @@ import type {
 } from './audio-contracts';
 import {locateSecondsCompat, resolveAudioGraphContext} from './audio-utils';
 import {OscillatorSynth} from './oscillator-synth';
+import {scoreSchedulingCapabilities} from './internal/session-score-scheduler';
 import {ScorePlayerScheduler} from './score-player-scheduler';
 import {PlaybackPublisher} from './playback-source';
 import {LiveNotes} from './internal/live-notes';
@@ -249,6 +250,17 @@ export class ScorePlayer {
       report: (error) => this.reportOperationError('document subscription cleanup', error),
     });
     if (options.tempo) this.scheduler.setTempo(options.tempo);
+  }
+
+  /**
+   * Real Session timing of the current synth (or the default oscillator):
+   * `shared-anchor` when it schedules and cancels attacks on the audio clock,
+   * otherwise `callback`.
+   */
+  get sessionTiming(): 'shared-anchor' | 'callback' {
+    const synth = this.synth ?? this.options.synth;
+    if (!synth) return 'shared-anchor';
+    return scoreSchedulingCapabilities(synth).attacks === 'audio-clock' ? 'shared-anchor' : 'callback';
   }
 
   /** Borrow one read-only Session anchor. Preload before attaching; release detaches only this player. */

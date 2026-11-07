@@ -14,6 +14,17 @@ import {
   type TransportSnapshot,
 } from './sync';
 
+/**
+ * How a participant actually times its sound (DEC-068). `shared-anchor`
+ * schedules natively from the Session's read-only anchor; `callback` attaches
+ * scheduling but starts notes from timer callbacks; `media-follower` follows
+ * commands like a media element; `external` drives a device or engine the
+ * Session cannot schedule (Web MIDI, a third-party engine).
+ */
+export type ParticipantTiming = 'shared-anchor' | 'callback' | 'media-follower' | 'external';
+
+const timings: readonly ParticipantTiming[] = ['shared-anchor', 'callback', 'media-follower', 'external'];
+
 /** Domain adapters name their stable local seconds axis explicitly. */
 export interface SessionParticipantOptions extends FollowerOptions {
   axis: string;
@@ -31,6 +42,12 @@ export interface SessionParticipantOptions extends FollowerOptions {
   activate?: () => void | Promise<void>;
   /** Opt into one shared scheduling authority instead of legacy follower commands. */
   attachScheduling?: (binding: SessionSchedulingBinding) => ConnectionLease;
+  /**
+   * The participant's real timing. Defaults to `shared-anchor` with
+   * `attachScheduling`, otherwise `media-follower`. `shared-anchor` requires
+   * `attachScheduling`; a callback-timed engine must not claim it.
+   */
+  timing?: ParticipantTiming;
 }
 
 export interface SessionParticipantLease {
@@ -75,7 +92,10 @@ export interface SessionTransportSnapshot extends TransportSnapshot {
   readonly ended: boolean;
   readonly range: Readonly<SyncLoopRegion> | null;
   readonly schedulingEpoch: number;
+  /** `shared-anchor` only when every participant reports that timing; `legacy` when none attaches scheduling. */
   readonly schedulingMode: 'shared-anchor' | 'mixed' | 'legacy';
+  /** Participant count per reported timing. */
+  readonly participantTiming: Readonly<Record<ParticipantTiming, number>>;
 }
 
 type WithSessionSnapshot<Event> = Event extends {snapshot: TransportSnapshot}
@@ -263,6 +283,12 @@ export class SessionTransport implements ModuleSession {
   register(transport: SyncFollowerTransport, options: SessionParticipantOptions): SessionParticipantLease {
     this.#assertActive();
     if (!options.axis?.trim()) throw new TypeError('A participant must name its local seconds axis.');
+    if (options.timing !== undefined && !timings.includes(options.timing)) {
+      throw new TypeError(`Unknown participant timing: ${String(options.timing)}`);
+    }
+    if (options.timing === 'shared-anchor' && !options.attachScheduling) {
+      throw new TypeError('A shared-anchor participant must attach Session scheduling.');
+    }
     readDuration(options);
     const offset = options.offsetSeconds ?? 0;
     const scale = options.positionScale ?? 1;
@@ -542,9 +568,17 @@ export class SessionTransport implements ModuleSession {
   }
 
   #extend(snapshot: TransportSnapshot): SessionTransportSnapshot {
-    const scheduled = [...this.#members].filter(member => member.options.attachScheduling).length;
+    const participantTiming: Record<ParticipantTiming, number> = {'shared-anchor': 0, callback: 0, 'media-follower': 0, external: 0};
+    let scheduled = 0;
+    for (const {options} of this.#members) {
+      if (options.attachScheduling) scheduled++;
+      participantTiming[options.timing ?? (options.attachScheduling ? 'shared-anchor' : 'media-follower')]++;
+    }
+    const anchored = participantTiming['shared-anchor'];
     return Object.freeze({...snapshot, position: this.scheduling.positionAt(snapshot.referenceTime), axis: 'session-seconds', durationSeconds: this.#duration(),
-      schedulingEpoch: this.#scheduling.epoch, schedulingMode: scheduled === this.#members.size ? 'shared-anchor' : scheduled === 0 ? 'legacy' : 'mixed',
+      schedulingEpoch: this.#scheduling.epoch,
+      schedulingMode: anchored === this.#members.size ? 'shared-anchor' : scheduled === 0 ? 'legacy' : 'mixed',
+      participantTiming: Object.freeze(participantTiming),
       participantCount: this.#members.size, pendingSourceCount: this.#pendingSources.size,
       membershipRevision: this.#membershipRevision,
       ended: this.#ended, range: this.#range});

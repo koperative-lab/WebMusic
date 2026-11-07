@@ -91,6 +91,7 @@ export class ScorePlayerModule implements ModuleHandle {
           offsetSeconds: options.offsetSeconds,
           positionScale: options.positionScale,
           attachScheduling: (binding) => player.attachScheduling(binding),
+          timing: player.sessionTiming,
           identity: player,
           durationSeconds: () => player.durationSeconds * player.rate,
           ended: () => player.playback.snapshot().state === 'ended',

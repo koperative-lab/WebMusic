@@ -237,6 +237,9 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 | `createTransportPort(session, {commands?})` · `TransportPort` | Session observation in a named axis with optional lent commands and committed/superseded/failed outcomes. |
 | `createControlPort(params)` · `ControlPort` | A parameter surface exposed as the module's control port. |
 | `checkModuleConformance(create, options?)` | Framework-neutral contract checks for a module factory; returns every failure. |
+| `RackModule` | Neutral mixing desk: one channel per admitted module ID with fader, pan, post-fader inserts and a `channel:<id>` tap, a real master bus and master inserts. |
+| `createProviderScope(options)` | Session election for provider Elements: the outermost provider owns the Session (and, without a parent, the audio environment); `local` forces an owned Session. |
+| `DeviceSink` · `CaptureSink` · `createOfflineModuleEnvironment()` | Output sinks: the device destination with optional device selection, MediaRecorder capture in the same context, and an offline environment for rendering a module graph. |
 | `ParamHandle` | Numeric base-value authority with native CV bindings, scheduled automation and subscriptions. |
 | `ParamSurface` | Read-only iterable collection of handles with `get(id)`; it does not own the handles. |
 | `ParamAudioBus` | One same-context full-value control bus shared by current and future AudioParam targets. |
@@ -300,6 +303,36 @@ can be compared against the current revision. `SOURCE_SCHEMAS` names
 error?}` with `status` `committed`, `superseded` or `failed` instead of
 rejecting. A `ModuleContext` lends one command-enabled port per Session as
 `context.transport`; `derive({transport: null})` lends none.
+
+### Racks, provider scopes and sinks
+
+`new RackModule(upstream, {id?, effect?, onError?})` registers in `upstream`
+and lends `context`, a child scope whose admission gives each module its own
+channel keyed by the module ID. `prepare()` builds the master bus and routes it
+through `routeModuleOutput(upstream, …)`; until then nothing is allocated.
+`admit(module, port)` returns a lease that removes only that channel.
+`setVolume(id, value)`, `setPan(id, value)`, `mute(id, muted)`, `solo(id, solo)`,
+`setMasterVolume(value)` (also the `master-volume` parameter), `setEffect(recipe)`,
+`channelInserts(id)` and `list()` edit and read the desk. `getPort('master')`
+(aliases `output`, `main`) and `getPort('channel:<id>')` return its outputs;
+`ports()` lists the control port, master and every channel. A child Rack in the
+scope is admitted once as a channel of its parent.
+
+`createProviderScope({id, parent, local?, audio?, destination?, registry?, admit?, target?, session?})`
+returns `{context, session, ownedSession?, ownedAudio?, dispose()}`. Without a
+parent it creates a lazy `ModuleAudioEnvironment` and a `SessionTransport`; with
+a parent it borrows both unless `local` is true. `dispose()` releases only what it
+created.
+
+`new DeviceSink(environment, {id?})` exposes the context destination as its
+`input` after `prepare()`; `selectDevice(deviceId)` calls
+`AudioContext.setSinkId()` and rejects where it is unavailable
+(`supportsDeviceSelection`). `new CaptureSink(environment, {id?, mimeType?, recorder?})`
+records producers connected to its input through a MediaStream destination in
+the same context: `start()`, then `stop()` resolves with the encoded `Blob`.
+`createOfflineModuleEnvironment({sampleRate, durationSeconds, channels?, create?})`
+returns `{environment, context, render()}`; modules borrow `environment` like a
+live one and `render()` starts rendering once.
 
 ### Module conformance
 
@@ -609,7 +642,11 @@ constructing them from labels. Presentation subscriptions never own the graph.
 ## session — @webmusic/kernel/session
 
 `SessionTransport` owns a source-free conductor and delegates command sequencing
-to `TransportGroup`. It implements `ModuleSession`, the interface a
+to `TransportGroup`. Each participant declares its real `timing`
+(`ParticipantTiming`: `shared-anchor`, `callback`, `media-follower` or
+`external`; default `shared-anchor` with `attachScheduling`, otherwise
+`media-follower`). The snapshot counts them in `participantTiming`, and
+`schedulingMode` is `shared-anchor` only when every participant reports it. It implements `ModuleSession`, the interface a
 `ModuleContext` lends to modules and the type of each player Element's
 `sessionTransport`. It creates no fake clip, score, audio output or AudioContext.
 The injected `now` must use the same reference clock as every participant.

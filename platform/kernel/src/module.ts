@@ -18,3 +18,6 @@ export * from './module/project-schema';
 export * from './module/project-registry';
 export * from './module/project-runtime';
 export * from './module/project-editor';
+export * from './module/rack';
+export * from './module/provider-scope';
+export * from './module/sinks';

@@ -168,7 +168,9 @@ schema), and the conformance kit used by Kernel's own modules.
 2. Sink modules: device destination (including output device selection where
    supported), offline render environment (graph realized on an
    `OfflineAudioContext`), audio capture sink, note sink contract for MIDI out.
-   Decide `TransportGroup`/`MirrorClockMaster` visibility per U0.
+   `TransportGroup`/`MirrorClockMaster` become Session internals; the public
+   `/sync` entry is removed in round 8 together with Bridge's sync family,
+   which still imports it.
 
 Exit: MC-05–MC-10 re-run against the neutral Rack; offline render of a two-source
 graph with master insert matches the live graph's topology.
