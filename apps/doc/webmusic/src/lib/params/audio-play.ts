@@ -135,7 +135,6 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       {name: 'input', kind: 'text', placeholder: '#session', fallback: 'the enclosing audio-player by containment, else standalone', note: 'Unique central audio-player selector. Explicit .player takes precedence; late insertion and replacement are observed; an unresolved selector stays detached.'},
-      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {
         name: 'src',
         kind: 'text',
@@ -220,7 +219,7 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     tag: 'audio-mixer',
     entry: ENTRY,
     params: [
-      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'standalone compatibility mode', note: 'Unique central audio-player selector. Explicit .player takes precedence; late insertion and replacement are observed.'},
+      {name: 'input', kind: 'text', placeholder: '#session', fallback: 'a module Rack', note: 'Unique audio-player selector; the desk becomes that player\'s mix backend instead of a Rack. Explicit .player takes precedence; late insertion and replacement are observed.'},
       {
         name: 'master-volume',
         kind: 'number',
@@ -266,7 +265,6 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       {name: 'input', kind: 'text', placeholder: '#session', fallback: 'the enclosing audio-player by containment, else an owned audition player', note: 'Unique central audio-player selector used for take audition. Explicit .player takes precedence; late insertion and replacement are observed.'},
-      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {
         name: 'device-id',
         kind: 'text',

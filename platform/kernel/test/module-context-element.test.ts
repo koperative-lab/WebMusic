@@ -2,7 +2,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ModuleAudioEnvironment, ModuleContext, createModuleHandle, type ModuleHandle} from '../src/module';
 import {
-  getModuleContextState, hasModuleContextBoundary, isModularComposition,
+  getModuleContextState, hasModuleContextBoundary,
   notifyModuleChange, notifyModuleContext, observeModuleContext, observeModuleTarget,
   provideModuleContext, requestModuleContext,
 } from '../src/elements';
@@ -24,7 +24,6 @@ describe('module context discovery', () => {
     const tag = `rack-provider-${++sequence}`;
     customElements.define(tag, class extends HTMLElement {});
     const outer = document.createElement('section');
-    outer.setAttribute('composition', 'modules');
     const rack = document.createElement(tag);
     const child = document.createElement('span');
     rack.attachShadow({mode: 'open'}).append(child);
@@ -36,13 +35,11 @@ describe('module context discovery', () => {
     cleanups.push(provideModuleContext(rack, () => rackContext));
     expect(requestModuleContext(rack)).toBe(rootContext);
     expect(requestModuleContext(child)).toBe(rackContext);
-    expect(isModularComposition(child)).toBe(true);
     expect(rootContext.audio.peek()).toBeUndefined();
   });
 
   it('keeps pending boundaries distinct from a genuine root and does not fall through', () => {
     const root = document.createElement('div');
-    root.setAttribute('composition', 'modules');
     const inner = document.createElement('div');
     const child = document.createElement('span');
     root.append(inner); inner.append(child); document.body.append(root);
@@ -62,7 +59,6 @@ describe('module context discovery', () => {
   it('waits for an unknown custom ancestor in modular mode and does not revive released observations', async () => {
     const tag = `late-rack-${++sequence}`;
     const root = document.createElement('div');
-    root.setAttribute('composition', 'modules');
     const inner = document.createElement(tag);
     const child = document.createElement('span');
     inner.append(child); root.append(inner); document.body.append(root);
@@ -87,8 +83,6 @@ describe('module context discovery', () => {
     const layout = document.createElement('unregistered-layout-wrapper');
     const child = document.createElement('span');
     layout.append(child); document.body.append(layout);
-    // Every Element composes through modules (DEC-068).
-    expect(isModularComposition(child)).toBe(true);
     expect(hasModuleContextBoundary(child)).toBe(false);
     expect(getModuleContextState(child)).toBe('missing');
   });
@@ -108,7 +102,6 @@ describe('module context discovery', () => {
 
   it.each(['open', 'closed'] as const)('borrows a %s shadow slot provider and observes reassignment', async (mode) => {
     const shell = document.createElement('div');
-    shell.setAttribute('composition', 'modules');
     const root = shell.attachShadow({mode});
     const first = document.createElement('slot');
     const second = document.createElement('slot');
@@ -185,7 +178,7 @@ describe('module context discovery', () => {
     expect(callback).toHaveBeenCalledTimes(count);
   });
 
-  it('ignores unrelated DOM churn but follows its own ancestry and boundary attributes', async () => {
+  it('ignores unrelated DOM churn but follows its own ancestry', async () => {
     const unrelated = document.createElement('div');
     const wrapper = document.createElement('div');
     const provider = document.createElement('section');
@@ -204,12 +197,9 @@ describe('module context discovery', () => {
     const baseline = requests;
     for (let index = 0; index < 20; index += 1) unrelated.append(document.createElement('p'));
     unrelated.textContent = 'live readout';
-    unrelated.setAttribute('composition', 'modules');
+    unrelated.setAttribute('name', 'readout');
     await flush();
     expect(requests).toBe(baseline);
-    wrapper.setAttribute('composition', 'modules');
-    await flush();
-    expect(callback).toHaveBeenLastCalledWith(undefined, 'pending');
     provider.append(child);
     await flush();
     expect(callback).toHaveBeenLastCalledWith(providedContext, 'ready');

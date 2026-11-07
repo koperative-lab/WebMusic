@@ -2,8 +2,8 @@ import {observeElementTarget, observeModuleContext, type ElementTargetState} fro
 import {AUDIO_PLAYER_OWNER} from '../../../core/player-owner';
 
 /**
- * Resolve the element a View companion follows (DEC-068): the first present
- * selector attribute (for example `player`, `input`, `source`), or — with
+ * Resolve the element an Audio companion (view or analyser) follows (DEC-068): the first present
+ * selector attribute (`input`), or — with
  * none — the enclosing `<audio-player>` scope by containment.
  */
 export function observeCompanionTarget(

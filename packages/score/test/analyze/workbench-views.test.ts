@@ -83,7 +83,7 @@ async function mount(options: MountOptions = {}) {
   if (options.tag === LIVE_CHORD || options.feature === 'live-chord') element.mode = 'live';
   for (const [name, value] of Object.entries(options.attrs ?? {})) element.setAttribute(name, value);
   if (options.player) {
-    element.setAttribute('player', '#p');
+    element.setAttribute('input', '#p');
     (element as unknown as {getRootNode: () => ParentNode}).getRootNode = () =>
       ({querySelector: (selector: string) => (selector === '#p' ? options.player : null)}) as never;
   }

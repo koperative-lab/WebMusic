@@ -54,7 +54,7 @@ interface AnalysisPlayer extends Element {
 
 /** Unique selector lookup within the follower's Document or ShadowRoot. */
 export function resolveAnalysisPlayer(host: Element): Element | undefined {
-  const selector = host.getAttribute('player');
+  const selector = host.getAttribute('input');
   if (!selector) return undefined;
   try {
     const root = host.getRootNode() as ParentNode;
@@ -84,8 +84,7 @@ export function readAnalysisPlayerScore(target: Element | undefined): Score | un
  * within the same root; cleanup releases listeners and target observation.
  */
 export function bindAnalysisPlayer(host: Element, handlers: AnalysisPlayerHandlers): (() => void) | undefined {
-  // `input` is the module grammar's name for the same selector (DEC-068).
-  const attribute = host.getAttribute('player') === null && host.getAttribute('input') !== null ? 'input' : 'player';
+  const attribute = 'input';
   const selector = host.getAttribute(attribute);
   // Without a selector the analysis borrows the nearest player or Rack part
   // scope by containment.

@@ -46,7 +46,7 @@ async function nativePlayer() {
 
 async function follower(feature: string, attrs: Record<string, string> = {}) {
   const node = document.createElement(`score-${feature}-analysis`) as ChordAnalysisElement;
-  node.setAttribute('player', '#source');
+  node.setAttribute('input', '#source');
   node.setAttribute('motion', 'stepped');
   for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
   document.body.append(node);
@@ -121,13 +121,13 @@ describe('native single-score player with independent Analyze components', () =>
     ]);
     const view = document.createElement('score-view');
     view.setAttribute('type', 'piano-roll');
-    view.setAttribute('player', '#source');
+    view.setAttribute('input', '#source');
     document.body.append(view);
     const pitch = document.createElement('score-pitch-view');
-    pitch.setAttribute('player', '#source');
+    pitch.setAttribute('input', '#source');
     const sheet = document.createElement('score-sheet-view') as SheetViewElement;
     sheet.score = source.resolvedScore;
-    sheet.setAttribute('player', '#source');
+    sheet.setAttribute('input', '#source');
     document.body.append(pitch, sheet);
     await flush();
     await vi.waitFor(() => expect(sheet.querySelector('.wui-status')).toBeNull());
@@ -242,7 +242,7 @@ it('Score View follows native source loading and error even before a score exist
   const source = await nativePlayer();
   const view = document.createElement('score-view');
   view.setAttribute('type', 'map');
-  view.setAttribute('player', '#source');
+  view.setAttribute('input', '#source');
   document.body.append(view);
   await flush();
   expect(view.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');

@@ -213,7 +213,7 @@ describe('<audio-clip-view> grid attributes', () => {
       },
     });
     const view = document.createElement('audio-clip-view') as AudioClipViewElement;
-    view.setAttribute('player', '#deck');
+    view.setAttribute('input', '#deck');
     view.setAttribute('grid', '');
     view.setAttribute('quantize', '');
     view.setAttribute('editable', '');

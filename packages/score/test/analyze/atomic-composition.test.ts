@@ -28,7 +28,7 @@ function source() {
 
 function panel(tag: string, type?: string) {
   const element = document.createElement(tag);
-  element.setAttribute('player', '#performance');
+  element.setAttribute('input', '#performance');
   if (type) element.setAttribute('type', type);
   element.setAttribute('motion', 'stepped');
   document.body.append(element);

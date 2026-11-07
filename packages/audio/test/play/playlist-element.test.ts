@@ -333,7 +333,7 @@ describe('playlist companion binding', () => {
     target.id = 'late-upgrade-deck';
     document.body.append(target);
     const element = mount();
-    element.setAttribute('player', '#late-upgrade-deck');
+    element.setAttribute('input', '#late-upgrade-deck');
     expect(element.player).toBeUndefined();
     customElements.define('late-companion-audio-player', class extends AudioPlayerElement {});
     await flush();
@@ -446,7 +446,7 @@ describe('playlist companion binding', () => {
       document.body.append(target);
     }
     const element = mount();
-    element.setAttribute('player', '.ambiguous-deck');
+    element.setAttribute('input', '.ambiguous-deck');
     await flush();
     expect(element.player).toBeUndefined();
     expect(owner.transport).toBeUndefined();

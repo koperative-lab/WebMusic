@@ -131,7 +131,7 @@ describe('shared native playback source', () => {
     const before = player.playback.snapshot();
     const follower = document.createElement('binding-chord-analysis') as AnalysisLaneElement;
 
-    follower.setAttribute('player', '#owner');
+    follower.setAttribute('input', '#owner');
     document.body.append(follower);
     await flush();
     expect(follower.textContent).not.toBe('');
@@ -154,7 +154,7 @@ describe('shared native playback source', () => {
 
   it('discovers a late owner, follows replacement and rejects ambiguous selectors', async () => {
     const host = document.createElement('div');
-    host.setAttribute('player', '#owner');
+    host.setAttribute('input', '#owner');
     document.body.append(host);
     const snapshots: Array<ScorePlaybackSnapshot | undefined> = [];
     const detach = bindAnalysisPlayer(host, {snapshot: (snapshot) => snapshots.push(snapshot)});
@@ -181,7 +181,7 @@ describe('shared native playback source', () => {
     const source = new PlaybackPublisher(() => state);
     owner(source);
     const host = document.createElement('div');
-    host.setAttribute('player', '#owner');
+    host.setAttribute('input', '#owner');
     document.body.append(host);
     const events: string[] = [];
     const detach = bindAnalysisPlayer(host, {noteOn: (midi) => events.push(`on:${midi}`), noteOff: (midi) => events.push(`off:${midi}`)});
@@ -198,7 +198,7 @@ describe('shared native playback source', () => {
     vi.advanceTimersByTime(1);
     owner(player.playback);
     const host = document.createElement('div');
-    host.setAttribute('player', '#owner');
+    host.setAttribute('input', '#owner');
     document.body.append(host);
     const attacks: number[] = [];
     const detach = bindAnalysisPlayer(host, {noteOn: (midi) => { attacks.push(midi); player.pause(); }});
@@ -213,7 +213,7 @@ describe('shared native playback source', () => {
     const source = new PlaybackPublisher(() => state);
     const element = owner(source);
     const host = document.createElement('div');
-    host.setAttribute('player', '#owner');
+    host.setAttribute('input', '#owner');
     document.body.append(host);
     const noteOn = vi.fn();
     const end = vi.fn();
@@ -241,7 +241,7 @@ describe('shared native playback source', () => {
   it.each(['binding-score-view', 'binding-score-preview', 'binding-chord-analysis'])('releases an initial subscription when %s is removed before subscribe returns', (tag) => {
     const {player} = engine();
     const follower = document.createElement(tag);
-    follower.setAttribute('player', '#owner');
+    follower.setAttribute('input', '#owner');
     const cleanup = vi.fn();
     owner({snapshot: () => player.playback.snapshot(), subscribe(listener) {
       listener(player.playback.snapshot());
@@ -258,7 +258,7 @@ describe('shared native playback source', () => {
     player.setRate(2);
     owner(player.playback);
     const follower = document.createElement(tag);
-    follower.setAttribute('player', '#owner');
+    follower.setAttribute('input', '#owner');
     document.body.append(follower);
     await flush();
     if (tag === 'binding-chord-analysis') {

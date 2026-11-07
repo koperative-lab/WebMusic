@@ -35,7 +35,7 @@ function player(score = music()) {
 function mount(feature: string) {
   const node = document.createElement(`score-${feature === 'live-chord' ? 'chord' : feature}-analysis`) as ChordAnalysisElement;
   if (feature === 'live-chord') node.mode = 'live';
-  node.setAttribute('player', '#source');
+  node.setAttribute('input', '#source');
   node.setAttribute('motion', 'stepped');
   document.body.append(node);
   return node;
@@ -95,7 +95,7 @@ describe('independent analysis capabilities', () => {
   it('parks a score-backed chord view and applies paused seeks without an animation frame', async () => {
     const source = player();
     const node = document.createElement('score-chord-analysis');
-    node.setAttribute('player', '#source');
+    node.setAttribute('input', '#source');
     node.setAttribute('motion', 'continuous');
     document.body.append(node);
     await flush();
@@ -134,7 +134,7 @@ describe('independent analysis capabilities', () => {
     const source = player();
     const node = mount('chord');
     await flush();
-    node.addEventListener('webscore:seek', () => node.removeAttribute('player'), {once: true});
+    node.addEventListener('webscore:seek', () => node.removeAttribute('input'), {once: true});
     node.querySelector<HTMLElement>('[role="slider"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(source.seek).not.toHaveBeenCalled();
   });
@@ -144,7 +144,7 @@ describe('independent analysis capabilities', () => {
     const node = mount('chord');
     node.score = source.resolvedScore;
     await flush();
-    node.removeAttribute('player');
+    node.removeAttribute('input');
     node.querySelector<HTMLElement>('[role="slider"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(source.seek).not.toHaveBeenCalled();
   });

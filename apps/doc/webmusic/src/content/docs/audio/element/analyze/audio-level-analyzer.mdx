@@ -55,8 +55,9 @@ back to containment; late insertion, upgrade and replacement are observed. The
 tool adds its own side tap on the port's context and never reroutes, prepares or
 schedules the source: a player's port appears once it prepares on play or
 preload. It registers no Session participant. Inside a provider it follows that
-scope's Session, so seek, pause and end reset its readings; a sibling linked
-only through `input` samples whatever reaches the port.
+scope's Session; linked through `input`, it follows the linked module's
+Session transport. Either way seek, pause and end reset its readings, and the
+linked player's loading and load errors appear in its status.
 
 ```html
 <audio-player src="/mp3/Arabesque%20No.1.mp3" controls>

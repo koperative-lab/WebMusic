@@ -685,97 +685,6 @@ describe('<audio-meter> borrowed player binding', () => {
     expect(second.listeners.get('load')?.size).toBe(1);
   });
 
-  it.each(['legacy', 'modules'])('follows a late selector target, source replacement and target removal in %s composition', async (composition) => {
-    stubFrames();
-    const host = document.createElement('section');
-    host.setAttribute('composition', composition);
-    document.body.append(host);
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.setAttribute('player', '#meter-owner'); host.append(element);
-    expect(element.analyser).toBeUndefined();
-    const fixture = playerFixture();
-    const target = Object.assign(document.createElement('div'), {player: fixture.player});
-    target.id = 'meter-owner'; host.append(target);
-    await Promise.resolve();
-    expect(element.analyser).toBe(fixture.analyser);
-    const next = playerFixture(); target.player = next.player;
-    target.dispatchEvent(new Event('webaudio:sourcechange'));
-    expect(element.analyser).toBe(next.analyser);
-    target.remove(); await Promise.resolve();
-    expect(element.analyser).toBeUndefined();
-    expect(next.analyser.disconnect).not.toHaveBeenCalled();
-  });
-
-  it.each(['legacy', 'modules'])('rebinds a replaced selector target and releases it on removal in %s composition', async (composition) => {
-    stubFrames();
-    const host = document.createElement('section');
-    host.setAttribute('composition', composition);
-    const first = playerFixture();
-    const target = Object.assign(document.createElement('div'), {player: first.player});
-    target.id = 'meter-owner';
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.setAttribute('player', '#meter-owner');
-    host.append(target, element); document.body.append(host);
-    expect(element.analyser).toBe(first.analyser);
-
-    const next = playerFixture();
-    const replacement = Object.assign(document.createElement('div'), {player: next.player});
-    replacement.id = target.id;
-    target.replaceWith(replacement);
-    await Promise.resolve();
-    expect(element.analyser).toBe(next.analyser);
-    expect(element.player).toBe(next.player);
-    target.dispatchEvent(new Event('webaudio:sourcechange'));
-    expect(element.analyser).toBe(next.analyser);
-
-    replacement.remove();
-    await Promise.resolve();
-    expect(element.analyser).toBeUndefined();
-    expect(element.player).toBeUndefined();
-    expect(first.analyser.disconnect).not.toHaveBeenCalled();
-    expect(next.analyser.disconnect).not.toHaveBeenCalled();
-  });
-
-  it.each(['object', 'selector'])('keeps explicit module %s input ahead of player selector discovery', async (binding) => {
-    stubFrames();
-    const host = document.createElement('section');
-    host.setAttribute('composition', 'modules');
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.setAttribute('player', '#meter-owner');
-    if (binding === 'object') element.inputModule = null;
-    else element.setAttribute('input', '#missing-module');
-    host.append(element); document.body.append(host);
-
-    const fixture = playerFixture();
-    const target = Object.assign(document.createElement('div'), {player: fixture.player});
-    target.id = 'meter-owner'; host.append(target);
-    await Promise.resolve();
-    expect(element.analyser).toBeUndefined();
-
-    if (binding === 'object') element.inputModule = undefined;
-    else element.removeAttribute('input');
-    expect(element.analyser).toBe(fixture.analyser);
-    target.remove();
-    await Promise.resolve();
-    expect(element.analyser).toBeUndefined();
-    expect(fixture.analyser.disconnect).not.toHaveBeenCalled();
-  });
-
-  it('keeps explicit input ahead of selector binding until the input is cleared', () => {
-    stubFrames();
-    const fixture = playerFixture();
-    const target = Object.assign(document.createElement('div'), {player: fixture.player});
-    target.id = 'meter-owner'; document.body.append(target);
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    const direct = playerFixture().analyser;
-    element.setAttribute('player', '#meter-owner'); element.analyser = direct as unknown as AnalyserNode;
-    document.body.append(element);
-    expect(element.analyser).toBe(direct);
-    element.analyser = undefined;
-    expect(element.analyser).toBe(fixture.analyser);
-    expect(direct.disconnect).not.toHaveBeenCalled();
-  });
-
   it('does not retain an obsolete source after a reentrant player replacement', () => {
     stubFrames();
     const second = playerFixture();
@@ -862,7 +771,7 @@ describe('<audio-meter> passive source feedback', () => {
   });
 
   it.each(['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer'] as const)(
-    'keeps %s following owner loading, failure, ready silence and removal without borrowing ownership', async (type) => {
+    'keeps %s following owner loading, failure and removal without borrowing its analyser', async (type) => {
       stubFrames();
       const owner = Object.assign(document.createElement('div'), {
         loading: false, loadError: undefined as Error | undefined,
@@ -872,7 +781,7 @@ describe('<audio-meter> passive source feedback', () => {
       document.body.append(owner);
       const element = document.createElement('test-audio-meter') as AudioMeterElement;
       element.type = type;
-      element.setAttribute('player', '#meter-status-owner');
+      element.setAttribute('input', '#meter-status-owner');
       document.body.append(element);
       const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
       expect(feedback().dataset.kind).toBe('waiting');
@@ -884,34 +793,19 @@ describe('<audio-meter> passive source feedback', () => {
       owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
       expect(feedback().getAttribute('role')).toBe('alert');
       expect(feedback().textContent).toBe('Decode failed');
-      const fixture = ownedContext();
+      // Readiness comes from the owner element; audio comes only from a module
+      // port tap (DEC-068), so a bare element never lends its analyser.
       owner.loadError = undefined;
-      owner.analyser = fixture.context.createAnalyser();
-      fixture.analysers[0]!.getByteFrequencyData.mockImplementation((buffer: Uint8Array) => buffer.fill(0));
-      fixture.analysers[0]!.getFloatFrequencyData.mockImplementation((buffer: Float32Array) => buffer.fill(-Infinity));
+      owner.analyser = ownedContext().context.createAnalyser();
       owner.dispatchEvent(new CustomEvent('webaudio:sourcechange'));
-      expect(feedback().hidden).toBe(true);
-      expect(element.snapshot?.type).toBe(type);
-      expect(element.snapshot?.silent).toBe(true);
-      const stage = element.shadowRoot!.querySelector('.wrap');
-      const analyser = element.analyser;
-      // Native player load state can change while the analyser identity stays
-      // the same. Redraw the existing stage without recreating the audio graph.
+      expect(feedback().dataset.kind).toBe('waiting');
+      expect(element.analyser).toBeUndefined();
       owner.loading = true;
       owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
       expect(feedback().dataset.kind).toBe('loading');
-      expect(element.shadowRoot!.querySelector('.wrap')).toBe(stage);
-      expect(element.analyser).toBe(analyser);
-      owner.loading = false;
-      owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
-      expect(feedback().hidden).toBe(true);
-      expect(element.shadowRoot!.querySelector('.wrap')).toBe(stage);
       owner.remove();
       await Promise.resolve();
       expect(feedback().dataset.kind).toBe('waiting');
-      // Stereo displays remove their own fan-out edge; no borrowed analyser
-      // ever receives an unqualified disconnect that would cut the owner route.
-      expect(fixture.analysers[0]!.disconnect.mock.calls.every((call) => call.length === 1)).toBe(true);
     },
   );
 
@@ -923,7 +817,7 @@ describe('<audio-meter> passive source feedback', () => {
     owner.id = 'meter-status-owner';
     document.body.append(owner);
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.setAttribute('player', '#meter-status-owner');
+    element.setAttribute('input', '#meter-status-owner');
     const fixture = ownedContext();
     if (source === 'context') element.context = fixture.context;
     else element.analyser = fixture.context.createAnalyser();

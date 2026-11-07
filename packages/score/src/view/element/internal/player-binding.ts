@@ -59,7 +59,7 @@ interface ViewPlayer extends Element {
 }
 
 /** Unique selector lookup within the follower's Document or ShadowRoot. */
-export function resolveViewPlayer(host: Element, selectorAttribute = 'player'): Element | undefined {
+export function resolveViewPlayer(host: Element, selectorAttribute = 'input'): Element | undefined {
   const selector = host.getAttribute(selectorAttribute);
   if (!selector) return undefined;
   try {
@@ -90,10 +90,8 @@ export function readViewPlayerScore(target: Element | undefined): Score | undefi
  * within the same root; cleanup releases listeners and target observation.
  */
 export function bindViewPlayer(
-  host: Element, handlers: ViewPlayerHandlers, preferredAttribute = 'player',
+  host: Element, handlers: ViewPlayerHandlers, selectorAttribute = 'input',
 ): (() => void) | undefined {
-  // `input` is the module grammar's name for the same selector (DEC-068).
-  const selectorAttribute = host.getAttribute(preferredAttribute) === null && host.getAttribute('input') !== null ? 'input' : preferredAttribute;
   const selector = host.getAttribute(selectorAttribute);
   // Without a selector the companion borrows the nearest player or Rack part
   // scope by containment.

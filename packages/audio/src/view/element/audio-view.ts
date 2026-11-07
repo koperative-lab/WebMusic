@@ -1,4 +1,4 @@
-import {observeCompanionTarget} from './internal/companion-target';
+import {observeCompanionTarget} from '../../play/element/internal/companion-target';
 // ============================================================================
 // <audio-view> — the single @webmusic/audio/view visualization element.
 //
@@ -251,7 +251,6 @@ export class AudioViewElement extends WebMusicElement {
       'format',
       'type',
       'loading',
-      'player',
       'input',
       'interactive',
       'drag-mode',
@@ -359,7 +358,7 @@ export class AudioViewElement extends WebMusicElement {
       this.refresh();
       return;
     }
-    if (name === 'player' || name === 'input') {
+    if (name === 'input') {
       this.bindPlayer();
       this.refresh();
       return;
@@ -1106,12 +1105,12 @@ export class AudioViewElement extends WebMusicElement {
     const generation = ++this.playerTargetGeneration;
     this.playerTargetCleanup?.(); this.playerTargetCleanup = undefined;
     this.playerSelectionError = undefined;
-    const selector = this.getAttribute('player') ?? this.getAttribute('input');
+    const selector = this.getAttribute('input');
     const current = (): boolean => this.isConnected &&
-      generation === this.playerTargetGeneration && (this.getAttribute('player') ?? this.getAttribute('input')) === selector;
+      generation === this.playerTargetGeneration && this.getAttribute('input') === selector;
     let initial = true;
     // `input` aliases `player`; with neither, the enclosing player scope is followed.
-    const cleanup = observeCompanionTarget(this, ['player', 'input'], (target, state) => {
+    const cleanup = observeCompanionTarget(this, ['input'], (target, state) => {
       if (!current()) return;
       const changed = target !== this.boundPlayer;
       const previousError = this.playerSelectionError?.message;

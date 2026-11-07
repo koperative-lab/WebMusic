@@ -101,7 +101,7 @@ describe('<audio-view> empty states', () => {
 
     // A meter is not seekable, but it is still a named thing on the page.
     const player = playerStub('meter-player', {analyser: {} as AnalyserNode});
-    view.setAttribute('player', '#meter-player');
+    view.setAttribute('input', '#meter-player');
     expect(mocks.meter).toHaveBeenCalledOnce();
     expect(view.getAttribute('role')).toBe('group');
     expect(view.getAttribute('aria-label')).toBe('Audio level meter');
@@ -438,7 +438,7 @@ describe('<audio-view> live player frame projection', () => {
     const {frames, flush} = installFrames();
     const player = {clip: toneClip(10), seconds: 2, duration: 10, playing: true, scratching: false};
     const source = playerStub('live-clock', player);
-    const view = mount({attributes: {player: '#live-clock', interactive: '', follow: ''}});
+    const view = mount({attributes: {input: '#live-clock', interactive: '', follow: ''}});
     const renderer = lastVisualizer();
     renderer.redrawFrame.mockImplementation((seconds?: number, follow?: boolean) => {
       if (follow && seconds !== undefined) renderer.setOffset(seconds - 1);
@@ -462,9 +462,9 @@ describe('<audio-view> live player frame projection', () => {
     const second = {...first, seconds: 7};
     const oldSource = playerStub('old-clock', first);
     playerStub('new-clock', second);
-    const view = mount({attributes: {player: '#old-clock', interactive: ''}});
+    const view = mount({attributes: {input: '#old-clock', interactive: ''}});
     const stale = [...frames.values()];
-    view.setAttribute('player', '#new-clock');
+    view.setAttribute('input', '#new-clock');
     first.seconds = 4;
     oldSource.dispatchEvent(new CustomEvent('webaudio:timeupdate', {detail: {seconds: 4}}));
     for (const callback of stale) callback(0);
@@ -488,11 +488,11 @@ describe('<audio-view> live player frame projection', () => {
       renderer.redrawFrame.mockImplementation(() => {
         if (replaced) return;
         replaced = true;
-        document.querySelector('probe-audio-view')!.setAttribute('player', '#replacement-clock');
+        document.querySelector('probe-audio-view')!.setAttribute('input', '#replacement-clock');
       });
       return renderer;
     });
-    const view = mount({attributes: {player: '#initial-clock', interactive: ''}});
+    const view = mount({attributes: {input: '#initial-clock', interactive: ''}});
     expect(view.getAttribute('aria-valuenow')).toBe('7');
     expect(frames.size).toBe(1);
     second.seconds = 7.5;
@@ -505,7 +505,7 @@ describe('<audio-view> live player frame projection', () => {
   it('keeps event-only targets event-driven even if they expose activity without a live position', () => {
     const {frames, flush} = installFrames();
     const source = playerStub('legacy-clock', {clip: toneClip(10), playing: true} as {clip: AudioClip});
-    const view = mount({attributes: {player: '#legacy-clock', interactive: ''}});
+    const view = mount({attributes: {input: '#legacy-clock', interactive: ''}});
     source.dispatchEvent(new CustomEvent('webaudio:timeupdate', {detail: {seconds: 3.5}}));
     flush();
     expect(view.getAttribute('aria-valuenow')).toBe('3.5');

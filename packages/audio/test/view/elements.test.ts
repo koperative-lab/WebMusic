@@ -65,7 +65,7 @@ describe('<audio-view> player integration', () => {
     mocks.waveform.mockImplementation(() => visualizerHarness(0));
     mocks.bind.mockReturnValue({unsubscribe: vi.fn()});
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#late-native-owner');
+    view.setAttribute('input', '#late-native-owner');
     document.body.append(view);
     expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
 
@@ -102,13 +102,13 @@ describe('<audio-view> player integration', () => {
 
   it('shows invalid and ambiguous player selection until a unique source is available', async () => {
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '[');
+    view.setAttribute('input', '[');
     document.body.append(view);
     expect(view.querySelector('[role="alert"]')?.textContent).toBe('Invalid player selector');
     const owners = Array.from({length: 2}, () => Object.assign(document.createElement('div'), {loading: true}));
     for (const owner of owners) owner.className = 'candidate-owner';
     document.body.append(...owners);
-    view.setAttribute('player', '.candidate-owner');
+    view.setAttribute('input', '.candidate-owner');
     expect(view.querySelector('[role="alert"]')?.textContent).toBe('Player selector matches multiple elements');
     owners[0].remove();
     await Promise.resolve();
@@ -122,7 +122,7 @@ describe('<audio-view> player integration', () => {
     document.body.append(owner);
     const view = document.createElement('test-audio-view') as AudioViewElement;
     view.type = 'meter';
-    view.setAttribute('player', '#meter-native-owner');
+    view.setAttribute('input', '#meter-native-owner');
     document.body.append(view);
     expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
     owner.clip = toneClip(1);
@@ -157,7 +157,7 @@ describe('<audio-view> player integration', () => {
     document.body.appendChild(playerElement);
 
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#player');
+    view.setAttribute('input', '#player');
     view.setAttribute('interactive', '');
     view.setAttribute('aria-label', 'Waveform seek position');
     document.body.appendChild(view);
@@ -205,7 +205,7 @@ describe('<audio-view> player integration', () => {
     document.body.append(playerElement);
 
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#pointer-player');
+    view.setAttribute('input', '#pointer-player');
     view.setAttribute('interactive', '');
     document.body.append(view);
     const surface = view.querySelector<HTMLElement>('.wui-stage__surface')!;
@@ -238,7 +238,7 @@ describe('<audio-view> player integration', () => {
     player.player = first;
     document.body.append(player);
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#borrowed-player');
+    view.setAttribute('input', '#borrowed-player');
     document.body.append(view);
     const firstPeaks = mocks.waveform.mock.calls.at(-1)![1];
 
@@ -272,7 +272,7 @@ describe('<audio-view> player integration', () => {
     const owned = player.player!;
     const seek = vi.spyOn(owned, 'seek').mockImplementation(() => {});
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#removed-player');
+    view.setAttribute('input', '#removed-player');
     document.body.append(view);
     unsubscribe.mockClear();
     player.remove();
@@ -292,7 +292,7 @@ describe('<audio-view> player integration', () => {
     document.body.append(player);
     const view = document.createElement('test-audio-view') as AudioViewElement;
     view.clip = toneClip(1);
-    view.setAttribute('player', '#explicit-view-player');
+    view.setAttribute('input', '#explicit-view-player');
     document.body.append(view);
     const peaks = mocks.waveform.mock.calls.at(-1)![1];
     const external = new AudioPlayer(toneClip(6));
@@ -311,7 +311,7 @@ describe('<audio-view> player integration', () => {
     source.clip = toneClip(3);
     document.body.append(source);
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#ready-source');
+    view.setAttribute('input', '#ready-source');
     document.body.append(view);
     expect(compute).toHaveBeenCalledOnce();
     expect(mocks.waveform).toHaveBeenCalledOnce();
@@ -351,7 +351,7 @@ describe('<audio-view> player integration', () => {
     document.body.appendChild(playerElement);
 
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#late-player');
+    view.setAttribute('input', '#late-player');
     document.body.appendChild(view);
     const firstPeaks = mocks.waveform.mock.calls.at(-1)?.[1];
 
@@ -374,7 +374,7 @@ describe('<audio-view> player integration', () => {
 
     const view = document.createElement('test-audio-view') as AudioViewElement;
     view.setAttribute('type', 'meter');
-    view.setAttribute('player', '#meter-player');
+    view.setAttribute('input', '#meter-player');
     document.body.appendChild(view);
 
     expect(mocks.meter).toHaveBeenCalledWith(expect.any(HTMLElement), analyser, expect.any(Object));
@@ -464,7 +464,7 @@ describe('<audio-view> src loading', () => {
     source.id = 'auxiliary-owner';
     const view = document.createElement('test-audio-view') as AudioViewElement;
     view.type = type;
-    view.setAttribute('player', '#auxiliary-owner');
+    view.setAttribute('input', '#auxiliary-owner');
     if (input === 'clip') view.clip = toneClip(1);
     else if (input === 'streamingClip') view.clip = createAudioClip({sampleRate: 100, length: 100, numberOfChannels: 1});
     else view[input] = spectrogramData();
@@ -492,7 +492,7 @@ describe('<audio-view> src loading', () => {
     const view = document.createElement('test-audio-view') as AudioViewElement;
     view.type = 'spectrogram';
     view.spectrogram = spectrogramData();
-    view.setAttribute('player', '#spectrogram-owner');
+    view.setAttribute('input', '#spectrogram-owner');
     document.body.append(source, view);
     source.loading = true;
     source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
@@ -507,7 +507,7 @@ describe('<audio-view> src loading', () => {
     });
     player.id = 'loading-owner';
     const view = document.createElement('test-audio-view') as AudioViewElement;
-    view.setAttribute('player', '#loading-owner');
+    view.setAttribute('input', '#loading-owner');
     document.body.append(player, view);
     expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
     player.loading = false;

@@ -118,7 +118,7 @@ describe('<audio-live-view>', () => {
     const source = Object.assign(document.createElement('div'), {analyser, loading: false});
     source.id = 'captured-tap';
     document.body.append(source);
-    const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#captured-tap'});
+    const view = mount<AudioLiveViewElement>('audio-live-view', {input: '#captured-tap'});
     const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
     step(100);
     expect(feedback().dataset.kind).toBe('error');
@@ -140,17 +140,17 @@ describe('<audio-live-view>', () => {
     const second = Object.assign(document.createElement('div'), {loading: false});
     first.id = 'old-live-owner'; second.id = 'new-live-owner';
     document.body.append(first, second);
-    const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#old-live-owner'});
+    const view = mount<AudioLiveViewElement>('audio-live-view', {input: '#old-live-owner'});
     const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
     expect(feedback().dataset.kind).toBe('loading');
     view.analyser = fakeAnalyser();
     expect(feedback().dataset.kind).not.toBe('loading');
     view.analyser = undefined;
     expect(feedback().dataset.kind).toBe('loading');
-    view.setAttribute('source', '#new-live-owner');
+    view.setAttribute('input', '#new-live-owner');
     expect(feedback().dataset.kind).toBe('waiting');
     first.dispatchEvent(new CustomEvent('webaudio:loaded'));
-    expect(view.getAttribute('source')).toBe('#new-live-owner');
+    expect(view.getAttribute('input')).toBe('#new-live-owner');
     expect(feedback().dataset.kind).toBe('waiting');
   });
 
@@ -169,7 +169,7 @@ describe('<audio-live-view>', () => {
     source.analyser = fakeAnalyser();
     document.body.append(source);
 
-    const element = mount<AudioLiveViewElement>('audio-live-view', {source: '#tap'});
+    const element = mount<AudioLiveViewElement>('audio-live-view', {input: '#tap'});
     await flush();
     expect(element.analyser).toBe(source.analyser);
     expect(element.live).toBe(true);
@@ -183,7 +183,7 @@ describe('<audio-live-view>', () => {
     recorder.inputAnalyser = fakeAnalyser();
     document.body.append(recorder);
 
-    const element = mount<AudioLiveViewElement>('audio-live-view', {source: '#rec'});
+    const element = mount<AudioLiveViewElement>('audio-live-view', {input: '#rec'});
     await flush();
     expect(element.analyser).toBe(recorder.inputAnalyser);
   });
@@ -228,7 +228,7 @@ describe('<audio-live-view>', () => {
     source.analyser = analyser;
     document.body.append(source);
 
-    const element = mount<AudioLiveViewElement>('audio-live-view', {source: '#shared'});
+    const element = mount<AudioLiveViewElement>('audio-live-view', {input: '#shared'});
     await flush();
     element.remove();
 
@@ -239,7 +239,7 @@ describe('<audio-live-view>', () => {
 
 
 it('tracks a late live source through loading, error, and passive waiting', async () => {
-  const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#late-live'});
+  const view = mount<AudioLiveViewElement>('audio-live-view', {input: '#late-live'});
   const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
   expect(feedback().dataset.kind).toBe('waiting');
   const source = Object.assign(document.createElement('div'), {

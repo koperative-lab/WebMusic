@@ -4,14 +4,6 @@ import type {ElementParamCatalog} from './types';
 
 const ENTRY = '@webmusic/audio/analyze/element';
 
-const PLAYER = {
-  name: 'player',
-  kind: 'text',
-  placeholder: '#session',
-  fallback: 'use input',
-  note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.',
-} as const;
-
 const INPUT = {
   name: 'input',
   kind: 'text',
@@ -39,7 +31,6 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     tag: 'audio-meter',
     entry: ENTRY,
     params: [
-      PLAYER,
       INPUT,
       PORT,
       {name: 'type', kind: 'enum', options: [...METER_TYPES], fallback: 'vu — needle dial with peak and clip lamps', note: 'Select the display: VU, loudness bars, scrolling waveform, oscilloscope, spectrum, spectrogram or stereometer. The graph stays connected.'},
@@ -76,7 +67,6 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     tag: 'audio-level-analyzer',
     entry: ENTRY,
     params: [
-      PLAYER,
       INPUT,
       PORT,
       {name: 'threshold-dbfs', kind: 'number', min: -60, max: 0, step: 1, fallback: '-12',
@@ -99,7 +89,6 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     tag: 'audio-spectrum-analyzer',
     entry: ENTRY,
     params: [
-      PLAYER,
       INPUT,
       PORT,
       {name: 'frozen', kind: 'bool', fallback: 'false', note: 'Hold the currently drawn FFT frame for inspection.'},
@@ -126,7 +115,6 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     tag: 'audio-oscilloscope',
     entry: ENTRY,
     params: [
-      PLAYER,
       INPUT,
       PORT,
       {name: 'frozen', kind: 'bool', fallback: 'false', note: 'Hold the current sampled window and stop polling.'},
@@ -151,7 +139,6 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     tag: 'audio-transient-analyzer',
     entry: ENTRY,
     params: [
-      PLAYER,
       INPUT,
       PORT,
       {name: 'sensitivity', kind: 'number', min: 0, max: 1, step: 0.05, fallback: '0.55', note: 'Higher sensitivity lowers the attack threshold; the tool control updates this attribute.'},

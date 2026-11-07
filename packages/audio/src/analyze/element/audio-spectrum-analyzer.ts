@@ -23,7 +23,7 @@ export interface AudioSpectrumProbeDetail {
 /** Live, inspectable FFT spectrum from a borrowed audio graph. */
 export class AudioSpectrumAnalyzerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'input', 'port', 'frozen', 'peak-hold', 'min-frequency', 'max-frequency', 'aria-label'];
+    return ['input', 'port', 'frozen', 'peak-hold', 'min-frequency', 'max-frequency', 'aria-label'];
   }
 
   #inputModule?: ModuleHandle | null;
@@ -79,7 +79,7 @@ export class AudioSpectrumAnalyzerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
+    if (name === 'input' || name === 'port') this.#bind();
     else if (name === 'frozen') {
       if (this.frozen) {
         this.#stop();

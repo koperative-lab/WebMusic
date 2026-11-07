@@ -191,9 +191,9 @@ describe('score inspection Elements', () => {
     player.id = 'selection-owner';
     document.body.append(player);
     const element = await mount(ChordAnalysisElement, music);
-    element.setAttribute('player', '#selection-owner');
+    element.setAttribute('input', '#selection-owner');
     await flush();
-    element.addEventListener('webscore:analysisselect', () => element.removeAttribute('player'), {once: true});
+    element.addEventListener('webscore:analysisselect', () => element.removeAttribute('input'), {once: true});
     const band = element.querySelectorAll('.wui-harmony-flow__lane[data-track="0"] > *')[1];
     expect(band).toBeDefined();
     band!.dispatchEvent(new MouseEvent('click', {bubbles: true}));

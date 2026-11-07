@@ -78,7 +78,7 @@ describe('<audio-view> player composition', () => {
     document.body.append(source.element);
     const clip = toneClip(4);
     const spectrogram = spectrogramData();
-    const view = mount({clip, spectrogram, attributes: {type, player: '#preparing-player', interactive: ''}});
+    const view = mount({clip, spectrogram, attributes: {type, input: '#preparing-player', interactive: ''}});
     expect(view.getAttribute('aria-valuenow')).toBe('1');
 
     view.loading = true;
@@ -110,7 +110,7 @@ describe('<audio-view> player composition', () => {
 
     const view = mount({
       clip: toneClip(4),
-      attributes: {player: '#transport-player', interactive: ''},
+      attributes: {input: '#transport-player', interactive: ''},
     });
 
     const drawn = visualizer.redraw.mock.calls.length;
@@ -139,7 +139,7 @@ describe('<audio-view> player composition', () => {
 
     const view = mount({
       clip: toneClip(4),
-      attributes: {player: '#reconnect-player', interactive: ''},
+      attributes: {input: '#reconnect-player', interactive: ''},
     });
     player.element.dispatchEvent(timeupdate(1));
     expect(view.getAttribute('aria-valuenow')).toBe('1');
@@ -171,7 +171,7 @@ describe('<audio-view> seek', () => {
 
     const view = mount({
       clip: toneClip(4),
-      attributes: {player: '#seek-player', interactive: ''},
+      attributes: {input: '#seek-player', interactive: ''},
     });
     const seeks: Array<{seconds: number}> = [];
     view.addEventListener('webaudio:seek', (event) => {
@@ -209,7 +209,7 @@ describe('<audio-view> type switching', () => {
     const view = mount({
       clip: toneClip(4),
       spectrogram: spectrogramData(),
-      attributes: {player: '#mode-player'},
+      attributes: {input: '#mode-player'},
     });
     expect(mocks.waveform).toHaveBeenCalledOnce();
 
@@ -297,7 +297,7 @@ describe('<audio-view> failure handling', () => {
     const errors: unknown[] = [];
     const view = document.createElement(TAG) as AudioViewElement;
     view.clip = toneClip(4);
-    view.setAttribute('player', '#hostile-player');
+    view.setAttribute('input', '#hostile-player');
     view.setAttribute('interactive', '');
     view.addEventListener('webaudio:error', (event) => {
       errors.push((event as CustomEvent<{error: unknown}>).detail.error);

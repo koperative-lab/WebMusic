@@ -10,7 +10,7 @@ import {HTMLElementBase, cssSizeAttr} from '../base';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 /** Attributes every score View Element observes for its data, playback and size. */
-export const SCORE_VIEW_BASE_ATTRIBUTES = Object.freeze(['src', 'format', 'player', 'input', 'width', 'height']);
+export const SCORE_VIEW_BASE_ATTRIBUTES = Object.freeze(['src', 'format', 'input', 'width', 'height']);
 
 /**
  * Data, playback and editor binding shared by the score View Elements. A
@@ -87,7 +87,7 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
 
   /** Handle a shared attribute; returns false for subclass attributes. */
   protected handleBaseAttribute(name: string): boolean {
-    if (name === 'player' || name === 'input') this.bindPlayer();
+    if (name === 'input') this.bindPlayer();
     // In editor mode only an added or removed src (a conflict) matters; format alone keeps the session.
     else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) { if (name === 'src') this.bindEditor(); } else void this.refresh(); }
     else if (name === 'width' || name === 'height') this.applyHostSize();

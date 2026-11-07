@@ -39,7 +39,7 @@ function emit(node: Element, type: string, detail?: unknown) {
   node.dispatchEvent(new CustomEvent(`webscore:${type}`, {detail, bubbles: true}));
 }
 
-function keyboard(attributes: Record<string, string> = {player: '#source'}) {
+function keyboard(attributes: Record<string, string> = {input: '#source'}) {
   const node = document.createElement('follower-keyboard') as PitchViewElement;
   for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
   document.body.append(node);
@@ -55,7 +55,7 @@ async function nativePlayer(score = music()) {
   return node;
 }
 
-async function scoreView(attributes: Record<string, string> = {player: '#source'}) {
+async function scoreView(attributes: Record<string, string> = {input: '#source'}) {
   const node = document.createElement('follower-score') as ScoreViewElement;
   for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
   document.body.append(node);
@@ -69,11 +69,11 @@ afterEach(() => {
 });
 
 describe('composable View player followers', () => {
-  it('hydrates duplicate held pitches, prioritizes player over source and reconciles pause snapshots', () => {
+  it('hydrates duplicate held pitches, ignores the retired source attribute and reconciles pause snapshots', () => {
     const selected = noteSource();
     const legacy = noteSource('legacy');
     selected.state.activeNotes = [{midi: 60, startTime: 0}, {midi: 60, startTime: 1}, {midi: 64, startTime: 1}];
-    const view = keyboard({player: '#source', source: '#legacy'});
+    const view = keyboard({input: '#source', source: '#legacy'});
     expect(view.active).toEqual([60, 64]);
     selected.state.activeNotes.splice(0, 1);
     emit(selected.node, 'noteoff', {midi: 60, startTime: 0});
@@ -105,20 +105,20 @@ describe('composable View player followers', () => {
     ambiguous.node.remove();
     await flush();
     expect(view.active).toEqual([64]);
-    view.setAttribute('player', '[');
+    view.setAttribute('input', '[');
     expect(view.active).toEqual([]);
-    view.setAttribute('player', '#source');
+    view.setAttribute('input', '#source');
     expect(view.active).toEqual([64]);
     view.remove();
     emit(second.node, 'noteon', {midi: 67});
     expect(view.active).toEqual([]);
   });
 
-  it('keeps legacy source and follows a late custom element upgrade without requiring another event', async () => {
+  it('follows a late custom element upgrade through input without requiring another event', async () => {
     const target = document.createElement('late-view-source');
     target.id = 'source';
     document.body.append(target);
-    const view = keyboard({source: '#source'});
+    const view = keyboard({input: '#source'});
     customElements.define('late-view-source', class extends HTMLElement {
       getPlaybackSnapshot() {
         return {nominalSeconds: 0, rate: 1, playing: true, activeNotes: [{midi: 67}]};
@@ -180,7 +180,7 @@ describe('composable View player followers', () => {
     const source = await nativePlayer();
     const own = music(['D4', 'F4']);
     io.load.mockResolvedValueOnce(own);
-    const view = await scoreView({player: '#source', src: 'own.mid'});
+    const view = await scoreView({input: '#source', src: 'own.mid'});
     expect(view.score).toBe(own);
     const explicit = music(['A4']);
     view.score = explicit;

@@ -31,7 +31,7 @@ const FRETBOARD_GEOMETRY_ATTRIBUTES = ['fret-width', 'string-spacing', 'string-w
  */
 export class PitchViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'direction', 'player', 'input', 'source', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
+    return ['type', 'direction', 'input', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
   }
 
   #notes = createPitchView();
@@ -140,7 +140,7 @@ export class PitchViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected || !this.#hostStyle) return;
-    if (name === 'player' || name === 'input' || name === 'source') this.#bindPlayer();
+    if (name === 'input') this.#bindPlayer();
     else if (name === 'type' || name === 'density' || name === 'scheme'
       || (this.type === 'keyboard' && (name === 'direction' || name === 'follow' || name === 'scroll' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
       || (this.type === 'fretboard' && FRETBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof FRETBOARD_GEOMETRY_ATTRIBUTES[number]))) this.#render();
@@ -254,7 +254,7 @@ export class PitchViewElement extends HTMLElementBase {
       },
       noteOn: ({midi}) => { this.#notes.noteOn(midi); },
       noteOff: ({midi}) => { this.#notes.noteOff(midi); },
-    }, this.getAttribute('player') ? 'player' : 'source');
+    });
   }
 }
 

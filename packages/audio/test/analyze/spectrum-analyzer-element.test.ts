@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {modulePlayerElement} from './module-player-fixture';
 import {
   defineAudioSpectrumAnalyzerElement,
   type AudioSpectrumAnalyzerElement,
@@ -41,18 +42,11 @@ function analyser(): AnalyserNode {
   } as AnalyserNode;
 }
 
-function player(node: AnalyserNode, playing = false) {
-  const element = Object.assign(document.createElement('div'), {
-    analyser: node, playing, currentTime: 0, duration: 2,
-  });
-  element.id = 'source';
-  document.body.append(element);
-  return element;
-}
+const player = (node: AnalyserNode, playing = false) => modulePlayerElement(node, playing);
 
 function panel(selector = '#source'): AudioSpectrumAnalyzerElement {
   const element = document.createElement('audio-spectrum-analyzer') as AudioSpectrumAnalyzerElement;
-  element.setAttribute('player', selector);
+  element.setAttribute('input', selector);
   document.body.append(element);
   return element;
 }
@@ -75,7 +69,7 @@ describe('<audio-spectrum-analyzer>', () => {
   it('treats explicit false-valued playground attributes as off and can enable them', () => {
     player(analyser(), true);
     const spectrum = document.createElement('audio-spectrum-analyzer') as AudioSpectrumAnalyzerElement;
-    spectrum.setAttribute('player', '#source');
+    spectrum.setAttribute('input', '#source');
     spectrum.setAttribute('frozen', 'false');
     spectrum.setAttribute('peak-hold', 'false');
     document.body.append(spectrum);

@@ -499,16 +499,16 @@ change rebinds. Rounds 3–6.
 | Retired | Replacement |
 |---|---|
 | `composition` attribute, descendant-Rack selection, `AudioPlayerConnection` | Containment and module context |
-| `player=` on views, analysis, recorder and playlist; `source=` on live view | `input` and `port` |
+| `player=` on views, analysis, meter, recorder, playlist and mixer; `source=` on live view and pitch view | `input` (plus `port` on Audio taps); a mixer linked by `input` is that player's mix backend |
 | `LoopPlayer` | The player's `loop` (a Session loop region); finite repeat counts are application logic over Session wraps |
 | `AbPlayer` | `InteractivePlayer.select()` over named sources, driven by a `Metronome` |
 | `TonePlayer` | Removed with Bridge's sync family in round 8; external engines join as `external` participants |
 | `MidiPlayerController` and `Player` aliases, `bindClock` | `PlayerController` (kept for `.controller`), `ScorePlayer`, a `Metronome` driving `advance()` |
-| Kernel `/sync` public entry | `TransportGroup` and `MirrorClockMaster` become Session internals |
+| Kernel `/sync` public entry, `MirrorClockMaster` | `TransportGroup` is a Session internal; the clockless fallback is removed because the Session clock is always readable |
 | Bridge `ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`, `clipAsMaster`, `scoreAsFollower` | One Session with Score and Audio modules; Bridge supplies axis mappings, for example from a beat grid |
 | Separate render graphs in `renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence` | Offline realization of the module graph |
 
-The 0.3.0 release notes list every removal with its replacement. Elements keep
+The [0.3.0 release notes](../release/0.3.0.md#breaking-changes-from-02-dec-068-mod-15) list every removal with its replacement. Elements keep
 their tag names. `score-player`'s `.rack` (an explicit Rack) and `.controller` (a
 borrowed controller) stay, implemented on the module path (round 5 choice in
 DEC-068); the Headless `Rack`, `createRack` and `PlayerController` therefore

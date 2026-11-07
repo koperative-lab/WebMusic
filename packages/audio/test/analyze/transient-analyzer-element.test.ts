@@ -2,6 +2,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 vi.mock('@webmusic/ui/transient-analyzer', () => import('../../../ui/src/transient-analyzer'));
 import {defineAudioTransientAnalyzerElement, type AudioTransientAnalyzerElement} from '../../src/analyze/element/audio-transient-analyzer';
+import {modulePlayerElement} from './module-player-fixture';
 
 interface FakeRunner {
   source: AnalyserNode;
@@ -35,14 +36,7 @@ function analyser(): AnalyserNode {
   return {fftSize: 32, context: {sampleRate: 48_000}} as AnalyserNode;
 }
 
-function player(node: AnalyserNode, playing = true) {
-  const element = Object.assign(document.createElement('div'), {
-    analyser: node, playing, currentTime: 0, duration: 2,
-  });
-  element.id = 'source';
-  document.body.append(element);
-  return element;
-}
+const player = (node: AnalyserNode, playing = true) => modulePlayerElement(node, playing);
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -56,7 +50,7 @@ describe('<audio-transient-analyzer>', () => {
     const tap = analyser();
     const owner = player(tap);
     const element = document.createElement('audio-transient-analyzer') as AudioTransientAnalyzerElement;
-    element.setAttribute('player', '#source');
+    element.setAttribute('input', '#source');
     document.body.append(element);
     expect(realtime.runners).toHaveLength(1);
     expect(realtime.runners[0]!.source).toBe(tap);
@@ -101,7 +95,7 @@ describe('<audio-transient-analyzer>', () => {
   it('invalidates stale source frames and keeps explicit input independent of player pauses', () => {
     const owner = player(analyser());
     const element = document.createElement('audio-transient-analyzer') as AudioTransientAnalyzerElement;
-    element.setAttribute('player', '#source');
+    element.setAttribute('input', '#source');
     document.body.append(element);
     realtime.runners[0]!.emit(0, 10);
     realtime.runners[0]!.emit(50, 150);

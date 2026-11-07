@@ -489,7 +489,7 @@ describe('mixer companion binding', () => {
 
   it('does not autoplay while its declared owner is missing', async () => {
     const element = document.createElement('audio-mixer') as AudioMixerElement;
-    element.setAttribute('player', '#missing-mix-deck');
+    element.setAttribute('input', '#missing-mix-deck');
     element.setAttribute('autoplay', '');
     const source = fakePlayer();
     element.members = [{id: 'stem', player: source}];
@@ -562,10 +562,10 @@ describe('<audio-mixer> passive source feedback', () => {
     element.members = [{id: 'one', player: fakePlayer()}];
     expect(feedback().hidden).toBe(true);
     expect(strips(element)).toEqual(['one']);
-    element.setAttribute('player', '#missing-mixer-owner');
+    element.setAttribute('input', '#missing-mixer-owner');
     expect(feedback().dataset.kind).toBe('waiting');
     expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-mixer__board')!.hidden).toBe(false);
-    element.removeAttribute('player');
+    element.removeAttribute('input');
     expect(feedback().hidden).toBe(true);
     element.members = [];
     expect(feedback().dataset.kind).toBe('waiting');

@@ -31,7 +31,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'audition'; player.editor = editor;
     const view = gridView();
-    view.editor = editor; view.editable = true; view.setAttribute('player', '#audition');
+    view.editor = editor; view.editable = true; view.setAttribute('input', '#audition');
     const supplied = editor.createInteractionSession();
     if (change !== 'assign') view.interactionSession = supplied;
     document.body.append(player, view);
@@ -62,7 +62,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'read-only-audition'; player.editor = editor;
     const view = document.createElement('integration-score-view') as ScoreViewElement;
-    view.editor = editor; view.setAttribute('player', '#read-only-audition');
+    view.editor = editor; view.setAttribute('input', '#read-only-audition');
     const supplied = editor.createInteractionSession();
     if (change !== 'assign') view.interactionSession = supplied;
     document.body.append(player, view);
@@ -85,7 +85,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'leave-audition'; player.editor = editor;
     const view = document.createElement('integration-score-view') as ScoreViewElement;
-    view.editor = editor; view.setAttribute('player', '#leave-audition');
+    view.editor = editor; view.setAttribute('input', '#leave-audition');
     document.body.append(player, view);
     expect((await player.waitForDocumentRevision(editor.getSnapshot())).status).toBe('applied');
     expect(view.getAttribute('data-playback-state')).toBe('ready');
@@ -120,7 +120,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'audition'; player.editor = editor;
     const view = gridView();
-    view.editor = editor; view.editable = true; view.setAttribute('player', '#audition');
+    view.editor = editor; view.editable = true; view.setAttribute('input', '#audition');
     document.body.append(player, view);
     await player.waitForDocumentRevision(editor.getSnapshot()); await player.seekNominal(1);
     const latest = editor.createInteractionSession(); latest.setSelection([noteId]);
@@ -137,7 +137,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'audition'; player.editor = editor;
     const view = gridView();
-    view.editor = editor; view.editable = true; view.setAttribute('player', '#audition');
+    view.editor = editor; view.editable = true; view.setAttribute('input', '#audition');
     document.body.append(player, view);
     await player.waitForDocumentRevision(editor.getSnapshot()); await player.seekNominal(1);
     const subscribe = vi.spyOn(player.playback, 'subscribe');
@@ -155,7 +155,7 @@ describe('editor, native Player and score grid integration', () => {
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'audition'; player.editor = editor;
     const view = gridView();
-    view.editor = editor; view.editable = true; view.setAttribute('player', '#audition');
+    view.editor = editor; view.editable = true; view.setAttribute('input', '#audition');
     document.body.append(player, view);
     expect((await player.waitForDocumentRevision(editor.getSnapshot())).status).toBe('applied');
     const source = player.playback;
@@ -190,7 +190,7 @@ describe('editor, native Player and score grid integration', () => {
     player.id = 'audition'; player.editor = editor; document.body.append(player);
     await player.waitForDocumentRevision(editor.getSnapshot());
     const view = tag === 'score-view' ? document.createElement('integration-score-view') as ScoreViewElement : gridView();
-    view.setAttribute('editor', ''); view.setAttribute('player', '#audition');
+    view.setAttribute('editor', ''); view.setAttribute('input', '#audition');
     if (view instanceof ScoreGridViewElement) view.editable = true;
     const score = music();
     expect(() => { view.score = score; }).not.toThrow();

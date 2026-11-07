@@ -13,7 +13,7 @@ function setup(type = 'keyboard', range: readonly [number, number] | null = [60,
   });
   player.id = 'sizing-player'; document.body.append(player);
   const element = document.createElement('sized-pitch-view') as PitchViewElement;
-  element.setAttribute('player', '#sizing-player'); element.setAttribute('type', type);
+  element.setAttribute('input', '#sizing-player'); element.setAttribute('type', type);
   if (range) {
     element.setAttribute('low', String(range[0])); element.setAttribute('high', String(range[1]));
   }

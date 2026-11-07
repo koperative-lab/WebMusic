@@ -84,6 +84,7 @@ for (const [name, pkg] of packages) {
   checkUiWebComponentFreedom(name, pkg);
   checkUiDomainVocabulary(name, pkg);
   checkKernelPrimitiveOwnership(name, pkg);
+  checkRetiredCompositionSurfaces(name, pkg);
   checkWuiInternalNamespace(name, pkg);
   checkLayerBoundary(name, pkg);
   checkInternalSourceReachability(name, pkg);
@@ -812,6 +813,40 @@ function checkKernelPrimitiveOwnership(name, pkg) {
   }
 }
 
+/**
+ * MC-27 (DEC-068): modular composition is the only model. No package reads the
+ * retired `composition` boundary or the `player=`/`source=` companion
+ * selectors (an explicit input is `input`), and no package exports a retired
+ * composition API again.
+ */
+function checkRetiredCompositionSurfaces(name, pkg) {
+  // Inside the function: the package loop above runs before later top-level consts initialize.
+  const retiredCompositionApis = Object.freeze([
+    'LoopPlayer', 'AbPlayer', 'TonePlayer', 'bindClock', 'MidiPlayerController',
+    'ScoreAudioSync', 'createSyncedPlayback', 'createAudioMasteredPlayback', 'clipAsMaster', 'scoreAsFollower',
+    'MirrorClockMaster', 'isModularComposition',
+  ]);
+  const attribute = /\b(?:get|has|set|remove)Attribute\(\s*['"](composition|player|source)['"]/g;
+  const observed = /observedAttributes[\s\S]{0,200}?\[([^\]]*)\]/g;
+  const exported = new RegExp(`^export\\s+(?:declare\\s+)?(?:abstract\\s+)?(?:class|function|const|let|interface|type|enum)\\s+(${retiredCompositionApis.join('|')})\\b`, 'gm');
+  for (const file of pkg.files) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(attribute)) {
+      errors.push(`${relativeToRoot(file)} reads the retired \`${match[1]}\` attribute; DEC-068 composes by containment and \`input\` (MC-27).`);
+    }
+    for (const match of text.matchAll(observed)) {
+      for (const retired of ['composition', 'player', 'source']) {
+        if (new RegExp(`['"]${retired}['"]`).test(match[1])) {
+          errors.push(`${relativeToRoot(file)} observes the retired \`${retired}\` attribute; DEC-068 composes by containment and \`input\` (MC-27).`);
+        }
+      }
+    }
+    for (const match of text.matchAll(exported)) {
+      errors.push(`${relativeToRoot(file)} exports the retired ${match[1]}; DEC-068 removed it with the single composition model (MC-27).`);
+    }
+  }
+}
+
 function checkUiWebComponentFreedom(name, pkg) {
   if (name !== '@webmusic/ui') return;
   for (const file of pkg.files) {
@@ -987,8 +1022,13 @@ async function checkApplicationImports() {
   const applicationRoots = [path.join(root, 'app'), path.join(root, 'apps')].filter((dir) => existsSync(dir));
   const files = (await Promise.all(applicationRoots.map(applicationTextFiles))).flat();
   const pattern = /(?:from\s+|import\s*(?:\(\s*)?)["'](@(?:webscore|webaudio|webmusic)\/[a-z-]+(?:\/[a-z0-9._/-]+)?)["']/g;
+  // MC-27: documentation, demos and snippets write `input`, never the retired selectors.
+  const retiredMarkup = /<[a-z]+-[a-z-]+\b[^>]*?\s(player|source)="[#.[]|\scomposition="modules"/g;
   for (const file of files) {
     const content = await readFile(file, 'utf8');
+    for (const match of content.matchAll(retiredMarkup)) {
+      errors.push(`${relativeToRoot(file)} uses retired markup ${JSON.stringify(match[0].trim().slice(-40))}; write input="#id" or nest the element (DEC-068 MC-27).`);
+    }
     for (const match of content.matchAll(pattern)) {
       const specifier = match[1];
       const dependency = packageName(specifier);

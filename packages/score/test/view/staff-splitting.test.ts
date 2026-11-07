@@ -111,7 +111,7 @@ describe('score staff splitting configuration', () => {
     const snapshot = source.getPlaybackSnapshot();
     const view = document.createElement('split-score-view') as ScoreViewElement;
     view.type = 'staff';
-    view.setAttribute('player', '#split-player');
+    view.setAttribute('input', '#split-player');
     document.body.append(view);
     await flush();
     for (const split of ['false', 'true', 'false']) {

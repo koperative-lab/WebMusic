@@ -35,12 +35,12 @@ canceling work and displaying external preparation failures.
   defineAudioMixerElement();
 </script>
 <audio-player id="session"></audio-player>
-<audio-mixer player="#session"></audio-mixer>
+<audio-mixer input="#session"></audio-mixer>
 ```
 
 ## Ports and composition
 
-Without a `player=` or `.player` link this desk is a **Rack** module (DEC-068):
+Without an `input=` or `.player` link this desk is a **Rack** module (DEC-068):
 a module provider whose children resolve their context through it.
 
 | Port | Family | Direction | Notes |
@@ -59,7 +59,7 @@ another provider borrows that Session. Members declared through `.members` play
 as one `media-follower` participant on a `mix-seconds` axis. A provider's new
 default destination moves only the master route, keeping channel levels, mutes
 and solo; a new admission, Session or audio environment rebuilds the desk and
-re-admits its children. With `player="#session"` or `.player` the desk is
+re-admits its children. With `input="#session"` or `.player` the desk is
 instead that player's mix backend and not a module. See
 [modular composition](/bridge/modular-composition/).
 
@@ -96,7 +96,7 @@ document.querySelector<AudioMixerElement>('audio-mixer')!.members = [
 
 | Member | Kind | Description |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for the central player; observes late insertion, upgrade, replacement and removal. |
+| `input` | attribute | Unique selector for the central player, making the desk its mix backend; observes late insertion, upgrade, replacement and removal. |
 | `.player` | property | Assign/read the central `AudioPlayer` or its Element; explicit assignment wins over the selector. |
 | `loading` / `.loading` | boolean attribute / property | Caller-owned asynchronous preparation, default `false`; the property reflects the attribute. Clearing it returns to ready or source waiting without replacing data or stopping playback. |
 | `master-volume` | attribute | Master fader level, applied live. |

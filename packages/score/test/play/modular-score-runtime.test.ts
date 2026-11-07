@@ -72,13 +72,44 @@ afterEach(async () => {
 });
 
 describe('Score module graph and Session integration', () => {
+  it('makes an outermost desk the Session root of its parts and releases it on removal (MC-23)', async () => {
+    const {synth} = fixture();
+    const desk = document.createElement('score-rack-control') as RackControlElement;
+    const part = document.createElement('score-rack-part') as RackPartElement;
+    part.id = 'lead';
+    part.score = score();
+    part.sound = synth;
+    desk.append(part);
+    document.body.append(desk);
+    await settle();
+    const session = desk.sessionTransport;
+    expect(session).toBeDefined();
+    expect(requestModuleContext(part)?.session).toBe(session);
+    expect(session!.snapshot.participantCount).toBe(1);
+    desk.remove();
+    await settle();
+    expect(desk.sessionTransport).toBeUndefined();
+  });
+
+  it('borrows the enclosing player Session instead of owning one', async () => {
+    const {context} = fixture();
+    const root = document.createElement('score-player') as ScorePlayerElement;
+    root.audioContext = context;
+    const desk = document.createElement('score-rack-control') as RackControlElement;
+    root.append(desk);
+    document.body.append(root);
+    await settle();
+    expect(desk.sessionTransport).toBeDefined();
+    expect(desk.sessionTransport).toBe(requestModuleContext(desk)?.session);
+  });
+
   it('routes nested real-player inputs to exact borrowed voices once without starting transport', async () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     let sequence = 0;
     Object.assign(synth, {supportsNoteOccurrences: true, noteOn: vi.fn(() => ++sequence), noteOffById: vi.fn()});
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules');
+
     root.audioContext = context;
     const child = document.createElement('score-player') as ScorePlayerElement;
     child.score = score();
@@ -195,7 +226,7 @@ describe('Score module graph and Session integration', () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules');
+
     root.audioContext = context;
     const desk = document.createElement('score-rack-control') as RackControlElement;
     const child = document.createElement('score-player') as ScorePlayerElement;
@@ -246,7 +277,7 @@ describe('Score module graph and Session integration', () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules');
+
     root.audioContext = context;
     const desk = document.createElement('module-custom-desk') as RackControlElement;
     const part = document.createElement('score-rack-part') as RackPartElement;
@@ -278,7 +309,7 @@ describe('Score module graph and Session integration', () => {
     const {scope, session, synth} = fixture();
     let upstream = scope;
     const host = document.createElement('div');
-    host.setAttribute('composition', 'modules');
+
     cleanups.push(() => session.dispose(), provideModuleContext(host, () => upstream));
     const child = document.createElement('score-player') as ScorePlayerElement;
     child.score = score();
@@ -300,7 +331,7 @@ describe('Score module graph and Session integration', () => {
   it('keeps duration unknown while a declared source loads and waits before preparing its real engine', async () => {
     const {scope, session, synth, context} = fixture();
     const host = document.createElement('div');
-    host.setAttribute('composition', 'modules');
+
     cleanups.push(() => session.dispose(), provideModuleContext(host, () => scope));
     const load = deferred<Score>();
     const child = document.createElement('module-delayed-score') as DelayedScoreElement;
@@ -332,7 +363,7 @@ describe('Score module graph and Session integration', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     cleanups.push(() => errors.mockRestore());
     const host = document.createElement('div');
-    host.setAttribute('composition', 'modules');
+
     cleanups.push(() => session.dispose(), provideModuleContext(host, () => scope));
     const load = deferred<Score>();
     const child = document.createElement('module-delayed-score') as DelayedScoreElement;

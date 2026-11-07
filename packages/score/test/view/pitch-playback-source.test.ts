@@ -42,7 +42,7 @@ function player(initial: ScorePlaybackSnapshot) {
 
 function mount(type: PitchViewType = 'keyboard') {
   const element = document.createElement('score-pitch-view') as PitchViewElement;
-  element.setAttribute('player', '#pitch-owner');
+  element.setAttribute('input', '#pitch-owner');
   element.setAttribute('type', type);
   element.setAttribute('data-motion', 'none');
   document.body.append(element);

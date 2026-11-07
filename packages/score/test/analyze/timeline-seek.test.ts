@@ -79,7 +79,7 @@ describe('<score-chord-analysis> seeking at a rate other than 1', () => {
     const score = melody();
     const player = stubPlayer();
     const element = document.createElement(tag()) as HTMLElement & {score?: Score};
-    element.setAttribute('player', '#player');
+    element.setAttribute('input', '#player');
     element.score = score;
     document.body.append(element);
     await flush();
@@ -108,7 +108,7 @@ describe('<score-chord-analysis> seeking at a rate other than 1', () => {
     const score = melody();
     const player = stubPlayer();
     const element = document.createElement(tag()) as HTMLElement & {score?: Score};
-    element.setAttribute('player', '#player');
+    element.setAttribute('input', '#player');
     element.score = score;
     document.body.append(element);
     await flush();
@@ -137,7 +137,7 @@ describe('<score-chord-analysis> seeking at a rate other than 1', () => {
     player.seekNominal = (seconds: number) => player.nominal.push(seconds);
 
     const element = document.createElement(tag()) as HTMLElement & {score?: Score};
-    element.setAttribute('player', '#player');
+    element.setAttribute('input', '#player');
     element.score = score;
     document.body.append(element);
     await flush();

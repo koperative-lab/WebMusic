@@ -1,4 +1,4 @@
-import {observeCompanionTarget} from './internal/companion-target';
+import {observeCompanionTarget} from '../../play/element/internal/companion-target';
 import {observeElementSource} from '@webmusic/kernel/element';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 import {tempoGridJump} from '@webmusic/kernel/transport';
@@ -28,7 +28,7 @@ interface PlayerFacade {
   seek?(seconds: number): unknown;
 }
 
-const OBSERVED = ['src', 'format', 'player', 'input', 'width', 'height', 'editable', 'tools', 'tool', 'snap', 'show-envelopes',
+const OBSERVED = ['src', 'format', 'input', 'width', 'height', 'editable', 'tools', 'tool', 'snap', 'show-envelopes',
   'pixels-per-second', 'amplitude', 'fade-curve', 'follow', 'grid', 'quantize', 'grid-edit'] as const;
 /** Attributes the mounted view applies in place; the others remount it. */
 const SETTING_ATTRIBUTES = new Set(['tools', 'tool', 'snap', 'show-envelopes', 'pixels-per-second', 'amplitude', 'fade-curve', 'follow',
@@ -92,7 +92,7 @@ export class AudioClipViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
-    if (name === 'player' || name === 'input') { this.bindPlayer(); return; }
+    if (name === 'input') { this.bindPlayer(); return; }
     if (name === 'width' || name === 'height') { this.applyHostSize(); if (name === 'height') this.render(); return; }
     if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) this.bindEditor(); else void this.loadSource(); return; }
     if (name === 'editable') { this.updateEditable(); if (!this.surface) this.render(); return; }
@@ -308,7 +308,7 @@ export class AudioClipViewElement extends HTMLElementBase {
     const generation = ++this.playerGeneration;
     this.unbindPlayer();
     // `input` aliases `player`; with neither, the enclosing player scope is followed.
-    const cleanup = observeCompanionTarget(this, ['player', 'input'], (target, state) => {
+    const cleanup = observeCompanionTarget(this, ['input'], (target, state) => {
       if (generation !== this.playerGeneration || !this.isConnected) return;
       this.connectPlayer(state === 'ready' ? target : undefined);
     });

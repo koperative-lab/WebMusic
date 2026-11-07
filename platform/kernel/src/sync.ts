@@ -7,16 +7,14 @@
 // serialization, generation guards, drift monitoring, scheduled joins,
 // master-self-stop reconciliation — hoisted here so every transport pairing
 // (score+clip, future families, external masters) reuses one hardened
-// implementation instead of re-writing it per pair. @webmusic/bridge remains
-// the domain assembly: it adapts ScorePlayer/AudioClipPlayer onto these role
-// contracts and keeps its public ScoreAudioSync surface.
+// implementation instead of re-writing it per pair. Since DEC-068 the group is
+// a private part of SessionTransport; Bridge registers Score and Audio engines
+// as Session participants instead of assembling a group itself.
 //
 // The master MUST expose a kernel TransportClockReader — the group anchors
 // by READING the clock, the exact affine map the master plays by, with no
-// sampling skew. A transport without a clock is wrapped in
-// {@link MirrorClockMaster}, which owns the sampled mirror-clock fallback
-// (dead-reckoning plus reconciliation) as ONE adapter instead of a second
-// code path inside the group.
+// sampling skew. The Session's own clock is always readable, so the group
+// needs no clockless fallback.
 //
 // The group is the session command authority: revisioned invalidation and
 // settlement wrap its existing cancellation/re-entry choreography. Engines
@@ -24,7 +22,7 @@
 // see platform/shared-clock-injection.md for that separate migration boundary.
 // ============================================================================
 
-import {TransportClock, type TransportClockReader} from './transport';
+import type {TransportClockReader} from './transport';
 import {
   MAX_TIMER_DELAY_MS,
   createTickSource,
@@ -66,8 +64,7 @@ export interface SyncMasterTransport {
   setRate?(rate: number): void;
   /** Current position on the master's axis. */
   readonly position: number;
-  /** Read-only transport clock (master position axis). REQUIRED — wrap a
-   * clockless transport in {@link MirrorClockMaster}. */
+  /** Read-only transport clock (master position axis). REQUIRED. */
   readonly clock: TransportClockReader;
   /**
    * Optional pre-drift-check reconciliation hook (adapters). Called once
@@ -204,15 +201,6 @@ export type TransportEvent =
  * stutter forever.
  */
 const MAX_CONSECUTIVE_DRIFT_JOINS = 3;
-
-/**
- * Relative slope error before {@link MirrorClockMaster} re-learns a
- * clockless transport's rate. Loose enough to ignore the quantization noise
- * of a transport whose position updates on a frame boundary, tight enough
- * that a refused or clamped rate is caught on the first reconcile that has
- * two samples.
- */
-const MIRROR_RATE_TOLERANCE = 0.02;
 
 /** Clockless adapters still need periodic sampling when follower drift is off.
  * Use the normal default drift cadence to avoid treating brief position
@@ -1224,173 +1212,6 @@ export class TransportGroup {
   }
 }
 
-/**
- * Minimal command surface a clockless transport must offer so
- * {@link MirrorClockMaster} can adapt it into the master role.
- */
-export interface ClocklessMasterTransport {
-  play(when?: number): Promise<void> | void;
-  pause(): void;
-  stop(): void;
-  seekPosition(position: number, when?: number): void | Promise<void>;
-  setRate?(rate: number): void;
-  readonly position: number;
-  dispose?(): void;
-}
-
-/**
- * Adapts a transport WITHOUT a readable clock into the required-clock
- * master role by dead-reckoning a mirror TransportClock across the command
- * surface, and reconciling the reckoning against the transport's actual
- * position at drift checks or periodic lifecycle samples when follower drift
- * checks are disabled:
- *
- * - after observed forward motion establishes the position's reported step,
- *   a longer stationary interval can indicate that the transport stopped
- *   on its own. The adapter then pauses the mirror and reports 'stalled'.
- *   Without prior motion, repeated positions alone are inconclusive and
- *   the adapter leaves the transport running;
- * - a moving transport that diverged from the extrapolation (refused or
- *   clamped rate, tempo automation) re-anchors the mirror so drift is
- *   measured against the transport, not the reckoning.
- *
- * This is the ONE home of the sampled fallback the score↔audio bridge used
- * to interleave through its clocked path.
- */
-export class MirrorClockMaster implements SyncMasterTransport {
-  readonly #inner: ClocklessMasterTransport;
-  readonly #mirror: TransportClock;
-  readonly #now: () => number;
-  #tolerance: number;
-  /** Last sample for estimating the transport's slope. */
-  #lastSample: {position: number; time: number} | null = null;
-  /** Last position change, retained across identical quantized samples. */
-  #lastChange: {position: number; time: number} | null = null;
-  /** Largest observed positive step since the last command. */
-  #reportedStep = 0;
-  #positiveSteps = 0;
-
-  constructor(inner: ClocklessMasterTransport, now: () => number, options: {reconcileToleranceSeconds?: number} = {}) {
-    this.#inner = inner;
-    this.#now = now;
-    this.#tolerance = options.reconcileToleranceSeconds ?? 0.03;
-    assertFiniteNonNegative('reconcileToleranceSeconds', this.#tolerance);
-    this.#mirror = new TransportClock(now);
-  }
-
-  get clock(): TransportClockReader {
-    return this.#mirror;
-  }
-
-  get position(): number {
-    return this.#inner.position;
-  }
-
-  async play(when?: number): Promise<void> {
-    await this.#inner.play(when);
-    this.#resetSamples();
-    this.#mirror.start(this.#now(), this.#inner.position);
-  }
-
-  pause(): void {
-    this.#inner.pause();
-    this.#resetSamples();
-    this.#mirror.pause(this.#now());
-  }
-
-  stop(): void {
-    this.#inner.stop();
-    this.#resetSamples();
-    const now = this.#now();
-    this.#mirror.pause(now);
-    this.#mirror.seekTo(0, now);
-  }
-
-  async seekPosition(position: number, when?: number): Promise<void> {
-    await this.#inner.seekPosition(position, when);
-    this.#resetSamples();
-    this.#mirror.seekTo(this.#inner.position, this.#now());
-  }
-
-  setRate(rate: number): void {
-    this.#inner.setRate?.(rate);
-    this.#resetSamples();
-    this.#mirror.setRate(rate, this.#now());
-  }
-
-  #resetSamples(): void {
-    this.#lastSample = null;
-    this.#lastChange = null;
-    this.#reportedStep = 0;
-    this.#positiveSteps = 0;
-  }
-
-  reconcile(now: number): 'ok' | 'stalled' {
-    const actual = this.#inner.position;
-    if (!Number.isFinite(actual) || actual < 0) {
-      this.#resetSamples();
-      return 'ok';
-    }
-    const mirrorPosition = this.#mirror.positionAt(now);
-    const sample = this.#lastSample;
-    this.#lastSample = {position: actual, time: now};
-    const changed = sample !== null && actual !== sample.position;
-    const previousChange = this.#lastChange;
-    if (sample === null || changed) {
-      if (changed && actual > sample.position) {
-        this.#reportedStep = Math.max(this.#reportedStep, actual - sample.position);
-        this.#positiveSteps += 1;
-      }
-      this.#lastChange = {position: actual, time: now};
-    }
-    // Position-only evidence cannot distinguish a stop from a quantized
-    // moving transport until it has reported at least one positive step.
-    // Allow that whole step plus tolerance before inferring a stall.
-    if (
-      !changed && sample !== null && previousChange !== null &&
-      this.#reportedStep > 0 &&
-      (now - previousChange.time) * this.#mirror.rate > this.#reportedStep + this.#tolerance &&
-      !this.#mirror.paused
-    ) {
-      this.#resetSamples();
-      this.#mirror.pause(now);
-      return 'stalled';
-    }
-    // Correct the reckoning's SLOPE, not only its intercept. A transport
-    // that clamped or refused the shared rate advances at a rate the mirror
-    // does not know; re-anchoring the position alone leaves the mirror
-    // drifting away again before the next check, which is what turns a rate
-    // mismatch into an endless correction loop. The next join then hands the
-    // followers the rate the transport actually runs at.
-    if (changed && previousChange !== null && !this.#mirror.paused) {
-      const elapsed = now - previousChange.time;
-      const advanced = actual - previousChange.position;
-      if (elapsed > 0 && advanced > 0) {
-        const measured = advanced / elapsed;
-        const current = this.#mirror.rate;
-        if (
-          Number.isFinite(measured) &&
-          measured > 0 &&
-          Math.abs(measured - current) > MIRROR_RATE_TOLERANCE * current &&
-          // The first boundary jump of a rounded position can look much
-          // faster than the true rate. Wait for another step in that case.
-          (measured < current || this.#positiveSteps >= 2 ||
-            advanced <= elapsed * current + this.#tolerance)
-        ) {
-          this.#mirror.setRate(measured, now);
-        }
-      }
-    }
-    if (Math.abs(mirrorPosition - actual) > this.#tolerance) {
-      this.#mirror.seekTo(actual, now);
-    }
-    return 'ok';
-  }
-
-  dispose(): void {
-    this.#inner.dispose?.();
-  }
-}
 
 function assertFiniteNonNegative(name: string, value: number): void {
   if (!Number.isFinite(value) || value < 0) {

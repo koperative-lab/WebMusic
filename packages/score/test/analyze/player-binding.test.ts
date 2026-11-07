@@ -16,7 +16,7 @@ const settle = async () => { await Promise.resolve(); await Promise.resolve(); }
 
 function follower(selector = '#player') {
   const host = document.createElement('div');
-  host.setAttribute('player', selector);
+  host.setAttribute('input', selector);
   document.body.append(host);
   return host;
 }
@@ -119,12 +119,12 @@ describe('borrowed Analyze player data and state', () => {
     player();
     const host = follower();
     expect(resolveAnalysisPlayer(host)).toBeUndefined();
-    host.setAttribute('player', '[');
+    host.setAttribute('input', '[');
     expect(() => bind(host, {})).not.toThrow();
     const shell = document.createElement('div');
     const shadow = shell.attachShadow({mode: 'open'});
     document.body.append(shell);
-    host.setAttribute('player', '#player');
+    host.setAttribute('input', '#player');
     shadow.append(host);
     expect(resolveAnalysisPlayer(host)).toBeUndefined();
     shadow.append(first.element);

@@ -42,11 +42,11 @@ export class AudioPlayerConnection {
     private readonly implicit = true,
   ) {}
 
-  /** An `input` attribute (or the retired `player` alias) or an assigned object links explicitly. */
+  /** An `input` attribute or an assigned object links explicitly. */
   get explicit(): boolean { return this.assigned !== undefined || this.selector !== null; }
 
   private get selector(): string | null {
-    return this.host.getAttribute('input') ?? this.host.getAttribute('player');
+    return this.host.getAttribute('input');
   }
 
   get player(): AudioPlayer | undefined { return this.owner; }

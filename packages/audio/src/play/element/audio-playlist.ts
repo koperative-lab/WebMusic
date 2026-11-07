@@ -95,7 +95,7 @@ function labelFor(entry: AudioPlaylistEntry): string {
 
 export class AudioPlaylistElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['input', 'player', 'src', 'loop', 'autoplay', 'volume', 'rate', 'prefetch', 'engine', 'skip-failed'];
+    return ['input', 'src', 'loop', 'autoplay', 'volume', 'rate', 'prefetch', 'engine', 'skip-failed'];
   }
 
   protected root?: ShadowRoot;
@@ -126,7 +126,7 @@ export class AudioPlaylistElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
-    if (name === 'input' || name === 'player') { this.connection.refresh(); this.render(); return; }
+    if (name === 'input') { this.connection.refresh(); this.render(); return; }
     const queue = this.queue;
     if (!queue) return;
     // Only the inputs that define the queue itself rebuild it; the live knobs

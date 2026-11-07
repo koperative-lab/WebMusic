@@ -94,7 +94,7 @@ describe('modular Audio composition', () => {
     const desk = new AudioMixer({audioContext: context.audio});
     const scope = new ModuleContext({id: 'foreign-score-rack', audio: new ModuleAudioEnvironment({context: context.audio}), session,
       admit: (module, port) => desk.admitAudio(module.id, port)});
-    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('section');
     host.innerHTML = '<late-audio-src src="nested.wav" volume="0.3"></late-audio-src>';
     const release = provideModuleContext(host, () => scope);
     document.body.append(host);
@@ -121,7 +121,9 @@ describe('modular Audio composition', () => {
     });
     const session = new SessionTransport(() => context.currentTime);
     const scope = new ModuleContext({id: 'late-foreign-rack', audio: new ModuleAudioEnvironment({context: context.audio}), session});
-    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('section');
+    // An undefined custom element is a pending boundary only inside a provider's scope (DEC-068).
+    const releaseOuter = provideModuleContext(host, () => new ModuleContext({id: 'outer-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session}));
     host.innerHTML = '<late-foreign-rack><audio-before-rack src="delayed.wav"></audio-before-rack></late-foreign-rack>';
     document.body.append(host);
     customElements.define('audio-before-rack', class extends AudioPlayerElement {});
@@ -142,13 +144,13 @@ describe('modular Audio composition', () => {
     await session.play();
     expect(leaf.player!.playing).toBe(true);
     expect(leaf.player!.outputPort!.context).toBe(context.audio);
-    host.remove(); session.dispose();
+    host.remove(); releaseOuter(); session.dispose();
   });
 
   it('upgrades a preassigned clip into the inherited module context without a legacy player', async () => {
     const context = new GraphContext();
     const options: Array<{audioContext?: AudioContext; moduleContext?: ModuleContext}> = [];
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = document.createElement('late-audio-clip') as AudioPlayerElement;
     leaf.clip = clip(); root.append(leaf); document.body.append(root);
     customElements.define('late-audio-clip', class extends AudioPlayerElement {
@@ -165,7 +167,7 @@ describe('modular Audio composition', () => {
 
   it('keeps pending src duration unknown and waits before starting the complete Session', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const ready = player(); ready.clip = clip();
     const loading = player(); loading.setAttribute('src', 'pending.wav');
     root.append(ready, loading); document.body.append(root);
@@ -188,7 +190,7 @@ describe('modular Audio composition', () => {
 
   it('keeps failed src blocking until retry and ignores stale loading generations', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.setAttribute('src', 'broken.wav'); root.append(leaf); document.body.append(root);
     const failure = new Error('download failed');
     loads[0]!.reject(failure);
@@ -211,7 +213,7 @@ describe('modular Audio composition', () => {
 
   it('releases pending src on detach without waiting for its request to settle', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.setAttribute('src', 'cancelled.wav'); root.append(leaf); document.body.append(root);
     const preload = root.preload();
     leaf.remove();
@@ -225,7 +227,7 @@ describe('modular Audio composition', () => {
 
   it('has a source-free Session and one routed leaf, with no graph allocated by discovery', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const desk = mixer(); const leaf = player(); leaf.clip = clip();
     desk.append(leaf); root.append(desk); document.body.append(root);
     expect(root.clip).toBeUndefined();
@@ -254,7 +256,7 @@ describe('modular Audio composition', () => {
   it('sums a nested mixer once and preserves a borrowed player after detach', async () => {
     const context = new GraphContext();
     const borrowed = new AudioPlayer(clip(), {audioContext: context.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const outer = mixer(); const inner = mixer(); const leaf = player(); leaf.player = borrowed;
     inner.append(leaf); outer.append(inner); root.append(outer); document.body.append(root);
     await root.play();
@@ -274,7 +276,7 @@ describe('modular Audio composition', () => {
 
   it('keeps a source-owning root and child master on separate upstream routes', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio; root.clip = clip();
+    const root = player(); root.audioContext = context.audio; root.clip = clip();
     const desk = mixer(); const leaf = player(); leaf.clip = clip();
     desk.append(leaf); root.append(desk); document.body.append(root);
     await root.play();
@@ -291,7 +293,7 @@ describe('modular Audio composition', () => {
     const borrowed = new AudioPlayer(clip(), {audioContext: context.audio});
     const first = new AudioMixer({audioContext: context.audio});
     const second = new AudioMixer({audioContext: context.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const desk = mixer(); desk.mixer = first;
     const leaf = player(); leaf.player = borrowed;
     desk.append(leaf); root.append(desk); document.body.append(root);
@@ -307,7 +309,7 @@ describe('modular Audio composition', () => {
 
   it('keeps an explicitly local child Session outside the ancestor participant set', () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.setAttribute('session', 'local'); leaf.clip = clip();
     root.append(leaf); document.body.append(root);
     expect(root.sessionTransport!.snapshot.participantCount).toBe(0);
@@ -329,7 +331,7 @@ describe('modular Audio composition', () => {
   it('still rejects an explicitly borrowed player from another context', async () => {
     const scopeContext = new GraphContext(); const foreignContext = new GraphContext();
     const borrowed = new AudioPlayer(clip(), {audioContext: foreignContext.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = scopeContext.audio;
+    const root = player(); root.audioContext = scopeContext.audio;
     const leaf = player(); leaf.player = borrowed; root.append(leaf); document.body.append(root);
     await expect(root.preload()).rejects.toThrow('must share the module AudioContext');
     expect(leaf.player).toBe(borrowed);
@@ -380,14 +382,14 @@ describe('modular Audio composition', () => {
   it('withdraws default routes from borrowed root players and mixers on detach', async () => {
     const context = new GraphContext();
     const borrowed = new AudioPlayer(clip(), {audioContext: context.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.player = borrowed;
+    const root = player(); root.player = borrowed;
     document.body.append(root); await root.play();
     const source = borrowed.outputPort!;
     root.remove();
     expect(source.disposed).toBe(false);
     expect(paths(source.node as unknown as GraphNode, context.destination)).toBe(0);
     const borrowedMixer = new AudioMixer({audioContext: context.audio});
-    const desk = mixer(); desk.setAttribute('composition', 'modules'); desk.mixer = borrowedMixer;
+    const desk = mixer(); desk.mixer = borrowedMixer;
     document.body.append(desk); await desk.module!.prepare!();
     const master = borrowedMixer.outputPort;
     expect(paths(master.node as unknown as GraphNode, context.destination)).toBe(1);
@@ -401,7 +403,7 @@ describe('modular Audio composition', () => {
   it('changes a mounted borrowed leaf to a local Session and back', async () => {
     const context = new GraphContext();
     const borrowed = new AudioPlayer(clip(), {audioContext: context.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.player = borrowed; root.append(leaf); document.body.append(root);
     await root.play();
     leaf.setAttribute('session', 'local');
@@ -423,7 +425,7 @@ describe('modular Audio composition', () => {
     // Exercise fallback transport cancellation independently of native Session
     // attachment, whose lease never calls the participant's local pause().
     vi.spyOn(borrowed, 'timingCapabilities', 'get').mockReturnValue({engine: 'external', sharedSessionClock: false, futureStart: false, nativeLoop: false});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.player = borrowed; root.append(leaf); document.body.append(root);
     await root.play();
     const output = borrowed.outputPort!;
@@ -445,7 +447,7 @@ describe('modular Audio composition', () => {
   it('detaches a shared-clock borrowed leaf by lease without calling local transport commands', async () => {
     const context = new GraphContext();
     const borrowed = new AudioPlayer(clip(), {audioContext: context.audio});
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.player = borrowed; root.append(leaf); document.body.append(root);
     await root.play();
     const output = borrowed.outputPort!;
@@ -466,7 +468,7 @@ describe('modular Audio composition', () => {
 
   it('realizes local and master declarations on the existing chains, with shared live parameters', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const desk = mixer(); const leaf = player(); leaf.clip = clip();
     const local = document.createElement('audio-effect') as AudioEffectElement;
     const master = document.createElement('audio-effect') as AudioEffectElement;
@@ -546,7 +548,7 @@ describe('neutral module audio taps', () => {
 describe('modular Audio Session and route ownership', () => {
   it('keeps an inherited leaf from rewriting its provider Session rate or loop', async () => {
     const context = new GraphContext();
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     root.setAttribute('rate', '1.5');
     const leaf = player(); leaf.clip = clip();
     leaf.setAttribute('rate', '0.5'); leaf.setAttribute('loop', '');
@@ -571,7 +573,7 @@ describe('modular Audio Session and route ownership', () => {
     const second = context.createGain();
     const audio = new ModuleAudioEnvironment({context: context.audio});
     let scope = new ModuleContext({id: 'routed-scope', audio, session, destination: () => first as unknown as AudioNode});
-    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('section');
     const leaf = player(); leaf.clip = clip(); host.append(leaf);
     const release = provideModuleContext(host, () => scope);
     document.body.append(host);
@@ -597,7 +599,7 @@ describe('modular Audio Session and route ownership', () => {
     const second = context.createGain();
     let scope = new ModuleContext({id: 'desk-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session,
       destination: () => first as unknown as AudioNode});
-    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('section');
     const desk = mixer(); const leaf = player(); leaf.clip = clip();
     desk.append(leaf); host.append(desk);
     const release = provideModuleContext(host, () => scope);
@@ -621,7 +623,7 @@ describe('modular Audio Session and route ownership', () => {
     const context = new GraphContext();
     context.state = 'suspended';
     context.resume = vi.fn(async () => { throw new Error('gesture required'); });
-    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const root = player(); root.audioContext = context.audio;
     const leaf = player(); leaf.clip = clip();
     root.append(leaf); document.body.append(root);
     const errors: unknown[] = [];
@@ -652,7 +654,7 @@ describe('modular Audio Session and route ownership', () => {
     const context = new GraphContext();
     const session = new SessionTransport(() => context.currentTime);
     const scope = new ModuleContext({id: 'closing-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session});
-    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('section');
     const leaf = player(); host.append(leaf);
     const release = provideModuleContext(host, () => scope);
     document.body.append(host);
@@ -663,5 +665,44 @@ describe('modular Audio Session and route ownership', () => {
     expect(errors).toHaveLength(3);
     expect(errors[0]).toBeInstanceOf(Error);
     host.remove(); release();
+  });
+});
+
+describe('Audio module ports (DEC-068 MC-20)', () => {
+  it('enumerates the player clip source, prepared output and borrowed transport, and passes the conformance kit', async () => {
+    const {checkModuleConformance, getModulePort, SOURCE_SCHEMAS} = await import('@webmusic/kernel/module');
+    const context = new GraphContext();
+    const session = new SessionTransport(() => context.currentTime);
+    const scope = new ModuleContext({id: 'audio-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session});
+    try {
+      const material = clip();
+      const owner = new AudioPlayer(material, {moduleContext: scope});
+      const source = getModulePort(owner.module, 'source', 'source');
+      expect(source?.schemaId).toBe(SOURCE_SCHEMAS.audioClip);
+      expect(source?.snapshot()).toMatchObject({readiness: 'ready', value: material});
+      expect(owner.module.ports?.().map(port => `${port.family}/${port.id}`)).toEqual(['source/source', 'transport/transport']);
+      await owner.preload();
+      expect(owner.module.ports?.().map(port => `${port.family}/${port.id}`)).toEqual(['audio/main', 'source/source', 'transport/transport']);
+      owner.dispose();
+
+      const playerReport = await checkModuleConformance(() => {
+        const subject = new AudioPlayer(clip(), {moduleContext: scope});
+        return {module: subject.module, dispose: () => subject.dispose()};
+      }, {borrowedPorts: ['transport/transport']});
+      expect(playerReport.failures).toEqual([]);
+
+      const mixer = new AudioMixer({moduleContext: scope});
+      mixer.module.prepare?.();
+      expect(getModulePort(mixer.module, 'main', 'audio')).toBe(mixer.outputPort);
+      expect(mixer.module.ports?.().map(port => `${port.family}/${port.id}`)).toEqual(['audio/main', 'transport/transport']);
+      mixer.dispose();
+      const mixerReport = await checkModuleConformance(() => {
+        const subject = new AudioMixer({moduleContext: scope});
+        return {module: subject.module, dispose: () => subject.dispose()};
+      }, {borrowedPorts: ['transport/transport']});
+      expect(mixerReport.failures).toEqual([]);
+    } finally {
+      session.dispose();
+    }
   });
 });

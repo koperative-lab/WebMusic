@@ -68,7 +68,6 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'off',
         note: 'Mark application-owned preparation, such as external decode or spectrum analysis, with the loading animation. This starts no request; clearing it restores automatic source/data readiness.',
       },
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing audio-player by containment', note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing, invalid syntax emits webaudio:error, and neither falls back to containment. The meter borrows its .analyser.'},
       {
         name: 'interactive',
@@ -300,7 +299,6 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       {name: 'src', kind: 'text', placeholder: 'song.wav', fallback: 'nothing drawn until .clip or .editor', note: 'Decoded audio drawn read-only; conflicts with .editor.'},
       FORMAT,
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing audio-player by containment', note: 'Follow one selected player; with an editor, only while it plays the same revision. A ruler click asks it to seek. An unresolved explicit input never falls back.'},
       {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
       {name: 'height', kind: 'text', placeholder: '240', fallback: 'ruler plus 180 px of channel lanes', note: 'Host height in px; the channel lanes take what the ruler leaves.'},
@@ -354,7 +352,6 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'waveform',
         note: 'How each captured column is painted. Unknown values fall back to waveform; changing it starts a fresh history.',
       },
-      {name: 'source', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#rec', fallback: 'follow the enclosing audio-player by containment', note: 'Selector of an element exposing a tap: .analyser, .inputAnalyser, .recorder.inputAnalyser or .player.analyser. Changing it starts a fresh history.'},
       {
         name: 'window-seconds',

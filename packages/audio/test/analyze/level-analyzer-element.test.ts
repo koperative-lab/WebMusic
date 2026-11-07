@@ -3,6 +3,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 vi.mock('@webmusic/ui/level-analyzer', () => import('../../../ui/src/level-analyzer'));
 import {defineAudioLevelAnalyzerElement, type AudioLevelAnalyzerElement} from '../../src/analyze/element/audio-level-analyzer';
 import {defineAllAudioElements} from '../../src/analyze/element';
+import {modulePlayerElement} from './module-player-fixture';
 
 defineAudioLevelAnalyzerElement();
 defineAllAudioElements();
@@ -93,11 +94,9 @@ describe('audio-level-analyzer', () => {
     const first = analyser();
     const second = analyser();
     second.setAmplitude(0.4);
-    const player = Object.assign(document.createElement('div'), {playing: false, analyser: first.node});
-    player.id = 'deck';
-    document.body.append(player);
+    const player = modulePlayerElement(first.node, false, 'deck');
     const element = document.createElement('audio-level-analyzer') as AudioLevelAnalyzerElement;
-    element.setAttribute('player', '#deck');
+    element.setAttribute('input', '#deck');
     document.body.append(element);
     vi.advanceTimersByTime(100);
     expect(first.reads).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {modulePlayerElement} from './module-player-fixture';
 import {
   defineAudioOscilloscopeElement,
   selectOscilloscopeTrace,
@@ -37,18 +38,11 @@ function analyser(sampleRate = 1_000): AnalyserNode {
   return {fftSize: 8, context: {sampleRate}} as AnalyserNode;
 }
 
-function player(node: AnalyserNode, playing = false) {
-  const element = Object.assign(document.createElement('div'), {
-    analyser: node, playing, currentTime: 0, duration: 2,
-  });
-  element.id = 'source';
-  document.body.append(element);
-  return element;
-}
+const player = (node: AnalyserNode, playing = false) => modulePlayerElement(node, playing);
 
 function panel(selector = '#source'): AudioOscilloscopeElement {
   const element = document.createElement('audio-oscilloscope') as AudioOscilloscopeElement;
-  element.setAttribute('player', selector);
+  element.setAttribute('input', selector);
   document.body.append(element);
   return element;
 }
@@ -147,7 +141,7 @@ describe('<audio-oscilloscope>', () => {
   it('treats explicit false-valued demo attributes as off and constrains scope controls', () => {
     player(analyser(), true);
     const scope = document.createElement('audio-oscilloscope') as AudioOscilloscopeElement;
-    scope.setAttribute('player', '#source');
+    scope.setAttribute('input', '#source');
     scope.setAttribute('frozen', 'false');
     scope.setAttribute('timebase-ms', '999');
     scope.setAttribute('trigger-level', '5');

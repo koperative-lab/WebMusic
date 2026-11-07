@@ -112,7 +112,7 @@ describe('score-view type switching', () => {
     await flush();
     source.rate = 2;
     await source.seekNominal(1.25);
-    const view = await mount('piano-roll', {player: '#player'});
+    const view = await mount('piano-roll', {input: '#player'});
     expect(view.score).toBe(source.resolvedScore);
     expect(view.currentTime).toBeCloseTo(1.25);
     view.type = 'waterfall';
@@ -132,7 +132,7 @@ describe('score-view type switching', () => {
     document.body.append(source);
     await flush();
     await source.seekNominal(0.5);
-    const view = await mount('piano-roll', {player: '#direction-player'});
+    const view = await mount('piano-roll', {input: '#direction-player'});
     for (const type of ['piano-roll', 'waterfall'] as const) {
       view.type = type;
       for (const direction of ['up', 'down', 'left', 'right'] as const) {
@@ -172,7 +172,7 @@ describe('score-view type switching', () => {
   });
 
   it('discovers late owners and clears invalid or ambiguous selections without fetching their src', async () => {
-    const view = await mount('piano-roll', {player: '#player'});
+    const view = await mount('piano-roll', {input: '#player'});
     expect(view.score).toBeUndefined();
     const first = player();
     first.target.setAttribute('src', 'owned.mid');
@@ -185,7 +185,7 @@ describe('score-view type switching', () => {
     other.target.remove();
     await flush();
     expect(view.score).toBe(first.target.resolvedScore);
-    view.setAttribute('player', '[');
+    view.setAttribute('input', '[');
     await flush();
     expect(view.score).toBeUndefined();
     expect(view.currentTime).toBe(0);

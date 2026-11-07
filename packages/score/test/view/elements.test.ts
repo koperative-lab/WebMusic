@@ -486,7 +486,7 @@ describe('<score-view> player linking', () => {
 
   it('listens to webscore:noteon / webscore:end on the player target', async () => {
     const player = stubPlayer();
-    const host = createHost({player: '#p'}, {querySelector: (sel) => (sel === '#p' ? player : null)});
+    const host = createHost({input: '#p'}, {querySelector: (sel) => (sel === '#p' ? player : null)});
     host.el.score = fakeScore;
     host.connect();
     await flush();

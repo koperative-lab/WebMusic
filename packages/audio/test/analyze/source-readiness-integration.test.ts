@@ -20,7 +20,7 @@ afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 describe.each(tags)('%s native player readiness', (tag) => {
   it('follows a late owner through external preparation, empty source and a loaded source without Web Audio support', async () => {
     const follower = document.createElement(tag);
-    const attribute = tag === 'audio-live-view' ? 'source' : 'player';
+    const attribute = 'input';
     follower.setAttribute(attribute, '#native-readiness-owner');
     document.body.append(follower);
     const status = (): HTMLElement | null => (follower.shadowRoot ?? follower).querySelector('.wui-status');
@@ -43,11 +43,13 @@ describe.each(tags)('%s native player readiness', (tag) => {
     owner.loading = false;
     expect(status()?.dataset.kind).not.toBe('loading');
     expect(status()?.hasAttribute('aria-busy')).not.toBe(true);
-    // Data-only views can draw now. The compact meter and live projection
-    // request a tap; without Web Audio they must expose failure, never stay
-    // loading. Detailed inspectors remain paused until playback starts.
+    // Data-only views can draw now. The live projection requests the player's
+    // analyser; without Web Audio it must expose failure, never stay loading.
+    // The meter taps a module port and never prepares the source (DEC-068), so
+    // it waits for playback. Detailed inspectors remain paused until then.
     if (tag === 'audio-view') expect(status()).toBeNull();
-    else if (tag === 'audio-meter' || tag === 'audio-live-view') expect(status()?.dataset.kind).toBe('error');
+    else if (tag === 'audio-live-view') expect(status()?.dataset.kind).toBe('error');
+    else if (tag === 'audio-meter') expect(status()?.dataset.kind).toBe('waiting');
     else expect(status()?.hidden).toBe(true);
     expect(owner.player?.clock).toBeUndefined();
 

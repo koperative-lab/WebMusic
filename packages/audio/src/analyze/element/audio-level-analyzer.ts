@@ -22,7 +22,7 @@ function toDbfs(linear: number): number {
 
 /** Sampled dynamics inspector over a borrowed audio graph. */
 export class AudioLevelAnalyzerElement extends WebMusicElement {
-  static get observedAttributes(): string[] { return ['player', 'input', 'port', 'threshold-dbfs']; }
+  static get observedAttributes(): string[] { return ['input', 'port', 'threshold-dbfs']; }
 
   #inputModule?: ModuleHandle | null;
   get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
@@ -87,7 +87,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
+    if (name === 'input' || name === 'port') this.#bind();
     else this.#render();
   }
 

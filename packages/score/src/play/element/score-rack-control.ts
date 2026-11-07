@@ -12,6 +12,7 @@ import {
 import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
 import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
+import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
 import {ScoreRackModule} from '../headless/score-rack-module';
 import {ScorePlayerModule} from '../headless/score-module';
 
@@ -90,10 +91,18 @@ export class RackControlElement extends WebMusicElement {
   private modularContext?: ModuleContext;
   private modularUpstream?: ModuleContext;
   private fallbackAudio?: ModuleAudioEnvironment;
+  /** The Session an outermost desk owns for its parts (DEC-068 MC-23). */
+  private ownedSession?: SessionTransport;
   private unsubscribeModule?: () => void;
   private readonly moduleParts = new Map<RackPartElementLike, {declaration: RackPartDeclaration; module: ScorePlayerModule}>();
 
   get module(): ModuleHandle | undefined { return this.moduleRack; }
+
+  /**
+   * The Session the desk's parts play in: its own when the desk is outermost,
+   * otherwise the enclosing provider's. Commands sent here reach every part.
+   */
+  get sessionTransport(): ModuleSession | undefined { return this.modularContext?.session; }
 
   /** Borrow the real engine module represented by a direct child declaration. */
   rackPartModule(part: RackPartElementLike): ModuleHandle | undefined {
@@ -456,19 +465,24 @@ export class RackControlElement extends WebMusicElement {
     // A destination-only change re-routes the desk master in place (DEC-065):
     // channels, levels, mute/solo and members stay.
     if (upstream && this.moduleRack && this.modularUpstream && moduleScopeChange(this.modularUpstream, upstream) === 'destination' &&
-      this.moduleRack.retarget(upstream)) {
+      this.moduleRack.retarget(this.ownedSession && !upstream.session ? upstream.derive({id: upstream.id, session: this.ownedSession}) : upstream)) {
       this.modularUpstream = upstream;
       return;
     }
     this.releaseModuleRack();
     if (this.assignedRack) { notifyModuleContext(this); return; }
+    let scope = upstream;
     if (!upstream && state === 'missing') {
-      this.fallbackAudio = new ModuleAudioEnvironment();
-      upstream = new ModuleContext({id: 'score-rack-root', audio: this.fallbackAudio});
+      const audio = this.fallbackAudio = new ModuleAudioEnvironment();
+      scope = upstream = new ModuleContext({id: 'score-rack-root', audio, session: this.ownSession(audio)});
+    } else if (upstream && !upstream.session) {
+      // A desk below a provider without a Session is still the outermost Session root.
+      scope = upstream.derive({id: upstream.id, session: this.ownSession(upstream.audio)});
     }
+    // The borrowed scope is what later notifications compare against.
     this.modularUpstream = upstream;
-    if (upstream) {
-      this.moduleRack = new ScoreRackModule(upstream, {effect: this.assignedEffect, onError: (error) => this.reportError(error)});
+    if (scope) {
+      this.moduleRack = new ScoreRackModule(scope, {effect: this.assignedEffect, onError: (error) => this.reportError(error)});
       this.modularContext = this.moduleRack.context;
       this.unsubscribeModule = this.moduleRack.subscribe(() => {
         this.notifyMembers?.();
@@ -518,12 +532,21 @@ export class RackControlElement extends WebMusicElement {
     this.notifyMembers?.();
   }
 
+  private ownSession(audio: {peek(): BaseAudioContext | undefined}): SessionTransport {
+    this.ownedSession = new SessionTransport(() => audio.peek()?.currentTime ?? 0, {
+      onOperationError: (_operation, error) => this.reportError(error),
+    });
+    return this.ownedSession;
+  }
+
   private releaseModuleRack(): void {
     this.unsubscribeModule?.();
     this.unsubscribeModule = undefined;
     const parts = [...this.moduleParts.values()];
     const rack = this.moduleRack;
     const audio = this.fallbackAudio;
+    const session = this.ownedSession;
+    this.ownedSession = undefined;
     this.moduleParts.clear();
     this.moduleRack = undefined;
     this.modularContext = undefined;
@@ -532,6 +555,7 @@ export class RackControlElement extends WebMusicElement {
     const clean = (callback: () => void) => { try { callback(); } catch (error) { this.reportError(error); } };
     for (const record of parts) clean(() => record.module.dispose());
     clean(() => rack?.dispose());
+    clean(() => session?.dispose());
     clean(() => audio?.dispose());
   }
 }

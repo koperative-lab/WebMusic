@@ -30,7 +30,7 @@ function player(activeNotes: {midi: number}[] = []) {
 function panel(selector = '#performance') {
   const element = document.createElement('score-chord-analysis') as ChordAnalysisElement;
   element.setAttribute('mode', 'live');
-  element.setAttribute('player', selector);
+  element.setAttribute('input', selector);
   document.body.append(element);
   return element;
 }
@@ -163,7 +163,7 @@ describe('live chord input ownership', () => {
     const element = document.createElement('score-chord-analysis') as ChordAnalysisElement;
     element.score = explicitScore;
     element.stabilityMs = 30;
-    element.setAttribute('player', '#performance');
+    element.setAttribute('input', '#performance');
     const changes: Array<{chord: string; midis: number[]}> = [];
     element.addEventListener('webscore:chordchange', (event) => changes.push((event as CustomEvent).detail));
     document.body.append(element);

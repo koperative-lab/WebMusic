@@ -78,7 +78,7 @@ export function selectOscilloscopeTrace(
 /** Triggered inspection of one borrowed, mono AnalyserNode time-domain window. */
 export class AudioOscilloscopeElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'input', 'port', 'frozen', 'timebase-ms', 'trigger-level', 'trigger-edge', 'aria-label'];
+    return ['input', 'port', 'frozen', 'timebase-ms', 'trigger-level', 'trigger-edge', 'aria-label'];
   }
 
   #inputModule?: ModuleHandle | null;
@@ -134,7 +134,7 @@ export class AudioOscilloscopeElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
+    if (name === 'input' || name === 'port') this.#bind();
     else if (name === 'frozen') {
       if (this.frozen) {
         this.#stop();

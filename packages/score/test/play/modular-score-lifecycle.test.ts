@@ -77,7 +77,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('honors a root destination assigned after connection', async () => {
     const f = fixture(); f.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = f.context; root.sound = f.synth; root.score = score();
+    root.audioContext = f.context; root.sound = f.synth; root.score = score();
     const probe = document.createElement('div'); root.append(probe); document.body.append(root); await settle();
     await requestModuleContext(probe)!.session!.preload();
     const requested = f.context.createGain(); root.destination = requested; await settle();
@@ -88,7 +88,7 @@ describe('Score modular scope and source lifecycle', () => {
 
   it('exposes its documented SessionTransport property', async () => {
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); const probe = document.createElement('div'); root.append(probe);
+    const probe = document.createElement('div'); root.append(probe);
     document.body.append(root); await settle();
     expect(requestModuleContext(probe)!.session).toBeDefined();
     expect(root.sessionTransport).toBe(requestModuleContext(probe)!.session);
@@ -99,7 +99,7 @@ describe('Score modular scope and source lifecycle', () => {
     const load = deferred<Score>(); vi.mocked(loadScoreFromUrl).mockReturnValueOnce(load.promise);
     const a = fixture(), b = fixture();
     const first = document.createElement('div'), second = document.createElement('div');
-    first.setAttribute('composition', 'modules'); second.setAttribute('composition', 'modules');
+
     cleanups.push(() => a.session.dispose(), () => b.session.dispose(), provideModuleContext(first, () => a.scope), provideModuleContext(second, () => b.scope));
     const deskA = document.createElement('score-rack-control'), deskB = document.createElement('score-rack-control');
     const part = document.createElement('score-rack-part') as RackPartElement;
@@ -164,7 +164,7 @@ describe('Score modular scope and source lifecycle', () => {
 
   it('revokes old playback data when its provider becomes pending', async () => {
     const f = fixture(); let scope: ModuleContext | undefined = f.scope;
-    const host = document.createElement('div'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('div');
     cleanups.push(() => f.session.dispose(), provideModuleContext(host, () => scope));
     const child = document.createElement('score-player') as ScorePlayerElement;
     child.score = score(); child.sound = f.synth; child.setAttribute('controls', 'show'); host.append(child); document.body.append(host); await settle();
@@ -188,7 +188,7 @@ describe('Score modular scope and source lifecycle', () => {
     const load = deferred<Score>(); vi.mocked(loadScoreFromUrl).mockReturnValueOnce(load.promise);
     const a = fixture(), b = fixture();
     const first = document.createElement('div'), second = document.createElement('div');
-    first.setAttribute('composition', 'modules'); second.setAttribute('composition', 'modules');
+
     cleanups.push(() => a.session.dispose(), () => b.session.dispose(), provideModuleContext(first, () => a.scope), provideModuleContext(second, () => b.scope));
     const deskA = document.createElement('score-rack-control'), deskB = document.createElement('score-rack-control');
     const part = document.createElement('score-rack-part') as RackPartElement;
@@ -210,7 +210,7 @@ describe('Score modular scope and source lifecycle', () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.setAttribute('loop', ''); root.audioContext = context;
+    root.setAttribute('loop', ''); root.audioContext = context;
     const child = document.createElement('lifecycle-delayed-score') as DelayedScoreElement;
     const pending = deferred<Score>(); child.pending = pending.promise; child.setAttribute('src', 'pending.mid'); child.sound = synth;
     root.append(child); document.body.append(root); await settle();
@@ -225,7 +225,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('uses declaration ids as channel labels', async () => {
     const {context, synth, session: unusedSession} = fixture(); unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = context;
+    root.audioContext = context;
     const desk = document.createElement('score-rack-control') as RackControlElement;
     const part = document.createElement('score-rack-part') as RackPartElement;
     part.id = 'lead'; part.score = score(); part.sound = synth; desk.append(part); root.append(desk); document.body.append(root); await settle();
@@ -236,7 +236,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('a root audioContext replacement is used by its replacement engine', async () => {
     const f = fixture(), g = fixture(); f.session.dispose(); g.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = f.context; root.sound = f.synth; root.score = score();
+    root.audioContext = f.context; root.sound = f.synth; root.score = score();
     const probe = document.createElement('div'); root.append(probe); document.body.append(root); await settle(); await requestModuleContext(probe)!.session!.preload();
     root.audioContext = g.context; await settle();
     await expect(requestModuleContext(probe)!.session!.preload()).resolves.toBeUndefined();
@@ -248,7 +248,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('rejects incompatible audio edits before disturbing the current source', async () => {
     const f = fixture(), g = fixture(); f.session.dispose(); g.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = f.context; root.destination = f.context.createGain();
+    root.audioContext = f.context; root.destination = f.context.createGain();
     root.score = score(); root.sound = f.synth; document.body.append(root); await settle();
     const session = root.sessionTransport!;
     await session.preload();
@@ -266,7 +266,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('re-routes descendant buses in place on a changed root route and rebinds on a new reference context', async () => {
     const f = fixture(), g = fixture(); f.session.dispose(); g.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = f.context;
+    root.audioContext = f.context;
     const desk = document.createElement('score-rack-control') as RackControlElement;
     const leaf = document.createElement('score-player') as ScorePlayerElement;
     leaf.score = score(); leaf.sound = f.synth; desk.append(leaf); root.append(desk); document.body.append(root); await settle();
@@ -304,7 +304,7 @@ describe('Score modular scope and source lifecycle', () => {
     const {loadScoreFromUrl} = await import('../../src/io/load');
     const load = deferred<Score>(); vi.mocked(loadScoreFromUrl).mockReturnValueOnce(load.promise);
     const f = fixture(); let scope: ModuleContext | undefined = f.scope;
-    const host = document.createElement('div'); host.setAttribute('composition', 'modules');
+    const host = document.createElement('div');
     cleanups.push(() => f.session.dispose(), provideModuleContext(host, () => scope));
     const desk = document.createElement('score-rack-control');
     const part = document.createElement('score-rack-part') as RackPartElement;
@@ -327,7 +327,7 @@ describe('Score modular scope and source lifecycle', () => {
   it('keeps loop bounds current as aggregate sources are replaced or removed', async () => {
     const f = fixture(); f.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.loop = true; root.audioContext = f.context;
+    root.loop = true; root.audioContext = f.context;
     const child = document.createElement('score-player') as ScorePlayerElement;
     child.score = score(); child.sound = f.synth; root.append(child); document.body.append(root); await settle();
     expect(root.sessionTransport!.snapshot.loop).toEqual({startSeconds: 0, endSeconds: 2});
@@ -349,7 +349,7 @@ describe('Score modular scope and source lifecycle', () => {
     vi.mocked(loadScoreFromUrl).mockImplementation(url => url === 'lead.mid' ? leadLoad.promise : bassLoad.promise);
     const f = fixture(); f.session.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
-    root.setAttribute('composition', 'modules'); root.audioContext = f.context;
+    root.audioContext = f.context;
     const desk = document.createElement('score-rack-control') as RackControlElement;
     const lead = document.createElement('score-rack-part') as RackPartElement;
     const bass = document.createElement('score-rack-part') as RackPartElement;

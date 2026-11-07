@@ -161,7 +161,7 @@ describe('Audio View as a read-only document follower', () => {
     const player = document.createElement('div') as unknown as HTMLElement & {seconds: number; duration: number; playing: boolean; seek: ReturnType<typeof vi.fn>; documentBinding: AudioDocumentPlaybackBinding};
     player.id = 'edit-player'; player.seconds = 2; player.duration = 10; player.playing = false; player.seek = vi.fn();
     player.documentBinding = {status: 'preparing', attempt: 1, documentCoordinates: true, applied: {documentId: snapshot.documentId, documentRevision: 0}};
-    const element = view(); element.editor = model; element.interactive = true; element.setAttribute('player', '#edit-player'); document.body.append(player, element);
+    const element = view(); element.editor = model; element.interactive = true; element.setAttribute('input', '#edit-player'); document.body.append(player, element);
     key(element, 'ArrowRight'); expect(player.seek).not.toHaveBeenCalled(); expect(element.getAttribute('data-playback-state')).toBe('pending');
     player.documentBinding = {...player.documentBinding, status: 'ready'}; player.dispatchEvent(new CustomEvent('webaudio:documentstatechange'));
     key(element, 'ArrowRight'); expect(player.seek).toHaveBeenCalled(); expect(element.getAttribute('data-playback-state')).toBe('ready');
@@ -169,7 +169,7 @@ describe('Audio View as a read-only document follower', () => {
 
   it('discovers a late player and drops its overlay on removal or ambiguity', async () => {
     const model = editor(), snapshot = model.getSnapshot(), element = view();
-    element.editor = model; element.setAttribute('player', '#late-player'); document.body.append(element);
+    element.editor = model; element.setAttribute('input', '#late-player'); document.body.append(element);
     expect(element.getAttribute('data-playback-state')).toBe('unbound');
     const player = document.createElement('div') as unknown as HTMLElement & {documentBinding: AudioDocumentPlaybackBinding};
     player.id = 'late-player'; player.documentBinding = {status: 'ready', attempt: 1, documentCoordinates: true, applied: {documentId: snapshot.documentId, documentRevision: 0}};

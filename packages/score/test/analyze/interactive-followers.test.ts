@@ -26,7 +26,7 @@ async function mount(score?: Score): Promise<ChordAnalysisElement> {
   const name = `interactive-analysis-${serial++}`;
   customElements.define(name, class extends ChordAnalysisElement {});
   const element = document.createElement(name) as ChordAnalysisElement;
-  element.setAttribute('player', '#player');
+  element.setAttribute('input', '#player');
   element.setAttribute('motion', 'stepped');
   if (score) element.score = score;
   document.body.append(element);
@@ -82,7 +82,7 @@ describe('chord follower navigation lifecycle', () => {
     await flush();
     expect(element.querySelector('[role="slider"]')?.getAttribute('aria-disabled')).not.toBe('true');
     expect(element.querySelectorAll('.wui-harmony-flow__band').length).toBeGreaterThan(0);
-    element.removeAttribute('player');
+    element.removeAttribute('input');
     await flush();
     expect(element.querySelector('[role="slider"]')?.getAttribute('aria-disabled')).toBe('true');
     expect(element.querySelectorAll('.wui-harmony-flow__band')).toHaveLength(0);

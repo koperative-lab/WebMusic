@@ -6,7 +6,7 @@
 > and Kernel's public `@webmusic/kernel/sync` entry are removed. Score and Audio now
 > play together under one Session — `createScoreAudioSession` in code, nested
 > players and Racks in markup. Sections below that describe `TransportGroup`,
-> `MirrorClockMaster` and the pair factories are a historical record of the 0.2
+> the removed `MirrorClockMaster` and the pair factories are a historical record of the 0.2
 > design; the [modular composition contract](../../dev/design/MODULAR-COMPOSITION.md) is current.
 
 The zero-domain shared kernel of the WebMusic ecosystem: the contracts and
@@ -326,9 +326,7 @@ master.clock (TransportClockReader)          ← the timeline, read never writte
 The role contracts encode the design:
 
 - The master **must** expose a `TransportClockReader`. There is no clockless
-  code path inside the group — a transport without a clock is wrapped in
-  `MirrorClockMaster` instead, so the fallback exists once as an adapter
-  rather than as a second branch through every method.
+  code path inside the group; the Session's own clock always satisfies it.
 - Scheduled-start support is **observed, not declared**. The group proposes
   `now + leadIn` to `master.play(when)`; a master that can arm does, and the
   group notices through `clock.holding`. A master that ignores the proposal
@@ -348,8 +346,7 @@ The role contracts encode the design:
 A join aligns the **slope before the intercept**: it hands the follower the
 clock's current rate and only then seeks and schedules. Seeking alone would
 leave a rate mismatch intact, so the drift just corrected starts growing back
-immediately — the same reasoning that makes `MirrorClockMaster` re-learn a
-rate rather than only a position.
+immediately.
 
 Two safeguards keep corrections from becoming pathologies. Drift checks hold
 off until a scheduled join's origin has passed, because a follower parked at
@@ -374,25 +371,6 @@ an already configured native loop; followers can retain independent periods whil
 the master continues. Drift compares local phase and reports master-axis seconds.
 The group does not configure native loops, consume nonlinear mappings or perform
 audio warping. Group-level loop re-entry still waits for a delivered watcher tick.
-
-### Clockless transports — the sampled fallback
-
-The Session's own clock is always readable, so public composition never needs
-this adapter; it remains a Kernel internal for transports without a clock.
-
-A transport with no readable clock is adapted into the required-clock role by
-dead-reckoning a mirror `TransportClock` across the command surface and
-reconciling it against the transport's actual position on drift checks, or on
-periodic lifecycle samples when follower drift checks are disabled:
-
-- after observing forward motion, a stationary interval whose expected advance
-  exceeds the largest reported position step plus tolerance suggests the
-  transport stopped: pause the mirror and report `'stalled'`. Without a prior
-  moving sample, repeated positions alone cannot establish a stop;
-- a moving transport that diverged re-anchors the mirror — **slope as well as
-  intercept**. Correcting only the position leaves a transport that refused or
-  clamped the shared rate drifting away again before the next check, which is
-  precisely how a rate mismatch turns into an endless correction loop.
 
 ## Error and lifetime policy
 
@@ -467,7 +445,7 @@ control, transport and source ports, and run the Kernel conformance kit
 
 The multi-entry build enables code splitting for both module formats. Root and
 subpath re-exports therefore use the same constructor within ESM and within
-CommonJS, including the `TransportClock` used by `MirrorClockMaster`. ESM and
+CommonJS, including the `TransportClock` the Session reads. ESM and
 CommonJS remain separate module instances.
 
 The kernel is a first-class checked package: its policy declares zero

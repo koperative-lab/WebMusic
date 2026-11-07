@@ -426,7 +426,7 @@ describe('score grid playback', () => {
     const player = document.createElement('grid-test-player') as ScorePlayerElement;
     player.id = 'grid-audition'; player.editor = editor;
     const view = document.createElement('grid-test-view') as ScoreGridViewElement;
-    view.editor = editor; view.editable = true; view.setAttribute('player', '#grid-audition');
+    view.editor = editor; view.editable = true; view.setAttribute('input', '#grid-audition');
     document.body.append(player, view);
     expect((await player.waitForDocumentRevision(editor.getSnapshot())).status).toBe('applied');
     await player.seekNominal(1);
@@ -448,7 +448,7 @@ describe('score grid playback', () => {
     await player.seekNominal(0.25);
     expect(view.currentTime).toBe(0.25);
     expect(view.querySelector('[data-playhead]')!.getAttribute('x1')).toBe(String(X(editor.score.timeMap.secondsToQuarters(0.25).toFloat())));
-    view.removeAttribute('player');
+    view.removeAttribute('input');
     expect(view.querySelector('[data-playhead]')).toBeNull();
     expect(view.querySelector<HTMLElement>('[part="grid"]')!.dataset.playbackState).toBe('unbound');
   });

@@ -272,7 +272,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       void this.#refresh();
       return;
     }
-    if (name === 'player' || name === 'input') {
+    if (name === 'input') {
       this.#bindPlayer();
       if (!this.#source.score && !this.getAttribute('src')) void this.#refresh();
       else this.#apply();

@@ -49,7 +49,7 @@ function latePair() {
   const target = document.createElement(name);
   target.id = 'owner';
   const host = document.createElement('div');
-  host.setAttribute('player', '#owner');
+  host.setAttribute('input', '#owner');
   document.body.append(target, host);
   return {name, target, host};
 }

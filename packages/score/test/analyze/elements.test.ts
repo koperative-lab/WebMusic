@@ -185,7 +185,7 @@ describe('<score-chord-analysis mode="live"> (dynamic, player-bound)', () => {
     const player = stubPlayer();
     const host = createHost<ChordAnalysisElement>(
       LIVE_CHORD,
-      {player: '#p'},
+      {input: '#p'},
       {querySelector: (sel) => (sel === '#p' ? player : null)},
     );
     return {player, host};
@@ -304,7 +304,7 @@ describe('live chord player ownership', () => {
     const playerB = stubPlayer();
     const host = createHost<ChordAnalysisElement>(
       LIVE_CHORD,
-      {player: '#a'},
+      {input: '#a'},
       {
         querySelector: (selector) =>
           selector === '#a' ? playerA : selector === '#b' ? playerB : null,
@@ -316,7 +316,7 @@ describe('live chord player ownership', () => {
     for (const midi of [60, 64, 67]) playerA.emit('webscore:noteon', {midi});
     expect(host.text()).toContain('C');
 
-    host.setAttribute('player', '#b');
+    host.setAttribute('input', '#b');
     await flush();
     expect(playerA.count('webscore:noteon')).toBe(0);
     expect(playerB.count('webscore:noteon')).toBe(1);
@@ -340,7 +340,7 @@ describe('<score-chord-analysis> playhead follow', () => {
     const player = stubPlayer();
     const host = createHost<ChordAnalysisElement>(
       CHORDS,
-      {player: '#p'},
+      {input: '#p'},
       {querySelector: (sel) => (sel === '#p' ? player : null)},
     );
     host.el.score = melodyScore(C_MAJOR);
@@ -387,7 +387,7 @@ describe('analysis player lookup scope', () => {
     root.append(player);
 
     const el = document.createElement(LIVE_CHORD);
-    el.setAttribute('player', '#shadowed-player');
+    el.setAttribute('input', '#shadowed-player');
     root.append(el);
     await flush();
 

@@ -20,8 +20,8 @@ function mount() {
   document.body.innerHTML = `
     <score-player id="piece"></score-player>
     <p role="status"></p>
-    <score-view player="#piece" type="staff"></score-view>
-    <score-pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></score-pitch-view>`;
+    <score-view input="#piece" type="staff"></score-view>
+    <score-pitch-view input="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></score-pitch-view>`;
   const player = document.querySelector<ScorePlayerElement>('score-player')!;
   const status = document.querySelector<HTMLElement>('[role="status"]')!;
   const detach = mountQuickStartStatus(player, status);

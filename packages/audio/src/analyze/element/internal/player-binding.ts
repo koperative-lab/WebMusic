@@ -1,7 +1,8 @@
-import {observeElementTarget, observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
+import {observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
 import type {AudioClip} from '../../../core';
-import type {ModuleHandle, TransportPort, TransportPortSnapshot} from '@webmusic/kernel/module';
+import {getModulePort, type ModuleHandle, type TransportPort, type TransportPortSnapshot} from '@webmusic/kernel/module';
 import {bindModuleAudioInput} from '../../../play/element/internal/module-input';
+import {observeCompanionTarget} from '../../../play/element/internal/companion-target';
 
 export interface AnalysisPlayerTarget extends Element {
   readonly clip?: AudioClip;
@@ -31,136 +32,99 @@ export interface AnalysisPlayerSnapshot {
 
 export type AnalysisPlayerUpdate = 'target' | 'source' | 'time' | 'state' | 'seek' | 'end';
 
-function finite(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function snapshot(target: AnalysisPlayerTarget | undefined, state: AnalysisPlayerSnapshot['state']): AnalysisPlayerSnapshot {
-  const clip = target?.clip;
-  return {
-    target,
-    clip,
-    seconds: Math.max(0, finite(target?.currentTime) ?? finite(target?.seconds) ?? 0),
-    duration: Math.max(0, finite(target?.duration) ?? clip?.duration ?? 0),
-    playing: target?.playing === true,
-    loading: target?.loading === true,
-    empty: !!target && 'clip' in target && !clip && !target.transport,
-    loadError: target?.loadError,
-    state,
-  };
-}
-
-/** Borrow one browser player; selection and listeners live only as long as this binding. */
+/** Tap one module audio input (explicit or by containment) and follow its Session transport; listeners live only as long as this binding. */
 export function bindAnalysisPlayer(
   host: Element,
   onUpdate: (kind: AnalysisPlayerUpdate, snapshot: AnalysisPlayerSnapshot) => void,
   assigned?: ModuleHandle | null,
   isCurrent: () => boolean = () => true,
 ): () => void {
-  if (assigned !== undefined || host.hasAttribute('input') || !host.hasAttribute('player')) {
-    // A tap follows the scope's Session transport so seek, pause and end
-    // reset history as they do for a linked player (DEC-068).
-    let tapped: AnalysisPlayerTarget | undefined;
-    let transport: TransportPort | undefined;
-    let last: TransportPortSnapshot | undefined;
-    let stopTransport: (() => void) | undefined;
-    const reading = (state: TransportPortSnapshot | undefined): AnalysisPlayerSnapshot => ({
-      target: tapped, seconds: state?.position ?? 0, duration: state?.durationSeconds ?? 0,
-      playing: tapped ? state?.playing ?? true : false, loading: false, empty: false, state: tapped ? 'ready' : 'unbound',
-    });
-    const follow = (next: TransportPort | undefined): void => {
-      if (next === transport) return;
-      stopTransport?.(); stopTransport = undefined;
-      transport = next; last = next?.snapshot();
-      stopTransport = next?.subscribe((state) => {
-        if (!isCurrent() || !tapped) { last = state; return; }
-        const previous = last;
-        last = state;
-        if (state.ended && !previous?.ended) { onUpdate('end', reading(state)); return; }
-        const expected = previous ? previous.position + (previous.playing ? (state.referenceTime - previous.referenceTime) * previous.rate : 0) : state.position;
-        if (!previous || state.playing !== previous.playing || Math.abs(state.position - expected) > 0.05) onUpdate('seek', reading(state));
-      });
-    };
-    const stopContext = observeModuleContext(host, (context) => follow(context?.transport));
-    const stopInput = bindModuleAudioInput(host, assigned, ({analyser, error}) => {
-      tapped = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
-      onUpdate('target', reading(last));
-      if (error !== undefined && isCurrent()) {
-        host.dispatchEvent(new CustomEvent('webaudio:error', {
-          detail: {error: error instanceof Error ? error : new Error(String(error))},
-          bubbles: true, composed: true,
-        }));
-      }
-    }, isCurrent);
-    return () => {
-      try { stopInput(); } finally { stopContext(); stopTransport?.(); stopTransport = undefined; }
-    };
-  }
-  const selector = host.getAttribute('player');
-  if (!selector) {
-    onUpdate('target', snapshot(undefined, 'unbound'));
-    return () => undefined;
-  }
-
-  let disposed = false;
-  let generation = 0;
-  let detach: (() => void) | undefined;
-  const attach = (element: Element | undefined, state: ElementTargetState): void => {
-    if (disposed || host.getAttribute('player') !== selector) return;
-    detach?.();
-    detach = undefined;
-    const ownGeneration = ++generation;
-    const target = element as AnalysisPlayerTarget | undefined;
-    const current = () => !disposed && isCurrent() && generation === ownGeneration && host.getAttribute('player') === selector;
-    host.setAttribute('data-player-state', state);
-    onUpdate('target', snapshot(target, state));
-    if (!target || !current()) return;
-
-    const listeners: Array<[string, EventListener]> = [];
-    const add = (name: string, kind: AnalysisPlayerUpdate, override?: (event: Event) => Partial<AnalysisPlayerSnapshot>) => {
-      const listener: EventListener = (event) => {
-        if (event.target !== target || !current()) return;
-        const reading = {...snapshot(target, state), ...override?.(event)};
-        onUpdate(kind, reading);
-      };
-      target.addEventListener(name, listener);
-      listeners.push([name, listener]);
-    };
-    add('webaudio:sourcechange', 'source', (event) => {
-      const detail = (event as CustomEvent<{clip?: AudioClip}>).detail;
-      return detail && 'clip' in detail ? {clip: detail.clip} : {};
-    });
-    add('webaudio:playerchange', 'source');
-    add('webaudio:loadstatechange', 'source');
-    add('webaudio:loaded', 'source');
-    add('webaudio:timeupdate', 'time', (event) => {
-      const seconds = finite((event as CustomEvent<{seconds?: number}>).detail?.seconds);
-      return seconds === undefined ? {} : {seconds: Math.max(0, seconds)};
-    });
-    add('webaudio:statechange', 'state', (event) => {
-      const playing = (event as CustomEvent<{playing?: boolean}>).detail?.playing;
-      return typeof playing === 'boolean' ? {playing} : {};
-    });
-    add('webaudio:seek', 'seek');
-    add('webaudio:end', 'end', () => ({playing: false}));
-    detach = () => {
-      for (const [name, listener] of listeners) target.removeEventListener(name, listener);
+  // A tap follows the scope's Session transport so seek, pause and end
+  // reset history as they do for a linked player (DEC-068).
+  let tapped: AnalysisPlayerTarget | undefined;
+  let transport: TransportPort | undefined;
+  let last: TransportPortSnapshot | undefined;
+  let stopTransport: (() => void) | undefined;
+  // The owning player element (the `input` target, or the enclosing player by
+  // containment) supplies source readiness: loading, failure and an empty clip.
+  let owner: AnalysisPlayerTarget | undefined;
+  let ownerState: AnalysisPlayerSnapshot['state'] = 'unbound';
+  const reading = (state: TransportPortSnapshot | undefined): AnalysisPlayerSnapshot => {
+    const clip = owner?.clip;
+    return {
+      target: tapped ?? owner, clip, seconds: state?.position ?? 0,
+      duration: state?.durationSeconds ?? clip?.duration ?? 0,
+      playing: tapped ? state?.playing ?? true : false,
+      loading: owner?.loading === true, loadError: owner?.loadError,
+      empty: !!owner && 'clip' in owner && !clip && !owner.transport,
+      state: tapped ? 'ready' : ownerState,
     };
   };
-
-  let stopObservation: (() => void) | undefined;
-  try {
-    stopObservation = observeElementTarget(host, selector, attach);
-  } catch (error) {
-    detach?.();
-    throw error;
-  }
+  const follow = (next: TransportPort | undefined): void => {
+    if (next === transport) return;
+    stopTransport?.(); stopTransport = undefined;
+    transport = next; last = next?.snapshot();
+    stopTransport = next?.subscribe((state) => {
+      if (!isCurrent() || !tapped) { last = state; return; }
+      const previous = last;
+      last = state;
+      if (state.ended && !previous?.ended) { onUpdate('end', reading(state)); return; }
+      const expected = previous ? previous.position + (previous.playing ? (state.referenceTime - previous.referenceTime) * previous.rate : 0) : state.position;
+      if (!previous || state.playing !== previous.playing || Math.abs(state.position - expected) > 0.05) onUpdate('seek', reading(state));
+    });
+  };
+  // An explicitly linked module lends its own Session transport; otherwise
+  // follow the enclosing scope's.
+  let scopeTransport: TransportPort | undefined;
+  let linkedTransport: TransportPort | undefined;
+  const stopContext = observeModuleContext(host, (context) => {
+    scopeTransport = context?.transport;
+    follow(linkedTransport ?? scopeTransport);
+  });
+  // Resolve the owner before tapping so its first reading selects the target
+  // and the tap that follows does not count as a second source change.
+  let detachOwner: (() => void) | undefined;
+  const stopOwner = assigned !== undefined ? () => undefined : observeCompanionTarget(host, ['input'], (element, state) => {
+    detachOwner?.(); detachOwner = undefined;
+    owner = element as AnalysisPlayerTarget | undefined;
+    ownerState = owner ? state : host.hasAttribute('input') ? state : 'unbound';
+    host.setAttribute('data-player-state', ownerState);
+    if (!isCurrent()) return;
+    // Once tapped, an owner change is a source change; before, it selects the target.
+    onUpdate(tapped ? 'source' : 'target', reading(last));
+    const target = owner;
+    if (!target) return;
+    // Owner events report readiness only; a replaced audio source arrives as a
+    // re-tap of the module port, so an unchanged readiness emits nothing.
+    const readiness = () => `${target.loading === true}|${String(target.loadError ?? '')}|${target.clip === undefined}`;
+    let seen = readiness();
+    const refresh: EventListener = (event) => {
+      if (event.target !== target || owner !== target || !isCurrent()) return;
+      const next = readiness();
+      if (next === seen && tapped) return;
+      seen = next;
+      onUpdate('source', reading(last));
+    };
+    const names = ['webaudio:sourcechange', 'webaudio:playerchange', 'webaudio:loadstatechange', 'webaudio:loaded'];
+    for (const name of names) target.addEventListener(name, refresh);
+    detachOwner = () => { for (const name of names) target.removeEventListener(name, refresh); };
+  });
+  const stopInput = bindModuleAudioInput(host, assigned, ({analyser, module, error}) => {
+    linkedTransport = module ? getModulePort(module, 'transport', 'transport') : undefined;
+    follow(linkedTransport ?? scopeTransport);
+    tapped = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
+    onUpdate('target', reading(last));
+    if (error !== undefined && isCurrent()) {
+      host.dispatchEvent(new CustomEvent('webaudio:error', {
+        detail: {error: error instanceof Error ? error : new Error(String(error))},
+        bubbles: true, composed: true,
+      }));
+    }
+  }, isCurrent);
   return () => {
-    if (disposed) return;
-    disposed = true;
-    generation += 1;
-    stopObservation?.();
-    detach?.();
-    detach = undefined;
+    try { stopInput(); } finally {
+      stopContext(); stopTransport?.(); stopTransport = undefined;
+      stopOwner(); detachOwner?.(); detachOwner = undefined; owner = undefined;
+    }
   };
 }

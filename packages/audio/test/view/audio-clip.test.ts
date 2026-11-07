@@ -315,7 +315,7 @@ describe('<audio-clip-view>', () => {
     const player = document.createElement('div') as unknown as HTMLElement & {seconds: number; documentBinding: AudioDocumentPlaybackBinding; seek: ReturnType<typeof vi.fn>};
     player.id = 'clip-player'; player.seconds = .5; player.seek = vi.fn();
     player.documentBinding = {status: 'preparing', attempt: 1, documentCoordinates: true, applied: {documentId: editor.getSnapshot().documentId, documentRevision: 0}};
-    const view = element(); view.editor = editor; view.setAttribute('player', '#clip-player');
+    const view = element(); view.editor = editor; view.setAttribute('input', '#clip-player');
     document.body.append(player, view);
     expect(view.getAttribute('data-playback-state')).toBe('pending');
     expect(view.querySelector('[data-playhead]')).toBeNull();

@@ -36,7 +36,7 @@ describe('shared playback with asynchronously loaded local music', () => {
     io.load.mockImplementationOnce(() => new Promise<Score>((resolve) => { finish = resolve; }));
     const follower = document.createElement(mode === 'chord' ? 'local-data-chord-analysis' : 'local-data-score-view') as ScoreViewElement | ChordAnalysisElement;
     if (follower instanceof ScoreViewElement) follower.type = mode as 'waterfall' | 'piano-roll';
-    follower.setAttribute('player', '#local-data-owner');
+    follower.setAttribute('input', '#local-data-owner');
     follower.setAttribute('src', '/local.mid');
     document.body.append(follower);
     await flush();

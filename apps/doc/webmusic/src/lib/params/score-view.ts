@@ -38,7 +38,6 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       {...SRC, fallback: 'borrow input data, else await .score'},
       FORMAT,
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part', note: 'Explicit input: one unique player or Rack part; borrow its score and position, following paused, playing, seek and source changes. Absent, containment selects the enclosing scope; an unresolved selector never falls back.'},
       {
         name: 'width',
@@ -194,7 +193,6 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       {...SRC, fallback: 'borrow input data, else await .score or .editor'},
       FORMAT,
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part, else no playhead', note: 'Explicit input: follow one player’s position and sounding notes; without an editor the grid also borrows its score. An unresolved selector never falls back.'},
       {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
       {name: 'height', kind: 'text', placeholder: '360', fallback: 'natural height', note: 'Host height, same rule as width; a fixed height scrolls a taller grid inside the box.'},
@@ -250,7 +248,6 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       SRC,
       FORMAT,
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part, else no playback overlay', note: 'Explicit input: follow one player’s position and sounding notes; without an editor the sheet also borrows its score. An unresolved selector never falls back.'},
       {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
       {name: 'height', kind: 'text', placeholder: '480', fallback: 'up to --wm-score-sheet-max-height, then scrolls', note: 'Host height, same rule as width.'},
@@ -296,9 +293,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       {name: 'type', kind: 'enum', options: ['keyboard', 'staff', 'fretboard'], fallback: 'keyboard', note: 'One passive sounding-pitch surface; switching preserves the current held notes.'},
       {name: 'direction', kind: 'enum', options: ['up', 'down', 'left', 'right'], fallback: 'down', note: 'Keyboard only: key-front direction. Low pitches stay left on horizontal keyboards and bottom on vertical keyboards; set a CSS height for left/right.', when: pitchTypes('keyboard')},
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part, else wait for notes', note: 'Explicit input: borrow held-note snapshots and events from one player; no score load or playback commands. An unresolved selector never falls back.'},
-      {name: 'source', kind: 'text', placeholder: '#my-input', fallback: 'use input', note: 'Retired selector (DEC-068), still read for existing markup; write input instead.'},
       {name: 'low', kind: 'number', step: 1, fallback: '48', note: 'Keyboard only: requested lowest MIDI key, rounded.', when: pitchTypes('keyboard')},
       {name: 'high', kind: 'number', step: 1, fallback: '71', note: 'Keyboard only: requested highest MIDI key, rounded.', when: pitchTypes('keyboard')},
       {name: 'system', kind: 'enum', options: ['grand', 'treble', 'bass'], fallback: 'grand', note: 'Staff only: clef system for the current pitches.', when: pitchTypes('staff')},

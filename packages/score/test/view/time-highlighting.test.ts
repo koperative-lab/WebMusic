@@ -91,7 +91,7 @@ describe.each(['piano-roll', 'waterfall'] as const)('%s precise time highlightin
     document.body.append(owner);
     const view = document.createElement('time-score-view') as ScoreViewElement;
     view.type = type;
-    view.setAttribute('player', '#time-owner');
+    view.setAttribute('input', '#time-owner');
     document.body.append(view);
     await flush();
     expect(activeIndexes(view)).toEqual([0, 1, 2, 3]);

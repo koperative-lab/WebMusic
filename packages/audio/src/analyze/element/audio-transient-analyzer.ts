@@ -27,7 +27,7 @@ function thresholdFor(sensitivity: number): number {
 
 /** Streaming attack inspector over a borrowed audio graph. */
 export class AudioTransientAnalyzerElement extends WebMusicElement {
-  static get observedAttributes(): string[] { return ['player', 'input', 'port', 'sensitivity', 'min-interval-ms']; }
+  static get observedAttributes(): string[] { return ['input', 'port', 'sensitivity', 'min-interval-ms']; }
 
   #inputModule?: ModuleHandle | null;
   get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
@@ -92,7 +92,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
+    if (name === 'input' || name === 'port') this.#bind();
     else this.#render();
   }
 

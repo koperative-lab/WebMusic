@@ -3,7 +3,7 @@ import {AudioDocumentBinding} from './audio-document-binding';
 import {AudioSequenceEngine} from './sequence-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
 import {InsertChain, type Effect} from '@webmusic/kernel/effect';
-import {AudioOutputPort, createConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
+import {AudioOutputPort, createConnectionLease, SOURCE_SCHEMAS, SourcePublisher, type ModuleHandle, type ModulePort} from '@webmusic/kernel/module';
 import {TempoClock, createTempoGrid, type TempoGrid, type TransportClockReader} from '@webmusic/kernel/transport';
 import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
 import type {ConnectionLease} from '@webmusic/kernel/module';
@@ -96,6 +96,8 @@ export class AudioPlayer {
   private port?: AudioOutputPort;
   private preparingOutput = false;
   private readonly moduleListeners = new Set<() => void>();
+  /** The clip this player plays, as a `webmusic.audio-clip` source port (DEC-068). */
+  private readonly sourcePort = new SourcePublisher<AudioClip>(SOURCE_SCHEMAS.audioClip, {id: 'source'});
   /** Stable nonvisual identity. Capability reads never prepare audio. */
   readonly module: ModuleHandle;
   private releases: Array<() => void> = [];
@@ -135,6 +137,7 @@ export class AudioPlayer {
       id: `audio-player-${++audioPlayerModuleSequence}`,
       get inserts() { return readInserts(); },
       getPort: (name) => this.ownsOutput && (name === 'output' || name === 'main') ? this.port : undefined,
+      ports: () => this.modulePorts(),
       prepare: () => this.preload(),
       subscribe: (listener) => {
         this.moduleListeners.add(listener);
@@ -169,6 +172,7 @@ export class AudioPlayer {
       onDetach: () => { this.releaseSource(); this.appliedDocument = undefined; this.publishSource(); },
       report: (error) => this.emitter.emit('error', error instanceof Error ? error : new Error(String(error))),
     });
+    this.syncSourcePort();
   }
 
   get documentSource(): AudioDocumentSource | undefined { return this.documentAttachment.getSource(); }
@@ -520,6 +524,7 @@ export class AudioPlayer {
     this.inserts = undefined;
     try { this.port?.dispose(); } catch (error) { failure ??= error; }
     this.port = undefined;
+    try { this.sourcePort.dispose(); } catch (error) { failure ??= error; }
     this.output = undefined;
     const context = this.context;
     this.context = undefined;
@@ -645,7 +650,30 @@ export class AudioPlayer {
     if (failure !== undefined) throw failure;
   }
 
+  /** Owned audio output (once prepared, while not driven by a backend), the clip source and a borrowed transport. */
+  private modulePorts(): readonly ModulePort[] {
+    const ports: ModulePort[] = [];
+    if (this.ownsOutput && this.port) ports.push(this.port);
+    if (!this.disposed) ports.push(this.sourcePort);
+    const transport = this.options.moduleContext?.transport;
+    if (transport) ports.push(transport);
+    return Object.freeze(ports);
+  }
+
+  /** Mirror clip and load state into the source port; repeated equal states commit nothing. */
+  private syncSourcePort(): void {
+    if (this.disposed) return;
+    const current = this.sourcePort.snapshot();
+    const error = this.loadError;
+    const clip = this.clip;
+    if (error) { if (current.readiness !== 'error' || current.error !== error) this.sourcePort.fail(error); }
+    else if (this.loading) { if (current.readiness !== 'loading') this.sourcePort.loading(); }
+    else if (clip) { if (current.readiness !== 'ready' || current.value !== clip) this.sourcePort.ready(clip); }
+    else if (current.readiness !== 'empty') this.sourcePort.clear();
+  }
+
   private publishSource(): void {
+    this.syncSourcePort();
     const clip = this.clip;
     const transport = this.borrowed;
     if (clip === this.announcedClip && transport === this.announcedTransport && this.appliedDocument === this.announcedDocument) return;
@@ -664,6 +692,7 @@ export class AudioPlayer {
     if (loading !== this.lastLoading || error !== this.lastLoadError) {
       this.lastLoading = loading;
       this.lastLoadError = error;
+      this.syncSourcePort();
       this.emitter.emit('loadstatechange', {loading, error});
     }
     if (this.disposed || generation !== this.generation || revision !== this.observationRevision) return;

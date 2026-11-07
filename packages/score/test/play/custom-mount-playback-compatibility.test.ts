@@ -90,11 +90,11 @@ describe('ScorePlayerElement custom mount compatibility', () => {
     const view = document.createElement('compat-custom-mount-view') as ScoreViewElement;
     for (const follower of [timeline, map, view]) {
       follower.score = score;
-      follower.setAttribute('player', '#custom-owner');
+      follower.setAttribute('input', '#custom-owner');
       document.body.append(follower);
     }
     const analysis = document.createElement('div');
-    analysis.setAttribute('player', '#custom-owner');
+    analysis.setAttribute('input', '#custom-owner');
     document.body.append(analysis);
     const noteOn = vi.fn();
     const noteOff = vi.fn();

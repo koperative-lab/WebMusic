@@ -62,7 +62,7 @@ async function mount(kind: 'template' | 'explicit' = 'template') {
   const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(new Uint8Array([1, 2, 3])));
   vi.stubGlobal('fetch', fetch);
   const root = document.createElement('score-player') as ScorePlayerElement;
-  root.setAttribute('composition', 'modules');
+
   root.audioContext = f.context;
   const leaf = document.createElement('score-player') as ScorePlayerElement;
   leaf.score = score();

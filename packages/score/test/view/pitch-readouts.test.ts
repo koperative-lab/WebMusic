@@ -23,7 +23,7 @@ function player(midis: readonly number[] = []) {
 function mount(type: PitchViewType) {
   const element = document.createElement('score-pitch-view') as PitchViewElement;
   element.setAttribute('type', type);
-  element.setAttribute('player', '#player');
+  element.setAttribute('input', '#player');
   element.setAttribute('data-motion', 'none');
   document.body.append(element);
   return element;
@@ -113,11 +113,11 @@ describe('passive score-pitch-view types', () => {
     expect(surface.active).toEqual([67]);
     emit(first, 'webscore:noteon', 64);
     expect(surface.active).toEqual([67]);
-    surface.removeAttribute('player');
+    surface.removeAttribute('input');
     expect(surface.active).toEqual([]);
     emit(second, 'webscore:noteon', 64);
     expect(surface.active).toEqual([]);
-    surface.setAttribute('player', '#player');
+    surface.setAttribute('input', '#player');
     expect(surface.active).toEqual([67]);
     surface.remove();
     expect(surface.active).toEqual([]);
@@ -298,7 +298,7 @@ it('upgrades a type property assigned before custom-element registration', async
   player([60]);
   const element = document.createElement('late-pitch-view') as PitchViewElement;
   element.type = 'staff';
-  element.setAttribute('player', '#player');
+  element.setAttribute('input', '#player');
   document.body.append(element);
   customElements.define('late-pitch-view', class extends PitchViewElement {});
   await flush();

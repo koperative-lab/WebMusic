@@ -2930,6 +2930,18 @@ it into the module path and then delete the legacy path, adding rounds as
 needed. `.rack` and `.controller` therefore move into the module path instead of
 being retired; the retired-surface table is corrected accordingly.
 
+**Round 10 choices (2026-11-07):** the companion selector is `input` everywhere,
+including `<audio-mixer>`, whose `input="#id"` makes it that player's mix
+backend instead of a Rack; no Element reads `player=` or `source=` any longer.
+Audio analysers and the meter tap the linked module's audio port and follow its
+Session transport (the player module now enumerates `audio`, `source` and
+`transport` ports); the linked player element still supplies loading and error
+status, and a bare element that only exposes `.analyser` is no longer an audio
+source. An outermost `score-rack-control` owns a Session like an outermost
+`audio-mixer` (MC-23). Kernel's `composition` boundary, `isModularComposition`
+and the unused `MirrorClockMaster` are removed. The architecture check rejects
+the retired attributes, markup and exports (MC-27).
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

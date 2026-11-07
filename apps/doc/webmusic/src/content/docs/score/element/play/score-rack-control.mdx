@@ -90,10 +90,12 @@ desk's own ports:
 | `master` | `audio` | output | Master insert output, once prepared; routed to the enclosing destination |
 | `channel:<id>` | `audio` | output | Post-insert tap of one admitted channel |
 
-The desk holds no Session of its own. It passes the ancestor's Session through,
-so parts join the enclosing player's Session rather than choosing a child as
-master; without an enclosing player the parts have no transport. Nesting another
-bus admits that one bus output and does not duplicate descendant registrations.
+Inside a `<score-player>` the desk passes that player's Session through, so
+parts join it rather than choosing a child as master. An outermost desk, or one
+below a provider without a Session, owns a Session of its own:
+`sessionTransport` returns it, and its commands start, pause and seek every
+part together. Nesting another bus admits that one bus output and does not
+duplicate descendant registrations.
 
 Containment places a direct `<score-effect>` or `audio-effect` on the master
 chain. Inside a `<score-rack-part>`, an effect belongs to that part's
@@ -185,6 +187,7 @@ declare members, and `.rack` can supply an existing Rack. Transport remains on
 | `solo` | attribute | Show per-channel solo, enabled by default. Soloing one channel clears the rest; `solo="false"` removes the command. |
 | child `<score-rack-part>` | markup | Each declares one rack member. Labelled by its `id`, or by position when it has none. |
 | `.rack` | property | The `Rack` to mix. Assigning one adopts it — it is never disposed here. Left unset, the element creates its own and disposes it on disconnect. |
+| `.sessionTransport` | property | Read-only `ModuleSession` the parts play in: the desk's own when it is outermost, otherwise the enclosing provider's; `undefined` while disconnected or when a Headless `.rack` is assigned. |
 | `.effect` | property | Post-processing recipe for the rack's summed output. Assign an `Effect` or `Effect.chain(...)`; replacing it updates the owned or assigned Rack in place without rebuilding members. |
 | `webscore:error` | event | `{ operation: 'rack-control', error }`, bubbling and composed. Reports member reconciliation, Rack mix commands, master-effect replacement, owned Rack cleanup or presenter failures. |
 

@@ -29,7 +29,7 @@ function fixture() {
   const target: ModuleHandle = {id: 'audio-owner', inserts: chain};
   const scope = new ModuleContext({id: 'audio-scope', audio: new ModuleAudioEnvironment({context}), target});
   const host = document.createElement('audio-test-provider');
-  host.setAttribute('composition', 'modules');
+
   cleanups.push(provideModuleContext(host, () => scope), () => chain.dispose());
   document.body.append(host);
   return {context, chain, host, target};

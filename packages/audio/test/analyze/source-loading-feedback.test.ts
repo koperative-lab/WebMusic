@@ -18,7 +18,7 @@ describe.each(['audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscillo
     });
     source.id = 'pending-source';
     const element = document.createElement(tag);
-    element.setAttribute('player', '#pending-source');
+    element.setAttribute('input', '#pending-source');
     document.body.append(source, element);
     const feedback = () => element.querySelector<HTMLElement>('.wui-status')!;
     expect(feedback().dataset.kind).toBe('loading');
@@ -45,7 +45,7 @@ describe.each(['audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscillo
     source.dispatchEvent(new CustomEvent('webaudio:sourcechange'));
     expect(feedback().dataset.kind).toBe('waiting');
 
-    element.removeAttribute('player');
+    element.removeAttribute('input');
     expect(feedback().dataset.kind).toBe('waiting');
     source.loading = true;
     source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));

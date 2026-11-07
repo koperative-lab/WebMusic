@@ -27,25 +27,24 @@ function unknownCustomElement(element: Element): boolean {
     !element.ownerDocument?.defaultView?.customElements.get(element.localName);
 }
 
-/** Whether a real provider (or a declared composition root) sits above `element`. */
+/** Whether a real provider sits above `element`. */
 function providerAbove(element: Element): boolean {
   for (let ancestor = parentElement(element); ancestor; ancestor = parentElement(ancestor)) {
-    if (providers.has(ancestor) || ancestor.hasAttribute('composition')) return true;
+    if (providers.has(ancestor)) return true;
   }
   return false;
 }
 
 /**
- * The nearest boundary above `host`: a provider, a declared composition root,
- * or a not-yet-defined custom element that may upgrade into a provider. An
+ * The nearest boundary above `host`: a provider or a not-yet-defined custom
+ * element that may upgrade into a provider. An
  * undefined element counts only inside a provider's scope, where borrowing
  * through it could reach the wrong authority; outside any provider an
  * undefined layout wrapper is just markup.
  */
 function boundary(host: Element): Element | undefined {
   for (let element = parentElement(host); element; element = parentElement(element)) {
-    if (providers.has(element) || element.hasAttribute('composition') ||
-      (unknownCustomElement(element) && providerAbove(element))) return element;
+    if (providers.has(element) || (unknownCustomElement(element) && providerAbove(element))) return element;
   }
   return undefined;
 }
@@ -53,15 +52,6 @@ function boundary(host: Element): Element | undefined {
 function dispatch(host: Element, name: string, detail?: unknown): void {
   const Constructor = host.ownerDocument?.defaultView?.CustomEvent;
   if (Constructor && typeof host.dispatchEvent === 'function') host.dispatchEvent(new Constructor(name, {bubbles: true, composed: true, detail}));
-}
-
-/**
- * Every Element composes through modules (DEC-068); the former
- * `composition="modules"` opt-in no longer selects anything. Kept so callers
- * written against the opt-in keep compiling; it always returns true.
- */
-export function isModularComposition(_host: Element): boolean {
-  return true;
 }
 
 /** Provide a pending boundary until read() returns a context. Disposal revokes only this provider. */
@@ -75,7 +65,7 @@ export function provideModuleContext(host: Element, read: () => ModuleContext | 
     const nearest = event.composedPath().find(candidate => {
       if (candidate === request.requester || !('nodeType' in candidate) || candidate.nodeType !== 1) return false;
       const element = candidate as Element;
-      return providers.has(element) || element.hasAttribute('composition') || unknownCustomElement(element);
+      return providers.has(element) || unknownCustomElement(element);
     });
     if (nearest !== host) return;
     request.claimed = true;
@@ -136,7 +126,7 @@ function observeRootMutations(Observer: typeof MutationObserver, root: Node, lis
         try { callback(records); } catch (error) { queueMicrotask(() => { throw error; }); }
       }
     });
-    observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ['composition', 'slot', 'name']});
+    observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ['slot', 'name']});
     entry = {observer, listeners};
     rootObservers.set(root, entry);
   }

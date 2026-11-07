@@ -1,4 +1,4 @@
-import {observeCompanionTarget} from './internal/companion-target';
+import {observeCompanionTarget} from '../../play/element/internal/companion-target';
 // ============================================================================
 // <audio-live-view> — a scrolling projection of a live AnalyserNode. The
 // newest column is at the right edge and history slides left.
@@ -13,7 +13,7 @@ import {observeCompanionTarget} from './internal/companion-target';
 // spectrogram under one `type`: both are "append one column per frame and
 // scroll", differing only in how a column is painted.
 //
-// Attributes: type source window-seconds height wave-color color-map
+// Attributes: type input window-seconds height wave-color color-map
 // Properties: .analyser
 // Events: webaudio:error — source access or drawing failed.
 //
@@ -60,17 +60,17 @@ interface AnalyserSource extends Element {
  *
  * ```html
  * <audio-recorder id="rec"></audio-recorder>
- * <audio-live-view source="#rec" type="waveform" window-seconds="4"></audio-live-view>
+ * <audio-live-view input="#rec" type="waveform" window-seconds="4"></audio-live-view>
  * ```
  *
- * Point `source` at anything exposing an `AnalyserNode` — the recorder, a
+ * Point `input` at anything exposing an `AnalyserNode` — the recorder, a
  * player, an `<audio-meter>` — or assign `.analyser` directly. The node is
  * **borrowed**: this element never creates, mutates or disposes it, so several
  * views can read the same tap.
  */
 export class AudioLiveViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'source', 'input', 'window-seconds', 'height', 'wave-color', 'color-map'];
+    return ['type', 'input', 'window-seconds', 'height', 'wave-color', 'color-map'];
   }
 
   private explicitAnalyser?: AnalyserNode;
@@ -87,7 +87,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
   private detachSource?: () => void;
 
   connectedCallback(): void {
-    upgradeProperties(this, ['analyser', 'source']);
+    upgradeProperties(this, ['analyser']);
     this.controller.setType(this.type);
     this.controller.setWindowSeconds(this.windowSeconds);
     // Resolve first so the stage mounts once, already knowing whether it animates.
@@ -112,7 +112,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'source' || name === 'input') {
+    if (name === 'input') {
       this.resolveSource();
     } else if (name === 'type') {
       this.controller.setType(this.type);
@@ -143,7 +143,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
     return Math.max(0.5, numAttr(this, 'window-seconds', 5));
   }
 
-  /** Borrow an analyser directly (overrides `source`). Never disposed here. */
+  /** Borrow an analyser directly (overrides `input`). Never disposed here. */
   set analyser(analyser: AnalyserNode | undefined) {
     this.explicitAnalyser = analyser;
     this.refreshSource();
@@ -167,12 +167,12 @@ export class AudioLiveViewElement extends HTMLElementBase {
     this.detachSource = undefined;
     this.sourceTarget = undefined;
     this.sourceError = undefined;
-    // `input` aliases `source`; with neither, the enclosing player scope is followed.
-    this.stopSourceObservation = observeCompanionTarget(this, ['source', 'input'], (element, state) => {
+    // `input` names the player; without it, the enclosing player scope is followed.
+    this.stopSourceObservation = observeCompanionTarget(this, ['input'], (element, state) => {
       this.detachSource?.();
       this.detachSource = undefined;
       this.sourceTarget = element as AnalyserSource | undefined;
-      this.sourceError = state === 'invalid' ? new Error('Invalid source selector')
+      this.sourceError = state === 'invalid' ? new Error('Invalid input selector')
         : state === 'ambiguous' ? new Error('Source selector matches multiple elements') : undefined;
       const target = this.sourceTarget;
       if (target) {

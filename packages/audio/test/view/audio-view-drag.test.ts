@@ -713,7 +713,7 @@ function mount(attributes: Record<string, string> = {}) {
   source.player = player;
   document.body.append(source);
   const view = document.createElement('drag-audio-view') as AudioViewElement;
-  view.setAttribute('player', `#${source.id}`);
+  view.setAttribute('input', `#${source.id}`);
   view.setAttribute('interactive', '');
   for (const [name, value] of Object.entries(attributes)) view.setAttribute(name, value);
   document.body.append(view);

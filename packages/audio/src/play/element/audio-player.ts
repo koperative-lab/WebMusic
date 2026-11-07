@@ -779,6 +779,12 @@ export class AudioPlayerElement extends WebMusicElement {
       id: this.id || player.module.id,
       get inserts() { return player.module.inserts; },
       getPort: (name) => player.module.getPort?.(name),
+      // The player's own audio and source ports, and the transport of the
+      // Session this element plays in, so an `input` link can follow it.
+      ports: () => {
+        const own = (player.module.ports?.() ?? []).filter(port => port.family !== 'transport');
+        return Object.freeze(context.transport ? [...own, context.transport] : own);
+      },
       prepare: () => this.prepareModuleSource(player, context, generation),
       subscribe: (listener) => player.module.subscribe?.(listener) ?? (() => {}),
     };

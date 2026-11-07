@@ -48,7 +48,7 @@ function fixture() {
   const target: ModuleHandle = {id: 'instrument', inserts: chain};
   const scope = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context}), target});
   const host = document.createElement('custom-module-provider');
-  host.setAttribute('composition', 'modules');
+
   cleanups.push(provideModuleContext(host, () => scope), () => chain.dispose());
   document.body.append(host);
   return {chain, context, host, target, nodes};

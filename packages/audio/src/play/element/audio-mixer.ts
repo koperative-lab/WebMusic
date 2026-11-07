@@ -58,7 +58,7 @@ let mixerElementSequence = 0;
 
 export class AudioMixerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'master-volume', 'autoplay', 'solo', 'loading'];
+    return ['input', 'master-volume', 'autoplay', 'solo', 'loading'];
   }
 
   protected root?: ShadowRoot;
@@ -100,7 +100,7 @@ export class AudioMixerElement extends WebMusicElement {
     this.own(() => { this.connection.disconnect(); this.teardown(); });
     upgradeProperties(this, PROPS);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
-    // A mixer explicitly linked to a player (`player=` or `.player`) is that
+    // A mixer explicitly linked to a player (`input=` or `.player`) is that
     // player's mix backend; otherwise it is a module Rack (DEC-068).
     this.modular = !this.connection.explicit;
     if (this.modular) this.mountModules();
@@ -117,7 +117,7 @@ export class AudioMixerElement extends WebMusicElement {
   attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
     if (name === 'loading') { this.notifyUI(); return; }
-    if (name === 'player') {
+    if (name === 'input') {
       // Linking or unlinking switches between backend and Rack roles.
       if (this.modular === this.connection.explicit) { this.remount(); return; }
       this.connection.refresh(); this.render(); return;

@@ -46,6 +46,7 @@ import type {AudioCanvasFrame} from '../render/overview';
 import {WebMusicElement, cssSizeAttr, numAttr, upgradeProperties} from './internal/base';
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import {bindModuleAudioInput} from '../../play/element/internal/module-input';
+import {observeCompanionTarget} from '../../play/element/internal/companion-target';
 
 /** Borrowed nonvisual player capability; monitoring never owns its transport. */
 export interface AudioMeterPlayer {
@@ -64,13 +65,6 @@ export interface AudioMeterSurfaceHandle {
   updateLabel(label: string): void;
   destroy(): void;
 }
-
-type PlayerElement = Element & {
-  readonly analyser?: AnalyserNode;
-  readonly loading?: boolean;
-  readonly loadError?: unknown;
-  readonly player?: AudioMeterPlayer;
-};
 
 /** Attributes that feed the controller's options rather than the display. */
 const TUNING_ATTRIBUTES: readonly string[] = [
@@ -133,7 +127,7 @@ export class AudioMeterElement extends WebMusicElement {
   // parameter catalog can be checked against this exact order.
   static get observedAttributes(): string[] {
     return [
-      'player', 'input', 'port', 'type', 'theme', 'size', 'width', 'height', 'mode', 'bars', 'aria-label',
+      'input', 'port', 'type', 'theme', 'size', 'width', 'height', 'mode', 'bars', 'aria-label',
       'scale', 'window-seconds', 'timebase-ms', 'trigger', 'loudness-mode', 'reference-dbfs',
       ...TUNING_ATTRIBUTES,
     ];
@@ -145,11 +139,11 @@ export class AudioMeterElement extends WebMusicElement {
   private meter?: AudioMeterController;
   private explicitPlayer?: AudioMeterPlayer;
   private boundPlayer?: AudioMeterPlayer;
-  private boundTarget?: PlayerElement;
   private playerAnalyser?: AnalyserNode;
   private playerError?: Error;
+  /** The `input` target or enclosing player element, read only for source readiness. */
+  private ownerTarget?: {readonly loading?: boolean; readonly loadError?: unknown};
   private playerUnbind: Array<() => void> = [];
-  private sourceObserver?: MutationObserver;
   private bindingRevision = 0;
   private refreshingPlayer = false;
   private presenter?: AudioMeterSurfaceHandle;
@@ -184,12 +178,11 @@ export class AudioMeterElement extends WebMusicElement {
     this.painter ??= this.createMeterPainter();
     this.mountCurrentUI();
     this.bindPlayer();
-    this.observePlayerTarget();
   }
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
-    if (name === 'player' || name === 'input' || name === 'port') {
+    if (name === 'input' || name === 'port') {
       this.bindPlayer();
       return;
     }
@@ -482,8 +475,6 @@ export class AudioMeterElement extends WebMusicElement {
   }
 
   protected teardown(): void {
-    this.sourceObserver?.disconnect();
-    this.sourceObserver = undefined;
     this.unbindPlayer();
     let firstError: unknown;
     try {
@@ -509,7 +500,7 @@ export class AudioMeterElement extends WebMusicElement {
   }
 
   private meterStatus(): StatusState {
-    const source = this.contextRef || this.analyserRef ? undefined : this.explicitPlayer ?? this.boundTarget;
+    const source = this.contextRef || this.analyserRef ? undefined : this.explicitPlayer ?? this.ownerTarget;
     if (source?.loading) return {kind: 'loading', message: 'Loading audio source.'};
     if (source?.loadError) {
       return {kind: 'error', message: source.loadError instanceof Error ? source.loadError.message : String(source.loadError)};
@@ -576,64 +567,50 @@ export class AudioMeterElement extends WebMusicElement {
     return undefined;
   }
 
-  private resolvePlayerTarget(): PlayerElement | undefined {
-    const selector = this.getAttribute('player');
-    if (!selector) return undefined;
-    try {
-      const targets = (this.getRootNode() as ParentNode).querySelectorAll(selector);
-      return targets.length === 1 ? targets[0] as PlayerElement : undefined;
-    } catch (error) {
-      this.onMeterError(error);
-      return undefined;
-    }
-  }
-
+  /** Without an assigned `.player` object, the meter taps a module audio input (DEC-068). */
   private usesModuleInput(): boolean {
-    return !this.explicitPlayer && (
-      this.assignedModule !== undefined || this.hasAttribute('input') ||
-      !this.hasAttribute('player')
-    );
+    return !this.explicitPlayer;
   }
 
   private bindPlayer(): void {
     const revision = this.unbindPlayer();
     if (revision !== this.bindingRevision || !this.isConnected || this.contextRef || this.analyserRef) return;
     if (this.usesModuleInput()) {
+      if (this.assignedModule === undefined) {
+        let detach: (() => void) | undefined;
+        const stop = observeCompanionTarget(this, ['input'], (element) => {
+          detach?.(); detach = undefined;
+          if (revision !== this.bindingRevision) return;
+          this.ownerTarget = element as AudioMeterElement['ownerTarget'];
+          this.presenter?.redraw();
+          if (!element) return;
+          const refresh = (): void => { if (revision === this.bindingRevision) this.presenter?.redraw(); };
+          const names = ['webaudio:sourcechange', 'webaudio:loaded', 'webaudio:playerchange', 'webaudio:loadstatechange'];
+          for (const name of names) element.addEventListener(name, refresh);
+          detach = () => { for (const name of names) element.removeEventListener(name, refresh); };
+        });
+        this.playerUnbind.push(() => { stop(); detach?.(); detach = undefined; this.ownerTarget = undefined; });
+      }
       this.playerUnbind.push(bindModuleAudioInput(this, this.assignedModule, ({analyser, error}) => {
         if (revision !== this.bindingRevision || !this.isConnected) return;
         this.playerAnalyser = analyser;
+        this.playerError = error === undefined ? undefined : error instanceof Error ? error : new Error(String(error));
         try { this.rebuild(); } catch (failure) { this.onMeterError(failure); }
         if (error) this.onMeterError(error);
       }));
       return;
     }
-    const target = this.explicitPlayer ? undefined : this.resolvePlayerTarget();
-    if (revision !== this.bindingRevision) return;
-    this.boundTarget = target;
-    this.boundPlayer = this.explicitPlayer ?? target?.player ?? target;
+    this.boundPlayer = this.explicitPlayer;
     const refresh = (): void => {
       if (revision === this.bindingRevision) this.refreshPlayerAnalyser();
     };
-    if (target) {
-      for (const name of ['webaudio:sourcechange', 'webaudio:loaded', 'webaudio:playerchange', 'webaudio:loadstatechange']) {
-        target.addEventListener(name, refresh);
-        this.playerUnbind.push(() => target.removeEventListener(name, refresh));
-      }
-      const registry = target.ownerDocument?.defaultView?.customElements;
-      if (target.localName.includes('-') && !registry?.get(target.localName)) {
-        void registry?.whenDefined(target.localName).then(() => {
-          if (revision === this.bindingRevision && this.isConnected) this.bindPlayer();
-        });
-      }
-    } else {
-      const player = this.explicitPlayer;
-      if (player?.on) {
-        for (const event of ['sourcechange', 'load'] as const) {
-          if (revision !== this.bindingRevision) break;
-          const release = player.on(event, refresh);
-          if (revision === this.bindingRevision) this.playerUnbind.push(release);
-          else release();
-        }
+    const player = this.explicitPlayer;
+    if (player?.on) {
+      for (const event of ['sourcechange', 'load'] as const) {
+        if (revision !== this.bindingRevision) break;
+        const release = player.on(event, refresh);
+        if (revision === this.bindingRevision) this.playerUnbind.push(release);
+        else release();
       }
     }
     if (revision === this.bindingRevision) this.refreshPlayerAnalyser();
@@ -645,12 +622,12 @@ export class AudioMeterElement extends WebMusicElement {
     this.refreshingPlayer = true;
     try {
       this.playerError = undefined;
-      const source = this.explicitPlayer ?? this.boundTarget;
+      const source = this.explicitPlayer;
       if (source?.loading || source?.loadError) {
         this.presenter?.redraw();
         return;
       }
-      const player = this.explicitPlayer ?? this.boundTarget?.player ?? this.boundTarget;
+      const player = this.explicitPlayer;
       const analyser = player?.analyser;
       if (revision !== this.bindingRevision || !this.isConnected) return;
       this.boundPlayer = player;
@@ -676,7 +653,6 @@ export class AudioMeterElement extends WebMusicElement {
     const revision = ++this.bindingRevision;
     const releases = this.playerUnbind.splice(0);
     this.boundPlayer = undefined;
-    this.boundTarget = undefined;
     this.playerAnalyser = undefined;
     this.playerError = undefined;
     const failures: unknown[] = [];
@@ -685,17 +661,6 @@ export class AudioMeterElement extends WebMusicElement {
     }
     for (const error of failures) this.onMeterError(error);
     return revision;
-  }
-
-  private observePlayerTarget(): void {
-    if (typeof MutationObserver === 'undefined') return;
-    this.sourceObserver = new MutationObserver(() => {
-      if (this.explicitPlayer || this.contextRef || this.analyserRef || this.usesModuleInput()) return;
-      if (this.resolvePlayerTarget() !== this.boundTarget) this.bindPlayer();
-    });
-    this.sourceObserver.observe(this.getRootNode(), {
-      childList: true, subtree: true, attributes: true, attributeFilter: ['id'],
-    });
   }
 
   /** `numAttr` without a fallback: an absent or unparsable value stays absent. */

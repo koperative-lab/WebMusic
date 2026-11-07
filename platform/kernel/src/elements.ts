@@ -17,7 +17,6 @@ export const HTMLElementBase = (
 ) as typeof HTMLElement;
 
 export {
-  isModularComposition,
   provideModuleContext,
   requestModuleContext,
   observeModuleContext,

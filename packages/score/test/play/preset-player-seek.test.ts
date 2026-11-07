@@ -32,7 +32,7 @@ async function nativePlayer() {
   owner.rate = 2;
   document.body.append(owner);
   const follower = document.createElement('score-chord-analysis');
-  follower.setAttribute('player', '#native-seek-owner');
+  follower.setAttribute('input', '#native-seek-owner');
   follower.setAttribute('motion', 'stepped');
   document.body.append(follower);
   await flush();

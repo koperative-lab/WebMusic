@@ -35,7 +35,7 @@ function owner(player: ScorePlayer): void {
 
 function view(): ScoreViewElement {
   const element = document.createElement('local-music-score-view') as ScoreViewElement;
-  element.setAttribute('player', '#settlement-owner');
+  element.setAttribute('input', '#settlement-owner');
   return element;
 }
 

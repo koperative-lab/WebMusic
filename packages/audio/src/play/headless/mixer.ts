@@ -9,7 +9,7 @@
 
 import {EventEmitter, type AudioClip} from '../../core';
 import {InsertChain, type Effect} from '@webmusic/kernel/effect';
-import {AudioOutputPort, createConnectionLease, type ConnectionLease, type ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
+import {AudioOutputPort, createConnectionLease, type ConnectionLease, type ModuleContext, type ModuleHandle, type ModulePort} from '@webmusic/kernel/module';
 import {AudioClipPlayer, type PlayerLike} from './player';
 import type {MediaPlaybackAdapterFactory} from './engines/media-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
@@ -147,7 +147,14 @@ export class AudioMixer {
     this.module = {
       id: `audio-mixer-${++mixerModuleSequence}`,
       get inserts() { return readInserts(); },
-      getPort: (name) => name === 'master' || name === 'output' ? this.port : undefined,
+      getPort: (name) => name === 'master' || name === 'output' || name === 'main' ? this.port : undefined,
+      ports: () => {
+        const ports: ModulePort[] = [];
+        if (this.port && !this.disposed) ports.push(this.port);
+        const transport = this.options.moduleContext?.transport;
+        if (transport) ports.push(transport);
+        return Object.freeze(ports);
+      },
       prepare: () => { this.ensureMaster(); },
       subscribe: (listener) => this.on('change', listener),
     };

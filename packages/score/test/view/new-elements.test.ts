@@ -221,7 +221,7 @@ describe('<score-pitch-view type=keyboard>', () => {
     const source = document.createElement('div');
     source.id = 'source';
     document.body.append(source);
-    const element = await mount(tag, undefined, {source: '#source', low: '60', high: '72'});
+    const element = await mount(tag, undefined, {input: '#source', low: '60', high: '72'});
 
     source.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 64}}));
     source.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 67}}));
@@ -242,10 +242,10 @@ describe('<score-pitch-view type=keyboard>', () => {
     document.body.append(source);
     const waterfallTag = define(class extends ScoreViewElement {});
     const waterfall = await mount<ScoreViewElement>(waterfallTag, fourBars(), {
-      type: 'waterfall', player: '#shared-waterfall-source',
+      type: 'waterfall', input: '#shared-waterfall-source',
     });
     const keyboard = await mount<PitchViewElement>(tag, undefined, {
-      player: '#shared-waterfall-source', low: '60', high: '72',
+      input: '#shared-waterfall-source', low: '60', high: '72',
     });
     source.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 60, startTime: 0}}));
     expect(keyboard.active).toEqual([60]);
@@ -265,12 +265,12 @@ describe('<score-pitch-view type=keyboard>', () => {
     const second = document.createElement('div');
     second.id = 'second';
     document.body.append(first, second);
-    const element = await mount(tag, undefined, {source: '#first'});
+    const element = await mount(tag, undefined, {input: '#first'});
 
     first.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 60}}));
     expect((element as unknown as {active: number[]}).active).toEqual([60]);
 
-    element.setAttribute('source', '#second');
+    element.setAttribute('input', '#second');
     expect((element as unknown as {active: number[]}).active).toEqual([]);
 
     first.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 62}}));
