@@ -444,6 +444,71 @@ export class ScorePlayer {
     this.playbackPublisher.notify();
   }
 
+  private replacementSerial = 0;
+
+  /**
+   * Play another score in place (DEC-068): the engine keeps its AudioContext,
+   * synth, output, inserts and any Session scheduling attachment. Playback
+   * stops and the new timeline starts at its origin; a synth that preloads
+   * prepares the new notes first. A later replacement or disposal supersedes
+   * this one, which then resolves without effect.
+   */
+  async replaceScore(score: Score): Promise<void> {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    if (this.documents.getSource()) throw new Error('A bound document owns this player\u2019s score; detach it before replacing the score.');
+    const serial = ++this.replacementSerial;
+    this.stop();
+    const candidate = await this.prepareDocument(score);
+    if (this.disposed || serial !== this.replacementSerial) return;
+    // A play request during preparation is stopped: adoption needs a paused timeline.
+    if (this.scheduler.isPlaying || this.playbackState !== 'stopped') this.stop();
+    this.scheduler.adoptTimeline(candidate.score, candidate.timeline, 0);
+    this.score = candidate.score;
+    this.preloadPromise = candidate.preload;
+    this.sourceRevision++;
+    this.activeNotes.clear();
+    this.playbackPublisher.notify();
+    this.scheduler.publishCursor();
+  }
+
+  /**
+   * Replace the instrument in place, keeping the context, output, inserts and
+   * transport; the next scheduled attack plays on the new synth. Returns false
+   * (changing nothing) when the new synth would change this player's Session
+   * timing class, so the caller must rebuild the engine instead. A synth this
+   * player owned is released; a borrowed one is only disconnected. A supplied
+   * synth is borrowed unless `ownership` transfers it; `undefined` restores
+   * the owned default oscillator.
+   */
+  replaceSynth(synth: HeadlessSynth | undefined, ownership: SynthOwnership = 'borrowed'): boolean {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    if (this.activeGraphBuild !== undefined) throw new Error('The synth cannot change during graph construction.');
+    const current = this.synth ?? this.options.synth;
+    const attacks = (value: HeadlessSynth | undefined) => value ? scoreSchedulingCapabilities(value).attacks : 'audio-clock';
+    if (attacks(synth) !== attacks(current)) return false;
+    if (synth === this.options.synth && (synth !== undefined || this.synthOwnership === 'owned')) return true;
+    this.options.synth = synth;
+    this.options.synthOwnership = synth ? ownership : undefined;
+    this.preloadPromise = undefined;
+    const output = this.output;
+    const context = this._context;
+    if (!output || !context || !this.synth) return true;
+    const previous = this.synth;
+    const previousCleanup = this.synthRouteCleanup;
+    const previousOwnership = this.synthOwnership;
+    const next = synth ?? new OscillatorSynth(context);
+    const route = next.connect?.(output);
+    this.synth = next;
+    this.synthRouteCleanup = typeof route === 'function' ? route : undefined;
+    this.synthOwnership = synth ? ownership : 'owned';
+    if (previousOwnership === 'owned') {
+      if (previous.dispose) this.tryCleanup('synth.dispose', () => previous.dispose!());
+      else if (previous.disconnect) this.tryCleanup('synth.disconnect', () => previous.disconnect!());
+    } else if (previousCleanup) this.tryCleanup('synth route cleanup', previousCleanup);
+    this.playbackPublisher.notify();
+    return true;
+  }
+
   /**
    * Seek in rate-scaled, real seconds; the promise settles once the transport
    * anchor is live again. With `when` (an absolute AudioContext time) a
@@ -568,6 +633,7 @@ export class ScorePlayer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.replacementSerial++;
     this.documents.dispose();
     this.playbackState = 'stopped';
     this.tryCleanup('live note input', () => this.liveNotes.dispose());

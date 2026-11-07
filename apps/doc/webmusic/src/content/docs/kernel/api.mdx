@@ -725,8 +725,10 @@ until retry, replacement or cancellation explicitly calls `release()`. Release
 unblocks a cancelled wait and makes late completion harmless. Session disposal
 releases outstanding reservations. The lease exposes `token`, `active` and `ready`.
 
-A lease exposes `token`, `active`, `ready`, `settled`, `cancellationError` and
-`release()`. `ready` waits for first explicit preparation/attachment or release;
+A lease exposes `token`, `active`, `ready`, `settled`, `cancellationError`,
+`release()` and `refresh()`. `refresh()` tells observers the member's source
+changed in place (a new duration or end) without a new registration: they get a
+`participants` event and re-read the snapshot; it is ignored once released. `ready` waits for first explicit preparation/attachment or release;
 preparation, activation and scheduling-attachment failures reject it. After a
 rejection, a retried preparation replaces the getter's value with a fresh promise,
 so read `ready` again to observe recovery. Do not await it before the action that

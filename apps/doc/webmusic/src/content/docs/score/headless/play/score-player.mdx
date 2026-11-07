@@ -225,6 +225,8 @@ only for explicit playback. Offset defaults 0 and positive position scale 1.
 | `source` | `SourcePublisher` with schema `webmusic.score` publishing the player's `playback` source. |
 | `retarget(context)` | Follow a republished scope in place: a destination-only change re-routes the prepared output and keeps the engine, Session membership and voices; returns `false` when the change needs a rebind. |
 | `setDocumentSource(source)` | Play a borrowed document in place of the constructed score; the engine and clock stay. |
+| `replaceScore(score)` | `Promise<void>`: stop the Session (when present), play another score on the same engine from 0 and refresh the participant, so the Session reads the new duration. |
+| `replaceSynth(synth)` | Swap the instrument in place and republish the control port; `false` (nothing changed) when the Session timing class would change. |
 | `subscribe(listener)` | Observe capability readiness/replacement; discovery itself allocates nothing. |
 | `dispose()` | Release registration, participant, route and ports; dispose only an engine the module created. |
 
@@ -318,6 +320,8 @@ remaining live voices.
 | Member | Return | Contract |
 | --- | --- | --- |
 | `setDocumentSource(source \| undefined)` | `void` | Attach/detach a borrowed Core document; see [revision application](#apply-document-revisions). |
+| `replaceScore(score)` | `Promise<void>` | Stop, then play another score on the same context, synth, output and inserts from 0, preloading its notes first when the synth preloads. Rejects while a document is bound; a later replacement or disposal supersedes it. |
+| `replaceSynth(synth, ownership?)` | `boolean` | Swap the instrument in place; the next attack plays on it. A supplied synth is `borrowed` unless `ownership` transfers it; `undefined` restores the owned oscillator. Returns `false`, changing nothing, when the new synth would change the Session timing class. |
 | `waitForDocumentRevision(target)` | `Promise<ScoreDocumentApplicationResult>` | Wait for a known document ID/revision and attempt outcome. |
 | `retryDocumentApplication()` | `Promise<ScoreDocumentApplicationResult>` | Retry the latest source snapshot with a fresh attempt. |
 | `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |

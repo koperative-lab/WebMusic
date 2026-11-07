@@ -372,4 +372,51 @@ describe('Score modular scope and source lifecycle', () => {
     expect(rack.list().find(channel => channel.id === module.id)).toMatchObject({volume: 0.3, muted: true});
     expect(loadScoreFromUrl).toHaveBeenCalledTimes(2);
   });
+
+  it('plays a replaced .score and .sound on the same engine, Session membership and route', async () => {
+    const f = fixture(); f.session.dispose();
+    const player = document.createElement('score-player') as ScorePlayerElement;
+    player.audioContext = f.context; player.sound = f.synth; player.score = score(2);
+    document.body.append(player); await settle();
+    await player.module!.prepare!();
+    const session = player.sessionTransport!;
+    const engine = player.module!.getPort!('main');
+    const participants: number[] = [];
+    cleanups.push(session.subscribe((event) => { if (event.type === 'participants') participants.push(session.participantCount); }));
+    expect(session.snapshot.durationSeconds).toBe(2);
+
+    const next = score(6);
+    player.score = next; await settle();
+    expect(player.playback.snapshot().score).toBe(next);
+    expect(player.resolvedScore).toBe(next);
+    expect(session.snapshot.durationSeconds).toBe(6);
+    expect(session.participantCount).toBe(1);
+    expect(participants.every((count) => count === 1)).toBe(true);
+    expect(player.module!.getPort!('main')).toBe(engine);
+
+    const other: HeadlessSynth = {connect: vi.fn(() => vi.fn()), noteOn: vi.fn(), noteOff: vi.fn(), dispose: vi.fn()};
+    player.sound = other; await settle();
+    expect(other.connect).toHaveBeenCalledOnce();
+    expect(f.synth.dispose).not.toHaveBeenCalled();
+    expect(player.module!.getPort!('main')).toBe(engine);
+    expect(player.playback.snapshot().score).toBe(next);
+    player.remove(); await settle();
+    expect(other.dispose).not.toHaveBeenCalled();
+  });
+
+  it('rebuilds when a new sound changes the engine timing class', async () => {
+    const f = fixture(); f.session.dispose();
+    const player = document.createElement('score-player') as ScorePlayerElement;
+    player.audioContext = f.context; player.sound = f.synth; player.score = score(2);
+    document.body.append(player); await settle();
+    await player.module!.prepare!();
+    const engine = player.module!.getPort!('main');
+    // A synth that schedules attacks on the audio clock reports shared-anchor timing.
+    const scheduled = {connect: vi.fn(() => vi.fn()), noteOn: vi.fn(), noteOff: vi.fn(), dispose: vi.fn(),
+      supportsScheduledCancellation: true, cancelScheduledNote: vi.fn(), noteOffById: vi.fn()} as unknown as HeadlessSynth;
+    player.sound = scheduled; await settle();
+    await player.module!.prepare!();
+    expect(player.module!.getPort!('main')).not.toBe(engine);
+    player.remove(); await settle();
+  });
 });

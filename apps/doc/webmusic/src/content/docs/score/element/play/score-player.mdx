@@ -223,8 +223,9 @@ They await an in-progress Element mount; disconnect or source replacement
 supersedes that wait. Without an editor input, `.documentBinding` is `undefined`.
 
 The [shared editing demo](/score/element/view/score-view/#follow-an-editor)
-combines import, grid editing, undo, audition and MIDI export. Audio resource property
-changes still rebuild the engine; ordinary document commits preserve it.
+combines import, grid editing, undo, audition and MIDI export. Ordinary document
+commits preserve the engine; so do `.score` and `.sound` replacements (below).
+Other audio resource property changes rebuild it.
 
 ## Share data and state with companions
 
@@ -270,6 +271,15 @@ channel is forwarded as `webscore:error`.
 
 The source attributes are read only while a source is being resolved; assigning a source property re-renders immediately when the element is connected. The four transport knobs are the exception — they apply live, in place, without rebuilding the player.
 
+Assigning `.score` or `.sound` to a player whose own engine is mounted (no
+editor, controller, Rack or load in flight) replaces it **in place**: the
+engine keeps its AudioContext, output port, inserts, Rack channel and Session
+membership. A new score stops the Session and restarts the timeline at 0; the
+Session reads the new duration at once. A new sound plays the next attack, and
+the control port follows its parameters; a sound that would change the
+engine's Session timing class (an audio-clock synth replacing a callback one,
+or the reverse) and clearing `.sound` rebuild the engine instead.
+
 **Source and audio**
 
 | Member | Kind | Default | Description |
@@ -281,7 +291,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
 | `loading` / `.loading` | attribute / property | `false` | Declare external preparation through the attribute or setter; the getter also includes native loading. No fetch, pause, seek or source replacement is initiated. |
 | `sound-font` | attribute | the built-in oscillator synth | Sample URL template containing `{midi}`, one file per note (`/sf/{midi}.mp3`). A template without `{midi}` is ignored, as is any value once `.sound` is set. |
-| `.score` | property | — | A parsed `Score`. Overrides `src`. |
+| `.score` | property | — | A parsed `Score`. Overrides `src`. A mounted engine plays a replacement in place, restarting at 0. |
 | `.playback` | read-only property | stable source | Resolved data and revisioned snapshots/subscriptions; optional `seekNominal` uses nominal seconds. See [shared source](/score/api/#shared-playback-observation). |
 | `.resolvedScore` | read-only property | `undefined` | Current mounted `Score`, including one loaded from `src`; undefined during source replacement and in Rack/controller modes. `.score` still returns only explicit assignment. |
 | `.sessionTransport` | read-only property | `undefined` | Current borrowed/owned modular Session; undefined outside module mode, while its provider is pending, or after teardown. |
@@ -290,7 +300,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | `controls` | attribute | `auto` | `auto` hides the transport of an inherited leaf, `show` displays it, `hide` suppresses local chrome. |
 | `.rack` | property | — | A borrowed [`Rack`](/score/headless/play/rack/) whose members share these transport commands. Overrides the nested desk, `.score` and `src`. |
 | `.controller` | property | — | A borrowed [`PlayerController`](/score/headless/play/player-controller/). Overrides every other source; see [Four ways to drive it](#four-ways-to-drive-it). |
-| `.sound` | property | — | A `Sound` / `HeadlessSynth` timbre. Overrides `sound-font`. |
+| `.sound` | property | — | A `Sound` / `HeadlessSynth` timbre. Overrides `sound-font`. A mounted engine swaps it in place unless the Session timing class changes. |
 | `.effect` | property | — | An `Effect` or `Effect.chain(...)` on the owned single-score output. Assigning it replaces the compatibility insert; in `.rack` / `.controller` mode, set the owning Rack or controller instead. |
 | `.audioContext` | property | one created on demand | Share an existing `AudioContext` — with an analyser, or with another player. |
 | `.destination` | property | `context.destination` | Route output into this node instead. Its `.context` also serves as the SoundFont context. |

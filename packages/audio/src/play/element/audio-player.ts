@@ -808,6 +808,8 @@ export class AudioPlayerElement extends WebMusicElement {
         const offTrack = queue.onTrackChange!(() => {
           if (generation !== this.moduleGeneration) return;
           queueEnded = false;
+          // The new entry's length is the Session duration now.
+          this.participant?.refresh();
           // The first entry's start is already the Session origin.
           if (session.position < 0.05) return;
           reanchoring = true;

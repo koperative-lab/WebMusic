@@ -65,6 +65,12 @@ export interface SessionParticipantLease {
   readonly cancellationError: unknown;
   /** Unregister first, then cancel only this member; never disposes its engine. */
   release(): void;
+  /**
+   * The member's source changed in place (a new duration or end), without a
+   * new registration: observers receive a `participants` event and re-read
+   * the snapshot. Ignored once released.
+   */
+  refresh(): void;
 }
 
 /** A pending data load, never a fabricated transport participant. */
@@ -416,6 +422,11 @@ export class SessionTransport implements ModuleSession {
       settled,
       get cancellationError() { return member.cancellationError; },
       release: () => this.#release(member),
+      refresh: () => {
+        if (!member.active || this.#disposed) return;
+        ++this.#membershipRevision;
+        this.#publish({type: 'participants', snapshot: this.snapshot});
+      },
     });
   }
 

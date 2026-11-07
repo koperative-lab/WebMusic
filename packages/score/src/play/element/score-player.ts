@@ -361,7 +361,41 @@ export class ScorePlayerElement extends WebMusicElement {
   set score(score: Score | undefined) {
     if (score !== undefined && this.hasEditorSource()) throw this.sourceConflict();
     this.explicitScore = score;
-    if (this.isConnected) this.requestRender();
+    if (!this.isConnected) return;
+    // A mounted engine plays the new score in place (DEC-068): its route,
+    // Session membership, synth and inserts stay.
+    if (score && this.replaceScoreInPlace(score)) return;
+    this.requestRender();
+  }
+
+  private scoreReplacement = 0;
+
+  /** The native engine this element mounted, while nothing else owns its source. */
+  private get replaceableEngine(): ScorePlayerModule | undefined {
+    const module = this.moduleSource;
+    if (!module || this.handle?.player !== module.player || this.loadController || this.mountedDocument
+      || this.hasEditorSource() || this.externalController || this.explicitRack || this.composedRack) return undefined;
+    return module;
+  }
+
+  private replaceScoreInPlace(score: Score): boolean {
+    const module = this.replaceableEngine;
+    if (!module) return false;
+    const serial = ++this.scoreReplacement;
+    const token = this.loadToken;
+    const current = () => serial === this.scoreReplacement && token === this.loadToken && this.moduleSource === module && this.isConnected;
+    this.activeNotes.clear();
+    void module.replaceScore(score).then(() => {
+      if (!current()) return;
+      this.setResolvedScore(score);
+      if (!current()) return;
+      this.sourceRevision += 1;
+      this.playbackPublisher.notify();
+      this.applyLoop();
+      this.publishModuleChange();
+      if (current()) this.emitState();
+    }, (error) => { if (current()) this.reportPlaybackError(error); });
+    return true;
   }
 
   get score(): Score | undefined {
@@ -490,8 +524,14 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Assign a timbre (Sound / HeadlessSynth) — overrides the `sound-font` attribute. */
   set sound(sound: HeadlessSynth | undefined) {
+    if (sound === this.explicitSound) return;
     this.explicitSound = sound;
-    if (this.isConnected) this.requestRender();
+    if (!this.isConnected) return;
+    // Swap the instrument of a mounted engine in place when its Session
+    // timing class stays the same; otherwise rebuild.
+    const module = sound ? this.replaceableEngine : undefined;
+    if (module && module.replaceSynth(sound)) return;
+    this.requestRender();
   }
 
   get sound(): HeadlessSynth | undefined {
@@ -1171,9 +1211,10 @@ export class ScorePlayerElement extends WebMusicElement {
       },
       onSeek: () => {
         if (token !== this.loadToken || !this.isConnected) return;
+        const replacement = this.scoreReplacement;
         this.dispatchEvent(new CustomEvent('webscore:seek', {bubbles: true}));
-        // A seek listener may replace the source or detach the element.
-        if (token === this.loadToken && this.isConnected) this.emitState();
+        // A seek listener may replace the source (in place or not) or detach the element.
+        if (token === this.loadToken && replacement === this.scoreReplacement && this.isConnected) this.emitState();
       },
       // Fired on every cursor tick (and once per seek). Keep nominal score
       // time and rate-scaled transport time explicit; the older `seconds` /

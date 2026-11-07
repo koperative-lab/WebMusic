@@ -549,6 +549,25 @@ describe('participant timing reports', () => {
     session.dispose();
   });
 
+  it('republishes a refreshed member in place and ignores a released one', () => {
+    const session = new SessionTransport(() => 0, {driftCheckIntervalMs: 0});
+    let duration = 2;
+    const lease = session.register(leafTransport(), {axis: 'a', durationSeconds: () => duration});
+    const events: Array<{count: number; duration: number | null; revision: number}> = [];
+    session.subscribe((event) => {
+      if (event.type === 'participants') events.push({count: event.snapshot.participantCount, duration: event.snapshot.durationSeconds, revision: event.snapshot.membershipRevision});
+    });
+    duration = 6;
+    lease.refresh();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({count: 1, duration: 6});
+    lease.release();
+    const released = events.length;
+    lease.refresh();
+    expect(events).toHaveLength(released);
+    session.dispose();
+  });
+
   it('rejects an unknown timing and shared-anchor without scheduling', () => {
     const session = new SessionTransport(() => 0, {driftCheckIntervalMs: 0});
     expect(() => session.register(leafTransport(), {axis: 'a', durationSeconds: 1, timing: 'shared-anchor'})).toThrow(/must attach Session scheduling/);

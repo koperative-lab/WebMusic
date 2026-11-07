@@ -18,6 +18,7 @@ import type {InsertChain} from '@webmusic/kernel/effect';
 import type {ModuleSession} from '@webmusic/kernel/session';
 import type {SyncFollowerTransport} from '@webmusic/kernel/session';
 import type {Score, ScoreDocumentSource, ScorePlaybackSource} from '../../core';
+import type {HeadlessSynth} from './audio-contracts';
 import type {NoteInputTarget} from '../core/note-input-model';
 import type {ScorePlayerOptions} from './audio-contracts';
 import {ScorePlayer} from './score-player';
@@ -175,6 +176,34 @@ export class ScorePlayerModule implements ModuleHandle {
       this.route = routeModuleOutput(next, this, port);
       this.notify();
     }
+    return true;
+  }
+
+  /**
+   * Play another score in place: the engine, its route, voices' synth and
+   * Session membership stay. The Session (when present) stops first, so every
+   * member restarts from the origin with the new timeline.
+   */
+  async replaceScore(score: Score): Promise<void> {
+    if (this.disposed) throw new Error('Score module has been disposed.');
+    await this.context.session?.stop();
+    if (this.disposed) return;
+    await this.player.replaceScore(score);
+    if (this.disposed) return;
+    this.source.ready(this.player.playback);
+    // The Session re-reads this member's duration and end in place.
+    this.participant?.refresh();
+    this.notify();
+  }
+
+  /**
+   * Replace the instrument in place; false when the timing class would change
+   * (the caller rebuilds). The control port follows the new synth's parameters.
+   */
+  replaceSynth(synth: HeadlessSynth | undefined): boolean {
+    if (this.disposed) throw new Error('Score module has been disposed.');
+    if (!this.player.replaceSynth(synth)) return false;
+    this.notify();
     return true;
   }
 
