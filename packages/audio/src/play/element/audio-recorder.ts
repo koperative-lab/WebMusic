@@ -28,6 +28,8 @@ import {AudioRecorder, type AudioRecorderOptions} from '../headless/recorder';
 import {AudioClipPlayer} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
 import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
+import {notifyModuleChange, observeModuleContext} from '@webmusic/kernel/element';
+import type {ModuleContext, ModuleHandle} from '@webmusic/kernel/module';
 import {clipToBlob, type ClipToWavOptions} from '../api/export';
 import {formatTime} from '../core/format';
 import {WebMusicElement, boolAttr, defineOnce, numAttr, upgradeProperties} from './internal/base';
@@ -96,11 +98,17 @@ export class AudioRecorderElement extends WebMusicElement {
   private compatibilityStyle?: HTMLStyleElement;
   private readonly subscribers = new Set<() => void>();
 
+  private moduleScope?: ModuleContext;
+
+  /** The current take's microphone as a module source (its `output` port exists while capturing). */
+  get module(): ModuleHandle | undefined { return this.engine?.module; }
+
   protected override onMount(): void {
     // Register rollback before anything can acquire a microphone or a context.
     this.own(() => { this.connection.disconnect(); this.teardown(); });
     upgradeProperties(this, ['player']);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
+    this.own(observeModuleContext(this, (context) => { this.moduleScope = context; notifyModuleChange(this); }));
     this.mountCurrentUI();
     this.connection.connect();
   }
@@ -171,6 +179,7 @@ export class AudioRecorderElement extends WebMusicElement {
     }
     this.engine = recorder;
     this.starting = true;
+    notifyModuleChange(this);
     this.notifyUI();
     try {
       this.subscribeToEngine(recorder);
@@ -239,8 +248,10 @@ export class AudioRecorderElement extends WebMusicElement {
     if (owner) {
       try {
         // The owner pauses a previous group when this explicit audition selects a take.
-        owner.setClip(clip);
-        await owner.play();
+        // Through a linked element the audition plays via its Session.
+        const adapter = this.connection.adapter;
+        if (adapter) { adapter.clip = clip; await adapter.play(); }
+        else { owner.setClip(clip); await owner.play(); }
       } catch (error) { if (this.owner === owner) this.reportOperationError(error); }
       if (this.owner === owner) this.notifyUI();
       return;
@@ -263,7 +274,10 @@ export class AudioRecorderElement extends WebMusicElement {
   /** Stop take playback and release its player. */
   stopPlayback(): void {
     if (this.owner) {
-      if (this.owner.clip === this.lastTake && !this.owner.transport) this.owner.stop();
+      if (this.owner.clip === this.lastTake && !this.owner.transport) {
+        const adapter = this.connection.adapter;
+        if (adapter) adapter.stop(); else this.owner.stop();
+      }
       this.notifyUI();
       return;
     }
@@ -347,6 +361,9 @@ export class AudioRecorderElement extends WebMusicElement {
         : {}),
       ...(requestedRate ? {sampleRate: requestedRate} : {}),
       ...(maxSeconds ? {maxRecordedFrames: Math.max(1, Math.ceil(maxSeconds * rate))} : {}),
+      // Inside a module scope the microphone borrows the scope's context, so
+      // it can be patched into that scope's effects and analysers (DEC-068).
+      ...(this.moduleScope && !requestedRate ? {audioContext: () => this.moduleScope!.audio.prepare() as AudioContext} : {}),
     };
   }
 
@@ -467,6 +484,7 @@ export class AudioRecorderElement extends WebMusicElement {
     const offFns = this.offFns;
     this.offFns = [];
     this.engine = undefined;
+    notifyModuleChange(this);
     this.capturing = false;
     this.starting = false;
     this.currentLevel = 0;

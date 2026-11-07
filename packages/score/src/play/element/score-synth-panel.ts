@@ -1044,7 +1044,12 @@ export class SynthPanelElement extends WebMusicElement {
         }
         if (name === 'lfo' && host) { this.wireAttachedLfo(host); continue; }
         if (name === 'macros' && host) { this.wireAttachedMacros(host); continue; }
-        if (host) host.textContent = 'This module does not expose this control capability.';
+        // The shared status presenter (DEC-052) reports an unsupported capability.
+        if (host) {
+          this.sectionStatuses.push(mountStatus(host, {
+            snapshot: () => ({kind: 'empty', message: 'This module does not expose this control capability.'}),
+          }, {classNames: {root: 'wui-status--embedded'}, onError: (error) => this.reportLfoError(error)}));
+        }
       }
       return false;
     }

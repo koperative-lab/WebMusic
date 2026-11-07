@@ -92,7 +92,6 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'off — no warm-up until the first play',
         note: 'Warms context, graph and decoded buffer on mount; an editor binding warms after its first applied revision. `preload="none"` opts out, as on <audio>.',
       },
-      {name: 'composition', kind: 'enum', options: ['modules'], fallback: 'legacy', note: 'Opt in to explicit module scope, shared audio environment and Session transport; configure before connecting.'},
       {name: 'session', kind: 'enum', options: ['local'], fallback: 'inherit', note: 'Create an independent Session boundary instead of borrowing the nearest module Session.'},
     ],
     properties: [
@@ -242,7 +241,6 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'no solo',
         note: 'Id of the member to solo, applied in place. Removing the attribute clears the solo rather than freezing it.',
       },
-      {name: 'composition', kind: 'enum', options: ['modules'], fallback: 'legacy', note: 'Opt in to explicit module scope, shared audio environment and Session transport; configure before connecting.'},
       {name: 'loading', kind: 'bool', fallback: 'off', note: 'Declare application-owned asynchronous source preparation. Shows loading without replacing mixer members or transport.'},
     ],
     properties: [

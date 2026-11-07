@@ -191,7 +191,7 @@ Central play/pause, seek and time controls for a selected audio clip, playlist o
 
 - Behavior/data collaboration: AudioPlayer + selected clip/queue/mix backend.
 - Reviewed UI composition: `@webmusic/ui/transport`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `loading`, `format`, `controls`, `loop`, `engine`, `preserves-pitch`, `volume`, `rate`, `pan`, `preload`, `composition`, `session`
+- Attribute controls: `src`, `loading`, `format`, `controls`, `loop`, `engine`, `preserves-pitch`, `volume`, `rate`, `pan`, `preload`, `session`
 - Properties and methods: `module`, `sessionTransport`, `loading`, `loadError`, `editor`, `source`, `documentBinding`, `waitForDocumentRevision()`, `retryDocumentApplication()`, `clip`, `player`, `effect`, `audioContext`, `clock`, `analyser`, `beginScratch()`, `scratching`
 - Events: `webaudio:loadstatechange`, `webaudio:sourcechange`, `webaudio:documentstatechange`, `webaudio:playerchange`, `webaudio:statechange`, `webaudio:timeupdate`, `webaudio:loaded`, `webaudio:end`, `webaudio:seek`, `webaudio:regionenter`, `webaudio:regionleave`, `webaudio:beat`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-player.mdx>) · [Element source](<../packages/audio/src/play/element/audio-player.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)
@@ -213,7 +213,7 @@ A mixer companion for audio-player, with master/member volume, mute and solo.
 
 - Behavior/data collaboration: AudioMixer.
 - Reviewed UI composition: `@webmusic/ui/mixer`.
-- Attribute controls: `player`, `master-volume`, `autoplay`, `solo`, `composition`, `loading`
+- Attribute controls: `player`, `master-volume`, `autoplay`, `solo`, `loading`
 - Properties and methods: `module`, `loading`, `player`, `mixer`, `members`, `audioContext`, `destination`, `masterVolume`
 - Events: `webaudio:end`, `webaudio:memberend`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-mixer.mdx>) · [Element source](<../packages/audio/src/play/element/audio-mixer.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)

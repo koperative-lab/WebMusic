@@ -46,7 +46,7 @@ The spectrum is a sampled FFT display, not calibrated sound pressure.
   import '@webmusic/audio/analyze/auto';
 </script>
 
-<score-player composition="modules" controls="show" time-control="full">
+<score-player controls="show" time-control="full">
   <score-rack-control id="desk" master mute solo>
     <score-player src="/midi/Arabesque%20No.1.mid"></score-player>
     <audio-player src="/wav/Arabesque%20No.1.wav"></audio-player>
@@ -61,8 +61,8 @@ The spectrum is a sampled FFT display, not calibrated sound pressure.
 <audio-spectrum-analyzer input="#desk" port="master"></audio-spectrum-analyzer>
 ```
 
-Use your site's base path for asset URLs. `composition="modules"` opts the outer
-player into module scope; ordinary layout wrappers preserve that scope. A child
+Use your site's base path for asset URLs. Every player is a module scope and the
+outer one owns the Session; ordinary layout wrappers preserve that scope. A child
 with `session="local"` establishes an independent Session boundary. Configure
 scope before connecting a playing composition; moving a running engine between
 authorities is not a silent handoff.

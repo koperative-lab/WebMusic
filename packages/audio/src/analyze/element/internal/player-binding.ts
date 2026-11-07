@@ -1,7 +1,6 @@
 import {observeElementTarget, type ElementTargetState} from '@webmusic/kernel/element';
 import type {AudioClip} from '../../../core';
 import type {ModuleHandle} from '@webmusic/kernel/module';
-import {isModularComposition} from '@webmusic/kernel/element';
 import {bindModuleAudioInput} from '../../../play/element/internal/module-input';
 
 export interface AnalysisPlayerTarget extends Element {
@@ -58,7 +57,7 @@ export function bindAnalysisPlayer(
   assigned?: ModuleHandle | null,
   isCurrent: () => boolean = () => true,
 ): () => void {
-  if (assigned !== undefined || host.hasAttribute('input') || (!host.hasAttribute('player') && isModularComposition(host))) {
+  if (assigned !== undefined || host.hasAttribute('input') || !host.hasAttribute('player')) {
     return bindModuleAudioInput(host, assigned, ({analyser, error}) => {
       const target = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
       onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, loading: false, empty: false, state: analyser ? 'ready' : 'unbound'});

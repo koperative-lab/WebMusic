@@ -9,6 +9,9 @@
 
 import {EventEmitter, createAudioClip, type AudioClip} from '../../core';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
+import {AudioOutputPort, type ModuleHandle} from '@webmusic/kernel/module';
+
+let recorderModuleSequence = 0;
 
 export interface AudioRecorderOptions {
   deviceId?: string;
@@ -19,6 +22,12 @@ export interface AudioRecorderOptions {
   maxRecordedFrames?: number;
   /** Maximum retained Float32 PCM bytes across channels. Default 256 MiB. */
   maxRecordedBytes?: number;
+  /**
+   * Capture in a borrowed context (for example a module scope's) instead of
+   * creating one per take, so the microphone can be routed through effects
+   * and analysers of that scope. A borrowed context is never closed.
+   */
+  audioContext?: AudioContext | (() => AudioContext);
 }
 
 export interface AudioRecorderEvents {
@@ -31,6 +40,24 @@ export interface AudioRecorderEvents {
 export class AudioRecorder {
   private readonly options: AudioRecorderOptions;
   private readonly emitter = new EventEmitter<AudioRecorderEvents>();
+  private port?: AudioOutputPort;
+  private readonly moduleListeners = new Set<() => void>();
+  /** The microphone as a module: its `output` port exists while capturing. */
+  readonly module: ModuleHandle = {
+    id: `audio-recorder-${++recorderModuleSequence}`,
+    getPort: (name) => name === 'output' || name === 'main' ? this.port : undefined,
+    ports: () => this.port ? [this.port] : [],
+    subscribe: (listener) => { this.moduleListeners.add(listener); return () => { this.moduleListeners.delete(listener); }; },
+  };
+
+  /** Microphone output while capturing; patch it into effects, mixers or analysers. */
+  get outputPort(): AudioOutputPort | undefined { return this.port; }
+
+  private notifyModule(): void {
+    for (const listener of [...this.moduleListeners]) {
+      try { listener(); } catch { /* observers cannot undo device state */ }
+    }
+  }
 
   private context: AudioContext | null = null;
   private stream: MediaStream | null = null;
@@ -131,7 +158,8 @@ export class AudioRecorder {
         throw new Error('AudioRecorder start was cancelled');
       }
 
-      context = createWebAudioContext(
+      const borrowed = this.options.audioContext;
+      context = borrowed ? (typeof borrowed === 'function' ? borrowed() : borrowed) : createWebAudioContext(
         'AudioContext is not available in this environment',
         this.options.sampleRate ? {sampleRate: this.options.sampleRate} : undefined,
       );
@@ -197,6 +225,9 @@ export class AudioRecorder {
       this.stream = stream;
       this.context = context;
       this.source = source;
+      // The microphone as a module source: no default route, so it never
+      // reaches the speakers unless a consumer patches it (DEC-068).
+      this.port = new AudioOutputPort(source, {id: 'output'});
       this.analyser = analyser;
       this.processor = processor;
       this.sampleRate = context.sampleRate;
@@ -209,6 +240,7 @@ export class AudioRecorder {
       }
       if (context.state !== 'running') throw new Error('AudioRecorder context did not start');
       this.state = 'recording';
+      this.notifyModule();
       this.emitter.emit('start', undefined);
     } catch (error) {
       // A start listener can throw after the resources have been published.
@@ -219,7 +251,7 @@ export class AudioRecorder {
           this.teardown();
         }
       } else {
-        cleanupRecorderResources({stream, context, source, analyser, processor});
+        cleanupRecorderResources({stream, context, source, analyser, processor, ownsContext: !this.options.audioContext});
       }
       throw error;
     }
@@ -287,13 +319,18 @@ export class AudioRecorder {
   }
 
   private teardown(): void {
+    const port = this.port;
+    this.port = undefined;
+    try { port?.dispose(); } catch { /* continue releasing the device */ }
     cleanupRecorderResources({
       stream: this.stream,
       context: this.context,
       source: this.source,
       analyser: this.analyser,
       processor: this.processor,
+      ownsContext: !this.options.audioContext,
     });
+    this.notifyModule();
     this.processor = null;
     this.source = null;
     this.analyser = null;
@@ -325,6 +362,8 @@ interface RecorderResources {
   source: MediaStreamAudioSourceNode | null;
   analyser: AnalyserNode | null;
   processor: ScriptProcessorNode | null;
+  /** A borrowed context stays open for its owner. */
+  ownsContext: boolean;
 }
 
 function cleanupRecorderResources(resources: RecorderResources): void {
@@ -359,7 +398,7 @@ function cleanupRecorderResources(resources: RecorderResources): void {
       /* continue stopping the remaining tracks */
     }
   }
-  if (resources.context) {
+  if (resources.context && resources.ownsContext) {
     try {
       void resources.context.close().catch(() => {});
     } catch {

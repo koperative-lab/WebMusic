@@ -141,7 +141,8 @@ export interface ModuleSession {
   register(transport: SyncFollowerTransport, options: SessionParticipantOptions): SessionParticipantLease;
   holdPendingSource(): SessionPendingSourceLease;
   dispatch(command: TransportCommand): Promise<TransportCommit>;
-  play(): Promise<TransportCommit>;
+  /** Start; `when` (reference-clock time) defers the shared start origin to no earlier than it. */
+  play(when?: number): Promise<TransportCommit>;
   pause(): Promise<TransportCommit>;
   stop(): Promise<TransportCommit>;
   seek(position: number): Promise<TransportCommit>;
@@ -172,6 +173,7 @@ export class SessionTransport implements ModuleSession {
   readonly #listeners = new Set<(event: SessionTransportEvent) => void>();
   readonly #range: Readonly<SyncLoopRegion> | null;
   readonly #leadIn: number;
+  #requestedStart?: number;
   #membershipRevision = 0;
   #generation = 0;
   #ended = false;
@@ -419,7 +421,18 @@ export class SessionTransport implements ModuleSession {
     this.#assertActive();
     return this.#group.dispatch(command).then(commit => Object.freeze({...commit, snapshot: this.#extend(commit.snapshot)}));
   }
-  play(): Promise<TransportCommit> { return this.dispatch({type: 'play'}); }
+  /**
+   * Start every participant from one shared origin. With `when` (a time on the
+   * Session's reference clock) the origin is no earlier than `when`, so a
+   * caller can schedule a start; an expired `when` starts after the lead-in.
+   */
+  play(when?: number): Promise<TransportCommit> {
+    if (when !== undefined) {
+      if (!Number.isFinite(when)) return Promise.reject(new RangeError('Session start time must be finite.'));
+      this.#requestedStart = when;
+    }
+    return this.dispatch({type: 'play'});
+  }
   pause(): Promise<TransportCommit> { return this.dispatch({type: 'pause'}); }
   stop(): Promise<TransportCommit> { return this.dispatch({type: 'stop'}); }
   seek(position: number): Promise<TransportCommit> { return this.dispatch({type: 'seek', position}); }
@@ -477,7 +490,9 @@ export class SessionTransport implements ModuleSession {
     const time = this.#now();
     const position = this.#ended ? this.#range?.startSeconds ?? 0 : this.#clock.positionAt(time);
     this.#ended = false;
-    this.#clock.startAt(time + this.#leadIn, position);
+    const requested = this.#requestedStart;
+    this.#requestedStart = undefined;
+    this.#clock.startAt(Math.max(time + this.#leadIn, requested ?? -Infinity), position);
     // A queued newer seek/rate/loop command owns the next scheduling commit.
     // The clock may be prepared for it, but old play work must not arm voices.
     if (epoch === this.#scheduling.epoch) this.#scheduling.anchor();

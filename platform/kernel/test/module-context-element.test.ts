@@ -83,11 +83,12 @@ describe('module context discovery', () => {
     expect(observed).toHaveBeenCalledTimes(count);
   });
 
-  it('does not turn an unrelated legacy custom layout wrapper into a modular boundary', () => {
+  it('does not turn an undefined custom layout wrapper outside any provider into a boundary', () => {
     const layout = document.createElement('unregistered-layout-wrapper');
     const child = document.createElement('span');
     layout.append(child); document.body.append(layout);
-    expect(isModularComposition(child)).toBe(false);
+    // Every Element composes through modules (DEC-068).
+    expect(isModularComposition(child)).toBe(true);
     expect(hasModuleContextBoundary(child)).toBe(false);
     expect(getModuleContextState(child)).toBe('missing');
   });

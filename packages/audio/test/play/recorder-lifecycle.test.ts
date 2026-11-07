@@ -335,3 +335,27 @@ describe('AudioRecorder context readiness and channel energy', () => {
     expect([...clip.channelData(1)!]).toEqual([0.5, 0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5]);
   });
 });
+
+describe('AudioRecorder as a module source', () => {
+  it('captures in a borrowed context, exposes the microphone port and never closes the context', async () => {
+    vi.stubGlobal('navigator', {mediaDevices: {getUserMedia: vi.fn(async () => fakeStream())}});
+    const contexts = installAudioContext();
+    const shared = new (globalThis as unknown as {AudioContext: new () => AudioContext}).AudioContext();
+    const recorder = new AudioRecorder({audioContext: () => shared});
+    const changes = vi.fn();
+    recorder.module.subscribe!(changes);
+    expect(recorder.outputPort).toBeUndefined();
+    await recorder.start();
+    expect(contexts).toHaveLength(1);
+    const port = recorder.outputPort!;
+    expect(port.id).toBe('output');
+    expect(port.defaultDestination).toBeUndefined();
+    expect(recorder.module.getPort!('output')).toBe(port);
+    expect(recorder.module.ports!()).toEqual([port]);
+    expect(changes).toHaveBeenCalled();
+    recorder.dispose();
+    expect(port.readiness).toBe('detached');
+    expect(recorder.outputPort).toBeUndefined();
+    expect(shared.close).not.toHaveBeenCalled();
+  });
+});

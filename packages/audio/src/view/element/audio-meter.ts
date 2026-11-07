@@ -44,7 +44,6 @@ import {
 } from '../render/meter-display';
 import type {AudioCanvasFrame} from '../render/overview';
 import {WebMusicElement, cssSizeAttr, numAttr, upgradeProperties} from './internal/base';
-import {isModularComposition} from '@webmusic/kernel/element';
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import {bindModuleAudioInput} from '../../play/element/internal/module-input';
 
@@ -592,7 +591,7 @@ export class AudioMeterElement extends WebMusicElement {
   private usesModuleInput(): boolean {
     return !this.explicitPlayer && (
       this.assignedModule !== undefined || this.hasAttribute('input') ||
-      (!this.hasAttribute('player') && isModularComposition(this))
+      !this.hasAttribute('player')
     );
   }
 

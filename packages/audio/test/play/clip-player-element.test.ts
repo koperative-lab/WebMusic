@@ -432,8 +432,10 @@ describe('<audio-player>', () => {
     element.setAttribute('loop', '9,10');
     expect(errors).toHaveLength(1);
     expect(errors[0]).toBeInstanceOf(RangeError);
+    // A seek reaches the playing engine through the Session, folded into the loop.
     element.seek(7);
-    expect(element.seconds).toBe(3);
+    await flush();
+    expect(element.seconds).toBeCloseTo(3, 1);
   });
 
   it('selects an explicit clip on a borrowed central owner before mount', () => {
@@ -462,11 +464,12 @@ describe('<audio-player>', () => {
     const before = element.currentTime;
     expect(before).toBeCloseTo(3, 6);
 
-    const setLoop = vi.spyOn(player!, 'setLoop');
     element.setAttribute('loop', '2,6');
+    await flush();
 
+    // The loop is the player's Session loop (DEC-068); the engine stays.
     expect(element.player).toBe(player);
-    expect(setLoop).toHaveBeenCalledWith({start: 2, end: 6});
+    expect(element.sessionTransport!.snapshot.loop).toEqual({startSeconds: 2, endSeconds: 6});
     expect(element.currentTime).toBeCloseTo(before, 6);
   });
 
@@ -551,11 +554,10 @@ describe('<audio-player>', () => {
   it('forwards a scheduled start time to the player', async () => {
     const element = mount();
     element.clip = clip();
-    const play = vi.spyOn(element.player!, 'play').mockResolvedValue();
-
+    // The start time defers the player's Session origin (DEC-068).
     await element.play(2.5);
 
-    expect(play).toHaveBeenCalledWith(2.5);
+    expect(element.sessionTransport!.clock.state.originTime).toBe(2.5);
   });
 
   it('warms the first-play path when preload is set', async () => {
@@ -568,7 +570,7 @@ describe('<audio-player>', () => {
     expect(contexts[0]!.createAnalyser).toHaveBeenCalled();
   });
 
-  it('reconciles attributes changed while disconnected on the next mount', () => {
+  it('reconciles attributes changed while disconnected on the next mount', async () => {
     const element = mount({}, 'probe-clip-player');
     element.clip = clip(4);
     element.remove();
@@ -580,8 +582,10 @@ describe('<audio-player>', () => {
 
     const options = built.at(-1);
     expect(options?.volume).toBe(0.25);
-    expect(options?.rate).toBe(1.5);
-    expect(options?.loop).toBe(true);
+    // Rate and loop are the player's Session state (DEC-068).
+    await flush();
+    expect(element.sessionTransport!.snapshot.rate).toBe(1.5);
+    expect(element.sessionTransport!.snapshot.loop).toEqual({startSeconds: 0, endSeconds: 4});
   });
 
   it('reloads a src that changed while disconnected', async () => {
@@ -613,16 +617,17 @@ describe('<audio-player>', () => {
     external.dispose();
   });
 
-  it('applies volume and rate to a borrowed player it does not own', () => {
+  it('applies volume and rate to a borrowed player it does not own', async () => {
     const element = mount({volume: '0.4', rate: '1.5'});
     const external = new AudioPlayer(clip());
     const setVolume = vi.spyOn(external, 'setVolume');
-    const setRate = vi.spyOn(external, 'setRate');
     const dispose = vi.spyOn(external, 'dispose');
 
     element.player = external;
     expect(setVolume).toHaveBeenCalledWith(0.4);
-    expect(setRate).toHaveBeenCalledWith(1.5);
+    // A borrowed player joins this element's Session, which carries the rate.
+    await flush();
+    expect(element.sessionTransport!.snapshot.rate).toBe(1.5);
 
     element.setAttribute('volume', '0.9');
     expect(setVolume).toHaveBeenLastCalledWith(0.9);

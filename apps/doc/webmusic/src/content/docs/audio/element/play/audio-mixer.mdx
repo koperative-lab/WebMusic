@@ -40,8 +40,9 @@ canceling work and displaying external preparation failures.
 
 ## Module bus composition
 
-`composition="modules"`, or inheritance from a module provider, makes this desk
-an explicit audio bus. `.module` exposes its mixer capability, `master` output
+Without an explicit `player=` link this desk is a module audio bus (DEC-068); an
+outermost desk owns the Session its members join, and members declared through
+`.members` play as one participant of it. `.module` exposes its mixer capability, `master` output
 and insert chain. Child outputs are admitted through routing leases and their
 existing Session passes through unchanged: mixer admission is not transport
 registration. Effects declared directly under this desk own master insert slots.
@@ -50,8 +51,8 @@ in place and channel levels, mutes and solo are kept. A new admission, Session o
 audio environment rebuilds the desk and re-admits its children.
 
 Use `input="#desk" port="master"` on an Audio analyzer to tap the mixed output.
-Reading `.module` does not prepare an AudioContext. Legacy player/mixer linking
-remains a separate supported mode. See [modular composition](/bridge/modular-composition/).
+Reading `.module` does not prepare an AudioContext. With `player=` or `.player`
+the desk is instead that player's mix backend. See [modular composition](/bridge/modular-composition/).
 
 
 <details class="component-section">

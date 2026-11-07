@@ -361,10 +361,11 @@ describe('<audio-mixer>', () => {
     element.masterVolume = 0.6;
     element.members = [{id: 'stem', clip: clip()}];
 
-    expect(element.built).toHaveLength(1);
-    expect(element.built[0]!.audioContext).toBe(shared);
-    expect(element.built[0]!.destination).toBe(sink);
-    expect(element.built[0]!.masterVolume).toBe(0.6);
+    // Each configuration change rebuilds the module desk; the current one
+    // carries every setting.
+    expect(element.built.at(-1)!.audioContext).toBe(shared);
+    expect(element.built.at(-1)!.destination).toBe(sink);
+    expect(element.built.at(-1)!.masterVolume).toBe(0.6);
     // One page, one clock: the desk must not have minted a second context.
     expect(contexts).toHaveLength(1);
 

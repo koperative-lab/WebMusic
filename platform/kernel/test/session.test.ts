@@ -556,3 +556,18 @@ describe('participant timing reports', () => {
     session.dispose();
   });
 });
+
+describe('scheduled Session starts', () => {
+  it('defers the shared origin to a requested start time and rejects a non-finite one', async () => {
+    let time = 0;
+    const session = new SessionTransport(() => time, {leadInSeconds: 0.05, driftCheckIntervalMs: 0});
+    await expect(session.play(Number.NaN)).rejects.toThrow(/finite/);
+    await session.play(2);
+    expect(session.clock.state.originTime).toBe(2);
+    await session.pause();
+    time = 10;
+    await session.play(1);
+    expect(session.clock.state.originTime).toBeCloseTo(10.05);
+    session.dispose();
+  });
+});

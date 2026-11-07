@@ -150,12 +150,24 @@ describe('Audio Player Element source recovery', () => {
     expect(element.player).toBeUndefined(); expect(element.clip).toBe(data);
     expect(details.at(-1)).toMatchObject({kind: 'clip', clip: data}); expect(element.source).toMatchObject({kind: 'clip', clip: data});
   });
+  it('plays an editor document as a Session participant through the module output (MOD-14)', async () => {
+    const source = editor(); const ctx = context(); const element = document.createElement('audio-player') as AudioPlayerElement;
+    element.audioContext = ctx; element.editor = source; document.body.append(element);
+    expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied'); await flush();
+    expect(element.sessionTransport!.snapshot.participantCount).toBe(1);
+    expect(element.player!.outputPort).toBeDefined();
+    expect(element.module!.getPort!('output')).toBe(element.player!.outputPort);
+    expect(() => element.player!.setEffect(undefined)).not.toThrow();
+    expect(element.player!.insertChain).toBeDefined();
+  });
   it('preloads an editor-bound sequence after its first applied revision', async () => {
     const source = editor(); const ctx = context(); const element = document.createElement('audio-player') as AudioPlayerElement;
     element.setAttribute('preload', ''); element.audioContext = ctx; element.editor = source; document.body.append(element);
     expect(ctx.createGain).not.toHaveBeenCalled();
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied'); await flush();
-    expect(ctx.createGain).toHaveBeenCalledOnce(); expect(ctx.createBuffer).toHaveBeenCalled(); expect(ctx.resume).not.toHaveBeenCalled();
+    // The sequence gain plus the player's own insert chain (input and output):
+    // document playback goes through the module output (MOD-14).
+    expect(ctx.createGain).toHaveBeenCalledTimes(3); expect(ctx.createBuffer).toHaveBeenCalled(); expect(ctx.resume).not.toHaveBeenCalled();
   });
   it('rebinds once a rejected preserves-pitch setting is removed', async () => {
     const source = editor(); const element = document.createElement('audio-player') as AudioPlayerElement; const errors: unknown[] = [];

@@ -1,7 +1,23 @@
+import {observeModuleContext} from '@webmusic/kernel/element';
+import {createCapabilityKey} from '@webmusic/kernel/module';
 import type {AudioPlayer} from '../../headless/audio-player';
 
 /** Borrow a Headless owner directly, or its canonical browser adapter. */
 export type AudioPlayerTarget = AudioPlayer | {readonly player?: AudioPlayer};
+
+/**
+ * Lent by an `<audio-player>` scope: the player that nested companions
+ * (playlist queue, recorder audition) attach to. Discovery goes through the
+ * module context, not a tag lookup (DEC-068).
+ */
+/** The element surface a companion commands instead of the Headless owner. */
+export interface AudioPlayerAdapter {
+  clip?: unknown;
+  play(): Promise<void>;
+  stop(): void;
+}
+
+export const AUDIO_PLAYER_OWNER = createCapabilityKey<AudioPlayerTarget>('audio.player-owner');
 
 function resolveOwner(value: AudioPlayerTarget | undefined): AudioPlayer | undefined {
   if (!value) return undefined;
@@ -20,17 +36,34 @@ export class AudioPlayerConnection {
   private active = false;
   private generation = 0;
   private waitingTag?: string;
+  private contextOwner?: AudioPlayerTarget;
+  private stopContext?: () => void;
 
   constructor(
     private readonly host: HTMLElement,
     private readonly changed: (owner: AudioPlayer | undefined) => void,
     private readonly failed: (error: unknown) => void,
+    /** Attach to the enclosing player's scope without an explicit link. */
+    private readonly implicit = true,
   ) {}
 
+  /** A `player` attribute or an assigned object links explicitly. */
+  get explicit(): boolean { return this.assigned !== undefined || this.host.hasAttribute('player'); }
+
   get player(): AudioPlayer | undefined { return this.owner; }
+
+  /**
+   * The linked browser adapter (an `<audio-player>`), when the link resolved
+   * through one. Commands sent to it reach its Session; commands sent to the
+   * Headless owner directly would bypass it (DEC-068).
+   */
+  get adapter(): AudioPlayerAdapter | undefined {
+    const target = this.target as Partial<AudioPlayerAdapter> | undefined;
+    return target && target !== this.owner && typeof target.play === 'function' && typeof target.stop === 'function'
+      && 'clip' in target ? target as AudioPlayerAdapter : undefined;
+  }
   get requested(): boolean {
-    return this.assigned !== undefined || this.host.hasAttribute('player') ||
-      !!this.host.parentElement?.closest('audio-player');
+    return this.explicit || (this.implicit && this.contextOwner !== undefined);
   }
 
   set(value: AudioPlayerTarget | undefined): void {
@@ -46,6 +79,12 @@ export class AudioPlayerConnection {
       this.observer = new MutationObserver(() => this.refresh());
       this.observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ['id']});
     }
+    if (this.implicit) {
+      this.stopContext = observeModuleContext(this.host, (context) => {
+        this.contextOwner = context?.capabilities.get(AUDIO_PLAYER_OWNER);
+        this.refresh();
+      });
+    }
     this.refresh();
   }
 
@@ -55,6 +94,9 @@ export class AudioPlayerConnection {
     this.waitingTag = undefined;
     this.observer?.disconnect();
     this.observer = undefined;
+    this.stopContext?.();
+    this.stopContext = undefined;
+    this.contextOwner = undefined;
     this.listen(undefined);
     this.commit(undefined);
   }
@@ -74,8 +116,8 @@ export class AudioPlayerConnection {
         this.failed(error);
         return;
       }
-    } else if (!target && !selector) {
-      target = this.host.parentElement?.closest('audio-player') as unknown as AudioPlayerTarget | undefined;
+    } else if (!target && !selector && this.implicit) {
+      target = this.contextOwner;
     }
     this.listen(target);
     this.commit(resolveOwner(target));

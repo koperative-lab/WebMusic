@@ -22,7 +22,8 @@ import type {PlayerLike} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
 import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
 import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, moduleScopeChange, routeModuleOutput, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
-import {isModularComposition, provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {SessionTransport, type ModuleSession, type SessionParticipantLease} from '@webmusic/kernel/session';
 import {
   WebMusicElement,
   boolAttr,
@@ -57,14 +58,15 @@ let mixerElementSequence = 0;
 
 export class AudioMixerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'master-volume', 'autoplay', 'solo', 'composition', 'loading'];
+    return ['player', 'master-volume', 'autoplay', 'solo', 'loading'];
   }
 
   protected root?: ShadowRoot;
   private _mixer?: AudioMixer;
   private owner?: AudioPlayer;
+  // A nested mixer is a Rack, so only an explicit link makes it a backend.
   private readonly connection = new AudioPlayerConnection(
-    this, (player) => this.attachPlayer(player), (error) => this.onMixerError(error),
+    this, (player) => this.attachPlayer(player), (error) => this.onMixerError(error), false,
   );
   private ownsMixer = false;
   private memberSpecs?: AudioMixerMemberSpec[];
@@ -86,6 +88,11 @@ export class AudioMixerElement extends WebMusicElement {
   private moduleRoute?: ConnectionLease;
   private moduleHandle?: ModuleHandle;
   private moduleReleases: Array<() => void> = [];
+  private ownedSession?: SessionTransport;
+  private mixParticipant?: SessionParticipantLease;
+  private moduleSyncedMixer?: AudioMixer;
+  /** The Session this desk owns when it is outermost; nested desks borrow. */
+  get sessionTransport(): ModuleSession | undefined { return this.moduleContext?.session; }
   get module(): ModuleHandle | undefined { return this.modular ? this.moduleHandle : undefined; }
 
   protected override onMount(): void {
@@ -93,7 +100,9 @@ export class AudioMixerElement extends WebMusicElement {
     this.own(() => { this.connection.disconnect(); this.teardown(); });
     upgradeProperties(this, PROPS);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
-    this.modular = isModularComposition(this);
+    // A mixer explicitly linked to a player (`player=` or `.player`) is that
+    // player's mix backend; otherwise it is a module Rack (DEC-068).
+    this.modular = !this.connection.explicit;
     if (this.modular) this.mountModules();
     if (!this._mixer && this.memberSpecs?.length) this.buildOwnedMixer();
     this.attach();
@@ -105,17 +114,14 @@ export class AudioMixerElement extends WebMusicElement {
    * The three attributes are live knobs, applied in place: rebuilding here
    * would restart the very stems this desk exists to keep aligned.
    */
-  attributeChangedCallback(name: string, previous: string | null, value: string | null): void {
+  attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
-    if (name === 'composition') {
-      if (previous === value) return;
-      super.disconnectedCallback();
-      super.connectedCallback();
-      notifyModuleContext(this);
-      return;
-    }
     if (name === 'loading') { this.notifyUI(); return; }
-    if (name === 'player') { this.connection.refresh(); this.render(); return; }
+    if (name === 'player') {
+      // Linking or unlinking switches between backend and Rack roles.
+      if (this.modular === this.connection.explicit) { this.remount(); return; }
+      this.connection.refresh(); this.render(); return;
+    }
     if (name === 'master-volume') {
       this.applyMasterVolume(numAttr(this, 'master-volume', 1, 0));
     } else if (name === 'solo') {
@@ -131,7 +137,15 @@ export class AudioMixerElement extends WebMusicElement {
   /** Borrow the central owner; the desk supplies its existing mixer backend. */
   set player(player: AudioPlayerTarget | undefined) {
     this.connection.set(player);
-    if (this.isConnected) this.render();
+    if (!this.isConnected) return;
+    if (this.modular === this.connection.explicit) { this.remount(); return; }
+    this.render();
+  }
+
+  private remount(): void {
+    super.disconnectedCallback();
+    super.connectedCallback();
+    notifyModuleContext(this);
   }
   get player(): AudioPlayer | undefined { return this.connection.player; }
 
@@ -213,6 +227,9 @@ export class AudioMixerElement extends WebMusicElement {
 
   /** Seek every member to the same position; the mixer re-aligns them. */
   seek(seconds: number): void {
+    // A paused declared mix shows the new position at once; the Session
+    // commit applies it to every participant.
+    if (this.mixParticipant?.active && this._mixer && !this._mixer.playing) this._mixer.seek(seconds);
     if (this.modular && this.moduleContext?.session) void this.moduleContext.session.seek(seconds).catch((error: unknown) => this.onMixerError(error));
     else if (this.owner) this.owner.seek(seconds);
     else if (!this.connection.requested) this._mixer?.seek(seconds);
@@ -276,7 +293,13 @@ export class AudioMixerElement extends WebMusicElement {
         this.notifyUI();
       },
       setSolo: (id) => this.applySolo(id),
-      ...(!this.modular && !this.connection.requested ? {
+      // An outermost desk commands the Session it owns; a nested desk has no
+      // transport of its own.
+      ...(this.ownedSession ? {
+        play: async () => { await this.ownedSession?.play(); this.notifyUI(); },
+        pause: () => { void this.ownedSession?.pause().catch((error: unknown) => this.onMixerError(error)); this.notifyUI(); },
+        stop: () => { void this.ownedSession?.stop().catch((error: unknown) => this.onMixerError(error)); this.notifyUI(); },
+      } : !this.modular && !this.connection.requested ? {
         play: async () => { await mixer?.play(); this.notifyUI(); },
         pause: () => { mixer?.pause(); this.notifyUI(); },
         stop: () => { mixer?.stop(); this.notifyUI(); },
@@ -324,6 +347,8 @@ export class AudioMixerElement extends WebMusicElement {
       this.moduleRegistration?.release(); this.moduleRegistration = undefined;
       this.detach();
       this.moduleRegistry?.dispose();
+      try { this.ownedSession?.dispose(); } catch (error) { this.onMixerError(error); }
+      this.ownedSession = undefined;
       this.moduleEnvironment?.dispose();
       this.moduleEnvironment = undefined;
       this.moduleContext = undefined;
@@ -335,7 +360,15 @@ export class AudioMixerElement extends WebMusicElement {
         ...(borrowed ? {create: () => borrowed.audioContext, owned: false} : {}),
       }));
       this.moduleRegistry = new ModuleRegistry();
-      const base = parent ?? new ModuleContext({id: `audio-desk-${++mixerElementSequence}`, audio});
+      // An outermost mixer owns the Session its members join (DEC-068).
+      const base = parent?.session ? parent : (() => {
+        this.ownedSession = new SessionTransport(() => audio.peek()?.currentTime ?? 0, {
+          onOperationError: (_operation, error) => this.onMixerError(error),
+        });
+        return parent
+          ? parent.derive({id: `audio-desk-${++mixerElementSequence}`, session: this.ownedSession})
+          : new ModuleContext({id: `audio-desk-${++mixerElementSequence}`, audio, session: this.ownedSession});
+      })();
       this.moduleContext = base.derive({
         id: `audio-desk-${++mixerElementSequence}`, registry: this.moduleRegistry, target: null,
         admit: (module, port) => {
@@ -351,10 +384,14 @@ export class AudioMixerElement extends WebMusicElement {
 
   private syncModuleMixer(): void {
     const mixer = this._mixer;
-    if (!mixer || !this.moduleContext || this.moduleHandle?.id === mixer.module.id) return;
+    if (!mixer || !this.moduleContext) return;
+    const id = this.id || mixer.module.id;
+    if (this.moduleHandle?.id === id && this.moduleSyncedMixer === mixer) return;
     this.moduleRegistration?.release();
+    this.moduleSyncedMixer = mixer;
     this.moduleHandle = {
-      id: mixer.module.id,
+      // The DOM id is the module and parent channel ID when present (DEC-068).
+      id,
       get inserts() { return mixer.module.inserts; },
       getPort: (name) => mixer.module.getPort?.(name),
       prepare: () => this.prepareModuleMixer(),
@@ -413,6 +450,27 @@ export class AudioMixerElement extends WebMusicElement {
     this.subscribeMixer();
     this.render();
     if (this.modular) this.syncModuleMixer();
+    this.registerMixParticipant();
+  }
+
+  /**
+   * Members declared on this desk play as one mix; that mix joins the
+   * Session as a single (media-follower) participant so Session commands
+   * reach it (DEC-068).
+   */
+  private registerMixParticipant(): void {
+    this.mixParticipant?.release();
+    this.mixParticipant = undefined;
+    const mixer = this._mixer;
+    const session = this.moduleContext?.session;
+    if (!this.modular || !mixer || !session || !this.ownsMixer || !this.memberSpecs?.length) return;
+    try {
+      this.mixParticipant = session.register({
+        play: () => mixer.play(), pause: () => mixer.pause(), stop: () => mixer.stop(),
+        seek: (seconds) => mixer.seek(seconds),
+        get position() { return mixer.seconds; }, get running() { return mixer.playing; },
+      }, {axis: 'mix-seconds', identity: mixer, durationSeconds: () => mixer.duration, endPolicy: 'position', timing: 'media-follower'});
+    } catch (error) { this.onMixerError(error); }
   }
 
   private attachPlayer(player: AudioPlayer | undefined): void {
@@ -447,6 +505,8 @@ export class AudioMixerElement extends WebMusicElement {
   }
 
   private detach(): void {
+    try { this.mixParticipant?.release(); } catch (error) { this.onMixerError(error); }
+    this.mixParticipant = undefined;
     this.moduleRoute?.release(); this.moduleRoute = undefined;
     this.moduleRegistration?.release(); this.moduleRegistration = undefined;
     this.moduleHandle = undefined;
@@ -470,6 +530,8 @@ export class AudioMixerElement extends WebMusicElement {
     this.moduleRegistration?.release(); this.moduleRegistration = undefined;
     for (const release of this.moduleReleases.splice(0).reverse()) release();
     this.moduleRegistry?.dispose(); this.moduleRegistry = undefined;
+    try { this.ownedSession?.dispose(); } catch (error) { this.onMixerError(error); }
+    this.ownedSession = undefined;
     this.moduleEnvironment?.dispose(); this.moduleEnvironment = undefined;
     this.moduleContext = undefined; this.parentModuleContext = undefined; this.moduleHandle = undefined;
     this.detach();

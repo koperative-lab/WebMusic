@@ -68,7 +68,9 @@ describe('element compatibility style reuse', () => {
     previous.solo('vocal');
 
     element.members = undefined;
-    expect(element.mixer).toBeUndefined();
+    // A standalone mixer is a module Rack (DEC-068), so its runtime stays
+    // while the declared membership empties.
+    expect(element.mixer?.ids() ?? []).toEqual([]);
     expect(previous.ids()).toEqual([]);
     element.members = [{id: 'vocal', player, volume: 0.7}];
     expect(element.mixer).not.toBe(previous);

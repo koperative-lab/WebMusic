@@ -134,7 +134,7 @@ export class AudioPlayer {
     this.module = {
       id: `audio-player-${++audioPlayerModuleSequence}`,
       get inserts() { return readInserts(); },
-      getPort: (name) => !this.borrowed && this.selectedClip && (name === 'output' || name === 'main') ? this.port : undefined,
+      getPort: (name) => this.ownsOutput && (name === 'output' || name === 'main') ? this.port : undefined,
       prepare: () => this.preload(),
       subscribe: (listener) => {
         this.moduleListeners.add(listener);
@@ -200,8 +200,12 @@ export class AudioPlayer {
     if (source) {
       let engine: AudioSequenceEngine;
       try {
-        engine = new AudioSequenceEngine(() => this.audioContext, {...this.options,
-          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop});
+        // Document playback flows through this player's own inserts and module
+        // output, so it is routed, patched and tapped like a clip (DEC-068).
+        const engineOptions = {...this.options,
+          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop};
+        Object.defineProperty(engineOptions, 'destination', {enumerable: true, get: () => this.documentOutputInput()});
+        engine = new AudioSequenceEngine(() => this.audioContext, engineOptions);
       } catch (error) {
         // Invalid sequence limits reject this request; the same source can be retried.
         if (generation === this.documentGeneration) this.documentTarget = this.documentSource;
@@ -306,31 +310,45 @@ export class AudioPlayer {
     this.scheduling = lease;
     return lease;
   }
+  /**
+   * Whether this player owns its output chain: a selected clip or an attached
+   * document. A borrowed group (playlist, mixer) keeps its own.
+   */
+  private get ownsOutput(): boolean {
+    return !this.disposed && (!this.borrowed ? !!this.selectedClip : !!this.sequenceEngine && this.borrowed === this.sequenceEngine);
+  }
+
+  /** The input of this player's output chain, for the document sequence engine. */
+  private documentOutputInput(): AudioNode | undefined {
+    this.ensureOutput();
+    return this.inserts?.input;
+  }
+
   /** Source-local post-fader processing. A borrowed group retains its own effects. */
   setEffect(effect: Effect | undefined): void {
     if (this.disposed) return;
-    if (this.borrowed) throw new Error('Configure effects on the borrowed transport or its master bus');
+    if (this.borrowed && !this.ownsOutput) throw new Error('Configure effects on the borrowed transport or its master bus');
     this.inserts?.setCompatibility(effect);
     this.options.effect = effect;
   }
   get insertChain(): InsertChain | undefined {
-    if (this.disposed || this.borrowed || !this.selectedClip) return undefined;
+    if (!this.ownsOutput) return undefined;
     this.ensureOutput();
     return this.inserts;
   }
   /** Explicit preparation of a source output; aggregate transports have no synthetic port. */
   get outputPort(): AudioOutputPort | undefined {
-    if (this.disposed || this.borrowed || !this.selectedClip) return undefined;
+    if (!this.ownsOutput) return undefined;
     this.ensureOutput();
     return this.port;
   }
-  peekOutputPort(): AudioOutputPort | undefined { return this.borrowed || !this.selectedClip ? undefined : this.port; }
+  peekOutputPort(): AudioOutputPort | undefined { return this.ownsOutput ? this.port : undefined; }
   /** Stable owned output tap; a borrowed group exposes only its own supported tap. */
   get analyser(): AnalyserNode | undefined {
     if (this.disposed) return undefined;
+    if (this.ownsOutput) return this.ensureOutput();
     if (this.borrowed) return this.borrowed.analyser;
-    if (!this.selectedClip) return undefined;
-    return this.ensureOutput();
+    return undefined;
   }
 
   setClip(clip: AudioClip | undefined): void {
@@ -534,7 +552,7 @@ export class AudioPlayer {
     if (this.preparingOutput) throw new Error('AudioPlayer output preparation cannot re-enter');
     this.preparingOutput = true;
     const generation = this.generation;
-    const current = () => !this.disposed && generation === this.generation && !this.borrowed && !!this.selectedClip;
+    const current = () => !this.disposed && generation === this.generation && this.ownsOutput;
     let output: AnalyserNode | undefined;
     let inserts: InsertChain | undefined;
     let port: AudioOutputPort | undefined;
