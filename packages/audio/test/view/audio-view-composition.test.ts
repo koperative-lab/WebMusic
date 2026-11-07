@@ -45,6 +45,26 @@ afterEach(() => {
 });
 
 describe('<audio-view> player composition', () => {
+  it('follows the enclosing player scope without a player selector (DEC-068)', async () => {
+    const {ModuleAudioEnvironment, ModuleCapabilities, ModuleContext} = await import('@webmusic/kernel/module');
+    const {provideModuleContext} = await import('@webmusic/kernel/element');
+    const {AUDIO_PLAYER_OWNER} = await import('../../src/core');
+    mocks.waveform.mockImplementation(() => fakeVisualizer());
+    const source = playerElement('scope-player', {duration: 4, seconds: 1.5});
+    const scope = new ModuleContext({id: 'player-scope', audio: new ModuleAudioEnvironment({context: {state: 'running'} as BaseAudioContext}),
+      capabilities: new ModuleCapabilities().with(AUDIO_PLAYER_OWNER, source.element)});
+    const provider = document.createElement('section');
+    document.body.append(provider);
+    const release = provideModuleContext(provider, () => scope);
+    const view = document.createElement(TAG) as AudioViewElement;
+    view.setAttribute('interactive', '');
+    view.clip = toneClip(4);
+    provider.append(view);
+    expect(view.getAttribute('aria-valuenow')).toBe('1.5');
+    release();
+  });
+
+
   it.each(['waveform', 'spectrogram'] as const)('restores %s data at the current player time after external preparation', (type) => {
     const visualizers: FakeVisualizer[] = [];
     const renderer = type === 'waveform' ? mocks.waveform : mocks.spectrogram;

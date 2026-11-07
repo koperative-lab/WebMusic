@@ -34,7 +34,7 @@ describe('Rack part declaration lifetime', () => {
     part.removeAttribute('src');
     part.score = undefined;
     expect(part.rackPartStatus().kind).toBe('waiting');
-    expect(part.style.display).toBe('none');
+    expect(part.style.display).toBe('contents');
   });
 
   it('clears loading and publishes a failed request to the desk', async () => {

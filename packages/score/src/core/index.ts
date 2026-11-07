@@ -116,3 +116,5 @@ export {
   type KeySignatureChange,
   type TimePosition,
 } from './compat';
+
+export {SCORE_PLAYBACK_OWNER, type ScorePlaybackOwner} from './playback-owner';

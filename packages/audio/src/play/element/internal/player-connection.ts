@@ -1,15 +1,10 @@
 import {observeModuleContext} from '@webmusic/kernel/element';
-import {createCapabilityKey} from '@webmusic/kernel/module';
 import type {AudioPlayer} from '../../headless/audio-player';
+import {AUDIO_PLAYER_OWNER} from '../../../core/player-owner';
 
 /** Borrow a Headless owner directly, or its canonical browser adapter. */
 export type AudioPlayerTarget = AudioPlayer | {readonly player?: AudioPlayer};
 
-/**
- * Lent by an `<audio-player>` scope: the player that nested companions
- * (playlist queue, recorder audition) attach to. Discovery goes through the
- * module context, not a tag lookup (DEC-068).
- */
 /** The element surface a companion commands instead of the Headless owner. */
 export interface AudioPlayerAdapter {
   clip?: unknown;
@@ -17,7 +12,7 @@ export interface AudioPlayerAdapter {
   stop(): void;
 }
 
-export const AUDIO_PLAYER_OWNER = createCapabilityKey<AudioPlayerTarget>('audio.player-owner');
+export {AUDIO_PLAYER_OWNER};
 
 function resolveOwner(value: AudioPlayerTarget | undefined): AudioPlayer | undefined {
   if (!value) return undefined;
@@ -81,7 +76,7 @@ export class AudioPlayerConnection {
     }
     if (this.implicit) {
       this.stopContext = observeModuleContext(this.host, (context) => {
-        this.contextOwner = context?.capabilities.get(AUDIO_PLAYER_OWNER);
+        this.contextOwner = context?.capabilities.get(AUDIO_PLAYER_OWNER) as AudioPlayerTarget | undefined;
         this.refresh();
       });
     }

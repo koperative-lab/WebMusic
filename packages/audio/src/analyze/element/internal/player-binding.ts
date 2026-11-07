@@ -1,6 +1,6 @@
-import {observeElementTarget, type ElementTargetState} from '@webmusic/kernel/element';
+import {observeElementTarget, observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
 import type {AudioClip} from '../../../core';
-import type {ModuleHandle} from '@webmusic/kernel/module';
+import type {ModuleHandle, TransportPort, TransportPortSnapshot} from '@webmusic/kernel/module';
 import {bindModuleAudioInput} from '../../../play/element/internal/module-input';
 
 export interface AnalysisPlayerTarget extends Element {
@@ -58,9 +58,33 @@ export function bindAnalysisPlayer(
   isCurrent: () => boolean = () => true,
 ): () => void {
   if (assigned !== undefined || host.hasAttribute('input') || !host.hasAttribute('player')) {
-    return bindModuleAudioInput(host, assigned, ({analyser, error}) => {
-      const target = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
-      onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, loading: false, empty: false, state: analyser ? 'ready' : 'unbound'});
+    // A tap follows the scope's Session transport so seek, pause and end
+    // reset history as they do for a linked player (DEC-068).
+    let tapped: AnalysisPlayerTarget | undefined;
+    let transport: TransportPort | undefined;
+    let last: TransportPortSnapshot | undefined;
+    let stopTransport: (() => void) | undefined;
+    const reading = (state: TransportPortSnapshot | undefined): AnalysisPlayerSnapshot => ({
+      target: tapped, seconds: state?.position ?? 0, duration: state?.durationSeconds ?? 0,
+      playing: tapped ? state?.playing ?? true : false, loading: false, empty: false, state: tapped ? 'ready' : 'unbound',
+    });
+    const follow = (next: TransportPort | undefined): void => {
+      if (next === transport) return;
+      stopTransport?.(); stopTransport = undefined;
+      transport = next; last = next?.snapshot();
+      stopTransport = next?.subscribe((state) => {
+        if (!isCurrent() || !tapped) { last = state; return; }
+        const previous = last;
+        last = state;
+        if (state.ended && !previous?.ended) { onUpdate('end', reading(state)); return; }
+        const expected = previous ? previous.position + (previous.playing ? (state.referenceTime - previous.referenceTime) * previous.rate : 0) : state.position;
+        if (!previous || state.playing !== previous.playing || Math.abs(state.position - expected) > 0.05) onUpdate('seek', reading(state));
+      });
+    };
+    const stopContext = observeModuleContext(host, (context) => follow(context?.transport));
+    const stopInput = bindModuleAudioInput(host, assigned, ({analyser, error}) => {
+      tapped = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
+      onUpdate('target', reading(last));
       if (error !== undefined && isCurrent()) {
         host.dispatchEvent(new CustomEvent('webaudio:error', {
           detail: {error: error instanceof Error ? error : new Error(String(error))},
@@ -68,6 +92,9 @@ export function bindAnalysisPlayer(
         }));
       }
     }, isCurrent);
+    return () => {
+      try { stopInput(); } finally { stopContext(); stopTransport?.(); stopTransport = undefined; }
+    };
   }
   const selector = host.getAttribute('player');
   if (!selector) {

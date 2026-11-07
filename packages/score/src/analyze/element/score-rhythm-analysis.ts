@@ -4,7 +4,7 @@ import {defineOnce} from './base';
 /** Inspect written attacks within explicit simple, compound or additive beat groups. */
 export class RhythmAnalysisElement extends AnalysisComponentElement {
   static get observedAttributes(): string[] {
-    return ['src', 'format', 'player', 'density', 'scheme', 'motion', 'window', 'part', 'beat-groups', 'subdivision'];
+    return ['src', 'format', 'player', 'input', 'density', 'scheme', 'motion', 'window', 'part', 'beat-groups', 'subdivision'];
   }
   protected get analysisType(): AnalysisViewType { return 'rhythm'; }
 }

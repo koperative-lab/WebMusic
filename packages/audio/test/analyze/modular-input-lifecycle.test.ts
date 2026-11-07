@@ -193,3 +193,27 @@ it.each(['getPort', 'createAnalyser', 'connect'] as const)('does not publish a h
   release();
   clean(input);
 });
+
+describe('tapped analysers follow the scope transport (DEC-068)', () => {
+  it('reports seek and end from the provider Session to a tapped analyser', async () => {
+    const {bindAnalysisPlayer} = await import('../../src/analyze/element/internal/player-binding');
+    const {ModuleAudioEnvironment, ModuleContext} = await import('@webmusic/kernel/module');
+    const {SessionTransport} = await import('@webmusic/kernel/session');
+    const {provideModuleContext} = await import('@webmusic/kernel/element');
+    let time = 0;
+    const session = new SessionTransport(() => time, {driftCheckIntervalMs: 0});
+    const scope = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context: {state: 'running'} as BaseAudioContext}), session});
+    const provider = document.createElement('section');
+    const host = document.createElement('div');
+    provider.append(host); document.body.append(provider);
+    const release = provideModuleContext(provider, () => scope);
+    const lead = source('lead');
+    const updates: Array<{kind: string; seconds: number}> = [];
+    const stop = bindAnalysisPlayer(host, (kind, reading) => updates.push({kind, seconds: reading.seconds}), lead.module as ModuleHandle);
+    expect(updates.at(-1)?.kind).toBe('target');
+    await session.seek(3);
+    expect(updates.some((update) => update.kind === 'seek' && update.seconds === 3)).toBe(true);
+    stop(); release(); session.dispose();
+    time = 1;
+  });
+});

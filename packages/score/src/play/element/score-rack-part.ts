@@ -1,4 +1,5 @@
-import type {Score} from '../../core';
+import {SCORE_PLAYBACK_OWNER, type Score, type ScorePlaybackSource} from '../../core';
+import type {ModuleContext} from '@webmusic/kernel/module';
 import type {ScoreFormat} from '../../io/load';
 import type {HeadlessSynth} from '../headless/audio-contracts';
 import {Sound} from '../headless/sound';
@@ -9,7 +10,7 @@ import {
   type ModuleRackPartHost,
 } from './internal/rack-part';
 import {WebMusicElement, upgradeProperties} from './internal/base';
-import {observeModuleContext, requestModuleContext} from '@webmusic/kernel/element';
+import {notifyModuleContext, observeModuleContext, provideModuleContext, requestModuleContext} from '@webmusic/kernel/element';
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import type {ModuleSession} from '@webmusic/kernel/session';
 
@@ -61,6 +62,11 @@ export class RackPartElement extends WebMusicElement {
     queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
   }
 
+  /** The part's playback source, once the desk has built its engine. */
+  get playback(): ScorePlaybackSource | undefined {
+    return (this.module as {player?: {playback?: ScorePlaybackSource}} | undefined)?.player?.playback;
+  }
+
   /** Borrow the desk-owned runtime without creating another source or route. */
   get module(): ModuleHandle | undefined {
     const desk = this.parentElement as Partial<ModuleRackPartHost> | null;
@@ -70,11 +76,29 @@ export class RackPartElement extends WebMusicElement {
 
   protected override onMount(): void {
     this.modularDesk = this.parentElement ?? undefined;
-    // This tag is a declaration, not a visual control. Keep that contract in
-    // the component itself so a page never needs a docs-only `display:none`.
-    (this as unknown as HTMLElement).style?.setProperty('display', 'none');
+    // This tag is a declaration, not a visual control: it draws no box of its
+    // own, while companions written inside it still render (DEC-068).
+    (this as unknown as HTMLElement).style?.setProperty('display', 'contents');
     upgradeProperties(this, ['score', 'sound']);
     this.own(() => this.cancelLoad());
+    // Views and analysis inside this part borrow its playback by containment;
+    // effects and inputs still resolve against the desk.
+    let lent: {desk: ModuleContext; module: ModuleHandle | undefined; context: ModuleContext} | undefined;
+    this.own(provideModuleContext(this, () => {
+      const desk = requestModuleContext(this);
+      if (!desk) return undefined;
+      const module = this.module;
+      // One lent scope per desk scope and engine, so companions see a change
+      // only when the playback they borrow changes.
+      if (lent?.desk !== desk || lent.module !== module) {
+        lent = {desk, module, context: desk.derive({id: `${desk.id}:part`, capabilities: desk.capabilities.with(SCORE_PLAYBACK_OWNER, this)})};
+      }
+      return lent.context;
+    }));
+    // The desk announces a new engine for this part; companions re-borrow.
+    const onModuleChange = (event: Event) => { if (event.target === this) notifyModuleContext(this); };
+    this.addEventListener?.('webmusic:modulechange', onModuleChange);
+    this.own(() => this.removeEventListener?.('webmusic:modulechange', onModuleChange));
     {
       let firstReady = true;
       this.own(observeModuleContext(this, (context, state) => {

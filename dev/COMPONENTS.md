@@ -99,7 +99,7 @@ Inspect metrical score pitch collections, simultaneous chords or held live notes
 
 - Behavior/data collaboration: inspectScoreChords or held-note inspection + explicit key context.
 - Reviewed UI composition: `@webmusic/ui/analysis`, `@webmusic/ui/harmony`, `@webmusic/ui/workbench`.
-- Attribute controls: `src`, `format`, `player`, `density`, `scheme`, `motion`, `window`, `mode`, `grouping`, `beat-groups`, `spelling`, `key`, `pitch-mode`, `alternates`, `stability-ms`
+- Attribute controls: `src`, `format`, `player`, `input`, `density`, `scheme`, `motion`, `window`, `mode`, `grouping`, `beat-groups`, `spelling`, `key`, `pitch-mode`, `alternates`, `stability-ms`
 - Properties and methods: `score`, `density`, `scheme`, `motion`, `window`, `selection`, `analysis`, `selectRegion`, `clearSelection`, `mode`, `grouping`, `spelling`, `key`, `pitchMode`, `stabilityMs`, `chord`
 - Events: `webscore:seek`, `webscore:analysisselect`, `webscore:chordchange`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx>) · [Element source](<../packages/score/src/analyze/element/score-chord-analysis.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-analyze.ts>)
@@ -110,7 +110,7 @@ Inspect spelled melodic or simultaneous intervals with note provenance.
 
 - Behavior/data collaboration: analyzeIntervals + written/sounding pitch evidence.
 - Reviewed UI composition: `@webmusic/ui/analysis`, `@webmusic/ui/harmony`, `@webmusic/ui/workbench`.
-- Attribute controls: `src`, `format`, `player`, `density`, `scheme`, `motion`, `window`, `part`, `voice`, `kind`, `pitch-mode`
+- Attribute controls: `src`, `format`, `player`, `input`, `density`, `scheme`, `motion`, `window`, `part`, `voice`, `kind`, `pitch-mode`
 - Properties and methods: `score`, `density`, `scheme`, `motion`, `window`, `selection`, `analysis`, `selectRegion`, `clearSelection`, `pitchMode`, `selectNotes`
 - Events: `webscore:seek`, `webscore:analysisselect`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/analyze/score-interval-analysis.mdx>) · [Element source](<../packages/score/src/analyze/element/score-interval-analysis.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-analyze.ts>)
@@ -121,7 +121,7 @@ Compare spelled score notes with an explicitly chosen tonic and scale form.
 
 - Behavior/data collaboration: inspectScale + explicit tonic and scale form.
 - Reviewed UI composition: `@webmusic/ui/analysis`, `@webmusic/ui/harmony`, `@webmusic/ui/workbench`.
-- Attribute controls: `src`, `format`, `player`, `density`, `scheme`, `motion`, `window`, `part`, `voice`, `tonic`, `scale`, `pitch-mode`
+- Attribute controls: `src`, `format`, `player`, `input`, `density`, `scheme`, `motion`, `window`, `part`, `voice`, `tonic`, `scale`, `pitch-mode`
 - Properties and methods: `score`, `density`, `scheme`, `motion`, `window`, `selection`, `analysis`, `selectRegion`, `clearSelection`, `tonic`, `scale`, `pitchMode`, `selectNotes`
 - Events: `webscore:seek`, `webscore:analysisselect`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/analyze/score-scale-analysis.mdx>) · [Element source](<../packages/score/src/analyze/element/score-scale-analysis.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-analyze.ts>)
@@ -132,7 +132,7 @@ Inspect score attacks against simple, compound or explicitly grouped meter.
 
 - Behavior/data collaboration: inspectScoreRhythm + explicit meter grouping.
 - Reviewed UI composition: `@webmusic/ui/analysis`, `@webmusic/ui/harmony`, `@webmusic/ui/workbench`.
-- Attribute controls: `src`, `format`, `player`, `density`, `scheme`, `motion`, `window`, `part`, `beat-groups`, `subdivision`
+- Attribute controls: `src`, `format`, `player`, `input`, `density`, `scheme`, `motion`, `window`, `part`, `beat-groups`, `subdivision`
 - Properties and methods: `score`, `density`, `scheme`, `motion`, `window`, `selection`, `analysis`, `selectRegion`, `clearSelection`
 - Events: `webscore:seek`, `webscore:analysisselect`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx>) · [Element source](<../packages/score/src/analyze/element/score-rhythm-analysis.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-analyze.ts>)
@@ -145,7 +145,7 @@ One score, three views: piano roll, staff or waterfall.
 
 - Behavior/data collaboration: createScoreView + read-only createScoreViewEditing + createPianoRollLayout + player binding.
 - Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `width`, `height`, `type`, `direction`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
+- Attribute controls: `src`, `format`, `player`, `input`, `width`, `height`, `type`, `direction`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
 - Properties and methods: `score`, `editor`, `interactionSession`, `currentTime`, `active`, `configure(configuration)`, `options`, `type`, `direction`
 - Events: None declared in this catalog.
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx>) · [Element source](<../packages/score/src/view/element/score-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
@@ -156,7 +156,7 @@ A DAW-style piano-roll grid that follows a player and, with a borrowed editor, e
 
 - Behavior/data collaboration: createScoreViewEditing + mountScoreGrid + player binding.
 - Reviewed UI composition: `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `width`, `height`, `editable`, `tools`, `tool`, `snap`, `velocity-lane`, `pixels-per-quarter`, `note-height`, `min-pitch`, `max-pitch`, `note-color`, `active-note-color`
+- Attribute controls: `src`, `format`, `player`, `input`, `width`, `height`, `editable`, `tools`, `tool`, `snap`, `velocity-lane`, `pixels-per-quarter`, `note-height`, `min-pitch`, `max-pitch`, `note-color`, `active-note-color`
 - Properties and methods: `score`, `editor`, `interactionSession`, `editable`, `tools`, `tool / snap / velocityLane`, `pixelsPerQuarter / noteHeight`, `currentTime`
 - Events: `editpreview`, `editcommit`, `editerror`, `gridsettingschange`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx>) · [Element source](<../packages/score/src/view/element/score-grid-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
@@ -167,7 +167,7 @@ Current sounding pitches as a keyboard, staff or fretboard, selected by type.
 
 - Behavior/data collaboration: ActiveNoteTracker + pitch projections + player binding.
 - Reviewed UI composition: `@webmusic/ui/pitch`, `@webmusic/ui/status`.
-- Attribute controls: `type`, `direction`, `player`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `scroll`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
+- Attribute controls: `type`, `direction`, `player`, `input`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `scroll`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
 - Properties and methods: `active`, `type`, `direction`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `firstFret`, `frets`, `whiteKeyWidth / blackKeyWidth / whiteKeyHeight / blackKeyHeight`, `fretWidth / stringSpacing / stringWidth`, `follow`, `scrollable`, `fitToWidth`
 - Events: None declared in this catalog.
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx>) · [Element source](<../packages/score/src/view/element/score-pitch-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
@@ -178,7 +178,7 @@ Engraved sheet music in pages or a continuous column, editable like a notation p
 
 - Behavior/data collaboration: createScoreViewEditing + mountScoreSheet + sheet editing operations + player binding.
 - Reviewed UI composition: `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `width`, `height`, `editable`, `tools`, `layout`, `zoom`, `follow-cursor`, `note-color`, `active-note-color`
+- Attribute controls: `src`, `format`, `player`, `input`, `width`, `height`, `editable`, `tools`, `layout`, `zoom`, `follow-cursor`, `note-color`, `active-note-color`
 - Properties and methods: `score`, `editor`, `interactionSession`, `editable`, `tools`, `layout / zoom / followCursor`, `currentTime`
 - Events: `editpreview`, `editcommit`, `editerror`, `sheetsettingschange`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-sheet-view.mdx>) · [Element source](<../packages/score/src/view/element/score-sheet-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
@@ -305,7 +305,7 @@ Waveform, spectrogram and meter views that follow a player, and draw an edited d
 
 - Behavior/data collaboration: AudioTimeline + renderer binding.
 - Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`, `@webmusic/ui/meter`.
-- Attribute controls: `src`, `peaks-src`, `format`, `type`, `loading`, `player`, `interactive`, `drag-mode`, `annotate`, `follow`, `scrollable`, `virtualization`, `width`, `pixels-per-second`, `height`, `amplitude`, `device-pixel-ratio`, `min-freq`, `max-freq`, `min-db`, `max-db`, `bars`, `bands`, `history`, `wave-color`, `progress-color`, `playhead-color`, `background-color`, `color-map`, `color-mode`, `channel-layout`, `color`, `peak-color`, `mode`
+- Attribute controls: `src`, `peaks-src`, `format`, `type`, `loading`, `player`, `input`, `interactive`, `drag-mode`, `annotate`, `follow`, `scrollable`, `virtualization`, `width`, `pixels-per-second`, `height`, `amplitude`, `device-pixel-ratio`, `min-freq`, `max-freq`, `min-db`, `max-db`, `bars`, `bands`, `history`, `wave-color`, `progress-color`, `playhead-color`, `background-color`, `color-map`, `color-mode`, `channel-layout`, `color`, `peak-color`, `mode`
 - Properties and methods: `loading`, `editor`, `interactionSession`, `clip`, `peaks`, `spectrogram`, `frequencyData`, `regions`, `options`, `zoom`, `visibleRange()`, `panTo()`, `setZoom()`
 - Events: `webaudio:seek`, `webaudio:regionchange`, `webaudio:viewportchange`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx>) · [Element source](<../packages/audio/src/view/element/audio-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-view.ts>)
@@ -316,7 +316,7 @@ A waveform clip editor modeled on audio editors such as Adobe Audition: range ed
 
 - Behavior/data collaboration: AudioViewEditing over a borrowed AudioClipEditor + clip edit builders.
 - Reviewed UI composition: `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `width`, `height`, `editable`, `tools`, `tool`, `snap`, `show-envelopes`, `pixels-per-second`, `amplitude`, `fade-curve`, `follow`, `grid`, `quantize`, `grid-edit`
+- Attribute controls: `src`, `format`, `player`, `input`, `width`, `height`, `editable`, `tools`, `tool`, `snap`, `show-envelopes`, `pixels-per-second`, `amplitude`, `fade-curve`, `follow`, `grid`, `quantize`, `grid-edit`
 - Properties and methods: `editor`, `clip`, `interactionSession`, `editable / tools / tool / snap / showEnvelopes / pixelsPerSecond / amplitude / fadeCurve / follow / grid / quantize / gridEdit`, `visibleRange()`
 - Events: `webaudio:editpreview`, `webaudio:editcommit`, `webaudio:editerror`, `clipsettingschange`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx>) · [Element source](<../packages/audio/src/view/element/audio-clip-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-view.ts>)
@@ -327,7 +327,7 @@ A scrolling projection of a live AnalyserNode — waveform or spectrogram — wi
 
 - Behavior/data collaboration: LiveViewController + LiveScrollBuffer over a borrowed analyser.
 - Reviewed UI composition: `@webmusic/ui/stage`.
-- Attribute controls: `type`, `source`, `window-seconds`, `height`, `wave-color`, `color-map`
+- Attribute controls: `type`, `source`, `input`, `window-seconds`, `height`, `wave-color`, `color-map`
 - Properties and methods: `analyser`, `live`, `windowSeconds`
 - Events: `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/view/audio-live-view.mdx>) · [Element source](<../packages/audio/src/view/element/audio-live-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-view.ts>)

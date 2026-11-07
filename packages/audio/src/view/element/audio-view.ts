@@ -1,3 +1,4 @@
+import {observeCompanionTarget} from './internal/companion-target';
 // ============================================================================
 // <audio-view> — the single @webmusic/audio/view visualization element.
 //
@@ -51,7 +52,7 @@ import {
   type AudioDocumentPlaybackBinding,
   type AudioPlaybackSourceSnapshot,
 } from '../../core';
-import {observeElementSource, observeElementTarget} from '@webmusic/kernel/element';
+import {observeElementSource} from '@webmusic/kernel/element';
 import {createAudioViewEditing, audioDocumentPlaybackCompatible, type AudioViewEditing} from '../headless/audio-editing';
 import {createAudioSequenceWaveform, type AudioSequenceWaveform} from '../headless/sequence-waveform';
 import {renderWaveformVisualizer} from '../render/waveform';
@@ -251,6 +252,7 @@ export class AudioViewElement extends WebMusicElement {
       'type',
       'loading',
       'player',
+      'input',
       'interactive',
       'drag-mode',
       'annotate',
@@ -357,7 +359,7 @@ export class AudioViewElement extends WebMusicElement {
       this.refresh();
       return;
     }
-    if (name === 'player') {
+    if (name === 'player' || name === 'input') {
       this.bindPlayer();
       this.refresh();
       return;
@@ -1104,12 +1106,12 @@ export class AudioViewElement extends WebMusicElement {
     const generation = ++this.playerTargetGeneration;
     this.playerTargetCleanup?.(); this.playerTargetCleanup = undefined;
     this.playerSelectionError = undefined;
-    const selector = this.getAttribute('player');
-    if (!selector) { this.connectPlayer(undefined); this.updateDocumentPlayback(); return; }
+    const selector = this.getAttribute('player') ?? this.getAttribute('input');
     const current = (): boolean => this.isConnected &&
-      generation === this.playerTargetGeneration && this.getAttribute('player') === selector;
+      generation === this.playerTargetGeneration && (this.getAttribute('player') ?? this.getAttribute('input')) === selector;
     let initial = true;
-    const cleanup = observeElementTarget(this, selector, (target, state) => {
+    // `input` aliases `player`; with neither, the enclosing player scope is followed.
+    const cleanup = observeCompanionTarget(this, ['player', 'input'], (target, state) => {
       if (!current()) return;
       const changed = target !== this.boundPlayer;
       const previousError = this.playerSelectionError?.message;

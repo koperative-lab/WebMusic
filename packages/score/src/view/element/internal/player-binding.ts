@@ -1,5 +1,5 @@
-import {observeElementTarget, type ElementTargetState} from '@webmusic/kernel/element';
-import {observeScorePlayback, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource, type ScorePlaybackNote} from '../../../core';
+import {observeElementTarget, observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
+import {observeScorePlayback, SCORE_PLAYBACK_OWNER, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource, type ScorePlaybackNote} from '../../../core';
 
 /** Cursor coordinates supplied by a borrowed player; never a follower clock. */
 export interface ViewPlayerNote {
@@ -90,10 +90,15 @@ export function readViewPlayerScore(target: Element | undefined): Score | undefi
  * within the same root; cleanup releases listeners and target observation.
  */
 export function bindViewPlayer(
-  host: Element, handlers: ViewPlayerHandlers, selectorAttribute = 'player',
+  host: Element, handlers: ViewPlayerHandlers, preferredAttribute = 'player',
 ): (() => void) | undefined {
+  // `input` is the module grammar's name for the same selector (DEC-068).
+  const selectorAttribute = host.getAttribute(preferredAttribute) === null && host.getAttribute('input') !== null ? 'input' : preferredAttribute;
   const selector = host.getAttribute(selectorAttribute);
-  if (!selector) return undefined;
+  // Without a selector the companion borrows the nearest player or Rack part
+  // scope by containment.
+  const contained = !selector;
+  if (contained && typeof (host.getRootNode?.() as Node | undefined)?.nodeType !== 'number') return undefined;
   const connectedAtStart = host.isConnected;
   let disposed = false;
   let generation = 0;
@@ -312,7 +317,12 @@ export function bindViewPlayer(
     // Kernel owns real-DOM discovery, including cancellable late definition
     // callbacks. A definition/source change must reattach even when the target
     // element stayed the same: its native playback capability may be new.
-    if (typeof root.nodeType === 'number') {
+    if (contained) {
+      stopDiscovery = observeModuleContext(host, (context) => {
+        const owner = context?.capabilities.get(SCORE_PLAYBACK_OWNER) as Element | undefined;
+        attach(owner, owner ? 'ready' : 'missing');
+      });
+    } else if (typeof root.nodeType === 'number') {
       stopDiscovery = observeElementTarget(host, selector, attach);
     } else {
       // Existing structural connection hosts have no browser lifetime to watch.

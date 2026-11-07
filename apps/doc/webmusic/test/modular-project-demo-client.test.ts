@@ -4,7 +4,9 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const boundaries = vi.hoisted(() => ({runtime: vi.fn(), editor: vi.fn()}));
 vi.mock('@webmusic/audio', () => ({createAudioClip: vi.fn(() => ({}))}));
 vi.mock('@webmusic/bridge', () => ({createWebMusicProjectPlugins: () => []}));
-vi.mock('@webmusic/kernel/module', () => ({
+vi.mock('@webmusic/kernel/module', async (importOriginal) => ({
+  // Domain cores create capability keys at load time; keep the real ones.
+  createCapabilityKey: (await importOriginal<typeof import('@webmusic/kernel/module')>()).createCapabilityKey,
   ModuleAudioEnvironment: class {dispose = vi.fn();},
   ProjectPluginRegistry: class {register = vi.fn();},
   ModuleProjectRuntime: class {constructor() {return boundaries.runtime();}},

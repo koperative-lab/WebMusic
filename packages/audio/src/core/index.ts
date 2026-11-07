@@ -68,3 +68,5 @@ export * from './sequence';
 export * from './editing';
 export * from './audio-position-map';
 export * from './document-playback';
+
+export {AUDIO_PLAYER_OWNER, type AudioPlayerOwner} from './player-owner';

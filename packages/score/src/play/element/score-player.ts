@@ -2,7 +2,7 @@ import {observeElementSource, type ElementSourceResolution} from '@webmusic/kern
 import {isScoreDocumentSource, ScoreDocumentApplicationError, noteMidi, noteOnsetSeconds,
   type Note, type Score, type ScoreDocumentSource, type ScoreDocumentRevision,
   type ScoreDocumentApplicationResult, type ScoreDocumentPlaybackBinding,
-  type ScorePlaybackReadiness, type ScorePlaybackSource} from '../../core';
+  type ScorePlaybackReadiness, type ScorePlaybackSource, SCORE_PLAYBACK_OWNER} from '../../core';
 import {PlaybackPublisher} from '../headless/playback-source';
 // Type-only: the four-format parser stack (and its XML / zip / MIDI / ABC
 // dependencies) is pulled in on demand from resolveScore(), the way every
@@ -554,6 +554,7 @@ export class ScorePlayerElement extends WebMusicElement {
           id: `${this.moduleId}:context`, audio: this.moduleAudio,
           registry: this.moduleContext.registry, session: this.moduleContext.session,
           destination: () => this.explicitDestination, target: this.moduleFacade,
+          capabilities: this.moduleContext.capabilities,
         });
         const kept = this.moduleSource ? this.moduleSource.retarget(next) : false;
         this.moduleContext = next;
@@ -1549,7 +1550,9 @@ export class ScorePlayerElement extends WebMusicElement {
       });
       session = this.ownedSession;
     }
-    this.moduleContext = upstream.derive({id: `${this.moduleId}:context`, session, target: this.moduleFacade});
+    // Nested views and analysis borrow this player's playback by containment.
+    this.moduleContext = upstream.derive({id: `${this.moduleId}:context`, session, target: this.moduleFacade,
+      capabilities: upstream.capabilities.with(SCORE_PLAYBACK_OWNER, this)});
     this.moduleSessionUnsubscribe = session.subscribe((event) => {
       if (event.type === 'snapshot' || event.type === 'participants' || event.type === 'source-error') this.applyLoop();
       // A source-free player waiting for a score becomes the aggregate root
@@ -1565,7 +1568,8 @@ export class ScorePlayerElement extends WebMusicElement {
   /** Re-derive this scope for a new upstream destination and re-route this player's output. */
   private followDestination(upstream: ModuleContext): boolean {
     const current = this.moduleContext!;
-    const next = upstream.derive({id: current.id, session: current.session, target: this.moduleFacade});
+    const next = upstream.derive({id: current.id, session: current.session, target: this.moduleFacade,
+      capabilities: upstream.capabilities.with(SCORE_PLAYBACK_OWNER, this)});
     if (this.moduleSource && !this.moduleSource.retarget(next)) return false;
     this.moduleUpstream = upstream;
     this.moduleContext = next;

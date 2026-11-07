@@ -1,5 +1,5 @@
-import {observeElementTarget, type ElementTargetState} from '@webmusic/kernel/element';
-import {type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource, type ScorePlaybackNote} from '../../../core';
+import {observeElementTarget, observeModuleContext, type ElementTargetState} from '@webmusic/kernel/element';
+import {SCORE_PLAYBACK_OWNER, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource, type ScorePlaybackNote} from '../../../core';
 import {bindAnalysisPlayback} from '../../headless/playback-binding';
 import {seekAnalysisPlayback} from '../../headless/seek';
 
@@ -84,8 +84,13 @@ export function readAnalysisPlayerScore(target: Element | undefined): Score | un
  * within the same root; cleanup releases listeners and target observation.
  */
 export function bindAnalysisPlayer(host: Element, handlers: AnalysisPlayerHandlers): (() => void) | undefined {
-  const selector = host.getAttribute('player');
-  if (!selector) return undefined;
+  // `input` is the module grammar's name for the same selector (DEC-068).
+  const attribute = host.getAttribute('player') === null && host.getAttribute('input') !== null ? 'input' : 'player';
+  const selector = host.getAttribute(attribute);
+  // Without a selector the analysis borrows the nearest player or Rack part
+  // scope by containment.
+  const contained = !selector;
+  if (contained && typeof (host.getRootNode?.() as Node | undefined)?.nodeType !== 'number') return undefined;
   const connectedAtStart = host.isConnected;
   let disposed = false;
   let generation = 0;
@@ -95,15 +100,15 @@ export function bindAnalysisPlayer(host: Element, handlers: AnalysisPlayerHandle
   let stopDiscovery: (() => void) | undefined;
 
   const attach = (next: Element | undefined, state?: ElementTargetState): void => {
-    if (disposed || host.getAttribute('player') !== selector) return;
+    if (disposed || host.getAttribute(attribute) !== selector) return;
     const ownGeneration = ++generation;
     clearListeners?.();
     clearListeners = undefined;
     currentScore = undefined;
-    const selected = host.getAttribute('player');
+    const selected = host.getAttribute(attribute);
     const wasConnected = host.isConnected;
     const current = () => !disposed && ownGeneration === generation && (!wasConnected || host.isConnected)
-      && host.getAttribute('player') === selected && handlers.isCurrent?.() !== false;
+      && host.getAttribute(attribute) === selected && handlers.isCurrent?.() !== false;
     let discovery = state === 'ready' ? 'resolved' : state ?? (next ? 'resolved' : 'missing');
     if (!state && !next) {
       try { if (selected && (root as ParentNode).querySelectorAll?.(selected).length > 1) discovery = 'ambiguous'; }
@@ -262,7 +267,12 @@ export function bindAnalysisPlayer(host: Element, handlers: AnalysisPlayerHandle
     // Kernel owns real-DOM discovery, including cancellable late definition
     // callbacks. A definition/source change must reattach even when the target
     // element stayed the same: its native playback capability may be new.
-    if (typeof root.nodeType === 'number') {
+    if (contained) {
+      stopDiscovery = observeModuleContext(host, (context) => {
+        const owner = context?.capabilities.get(SCORE_PLAYBACK_OWNER) as Element | undefined;
+        attach(owner, owner ? 'ready' : 'missing');
+      });
+    } else if (typeof root.nodeType === 'number') {
       stopDiscovery = observeElementTarget(host, selector, attach);
     } else {
       // Existing structural connection hosts have no browser lifetime to watch.

@@ -215,3 +215,23 @@ describe('composable View player followers', () => {
     expect(view.currentTime).toBe(0);
   });
 });
+
+describe('View companions by containment and input (DEC-068)', () => {
+  it('borrows the enclosing player without a selector and follows input= like player=', async () => {
+    const owner = document.createElement('follower-player') as ScorePlayerElement;
+    owner.id = 'source';
+    const score = music();
+    owner.score = score;
+    const nested = document.createElement('follower-score') as ScoreViewElement;
+    owner.append(nested);
+    document.body.append(owner);
+    await flush(); await flush();
+    expect(nested.getAttribute('data-player-state')).toBe('ready');
+    expect((nested as unknown as {resolvedScore?: Score}).resolvedScore).toBe(score);
+    const linked = await scoreView({input: '#source'});
+    expect(linked.getAttribute('data-player-state')).toBe('ready');
+    expect((linked as unknown as {resolvedScore?: Score}).resolvedScore).toBe(score);
+    const unrelated = await scoreView({});
+    expect(unrelated.getAttribute('data-player-state')).toBe('missing');
+  });
+});

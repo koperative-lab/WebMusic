@@ -1,3 +1,4 @@
+import {observeCompanionTarget} from './internal/companion-target';
 // ============================================================================
 // <audio-live-view> — a scrolling projection of a live AnalyserNode. The
 // newest column is at the right edge and history slides left.
@@ -38,7 +39,6 @@ import {
 import {applyAudioPresenterSurface, prepareAudioViewHost} from './internal/surface';
 import {mountCanvasStage, type CanvasStageHandle} from '@webmusic/ui/stage';
 import type {StatusState} from '@webmusic/ui/status';
-import {observeElementTarget} from '@webmusic/kernel/element';
 
 /** Which drawing the live columns get. */
 export type LiveViewType = LiveProjectionType;
@@ -70,7 +70,7 @@ interface AnalyserSource extends Element {
  */
 export class AudioLiveViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'source', 'window-seconds', 'height', 'wave-color', 'color-map'];
+    return ['type', 'source', 'input', 'window-seconds', 'height', 'wave-color', 'color-map'];
   }
 
   private explicitAnalyser?: AnalyserNode;
@@ -112,7 +112,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'source') {
+    if (name === 'source' || name === 'input') {
       this.resolveSource();
     } else if (name === 'type') {
       this.controller.setType(this.type);
@@ -167,9 +167,8 @@ export class AudioLiveViewElement extends HTMLElementBase {
     this.detachSource = undefined;
     this.sourceTarget = undefined;
     this.sourceError = undefined;
-    const selector = this.getAttribute('source');
-    if (!selector) { this.refreshSource(); return; }
-    this.stopSourceObservation = observeElementTarget(this, selector, (element, state) => {
+    // `input` aliases `source`; with neither, the enclosing player scope is followed.
+    this.stopSourceObservation = observeCompanionTarget(this, ['source', 'input'], (element, state) => {
       this.detachSource?.();
       this.detachSource = undefined;
       this.sourceTarget = element as AnalyserSource | undefined;

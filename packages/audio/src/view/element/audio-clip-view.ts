@@ -1,4 +1,5 @@
-import {observeElementSource, observeElementTarget} from '@webmusic/kernel/element';
+import {observeCompanionTarget} from './internal/companion-target';
+import {observeElementSource} from '@webmusic/kernel/element';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 import {tempoGridJump} from '@webmusic/kernel/transport';
 import {audioSequenceTempoGrid, isAudioClipEditorPort, type AudioClip, type AudioClipEditorPort, type AudioDocumentPlaybackBinding,
@@ -27,7 +28,7 @@ interface PlayerFacade {
   seek?(seconds: number): unknown;
 }
 
-const OBSERVED = ['src', 'format', 'player', 'width', 'height', 'editable', 'tools', 'tool', 'snap', 'show-envelopes',
+const OBSERVED = ['src', 'format', 'player', 'input', 'width', 'height', 'editable', 'tools', 'tool', 'snap', 'show-envelopes',
   'pixels-per-second', 'amplitude', 'fade-curve', 'follow', 'grid', 'quantize', 'grid-edit'] as const;
 /** Attributes the mounted view applies in place; the others remount it. */
 const SETTING_ATTRIBUTES = new Set(['tools', 'tool', 'snap', 'show-envelopes', 'pixels-per-second', 'amplitude', 'fade-curve', 'follow',
@@ -91,7 +92,7 @@ export class AudioClipViewElement extends HTMLElementBase {
 
   attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
-    if (name === 'player') { this.bindPlayer(); return; }
+    if (name === 'player' || name === 'input') { this.bindPlayer(); return; }
     if (name === 'width' || name === 'height') { this.applyHostSize(); if (name === 'height') this.render(); return; }
     if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) this.bindEditor(); else void this.loadSource(); return; }
     if (name === 'editable') { this.updateEditable(); if (!this.surface) this.render(); return; }
@@ -306,9 +307,8 @@ export class AudioClipViewElement extends HTMLElementBase {
   private bindPlayer(): void {
     const generation = ++this.playerGeneration;
     this.unbindPlayer();
-    const selector = this.getAttribute('player');
-    if (!selector) { this.updatePlayback(); return; }
-    const cleanup = observeElementTarget(this, selector, (target, state) => {
+    // `input` aliases `player`; with neither, the enclosing player scope is followed.
+    const cleanup = observeCompanionTarget(this, ['player', 'input'], (target, state) => {
       if (generation !== this.playerGeneration || !this.isConnected) return;
       this.connectPlayer(state === 'ready' ? target : undefined);
     });

@@ -254,3 +254,20 @@ it('Score View follows native source loading and error even before a score exist
   expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
   expect(view.querySelector('[aria-busy="true"]')).toBeNull();
 });
+
+describe('Analysis companions by containment (DEC-068)', () => {
+  it('borrows the enclosing player and its position without a selector', async () => {
+    io.load.mockResolvedValueOnce(music());
+    const source = document.createElement('score-player') as ScorePlayerElement;
+    source.setAttribute('src', 'piece.mid');
+    const nested = document.createElement('score-chord-analysis') as ChordAnalysisElement;
+    nested.setAttribute('motion', 'stepped');
+    source.append(nested);
+    document.body.append(source);
+    await flush(); await flush();
+    await source.seekNominal(1);
+    await flush();
+    expect(nested.getAttribute('data-player-state')).not.toBe('missing');
+    expect(position(nested)).toBeCloseTo(1);
+  });
+});

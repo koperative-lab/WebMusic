@@ -75,6 +75,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'no playhead, and no analyser for type="meter"',
         note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing and invalid syntax emits webaudio:error. Live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
       },
+      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
       {
         name: 'interactive',
         kind: 'bool',
@@ -306,6 +307,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'src', kind: 'text', placeholder: 'song.wav', fallback: 'nothing drawn until .clip or .editor', note: 'Decoded audio drawn read-only; conflicts with .editor.'},
       FORMAT,
       {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'no playhead', note: 'Follow one selected player; with an editor, only while it plays the same revision. A ruler click asks it to seek.'},
+      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
       {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
       {name: 'height', kind: 'text', placeholder: '240', fallback: 'ruler plus 180 px of channel lanes', note: 'Host height in px; the channel lanes take what the ruler leaves.'},
       {name: 'editable', kind: 'bool', fallback: 'off — read-only drawing',
@@ -365,6 +367,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'no analyser — the strip says so and stays still',
         note: 'Selector of an element exposing a tap: .analyser, .inputAnalyser, .recorder.inputAnalyser or .player.analyser.',
       },
+      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
       {
         name: 'window-seconds',
         kind: 'number',
