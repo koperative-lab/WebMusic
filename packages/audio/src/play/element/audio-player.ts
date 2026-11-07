@@ -157,6 +157,8 @@ export class AudioPlayerElement extends WebMusicElement {
   private parentModuleContext?: ModuleContext;
   private moduleEnvironment?: ModuleAudioEnvironment;
   private ownedSession?: SessionTransport;
+  /** Entry-change and queue-end observation of a borrowed queue source. */
+  private queueRelease?: () => void;
   private moduleReleases: Array<() => void> = [];
   private participant?: SessionParticipantLease;
   private readonly retiringParticipants = new Set<SessionParticipantLease>();
@@ -766,7 +768,10 @@ export class AudioPlayerElement extends WebMusicElement {
     const player = this._player;
     // An attached document is a source like a clip (MOD-14): it registers
     // with the Session and plays through the module output.
-    const clip: object | undefined = player?.clip ?? player?.documentSource;
+    // A borrowed queue is one stable source across its entries (DEC-068):
+    // keying on the current clip would re-register at every entry change.
+    const queue = player?.transport?.onTrackChange ? player.transport : undefined;
+    const clip: object | undefined = queue ?? player?.clip ?? player?.documentSource;
     if (player === this.moduleSourcePlayer && clip === this.moduleSource) return;
     const pending = this.detachModuleSource();
     const generation = this.moduleGeneration;
@@ -793,9 +798,31 @@ export class AudioPlayerElement extends WebMusicElement {
     this.moduleContext = context.derive({id: context.id, target: module});
     const register = () => {
       if (generation !== this.moduleGeneration || !this.isConnected || !clip || !context.session) return;
+      const session = context.session;
+      // Queue source: Session time is the selected entry's time. An entry
+      // change re-anchors the Session at 0 (one committed seek every member
+      // follows) without seeking the queue, which already starts there.
+      let reanchoring = false;
+      let queueEnded = false;
+      if (queue) {
+        const offTrack = queue.onTrackChange!(() => {
+          if (generation !== this.moduleGeneration) return;
+          queueEnded = false;
+          // The first entry's start is already the Session origin.
+          if (session.position < 0.05) return;
+          reanchoring = true;
+          void session.seek(0).catch((error) => this.onPlayerError(error)).finally(() => { reanchoring = false; });
+        });
+        const offEnd = queue.onEnd?.(() => { if (generation === this.moduleGeneration) queueEnded = true; });
+        this.queueRelease = () => { offTrack(); offEnd?.(); };
+      }
       const transport = {
-        play: (when?: number) => player.play(when),
-        pause: () => player.pause(), stop: () => player.stop(), seek: (seconds: number) => player.seek(seconds),
+        play: (when?: number) => { queueEnded = false; return player.play(when); },
+        pause: () => player.pause(), stop: () => player.stop(),
+        seek: (seconds: number) => {
+          if (reanchoring) { reanchoring = false; return; }
+          player.seek(seconds);
+        },
         setRate: (rate: number) => player.setRate(rate),
         get position() { return player.seconds; }, get running() { return player.playing; },
         get clock() { return player.clock; },
@@ -813,7 +840,14 @@ export class AudioPlayerElement extends WebMusicElement {
         try { await operation(); } catch (error) { report(error); throw error; }
       };
       try {
-        this.participant = context.session.register(transport, {
+        this.participant = context.session.register(transport, queue ? {
+          // Each entry is one pass of the Session timeline; the queue, not the
+          // entry length, decides when the Session ends.
+          axis: 'queue-entry-seconds', identity: queue,
+          durationSeconds: () => player.duration > 0 ? player.duration : null,
+          endPolicy: 'participant', ended: () => queueEnded,
+          prepare: () => observed(() => this.prepareModuleSource(player, context, generation)),
+        } : {
           axis: 'clip-seconds', identity: player,
           durationSeconds: () => player.clip || player.documentSource ? player.duration : null,
           endPolicy: 'position',
@@ -869,6 +903,9 @@ export class AudioPlayerElement extends WebMusicElement {
 
   private detachModuleSource(): Promise<void> | undefined {
     this.moduleGeneration++;
+    const queue = this.queueRelease;
+    this.queueRelease = undefined;
+    try { queue?.(); } catch (error) { this.onPlayerError(error); }
     const participant = this.participant;
     this.participant = undefined;
     if (participant) {

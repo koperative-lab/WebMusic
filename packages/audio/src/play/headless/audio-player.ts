@@ -22,6 +22,10 @@ export interface AudioPlayerTransport {
   readonly clip?: AudioClip;
   readonly currentClip?: AudioClip;
   readonly analyser?: AnalyserNode;
+  /** The group's stable output (a queue bus or a mix master), without preparing it. */
+  peekOutputPort?(): AudioOutputPort | undefined;
+  /** Queue capability: the selected entry changed (DEC-068 queue source). */
+  onTrackChange?(notify: () => void): () => void;
   readonly clock?: TransportClockReader;
   readonly timingCapabilities?: PlaybackTimingCapabilities;
   readonly schedulingMode?: PlaybackSchedulingMode;
@@ -136,7 +140,7 @@ export class AudioPlayer {
     this.module = {
       id: `audio-player-${++audioPlayerModuleSequence}`,
       get inserts() { return readInserts(); },
-      getPort: (name) => this.ownsOutput && (name === 'output' || name === 'main') ? this.port : undefined,
+      getPort: (name) => name === 'output' || name === 'main' ? this.currentOutputPort() : undefined,
       ports: () => this.modulePorts(),
       prepare: () => this.preload(),
       subscribe: (listener) => {
@@ -399,10 +403,16 @@ export class AudioPlayer {
         if (current() && this.configured.has('pan')) transport.setPan?.(this.storedPan);
         if (current() && this.configured.has('preservesPitch')) transport.setPreservesPitch?.(this.storedPreservesPitch);
         if (!current()) return;
+        let borrowedPort = transport.peekOutputPort?.();
         own(transport.subscribe?.(() => {
           if (!current()) return;
           this.publishSource();
           if (current()) this.publishState();
+          const port = transport.peekOutputPort?.();
+          if (current() && port !== borrowedPort) {
+            borrowedPort = port;
+            this.notifyModuleListeners();
+          }
         }));
         if (current()) own(transport.onEnd?.(() => {
           if (!current()) return;
@@ -585,6 +595,12 @@ export class AudioPlayer {
         try { output?.disconnect(); } catch { /* release the candidate output */ }
       }
     }
+    this.notifyModuleListeners(current);
+    return current() ? output : undefined;
+  }
+
+  /** Module port lists changed: an output was prepared or a borrowed group published its own. */
+  private notifyModuleListeners(current: () => boolean = () => !this.disposed): void {
     for (const listener of [...this.moduleListeners]) {
       if (!current()) break;
       if (!this.moduleListeners.has(listener)) continue;
@@ -592,7 +608,6 @@ export class AudioPlayer {
         this.emitter.emitSafely('error', error instanceof Error ? error : new Error(String(error)), () => {});
       }
     }
-    return current() ? output : undefined;
   }
 
   private ensureEngine(): AudioClipPlayer | undefined {
@@ -650,10 +665,23 @@ export class AudioPlayer {
     if (failure !== undefined) throw failure;
   }
 
-  /** Owned audio output (once prepared, while not driven by a backend), the clip source and a borrowed transport. */
+  /**
+   * The output a tap follows: the owned chain, or a borrowed queue's or mix's
+   * own stable output. A borrowed port is observed only; this player never
+   * reroutes the group that owns it.
+   */
+  private currentOutputPort(): AudioOutputPort | undefined {
+    if (this.disposed) return undefined;
+    if (this.ownsOutput) return this.port;
+    const borrowed = this.borrowed?.peekOutputPort?.();
+    return borrowed && !borrowed.disposed ? borrowed : undefined;
+  }
+
+  /** Audio output (owned once prepared, or the borrowed group's), the clip source and a borrowed transport. */
   private modulePorts(): readonly ModulePort[] {
     const ports: ModulePort[] = [];
-    if (this.ownsOutput && this.port) ports.push(this.port);
+    const output = this.currentOutputPort();
+    if (output) ports.push(output);
     if (!this.disposed) ports.push(this.sourcePort);
     const transport = this.options.moduleContext?.transport;
     if (transport) ports.push(transport);

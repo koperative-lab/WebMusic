@@ -46,12 +46,14 @@ a module provider whose children resolve their context through it.
 | Port | Family | Direction | Notes |
 | --- | --- | --- | --- |
 | `master` (alias `output`) | `audio` | output | The mixed bus after the master inserts; routed to the parent's admission or default destination, then `.destination`. |
+| `channel:<id>` | `audio` | output | One committed channel strip after its fader and inserts, before the master bus; listed while the channel exists. A tap observes it without rerouting. |
 
 Nested module outputs are admitted as channel strips through routing leases; a
 nested `<audio-player>` becomes a channel keyed by its `id`. Admission is not
 transport registration: each child's Session passes through unchanged.
 `<audio-effect>` declarations directly under the desk own master insert slots.
-Tap the mixed output with `input="#desk" port="master"` on an Audio analyzer.
+Tap the mixed output with `input="#desk" port="master"` on an Audio analyzer,
+or one strip with `port="channel:piano"`.
 Reading `.module` does not prepare an AudioContext.
 
 An outermost desk owns the Session its children join; a desk inside a player or
@@ -60,7 +62,8 @@ as one `media-follower` participant on a `mix-seconds` axis. A provider's new
 default destination moves only the master route, keeping channel levels, mutes
 and solo; a new admission, Session or audio environment rebuilds the desk and
 re-admits its children. With `input="#session"` or `.player` the desk is
-instead that player's mix backend and not a module. See
+instead that player's mix backend and not a module; that player then lists the
+mix master as its own `output` for taps. See
 [modular composition](/bridge/modular-composition/).
 
 ```html

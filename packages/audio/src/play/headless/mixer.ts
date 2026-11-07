@@ -78,6 +78,8 @@ interface AudioChannel {
   source: AudioOutputPort;
   gain: GainNode;
   inserts: InsertChain;
+  /** Post-insert channel output (`channel:<id>`), routed into the master bus. */
+  output: AudioOutputPort;
   committed: boolean;
   route: ConnectionLease;
   lease: ConnectionLease;
@@ -114,7 +116,9 @@ export class AudioMixer {
     const readDuration = () => this.duration;
     const readPlaying = () => this.playing;
     const readAnalyser = () => this.masterAnalyser;
+    const readPort = () => this.disposed ? undefined : this.port;
     return {
+      peekOutputPort: readPort,
       get seconds() { return readSeconds(); },
       get duration() { return readDuration(); },
       get playing() { return readPlaying(); },
@@ -147,10 +151,14 @@ export class AudioMixer {
     this.module = {
       id: `audio-mixer-${++mixerModuleSequence}`,
       get inserts() { return readInserts(); },
-      getPort: (name) => name === 'master' || name === 'output' || name === 'main' ? this.port : undefined,
+      getPort: (name) => name === 'master' || name === 'output' || name === 'main' ? this.port
+        : name.startsWith('channel:') ? this.channelOutput(name.slice('channel:'.length)) : undefined,
       ports: () => {
         const ports: ModulePort[] = [];
         if (this.port && !this.disposed) ports.push(this.port);
+        if (!this.disposed) {
+          for (const channel of this.channels.values()) if (channel.committed) ports.push(channel.output);
+        }
         const transport = this.options.moduleContext?.transport;
         if (transport) ports.push(transport);
         return Object.freeze(ports);
@@ -167,6 +175,12 @@ export class AudioMixer {
   get insertChain(): InsertChain { this.ensureMaster(); return this.inserts!; }
   /** Rack-owned inserts follow this channel's fader, before the master bus. */
   channelInserts(id: string): InsertChain | undefined { return this.channels.get(id)?.inserts; }
+
+  /** The post-insert output of one committed channel, for a tap (`channel:<id>`). */
+  channelOutput(id: string): AudioOutputPort | undefined {
+    const channel = this.channels.get(id);
+    return channel?.committed ? channel.output : undefined;
+  }
 
   setEffect(effect: Effect | undefined): void {
     if (this.disposed) return;
@@ -212,12 +226,14 @@ export class AudioMixer {
     gain.gain.value = mix.muted || (this.soloId !== null && this.soloId !== id) ? 0 : mix.volume;
     const previousDefault = source.defaultDestination;
     let inserts: InsertChain | undefined;
+    let output: AudioOutputPort | undefined;
     let route: ConnectionLease | undefined;
     let channel: AudioChannel | undefined = undefined;
     try {
       inserts = new InsertChain(context);
       gain.connect(inserts.input);
-      inserts.output.connect(this.master!);
+      // A tappable channel output, like a Kernel Rack channel; taps never reroute it.
+      output = new AudioOutputPort(inserts.output, {id: `channel:${id}`, defaultDestination: this.master!});
       route = createConnectionLease(() => {
         if (!source.disposed && source.defaultDestination === gain) {
           source.setDefault(channel?.committed ? undefined : previousDefault);
@@ -230,11 +246,12 @@ export class AudioMixer {
       assertCurrent();
     } catch (error) {
       try { route?.release(); } catch { /* preserve admission failure */ }
+      try { output?.dispose(); } catch { /* release the candidate channel output */ }
       try { inserts?.dispose(); } catch { /* release the candidate inserts */ }
       try { gain.disconnect(); } catch { /* release the candidate channel */ }
       throw error;
     }
-    channel = {source, gain, inserts, route, committed: false, volume: mix.volume, muted: mix.muted, lease: undefined!};
+    channel = {source, gain, inserts, output, route, committed: false, volume: mix.volume, muted: mix.muted, lease: undefined!};
     const owned = channel;
     channel.lease = createConnectionLease(() => {
       const current = this.channels.get(id) === owned;
@@ -245,7 +262,7 @@ export class AudioMixer {
         if (!this.members.has(id) && this.soloId === id) this.soloId = null;
       }
       let failure: unknown;
-      for (const release of [() => owned.route.release(), () => owned.inserts.dispose(), () => owned.gain.disconnect()]) {
+      for (const release of [() => owned.route.release(), () => owned.output.dispose(), () => owned.inserts.dispose(), () => owned.gain.disconnect()]) {
         try { release(); } catch (error) { failure ??= error; }
       }
       // Reconcile even after cleanup failure, using the latest state if a

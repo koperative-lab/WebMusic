@@ -24,6 +24,7 @@ import {EventEmitter, type AudioClip, type AudioFormat} from '../../core';
 import {AudioClipPlayer, type PlayerEngineKind} from './player';
 import type {MediaPlaybackAdapterFactory} from './engines/media-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
+import {AudioOutputPort} from '@webmusic/kernel/module';
 
 /** One queue entry: an already-decoded clip, or a URL to resolve on demand. */
 export interface AudioPlaylistEntry {
@@ -103,6 +104,9 @@ export class AudioPlaylist {
   private ownsContext = false;
   private player: AudioClipPlayer | null = null;
   private playerOff: Array<() => void> = [];
+  /** Queue bus every entry plays into; its port is the queue's one stable output. */
+  private bus: GainNode | null = null;
+  private busPort: AudioOutputPort | null = null;
   private currentIndex = -1;
   private wantsPlayback = false;
   private volume: number;
@@ -353,6 +357,17 @@ export class AudioPlaylist {
   get analyser(): AnalyserNode | undefined { return this.player?.analyser; }
   get clock() { return this.player?.clock; }
 
+  /**
+   * The queue's stable output (DEC-068): one bus every entry plays into, so a
+   * tap or a route survives entry changes. Reading it prepares the bus.
+   */
+  get outputPort(): AudioOutputPort { return this.ensureBus().port; }
+  /** The output port once an entry has played or {@link outputPort} was read; never prepares. */
+  peekOutputPort(): AudioOutputPort | undefined { return this.busPort ?? undefined; }
+
+  /** Queue capability for a borrowing player: the selected entry changed. */
+  onTrackChange(notify: () => void): () => void { return this.on('trackchange', notify); }
+
   /** Observe existing queue state without creating another player or timer. */
   subscribe(notify: () => void): () => void {
     if (this.disposed) return () => {};
@@ -384,6 +399,11 @@ export class AudioPlaylist {
     this.generation++;
     this.wantsPlayback = false;
     this.teardownPlayer();
+    const port = this.busPort;
+    const bus = this.bus;
+    this.busPort = this.bus = null;
+    try { port?.dispose(); } catch { /* Teardown continues. */ }
+    try { bus?.disconnect(); } catch { /* Teardown continues. */ }
     this.notify();
     this.subscribers.clear();
     this.emitter.removeAllListeners();
@@ -398,6 +418,25 @@ export class AudioPlaylist {
   }
 
   // --- internals ---
+
+  private ensureBus(): {bus: GainNode; port: AudioOutputPort} {
+    if (this.disposed) throw new Error('AudioPlaylist is disposed');
+    if (this.bus && this.busPort) return {bus: this.bus, port: this.busPort};
+    const context = this.ensureContext();
+    const bus = context.createGain();
+    let port: AudioOutputPort;
+    try {
+      port = new AudioOutputPort(bus, {id: 'output', defaultDestination: this.options.destination ?? context.destination});
+    } catch (error) {
+      try { bus.disconnect(); } catch { /* Preserve the construction failure. */ }
+      throw error;
+    }
+    this.bus = bus;
+    this.busPort = port;
+    // A borrowing player re-lists its ports when the queue's output appears.
+    this.notify();
+    return {bus, port};
+  }
 
   private ensureContext(): AudioContext {
     if (this.context) return this.context;
@@ -506,7 +545,7 @@ export class AudioPlaylist {
       audioContext: this.ensureContext(),
       volume: this.volume,
       rate: this.rate,
-      ...(this.options.destination ? {destination: this.options.destination} : {}),
+      destination: this.ensureBus().bus,
       ...(this.options.engine ? {engine: this.options.engine} : {}),
       ...(this.options.mediaAdapterFactory
         ? {mediaAdapterFactory: this.options.mediaAdapterFactory}

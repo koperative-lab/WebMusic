@@ -68,22 +68,23 @@ Sharing this facade does not complete shared-clock injection across mix members.
 ## Ports and composition
 
 `player.module` is the facade's `ModuleHandle`: its `id`, `inserts`,
-`prepare()` (which preloads) and `subscribe`. It implements the `getPort`
-shortcut but no `ports()` enumeration, so
-[`getModulePort(player.module, 'main', 'audio')`](/kernel/api/#module--webmusickernelmodule) resolves its one port
-through that shortcut.
+`prepare()` (which preloads), `subscribe`, `getPort(name)` and a `ports()`
+enumeration, so
+[`getModulePort(player.module, 'main', 'audio')`](/kernel/api/#module--webmusickernelmodule) resolves its output.
 
 | Family | Port | Direction | Present |
 | --- | --- | --- | --- |
-| audio | `main` (alias `output`) | output | Once prepared, while it plays an owned clip or edited sequence |
+| audio | `main` (alias `output`) | output | Once prepared, while it plays an owned clip or edited sequence; over a borrowed playlist or mixer, that group's own stable output (`peekOutputPort()`), observed and never rerouted |
+| source | `source` | output | Always: `webmusic.audio-clip`, mirroring the selected clip and its loading and error state |
+| transport | `transport` | output | When a `moduleContext` lends one |
 
 With the `moduleContext` option the facade prepares its AudioContext from that
 scope's audio environment, installs no default speaker route and never closes the
 context. It does not register itself with a Session; its host does.
 `<audio-player>` and Bridge's [`registerAudioParticipant`](/bridge/headless/score-audio-session/) register
 it on `clip-seconds`, reporting `shared-anchor` when the buffer engine attaches
-Session scheduling and `media-follower` otherwise. A borrowed transport, such as
-a playlist or mixer, exposes no output through the facade.
+Session scheduling and `media-follower` otherwise; `<audio-player>` registers a
+borrowed queue once on `queue-entry-seconds`.
 
 ## Shared Session scheduling
 

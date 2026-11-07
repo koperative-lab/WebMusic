@@ -394,6 +394,8 @@ export class AudioMixerElement extends WebMusicElement {
       id,
       get inserts() { return mixer.module.inserts; },
       getPort: (name) => mixer.module.getPort?.(name),
+      // Master, `channel:<id>` taps and the Session transport, for `input`/`port` links.
+      ports: () => mixer.module.ports?.() ?? [],
       prepare: () => this.prepareModuleMixer(),
       subscribe: (listener) => mixer.module.subscribe?.(listener) ?? (() => {}),
     };

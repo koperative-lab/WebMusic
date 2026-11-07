@@ -66,10 +66,17 @@ in the nearest enclosing `<audio-player>`. An unresolved explicit selector
 stays detached and never falls back to containment.
 
 A linked queue becomes that player's borrowed backend: the player's controls
-drive it, the player keeps the queue's own transport commands, rate and loop,
-and audio flows through the queue's graph rather than the player's `output`
-port. Without a link, the playlist shows its own transport and joins no
-Session.
+drive it and the player keeps the queue's own rate and loop. Every entry plays
+into one queue bus, so the queue has a stable `output` port that survives entry
+changes; the player lists it as its own `output` (alias `main`) for taps, such
+as an Audio analyser with `input="#player"`, without rerouting it.
+
+In a Session the linked queue is one **queue source**: the player registers it
+once (axis `queue-entry-seconds`), not once per entry. Session time is the
+selected entry's time; an entry change re-anchors the Session at 0 in one
+committed seek that every member follows, and the Session ends when the queue
+ends, not at each entry's end. Without a link, the playlist shows its own
+transport and joins no Session.
 
 ```html
 <audio-player controls>

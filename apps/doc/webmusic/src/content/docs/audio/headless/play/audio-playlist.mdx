@@ -47,13 +47,19 @@ const dispose = () => playlist.dispose();
 
 ## Ports and composition
 
-`AudioPlaylist` is a queue source, not a module: it has no `ModuleHandle`, ports
-or Session participant of its own. An
-[`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition) facade
-borrows it with `setTransport(queue)`; that facade's `.module` then exposes no
-audio output, because the queue's engines keep their own routes.
-`<audio-playlist>` attaches to the enclosing `<audio-player>` or to the one named
-by `input`.
+`AudioPlaylist` is a queue source, not a module: it has no `ModuleHandle` or
+Session participant of its own. Every entry plays into one queue bus, so the
+queue has one stable output: `outputPort` (an `AudioOutputPort` with ID
+`output`, prepared on first read) and `peekOutputPort()` (without preparing).
+`onTrackChange(notify)` is the queue capability a borrowing player reads.
+
+An [`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition)
+facade borrows the queue with `setTransport(queue)`; that facade's `.module`
+then lists the queue's output as its own `output` (alias `main`) for taps,
+without rerouting it. `<audio-playlist>` attaches to the enclosing
+`<audio-player>` or to the one named by `input`; that player registers the queue
+once as a Session queue source on the `queue-entry-seconds` axis, re-anchoring
+the Session at 0 at each entry change.
 
 ## Loading is injected
 

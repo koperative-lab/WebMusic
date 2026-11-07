@@ -17,7 +17,7 @@ const PORT = {
   kind: 'text',
   placeholder: 'master',
   fallback: 'output',
-  note: 'Named audio output to tap on the input module; players and recorders also answer main, mixers master.',
+  note: 'Named audio output to tap on the input module; players and recorders also answer main, mixers master and channel:<id> for one strip. A player over a playlist or mixer backend answers with that group\u2019s output.',
 } as const;
 
 const METER_TYPES = ['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer'] as const;

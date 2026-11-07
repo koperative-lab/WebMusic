@@ -44,7 +44,7 @@ resolve their module context through it, and the outermost player is the
 
 | Port | Family | Direction | Notes |
 | --- | --- | --- | --- |
-| `output` (alias `main`) | `audio` | output | The player's own chain after its inserts, created when it prepares (play or `preload`). Absent while the player is empty or drives a linked playlist or mixer backend; a source-free root has no fabricated output. |
+| `output` (alias `main`) | `audio` | output | The player's own chain after its inserts, created when it prepares (play or `preload`). Over a linked playlist or mixer backend it is that group's own stable output (the queue bus or the mix master), observed for taps and never rerouted by the player. Absent while the player is empty; a source-free root has no fabricated output. |
 
 Containment connects in both directions. Nested players, playlists, recorders,
 views, analysers and `<audio-effect>` declarations attach to the nearest player;
@@ -60,9 +60,11 @@ nearest Session, through layout wrappers and mixer scopes, unless
 editor document registers its engine once as a participant on the
 `clip-seconds` axis; a borrowed `.player` joins the same way. The decoded-buffer engine reports `shared-anchor`
 timing; the media-element engine and document sequences report
-`media-follower`. A source-free outer player conducts its nested members, and a
-player that drives a borrowed queue or mix keeps that transport's own
-commands, rate and loop. `play(when)` defers the Session start to `when`.
+`media-follower`. A source-free outer player conducts its nested members. A player
+over a borrowed queue registers the queue once as a queue source on the
+`queue-entry-seconds` axis: each entry change re-anchors the Session at 0 and
+the Session ends with the queue. A borrowed queue or mix keeps its own rate and
+loop. `play(when)` defers the Session start to `when`.
 
 Play, pause, stop, seek and rate commands delegate to the Session in Session
 seconds; a failed command, preparation or activation is reported as
