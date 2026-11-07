@@ -55,6 +55,21 @@ export interface PresetPlayerOptions {
   onSeek?: () => void;
   onEnd?: () => void;
   onError?: (error: unknown) => void;
+  /**
+   * Route transport commands to the player's Session instead of the engine
+   * (DEC-068). The engine stays the source of displayed state; once it is a
+   * Session participant only the Session may command it.
+   */
+  transport?: PresetTransportCommands;
+}
+
+/** Session-backed commands in the engine's own coordinates. */
+export interface PresetTransportCommands {
+  play(): Promise<void>;
+  pause(): void;
+  stop(): void;
+  /** Nominal score seconds. */
+  seekNominal(seconds: number): Promise<void>;
 }
 
 export interface PresetPlayerHandle {
@@ -422,7 +437,7 @@ export function mountPresetPlayer(
       if (generation !== playGeneration || destroyed || !starting) return;
       // ScorePlayer resumes the context before awaiting sample preparation,
       // preserving user activation from a presenter click.
-      await player.play();
+      await (options.transport ? options.transport.play() : player.play());
       if (generation !== playGeneration || destroyed) return;
     } catch (error) {
       if (generation !== playGeneration || destroyed) return;
@@ -442,7 +457,7 @@ export function mountPresetPlayer(
     if (!starting && !player.isPlaying()) return;
     playGeneration += 1;
     starting = false;
-    player.pause();
+    if (options.transport) options.transport.pause(); else player.pause();
     notify();
     options.onPause?.();
   };
@@ -451,7 +466,7 @@ export function mountPresetPlayer(
     starting = false;
     clearReset();
     displayProgress = 0;
-    player.stop();
+    if (options.transport) options.transport.stop(); else player.stop();
     notify();
   };
   const seekFraction = async (fraction: number): Promise<void> => {
@@ -459,7 +474,9 @@ export function mountPresetPlayer(
     if (destroyed) return;
     clearReset();
     displayProgress = undefined;
-    const pending = player.seekFraction(fraction);
+    const pending = options.transport
+      ? options.transport.seekNominal(Math.max(0, Math.min(1, fraction)) * player.durationSeconds * player.rate)
+      : player.seekFraction(fraction);
     try {
       // Seeking publishes a cursor synchronously, and a cursor listener can
       // replace this facade before the command returns.
@@ -476,7 +493,7 @@ export function mountPresetPlayer(
     if (destroyed) return;
     clearReset();
     displayProgress = undefined;
-    return player.seek(seconds);
+    return options.transport ? options.transport.seekNominal(seconds * player.rate) : player.seek(seconds);
   };
 
   const binding: TransportBinding = {

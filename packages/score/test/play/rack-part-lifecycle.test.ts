@@ -73,6 +73,7 @@ describe('Rack part declaration lifetime', () => {
     await flush();
     expect(part.rackPartDeclaration()).toBeUndefined();
     part.remove();
+    await Promise.resolve();
     expect(loads[1]!.signal.aborted).toBe(true);
     loads[1]!.resolve({id: 'detached'} as unknown as Score);
     await flush();

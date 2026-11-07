@@ -128,7 +128,7 @@ faders follow.
 
 ## A module bus inside a Session
 
-Inside `composition="modules"`, this desk provides a `ScoreRackModule` through
+Without an assigned `.rack`, this desk provides a `ScoreRackModule` through
 `.module`. It admits Score or Audio module outputs into channel gains and one
 master insert/output bus. Nesting another bus admits that one bus output;
 it does not duplicate descendant transport registrations. The desk passes the
@@ -139,7 +139,7 @@ An external analyzer can use `input="#desk" port="master"`. A local player owns
 its own insert; moving an effect under that player changes its declared owner,
 not its HTML slot semantics. Direct `score-rack-part` declarations also work in module mode: each resolves
 to one actual ScorePlayerModule, with its `.module` available for explicit
-targeting. Outside module mode, `.rack` and declarations retain the legacy Rack contract. See [the mixed example](/bridge/modular-composition/).
+targeting. Assigning a Headless `Rack` to `.rack` backs the same mixer surface with that borrowed Rack instead: declarations become its members and an enclosing player drives it. See [the mixed example](/bridge/modular-composition/).
 
 
 <details class="component-section">

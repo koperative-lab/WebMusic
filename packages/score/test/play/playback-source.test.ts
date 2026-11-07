@@ -147,6 +147,7 @@ describe('shared native playback source', () => {
     follower.remove();
     expect(player.playback.snapshot().readiness).toBe('ready');
     player.remove();
+    await Promise.resolve();
     expect(snapshots.at(-1)?.readiness).toBe('disposed');
     detach();
   });

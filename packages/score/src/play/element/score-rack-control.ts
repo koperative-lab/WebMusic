@@ -1,5 +1,5 @@
 import {mountMixer, type MixerBinding, type MixerHandle} from "@webmusic/ui/mixer";
-import {createRack, type Rack} from "../headless/rack";
+import type {Rack} from "../headless/rack";
 import type {Effect} from "../headless/effects";
 import {
   RACK_PART_EVENT,
@@ -10,7 +10,7 @@ import {
   type RackShareDetail,
 } from "./internal/rack-part";
 import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
-import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {ScoreRackModule} from '../headless/score-rack-module';
 import {ScorePlayerModule} from '../headless/score-module';
@@ -74,7 +74,6 @@ export class RackControlElement extends WebMusicElement {
   private compatibilityStyle?: HTMLStyleElement;
   private observer?: MutationObserver;
   private assignedRack?: Rack;
-  private ownedRack?: Rack;
   private assignedEffect?: Effect;
   /** Distinguish "never assigned" from an explicit `.effect = undefined`. */
   private effectAssigned = false;
@@ -86,7 +85,7 @@ export class RackControlElement extends WebMusicElement {
    * the same.
    */
   private readonly declared = new Map<RackPartElementLike, RackPartDeclaration>();
-  private modular = false;
+
   private moduleRack?: ScoreRackModule;
   private modularContext?: ModuleContext;
   private modularUpstream?: ModuleContext;
@@ -102,19 +101,22 @@ export class RackControlElement extends WebMusicElement {
   }
 
   override disconnectedCallback(): void {
-    if (!this.modular) { super.disconnectedCallback(); return; }
     queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
   }
 
   protected override onMount(): void {
-    this.modular = isModularComposition(this);
-    if (this.modular) { this.mountModular(); return; }
+
+    // One path (DEC-068): the desk is a module Rack, unless a script assigned a
+    // Headless Rack, which then backs the same mixer surface.
+    this.own(() => this.releaseModuleRack());
     this.own(() => { this.handle?.destroy(); this.handle = undefined; });
     this.own(() => { this.unsubscribeMembers?.(); this.unsubscribeMembers = undefined; });
     this.own(() => { this.observer?.disconnect(); this.observer = undefined; });
     this.own(() => this.releaseRack());
     upgradeProperties(this, ["rack", "effect"]);
     if (!this.root) this.root = this.attachShadow({mode: "open"});
+    this.own(provideModuleContext(this, () => this.assignedRack ? undefined : this.modularContext));
+    this.own(observeModuleContext(this, (upstream, state) => this.bindModuleRack(upstream, state)));
 
     // Parts arrive and leave as markup, and each nudges upward when its own
     // score resolves — which happens long after it was appended.
@@ -130,7 +132,7 @@ export class RackControlElement extends WebMusicElement {
     this.subscribeMembers();
     this.mountUI();
     this.reconcile();
-    this.announce();
+    if (this.assignedRack) this.announce();
   }
 
   /**
@@ -141,23 +143,30 @@ export class RackControlElement extends WebMusicElement {
 
   set rack(rack: Rack | undefined) {
     if (rack === this.assignedRack) return;
+    const backingChanged = !rack !== !this.assignedRack;
     this.assignedRack = rack;
     this.declared.clear();
-    if (rack && this.ownedRack) { this.ownedRack.dispose(); this.ownedRack = undefined; }
     if (rack && this.effectAssigned) {
       try { rack.setEffect(this.assignedEffect); }
       catch (error) { this.reportError(error); }
     }
-    if (this.isConnected) {
-      this.subscribeMembers();
-      this.reconcile();
-      this.announce();
-      this.notifyMembers?.();
+    if (!this.isConnected) return;
+    if (backingChanged) {
+      // Switching between a module Rack and a borrowed Headless Rack swaps the
+      // backing of this desk; remount so members and scope follow it.
+      if (!rack) this.announce();
+      super.disconnectedCallback();
+      super.connectedCallback();
+      return;
     }
+    this.subscribeMembers();
+    this.reconcile();
+    this.announce();
+    this.notifyMembers?.();
   }
 
   get rack(): Rack | undefined {
-    return this.assignedRack ?? this.ownedRack;
+    return this.assignedRack;
   }
 
   /**
@@ -168,7 +177,7 @@ export class RackControlElement extends WebMusicElement {
    * property deliberately updates that rack's master effect in place.
    */
   set effect(effect: Effect | undefined) {
-    if (this.moduleRack) {
+    if (this.moduleRack && !this.assignedRack) {
       this.moduleRack.setEffect(effect);
       this.effectAssigned = true;
       this.assignedEffect = effect;
@@ -190,32 +199,18 @@ export class RackControlElement extends WebMusicElement {
   }
 
   get effect(): Effect | undefined {
-    if (this.moduleRack) return this.moduleRack.effect;
+    if (this.moduleRack && !this.assignedRack) return this.moduleRack.effect;
     const rack = this.rack;
     return rack ? rack.effect : this.assignedEffect;
   }
 
-  /** The rack to build into: whatever was assigned, else one of our own. */
+  /** The borrowed Headless Rack this desk builds into, if one was assigned. */
   private ensureRack(): Rack | undefined {
-    if (this.assignedRack) return this.assignedRack;
-    if (!this.ownedRack) {
-      try {
-        this.ownedRack = createRack(
-          this.effectAssigned ? {effect: this.assignedEffect} : {},
-        );
-      }
-      catch (error) { this.reportError(error); return undefined; }
-      this.subscribeMembers();
-      this.announce();
-    }
-    return this.ownedRack;
+    return this.assignedRack;
   }
 
   private releaseRack(): void {
     this.declared.clear();
-    const owned = this.ownedRack;
-    this.ownedRack = undefined;
-    try { owned?.dispose(); } catch (error) { this.reportError(error); }
   }
 
   private subscribeMembers(): void {
@@ -252,7 +247,7 @@ export class RackControlElement extends WebMusicElement {
    * sound actually changed.
    */
   private reconcile(): void {
-    if (this.modular) { this.reconcileModuleParts(); return; }
+    if (!this.assignedRack) { this.reconcileModuleParts(); return; }
     const declarations: Array<{part: RackPartElementLike; declaration: RackPartDeclaration}> = [];
     for (const part of Array.from(this.children).filter(isRackPart)) {
       try {
@@ -348,7 +343,7 @@ export class RackControlElement extends WebMusicElement {
     const written = new Map<string, number>();
     for (const child of Array.from(this.children)) {
       if (!isRackPart(child)) continue;
-      if (this.modular) {
+      if (!this.assignedRack) {
         const record = this.moduleParts.get(child);
         if (record) written.set(record.module.id, written.size);
         continue;
@@ -369,7 +364,7 @@ export class RackControlElement extends WebMusicElement {
       // Rendered FROM the rack, not from a copy: a member's level is readable
       // now, so nothing here can drift from the gain node it controls.
       snapshot: () => {
-        const rack = this.moduleRack ?? this.rack;
+        const rack = this.assignedRack ?? this.moduleRack;
         const members = this.inWrittenOrder<{id: string; volume: number; muted: boolean; solo: boolean}>(rack?.list() ?? []);
         const labels = new Map([...this.moduleParts.values()].map(({declaration, module}) => [module.id, declaration.id]));
         const partStates = Array.from(this.children).filter(isRackPart).map((part) => part.rackPartStatus?.());
@@ -389,9 +384,9 @@ export class RackControlElement extends WebMusicElement {
           disabled: !rack,
         };
       },
-      setMaster: (value) => { (this.moduleRack ?? this.rack)?.setMasterVolume(value); },
-      setChannel: (id, value) => { (this.moduleRack ?? this.rack)?.setVolume(id, value); },
-      ...(boolAttr(this, "mute", true) ? {setMuted: (id: string, muted: boolean) => { (this.moduleRack ?? this.rack)?.mute(id, muted); }} : {}),
+      setMaster: (value) => { (this.assignedRack ?? this.moduleRack)?.setMasterVolume(value); },
+      setChannel: (id, value) => { (this.assignedRack ?? this.moduleRack)?.setVolume(id, value); },
+      ...(boolAttr(this, "mute", true) ? {setMuted: (id: string, muted: boolean) => { (this.assignedRack ?? this.moduleRack)?.mute(id, muted); }} : {}),
       // Mute and solo appear only when the binding can act on them, so the
       // attributes that show them are spelled as the commands being present.
       // The presenter's solo is EXCLUSIVE and clears with `null`, while the
@@ -400,7 +395,7 @@ export class RackControlElement extends WebMusicElement {
       ...(boolAttr(this, "solo", true)
         ? {
             setSolo: (id: string | null) => {
-              const rack = this.moduleRack ?? this.rack;
+              const rack = this.assignedRack ?? this.moduleRack;
               if (!rack) return;
               for (const member of rack.list()) rack.solo(member.id, member.id === id);
             },
@@ -454,43 +449,29 @@ export class RackControlElement extends WebMusicElement {
     root.append(this.compatibilityStyle);
   }
 
-  private mountModular(): void {
-    this.own(() => this.releaseModuleRack());
-    this.own(() => { this.handle?.destroy(); this.handle = undefined; });
-    upgradeProperties(this, ['effect']);
-    if (!this.root) this.root = this.attachShadow({mode: 'open'});
-    this.own(provideModuleContext(this, () => this.modularContext));
-    this.own(observeModuleContext(this, (upstream, state) => {
-      if (!upstream && state === 'missing' && this.fallbackAudio && this.modularUpstream) return;
-      if (sameModuleScope(upstream, this.modularUpstream)) { this.modularUpstream = upstream; return; }
-      this.releaseModuleRack();
-      if (!upstream && state === 'missing') {
-        this.fallbackAudio = new ModuleAudioEnvironment();
-        upstream = new ModuleContext({id: 'score-rack-root', audio: this.fallbackAudio});
-      }
-      this.modularUpstream = upstream;
-      if (upstream) {
-        this.moduleRack = new ScoreRackModule(upstream, {effect: this.assignedEffect, onError: (error) => this.reportError(error)});
-        this.modularContext = this.moduleRack.context;
-        this.unsubscribeModule = this.moduleRack.subscribe(() => {
-          this.notifyMembers?.();
-          notifyModuleChange(this);
-        });
-        this.reconcileModuleParts();
-      }
-      notifyModuleContext(this);
-      notifyModuleChange(this);
-      this.notifyMembers?.();
-    }));
-    this.addEventListener(RACK_PART_EVENT, this.onPartChanged);
-    this.own(() => this.removeEventListener(RACK_PART_EVENT, this.onPartChanged));
-    if (typeof MutationObserver !== 'undefined') {
-      const observer = new MutationObserver(() => this.reconcileModuleParts());
-      observer.observe(this, {childList: true});
-      this.own(() => observer.disconnect());
+  /** Build the module Rack in the borrowed scope; a borrowed Headless Rack needs none. */
+  private bindModuleRack(upstream: ModuleContext | undefined, state: 'ready' | 'pending' | 'missing'): void {
+    if (!upstream && state === 'missing' && this.fallbackAudio && this.modularUpstream) return;
+    if (sameModuleScope(upstream, this.modularUpstream) && (this.moduleRack || this.assignedRack)) { this.modularUpstream = upstream; return; }
+    this.releaseModuleRack();
+    if (this.assignedRack) { notifyModuleContext(this); return; }
+    if (!upstream && state === 'missing') {
+      this.fallbackAudio = new ModuleAudioEnvironment();
+      upstream = new ModuleContext({id: 'score-rack-root', audio: this.fallbackAudio});
     }
-    this.mountUI();
-    this.reconcileModuleParts();
+    this.modularUpstream = upstream;
+    if (upstream) {
+      this.moduleRack = new ScoreRackModule(upstream, {effect: this.assignedEffect, onError: (error) => this.reportError(error)});
+      this.modularContext = this.moduleRack.context;
+      this.unsubscribeModule = this.moduleRack.subscribe(() => {
+        this.notifyMembers?.();
+        notifyModuleChange(this);
+      });
+      this.reconcileModuleParts();
+    }
+    notifyModuleContext(this);
+    notifyModuleChange(this);
+    this.notifyMembers?.();
   }
 
   private reconcileModuleParts(): void {

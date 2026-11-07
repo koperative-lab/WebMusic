@@ -61,6 +61,7 @@ export class ScorePlayerModule implements ModuleHandle {
   private readonly listeners = new Set<() => void>();
   private readonly registration: ConnectionLease;
   private participant?: ReturnType<ModuleSession['register']>;
+  private sessionUnsubscribe?: () => void;
   private route?: ConnectionLease;
   private preparing?: Promise<void>;
   private disposed = false;
@@ -113,6 +114,18 @@ export class ScorePlayerModule implements ModuleHandle {
           get running() { return player.isPlaying(); },
           get clock() { return player.clock; },
         };
+        const scale = options.positionScale ?? 1;
+        const offset = options.offsetSeconds ?? 0;
+        // Before the engine follows the Session's scheduling (it attaches on
+        // preparation), mirror committed paused seeks and stops into it so its
+        // own playback source shows the Session position.
+        this.sessionUnsubscribe = session.subscribe((event) => {
+          if (event.type !== 'commit' || player.followsSession || this.disposed) return;
+          const command = event.commit.command.type;
+          if (command !== 'seek' && command !== 'stop') return;
+          const local = Math.max(0, event.snapshot.position * scale + offset);
+          void player.seekNominal(local).catch((error) => this.onError?.(error));
+        });
         this.participant = session.register(follower, {
           axis: 'score-nominal-seconds',
           offsetSeconds: options.offsetSeconds,
@@ -132,6 +145,7 @@ export class ScorePlayerModule implements ModuleHandle {
         });
       }
     } catch (error) {
+      this.sessionUnsubscribe?.();
       this.registration.release();
       this.notes.dispose();
       this.source.dispose();
@@ -228,6 +242,8 @@ export class ScorePlayerModule implements ModuleHandle {
 
   private async prepareCurrent(): Promise<void> {
     if (this.disposed) throw new Error('Score module preparation was cancelled.');
+    // A pending or conflicting document fails before any audio is requested.
+    this.player.assertDocumentPlayable();
     const audio = this.context.audio.prepare() as AudioContext;
     this.player.configureAudio(audio);
     await this.player.preload();
@@ -270,6 +286,7 @@ export class ScorePlayerModule implements ModuleHandle {
     this.heldNotes.clear();
     clean(() => this.notes.dispose());
     clean(() => this.source.dispose());
+    clean(() => this.sessionUnsubscribe?.());
     clean(() => this.participant?.release());
     clean(() => this.route?.release());
     clean(() => this.registration.release());

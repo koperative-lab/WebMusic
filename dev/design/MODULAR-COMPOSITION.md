@@ -501,18 +501,20 @@ change rebinds. Rounds 3–6.
 |---|---|
 | `composition` attribute, descendant-Rack selection, `AudioPlayerConnection` | Containment and module context |
 | `player=` on views, analysis, recorder and playlist; `source=` on live view | `input` and `port` |
-| `.rack` and `.controller` on `score-player` | Racks by containment or `input` |
-| Score `Rack`, `createRack`, `RackTransportController` | `ScoreRackModule` over the Kernel Rack |
 | `LoopPlayer` | Session loop region with a repeat count |
 | `AbPlayer` | Named source variants on the interactive Score source; selecting keeps Session position |
 | `TonePlayer` | Removed; external engines join as `external` participants |
-| `PlayerController`, `MidiPlayerController`, `bindClock`, the `Player` alias | Transport port commands and the Session |
+| `MidiPlayerController` and `Player` aliases, `bindClock` | `PlayerController` (kept for `.controller`), transport port commands and the Session |
 | Kernel `/sync` public entry | `TransportGroup` and `MirrorClockMaster` become Session internals |
 | Bridge `ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`, `clipAsMaster`, `scoreAsFollower` | One Session with Score and Audio modules; Bridge supplies axis mappings, for example from a beat grid |
 | Separate render graphs in `renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence` | Offline realization of the module graph |
 
 The 0.3.0 release notes list every removal with its replacement. Elements keep
-their tag names.
+their tag names. `score-player`'s `.rack` (an explicit Rack) and `.controller` (a
+borrowed controller) stay, implemented on the module path (round 5 choice in
+DEC-068); the Headless `Rack`, `createRack` and `PlayerController` therefore
+stay as their object types. A `score-rack-control` with an assigned `.rack` is
+backed by that Rack; without one it is a module Rack.
 
 ## Acceptance
 

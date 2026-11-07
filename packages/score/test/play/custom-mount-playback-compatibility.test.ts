@@ -134,6 +134,7 @@ describe('ScorePlayerElement custom mount compatibility', () => {
     expect(noteOn).not.toHaveBeenCalled();
     expect(visual.redraw).not.toHaveBeenCalled();
     player.remove();
+    await Promise.resolve();
     expect(player.destroyHandle).toHaveBeenCalledTimes(1);
   });
 });

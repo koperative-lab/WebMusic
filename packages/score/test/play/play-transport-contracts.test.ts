@@ -121,7 +121,9 @@ describe('Play transport mode contracts', () => {
     document.body.append(owner);
     await flush();
     const failure = new Error('resume failed');
-    vi.spyOn(ScorePlayer.prototype, method).mockRejectedValue(failure);
+    // Seeks go to the player's Session, which applies them to the engine on
+    // its nominal axis (DEC-068); a failing engine seek is reported once.
+    vi.spyOn(ScorePlayer.prototype, 'seekNominal').mockRejectedValue(failure);
     const errors: unknown[] = [];
     owner.addEventListener('webscore:error', (event) => errors.push((event as CustomEvent).detail.error));
     owner[method](0.5);

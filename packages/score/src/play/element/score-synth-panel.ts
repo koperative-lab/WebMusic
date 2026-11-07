@@ -50,7 +50,6 @@ import {mountLfo, type LfoBinding, type LfoHandle} from "@webmusic/ui/lfo";
 import {mountParameterRack, type ParameterRackBinding, type ParameterRackHandle} from "@webmusic/ui/parameter";
 import type {ModuleHandle, ParamHandle, ParamSurface} from '@webmusic/kernel/module';
 import {
-  isModularComposition,
   observeModuleContext,
   observeModuleTarget,
 } from '@webmusic/kernel/element';
@@ -653,7 +652,7 @@ export class SynthPanelElement extends WebMusicElement {
       ownResolution(observeModuleContext(this, (context, state) => {
         if (generation !== this.moduleBindingGeneration || !this.active) return;
         const previouslyAttached = this.attachedMode;
-        bind(context?.target, state !== 'missing' || isModularComposition(this));
+        bind(context?.target, state !== 'missing');
         if (!this.attachmentStarting) this.updateOwnershipMode(previouslyAttached);
       }));
     }

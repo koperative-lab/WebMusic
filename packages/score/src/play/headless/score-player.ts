@@ -413,6 +413,9 @@ export class ScorePlayer {
    * `when` that has already passed starts immediately without skipping
    * material; omitting it preserves the classic immediate start.
    */
+  /** Throw the document's not-ready or conflict error when its current revision cannot play. */
+  assertDocumentPlayable(): void { this.documents.assertPlayable(); }
+
   play(when?: number): Promise<void> {
     try { this.documents.assertPlayable(); } catch (error) { return Promise.reject(error); }
     if (!this.scheduler.isPlaying) this.playbackState = 'starting';

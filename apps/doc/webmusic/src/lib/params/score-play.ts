@@ -86,7 +86,6 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'off — volume is settable but has no control',
         note: 'Add a volume control to the chrome, as a horizontal fader or a rotary knob. Moves the same knob the volume attribute sets; needs the element to own its engine, so it is inert in .rack and .controller mode.',
       },
-      {name: 'composition', kind: 'enum', options: ['modules'], fallback: 'legacy', note: 'Opt in to explicit module scope, shared audio environment and Session transport; configure before connecting.'},
       {name: 'session', kind: 'enum', options: ['local'], fallback: 'inherit', note: 'Create an independent Session boundary instead of borrowing the nearest module Session.'},
       {name: 'controls', kind: 'enum', options: ['auto', 'show', 'hide'], fallback: 'auto', note: 'In module mode, auto hides inherited transport controls; show sends commands to the same Session, hide suppresses the local surface.'},
     ],

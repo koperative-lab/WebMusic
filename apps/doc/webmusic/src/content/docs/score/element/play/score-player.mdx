@@ -198,14 +198,19 @@ Native and Rack `play()` await preparation and startup. Borrowed controller
 mode delegates its command and resolves immediately; the controller's error
 channel is forwarded as `webscore:error`.
 
-## Opt-in module composition
+## Module composition
 
-Set `composition="modules"` before connection to give this player explicit
-module scope. A source-free outer player owns `SessionTransport`; a leaf with a
-source registers its actual engine once. Nested leaves borrow the nearest
-Session, including through layout wrappers and mixer scopes. `session="local"`
-creates an independent boundary. Legacy standalone behavior remains available
-when module composition is not selected.
+Every player is a module scope (DEC-068). The outermost player owns a
+`SessionTransport` — a standalone player is a Session of one — and a nested
+player borrows the nearest Session, including through layout wrappers and mixer
+scopes. A player with a source registers its actual engine once as a
+participant; its transport bar sends play, pause, stop and seek to the Session.
+A source-free outer player conducts its nested members. `session="local"`
+creates an independent boundary. A borrowed `.controller`, an explicit `.rack`
+and a custom `mountScore()` handle whose engine is not a native `ScorePlayer`
+keep their own transport and do not join the Session. Removing the element
+releases its engine and Session after the current task, so a synchronous move
+within the same scope keeps them.
 
 `controls="auto"` hides the transport of an inherited leaf, `show` displays a
 second control view of the same authority, and `hide` suppresses local chrome.
@@ -213,7 +218,7 @@ These controls do not register another participant. `.sessionTransport` exposes
 the borrowed/owned authority and `.module` exposes the local capability handle;
 a source-free root has no fabricated audio output.
 
-Module-mode play/pause/stop/seek/rate commands delegate to the Session. Seek is
+Play/pause/stop/seek/rate commands delegate to the Session. Seek is
 on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
 Unknown/live duration remains explicit on the Session snapshot instead of being
 reported as a known finite clip. Discovery does not prepare audio. See

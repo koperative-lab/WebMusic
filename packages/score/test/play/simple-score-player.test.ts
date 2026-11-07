@@ -192,6 +192,13 @@ function mount(
   return {element, events};
 }
 
+/** Detach like the DOM: disconnected first, cleanup after the layout-move microtask. */
+async function disconnect(element: ScorePlayerElement): Promise<void> {
+  (element as {isConnected: boolean}).isConnected = false;
+  element.disconnectedCallback();
+  await Promise.resolve();
+}
+
 afterEach(() => {
   state.scores.length = 0;
   state.loadRequests.length = 0;
@@ -305,7 +312,7 @@ describe('<score-player> transport events', () => {
 
     expect(resolveScore).toHaveBeenCalledTimes(1);
     expect(mountScore).toHaveBeenCalledWith(resolvedScore, expect.any(Object));
-    element.disconnectedCallback();
+    await disconnect(element);
     expect(state.destroy).toHaveBeenCalledTimes(1);
   });
 
@@ -374,7 +381,7 @@ describe('<score-player> transport events', () => {
     state.loadRequests[1]!.resolve(second);
     await flush();
     expect(element.resolvedScore).toBe(second);
-    element.disconnectedCallback();
+    await disconnect(element);
     expect(element.resolvedScore).toBeUndefined();
   });
 
@@ -498,7 +505,7 @@ describe('<score-player> URL cancellation', () => {
     const {element} = mount(null, {attributes: {src: 'pending.mid'}});
     await vi.waitFor(() => expect(state.loadRequests).toHaveLength(1));
 
-    element.disconnectedCallback();
+    await disconnect(element);
     expect(state.loadRequests[0]!.signal.aborted).toBe(true);
     await flush();
 

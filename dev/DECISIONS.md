@@ -2922,6 +2922,14 @@ Kernel's public `/sync` entry, and Bridge's `ScoreAudioSync` family (Session
 composition with Bridge axis mappings). DEC-011, DEC-016, DEC-017, DEC-018,
 DEC-029, DEC-063 and DEC-065 carry dated refinements.
 
+**Round 5 choice (2026-11-07):** measured against the test suites, forcing every
+instance onto the module path failed 162 tests whose behavior exists only on the
+legacy path (preset player UI, editor document binding, standalone synth panels
+with LFO and envelopes, `.rack` and `.controller`). The owner chose to port all of
+it into the module path and then delete the legacy path, adding rounds as
+needed. `.rack` and `.controller` therefore move into the module path instead of
+being retired; the retired-surface table is corrected accordingly.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

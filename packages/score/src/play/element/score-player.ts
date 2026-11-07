@@ -28,10 +28,11 @@ import type {Rack} from '../headless/rack';
 import type {Effect} from '../headless/effects';
 import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/base';
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
-import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
 import {ScorePlayerModule} from '../headless/score-module';
+import {ScorePlayer} from '../headless/score-player';
 import {mountModuleTransport, setModuleTransportVisibility} from './internal/module-transport';
 import {createModuleSoundfont} from './internal/lazy-module-soundfont';
 
@@ -132,7 +133,6 @@ export class ScorePlayerElement extends WebMusicElement {
       'loop',
       'time-control',
       'volume-control',
-      'composition',
       'session',
       'controls',
     ];
@@ -184,13 +184,15 @@ export class ScorePlayerElement extends WebMusicElement {
   // Sound-font synth cache: one AudioContext per element, reused across renders
   // instead of leaking a fresh context every attribute change.
   private ownedContext?: AudioContext;
+  private ownedScope?: ModuleAudioEnvironment;
+  /** The Session transport of a source-free aggregate root, when that is what is mounted. */
+  private aggregateHandle?: PresetPlayerHandle;
   private ownedSynth?: HeadlessSynth;
   private ownedSynthContext?: AudioContext;
   private ownedTemplate?: string;
   private playbackReadiness: ScorePlaybackReadiness = 'empty';
   private sourceRevision = 0;
   private playbackError?: unknown;
-  private modular = false;
   private readonly moduleId = `score-player-module-${++nextElementModuleId}`;
   private moduleContext?: ModuleContext;
   private moduleUpstream?: ModuleContext;
@@ -238,10 +240,12 @@ export class ScorePlayerElement extends WebMusicElement {
       documentBinding: this.documentBinding,
     };
   }, (seconds) => {
-    if (this.modular) return this.seekNominal(seconds);
-    const source = this.handle?.player?.playback;
     if (this.documentBlocked) return Promise.reject(this.documentBlocked);
-    if (!source?.seekNominal) return Promise.reject(new Error('Native score playback is unavailable.'));
+    // A companion's seek goes straight to the Session on the nominal axis.
+    if (this.moduleSource && this.moduleContext?.session) return this.sessionSeekNominal(seconds);
+    const source = this.handle?.player?.playback;
+    // A custom mount without a native source still takes nominal seeks.
+    if (!source?.seekNominal) return this.seekNominal(seconds);
     return source.seekNominal(seconds);
   });
 
@@ -251,7 +255,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   get module(): ModuleHandle | undefined {
-    return this.modular && this.moduleContext ? this.moduleFacade : undefined;
+    return this.moduleContext ? this.moduleFacade : undefined;
   }
 
   /** Borrow the current command authority without preparing audio. */
@@ -260,16 +264,14 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   override disconnectedCallback(): void {
-    if (!this.modular) { super.disconnectedCallback(); return; }
     // A synchronous layout move keeps the engine and Session registration.
     queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
   }
 
   protected override onMount(): void {
-    this.modular = isModularComposition(this);
-    if (this.modular) { this.mountModularComposition(); return; }
     // Register lifetime teardown before property upgrades or mounts: an
     // inherited setter/hook may fail, but a partial player/load must not leak.
+    this.own(() => this.releaseModularComposition());
     this.own(() => this.teardown());
     // A `<score-rack-control>` written inside this element announces its rack upward;
     // this is also PULLED below, because whichever of the two upgraded first
@@ -300,19 +302,28 @@ export class ScorePlayerElement extends WebMusicElement {
     // After the upgrade, so a property assigned before this element upgraded
     // still wins over the markup.
     this.syncKnobAttributes();
-    this.bindEditorSource();
+    // Bind the editor first so the render the scope binding requests sees it.
+    this.bindEditorSource(false);
+    // Every player is a module provider (DEC-068): the outermost one owns the
+    // Session, nested ones borrow it. Binding the scope requests the render.
+    this.own(provideModuleContext(this, () => this.moduleContext));
+    this.own(observeModuleContext(this, (upstream, state) => {
+      if (sameModuleScope(upstream, this.moduleUpstream)) { this.moduleUpstream = upstream; return; }
+      if (!upstream && state === 'missing' && this.moduleAudio && this.moduleContext) return;
+      this.bindModularContext(upstream, state);
+    }));
   }
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
     if (name && !ScorePlayerElement.observedAttributes.includes(name)) return;
-    if (name === 'composition' || (name === 'session' && this.modular)) {
+    if (name === 'session') {
       super.disconnectedCallback();
       super.connectedCallback();
       return;
     }
-    if (name === 'controls' && this.modular) {
-      if (this.handle) setModuleTransportVisibility(this.handle.element, this.moduleControlsVisible);
+    if (name === 'controls') {
+      if (this.handle?.element) setModuleTransportVisibility(this.handle.element, this.moduleControlsVisible);
       return;
     }
     if (name === 'loading') {
@@ -509,7 +520,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private setAudioConfiguration(context: AudioContext | undefined, destination: AudioNode | undefined): void {
-    const modular = this.modular || isModularComposition(this);
+    const modular = true;
     const selected = context ?? destination?.context;
     if (modular) {
       if (context && destination && destination.context !== context) throw new Error('Destination must use the same AudioContext.');
@@ -522,7 +533,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.explicitContext = context;
     this.explicitDestination = destination;
     if (!this.isConnected) return;
-    if (this.modular && this.moduleAudio && this.moduleContext) {
+    if (this.moduleAudio && this.moduleContext) {
       if (selected !== this.moduleAudio.peek() && (selected || previous)) {
         // A new reference clock requires a fresh, paused Session and scope.
         // Validation above happens before releasing the working owner.
@@ -548,8 +559,10 @@ export class ScorePlayerElement extends WebMusicElement {
     this.setRateValue(rate, true);
   }
   get rate(): number {
-    if (this.modular) return this.moduleContext?.session?.snapshot.rate ?? this.rateValue;
-    return this.externalController?.rate ?? this.handle?.player?.rate ?? this.rateValue;
+    if (this.externalController) return this.externalController.rate;
+    if (this.explicitRack || this.composedRack) return this.rateValue;
+    if (!this.moduleSource && this.handle?.player) return this.handle.player.rate;
+    return this.moduleContext?.session?.snapshot.rate ?? this.rateValue;
   }
 
   /** Master volume (linear, 1 = unchanged). Applies live. */
@@ -631,22 +644,41 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private applyRate(explicit: boolean): void {
-    if (this.modular && this.moduleContext?.session) {
-      if (explicit || this.ownedSession) void this.moduleContext.session.setRate(this.rateValue).catch((error) => this.reportPlaybackError(error));
-      return;
-    }
     // A borrowed controller owns its transport; only an explicit `.rate` set
     // reaches it (render() never re-pushes stored state onto it).
     if (this.externalController) {
       if (explicit) this.externalController.setRate(this.rateValue);
       return;
     }
-    this.handle?.player?.setRate(this.rateValue);
+    // A Rack keeps its own member clocks; it has no single player rate.
+    if (this.explicitRack || this.composedRack) { this.emitState(); return; }
+    // A custom mount's engine is outside the Session and takes its own rate.
+    if (!this.moduleSource && this.handle?.player) {
+      this.handle.player.setRate(this.rateValue);
+      this.emitState();
+      return;
+    }
+    // Only the Session owner maps its declarative rate; an inherited leaf never
+    // rewrites its provider's transport unless the rate is set explicitly.
+    const session = this.moduleContext?.session;
+    if (session && (explicit || this.ownedSession)) {
+      const player = this.moduleSource?.player;
+      // Before the engine joins Session scheduling it reports its own rate.
+      if (player && !player.followsSession) player.setRate(this.rateValue);
+      void session.setRate(this.rateValue).catch((error) => this.reportPlaybackError(error));
+    }
     this.emitState();
   }
 
   private applyLoop(): void {
-    if (this.modular) {
+    if (this.explicitRack || this.composedRack || this.externalController) return;
+    const custom = !this.moduleSource ? this.handle?.player : undefined;
+    if (custom) {
+      if (this.loopOn) custom.setLoop(0, custom.durationSeconds);
+      else custom.clearLoop();
+      return;
+    }
+    {
       if (!this.isConnected) return;
       const session = this.moduleContext?.session;
       if (!session || (!this.ownedSession && !this.pinnedLoop)) return;
@@ -656,17 +688,11 @@ export class ScorePlayerElement extends WebMusicElement {
       const current = session.snapshot.loop;
       if (current?.startSeconds === loop?.startSeconds && current?.endSeconds === loop?.endSeconds) return;
       void session.setLoop(loop).catch((error) => this.reportPlaybackError(error));
-      return;
     }
-    const player = this.handle?.player;
-    if (!player) return;
-    if (this.loopOn) player.setLoop(0, player.durationSeconds);
-    else player.clearLoop();
   }
 
   play(): Promise<void> {
     if (this.documentBlocked) return Promise.reject(this.documentBlocked);
-    if (this.modular) return this.moduleContext?.session?.play().then(() => undefined) ?? Promise.resolve();
     if (this.hasEditorSource() && !this.handle?.player) {
       return Promise.reject(new ScoreDocumentApplicationError('not-ready', 'Document playback is not ready.'));
     }
@@ -676,27 +702,27 @@ export class ScorePlayerElement extends WebMusicElement {
       this.externalController.play();
       return Promise.resolve();
     }
-    return this.handle?.play() ?? Promise.resolve();
+    return this.handle?.play() ?? this.moduleContext?.session?.play().then(() => undefined) ?? Promise.resolve();
   }
 
   pause(): void {
-    if (this.modular) { void this.moduleContext?.session?.pause().catch((error) => this.reportPlaybackError(error)); return; }
     if (this.externalController) {
       this.externalController.pause();
       return;
     }
-    this.handle?.pause();
+    if (this.handle) this.handle.pause();
+    else void this.moduleContext?.session?.pause().catch((error) => this.reportPlaybackError(error));
     this.emitState();
   }
 
   /** Stop and rewind to the start. */
   stop(): void {
-    if (this.modular) { void this.moduleContext?.session?.stop().catch((error) => this.reportPlaybackError(error)); return; }
     if (this.externalController) {
       this.externalController.stop();
       return;
     }
-    this.handle?.stop();
+    if (this.handle) this.handle.stop();
+    else void this.moduleContext?.session?.stop().catch((error) => this.reportPlaybackError(error));
     this.activeNotes.clear();
     this.dispatchEvent(new CustomEvent('webscore:stop', {bubbles: true}));
     this.emitState();
@@ -705,15 +731,12 @@ export class ScorePlayerElement extends WebMusicElement {
   /** Jump to a position in seconds (clamped to `[0, duration]`). */
   seek(seconds: number): void {
     if (this.documentBlocked) { this.reportPlaybackError(this.documentBlocked, 'seek'); return; }
-    if (this.modular) { void this.moduleContext?.session?.seek(seconds).catch((error) => this.reportPlaybackError(error, 'seek')); return; }
     if (this.externalController) {
       this.externalController.seek(seconds);
       return;
     }
     const handle = this.handle;
-    const player = handle?.player;
-    if (player) this.reportSeekFailure(player.seek(seconds), handle);
-    else if (handle?.seek) this.reportSeekFailure(handle.seek(seconds), handle);
+    if (handle?.seek) this.reportSeekFailure(handle.seek(seconds), handle);
     else if (handle?.seekFraction) {
       this.reportSeekFailure(handle.seekFraction(this.duration > 0 ? seconds / this.duration : 0), handle);
     }
@@ -725,10 +748,6 @@ export class ScorePlayerElement extends WebMusicElement {
   /** Seek in nominal score seconds; delegates to the existing transport. */
   seekNominal(seconds: number): Promise<void> {
     if (this.documentBlocked) return Promise.reject(this.documentBlocked);
-    if (this.modular) {
-      if (!this.moduleSource) return Promise.reject(new Error('This aggregate Session has no nominal score axis.'));
-      return this.moduleContext?.session?.seek(seconds).then(() => undefined) ?? Promise.resolve();
-    }
     if (this.externalController) {
       this.externalController.seek(seconds / this.externalController.rate);
       return Promise.resolve();
@@ -737,8 +756,11 @@ export class ScorePlayerElement extends WebMusicElement {
       return Promise.reject(new Error('Rack has no single nominal score axis; use seek() or seekFraction().'));
     }
     const handle = this.handle;
-    const pending = handle?.player ? handle.player.seekNominal(seconds)
-      : Promise.resolve(handle?.seek?.(seconds / this.rateValue));
+    if (handle && handle === this.aggregateHandle) return Promise.reject(new Error('This aggregate Session has no nominal score axis.'));
+    const session = this.moduleContext?.session;
+    const pending = this.moduleSource && session ? this.sessionSeekNominal(seconds)
+      : handle?.player ? handle.player.seekNominal(seconds)
+        : Promise.resolve(handle?.seek?.(seconds / this.rateValue));
     if (handle !== this.handle || !this.isConnected) return pending;
     this.dispatchEvent(new CustomEvent('webscore:seek', {bubbles: true}));
     if (handle === this.handle && this.isConnected) this.emitState();
@@ -748,15 +770,14 @@ export class ScorePlayerElement extends WebMusicElement {
   /** Jump to a fraction of the piece (`0` = start, `1` = end). */
   seekFraction(fraction: number): void {
     if (this.documentBlocked) { this.reportPlaybackError(this.documentBlocked, 'seek'); return; }
-    if (this.modular) { this.seek(Math.max(0, Math.min(1, fraction)) * this.duration); return; }
     if (this.externalController) {
       this.externalController.seekFraction(fraction);
       return;
     }
+    // The native source seeks through seek() so one public call emits one event.
+    if (this.moduleSource) { this.seek(Math.max(0, Math.min(1, fraction)) * this.duration); return; }
     const handle = this.handle;
-    const player = handle?.player;
-    if (player) this.reportSeekFailure(player.seekFraction(fraction), handle);
-    else this.reportSeekFailure(handle?.seekFraction?.(fraction), handle);
+    this.reportSeekFailure(handle?.seekFraction?.(fraction), handle);
     if (handle !== this.handle || !this.isConnected) return;
     this.dispatchEvent(new CustomEvent('webscore:seek', {bubbles: true}));
     if (handle === this.handle && this.isConnected) this.emitState();
@@ -899,8 +920,8 @@ export class ScorePlayerElement extends WebMusicElement {
   private rollbackFailedRender(error: unknown): void {
     const failures: unknown[] = [error];
     try {
-      this.teardown(this.modular && !!this.modulePendingSource);
-      if (this.modular) this.releaseModuleSource();
+      this.teardown(!!this.modulePendingSource);
+      this.releaseModuleSource();
     } catch (cleanupError) {
       failures.push(cleanupError);
     }
@@ -933,7 +954,8 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Reconcile both additions and removals against the currently attached desk. */
   private adoptComposedRack(): boolean {
-    if (this.modular) return false;
+    // Only a desk backed by a borrowed Headless Rack is adopted; a module desk
+    // joins this player's Session through the module scope instead.
     const desk = this.querySelector(RACK_DESK_TAG);
     const rack = (desk as {rack?: Rack} | null)?.rack;
     if (rack === this.composedRack) return false;
@@ -986,7 +1008,10 @@ export class ScorePlayerElement extends WebMusicElement {
 
   protected async render(reuseDocument = false): Promise<void> {
     this.syncPreparationStatus();
-    if (this.modular) { await this.renderModular(); return; }
+    // The module scope arrives synchronously on mount; a pending provider
+    // boundary re-requests the render once it resolves.
+    const context = this.moduleContext;
+    if (!context?.session) return;
     // A caller can remove the desk and assign a score before the observer's
     // microtask. Never mount the removed desk's now-disposed Rack in that gap.
     this.adoptComposedRack();
@@ -1006,7 +1031,8 @@ export class ScorePlayerElement extends WebMusicElement {
         this.documentBlocked = undefined;
         handle.setUnavailable?.();
         if (handle !== this.handle || !this.isConnected) return;
-        handle.player!.setDocumentSource(editor);
+        if (this.moduleSource) this.moduleSource.setDocumentSource(editor);
+        else handle.player!.setDocumentSource(editor);
         if (handle !== this.handle || !this.isConnected) return;
         this.reflectDocumentState();
         this.playbackPublisher.notify();
@@ -1017,6 +1043,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.cancelLoad();
     const token = this.loadToken;
     this.replaceHandle(undefined);
+    this.releaseModuleSource();
     if (token !== this.loadToken || !this.isConnected) return;
     this.clearStatus();
     this.playbackError = undefined;
@@ -1047,15 +1074,41 @@ export class ScorePlayerElement extends WebMusicElement {
 
     const controller = new AbortController();
     this.loadController = controller;
+    // A declared source holds the Session's start until this player registers.
+    const pending = !editor && !this.explicitScore && this.getAttribute('src') ? context.session.holdPendingSource() : undefined;
+    this.modulePendingSource = pending;
     this.showStatus('loading', 'Loading score');
     let score: Score | undefined;
     try {
       score = editor ? editor.getSnapshot().content : await this.resolveScore(controller.signal);
+    } catch (error) {
+      pending?.reject(error);
+      throw error;
     } finally {
       if (this.loadController === controller) this.loadController = undefined;
     }
-    if (token !== this.loadToken || !this.isConnected) return; // superseded or detached
+    if (token !== this.loadToken || !this.isConnected || context !== this.moduleContext) return; // superseded or detached
 
+    if (!score && pending) {
+      const error = new Error('The declared score source did not produce a score.');
+      pending.reject(error);
+      throw error;
+    }
+    if (!score && this.isAggregateRoot(context)) {
+      // A source-free Session root conducts its nested members (DEC-063).
+      const handle = mountModuleTransport(this.ensureTransportHost(), context.session, undefined, {
+        visible: this.moduleControlsVisible,
+        time: this.timeControl, volume: this.volumeControl, onError: (error) => this.reportPlaybackError(error),
+        getVolume: () => this.volumeValue, onVolumeChange: (value) => this.setVolumeValue(value),
+      });
+      if (!this.commitHandle(handle, token)) return;
+      this.aggregateHandle = handle;
+      this.playbackReadiness = 'unavailable';
+      this.playbackPublisher.notify();
+      this.applyLoop();
+      this.publishModuleChange();
+      return;
+    }
     if (!score) {
       this.playbackReadiness = 'empty';
       // Status uses the owned transport host too, preserving authored desks
@@ -1066,7 +1119,19 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     const audio = this.buildSynth();
     if (token !== this.loadToken || !this.isConnected) return;
+    const session = context.session;
     const candidate = this.mountScore(score, {
+      transport: {
+        play: () => session.play().then(() => undefined),
+        pause: () => { void session.pause().catch((error) => this.reportPlaybackError(error)); },
+        stop: () => {
+          // As with seeks, a paused engine outside Session scheduling rewinds at once.
+          const engine = this.moduleSource?.player;
+          if (engine && !engine.followsSession) engine.stop();
+          void session.stop().catch((error) => this.reportPlaybackError(error));
+        },
+        seekNominal: (seconds) => this.sessionSeekNominal(seconds),
+      },
       documentSource: editor,
       ...audio,
       synth: this.explicitSound ?? audio.synth,
@@ -1130,12 +1195,31 @@ export class ScorePlayerElement extends WebMusicElement {
         this.dispatchEvent(new CustomEvent('webscore:end', {bubbles: true}));
       },
     });
-    if (!this.commitHandle(candidate, token)) return;
+    if (!this.commitHandle(candidate, token)) { pending?.release(); return; }
     this.mountedDocument = Boolean(editor);
     const current = () => token === this.loadToken && this.isConnected && this.handle === candidate;
+    if (candidate.player instanceof ScorePlayer) {
+      // The mounted native engine is this player's module and Session
+      // participant. A custom mount's engine stays outside the Session and
+      // keeps receiving its own commands.
+      try {
+        const source = new ScorePlayerModule(score, {id: this.moduleId, context, player: candidate.player,
+          onError: (error) => this.reportPlaybackError(error)});
+        this.moduleSource = source;
+        this.moduleUnsubscribe = source.subscribe(() => this.publishModuleChange());
+        pending?.resolve();
+      } catch (error) {
+        pending?.reject(error);
+        throw error;
+      } finally {
+        if (this.modulePendingSource === pending) this.modulePendingSource = undefined;
+      }
+    } else pending?.release();
+    if (candidate.element) setModuleTransportVisibility(candidate.element, this.moduleControlsVisible);
+    if (!current()) return;
     // Player setters can synchronously dispatch events whose listeners replace
     // this mount. Do not continue configuring or publish data for that old pass.
-    candidate.player?.setRate(this.rateValue);
+    this.applyRate(false);
     if (!current()) return;
     candidate.player?.setVolume(this.volumeValue);
     if (!current()) return;
@@ -1145,7 +1229,27 @@ export class ScorePlayerElement extends WebMusicElement {
     if (!current()) return;
     if (!editor) this.setResolvedScore(score);
     if (current()) this.publishMountedPlayback();
+    if (current()) this.publishModuleChange();
     if (current()) this.emitState();
+  }
+
+  /**
+   * Seek this player's Session in nominal score seconds. A paused engine that
+   * does not follow the Session yet shows the new position at once; the
+   * Session commit applies (and reports) it too.
+   */
+  private sessionSeekNominal(seconds: number): Promise<void> {
+    const session = this.moduleContext?.session;
+    if (!session) return Promise.resolve();
+    const engine = this.moduleSource?.player;
+    if (engine && !engine.followsSession) void engine.seekNominal(seconds).catch(() => undefined);
+    return session.seek(seconds).then(() => undefined);
+  }
+
+  /** A source-free player with nested Session members, or that owns a Session others joined. */
+  private isAggregateRoot(context: ModuleContext): boolean {
+    const session = context.session;
+    return !!session && (session.participantCount > 0 || session.snapshot.pendingSourceCount > 0 || context.registry.snapshot().length > 0);
   }
 
   /**
@@ -1315,6 +1419,19 @@ export class ScorePlayerElement extends WebMusicElement {
       return {};
     }
     const externalContext = this.explicitContext ?? (this.explicitDestination?.context as AudioContext | undefined);
+    // Without an explicit context the sampler borrows the module scope's audio
+    // environment and allocates nothing until preparation (DEC-068).
+    if (!externalContext && this.moduleContext) {
+      if (this.ownedSynth && !this.ownedSynthContext && this.ownedTemplate === template && this.ownedScope === this.moduleContext.audio) {
+        return {synth: this.ownedSynth};
+      }
+      this.clearSoundfontSynth();
+      const synth = createModuleSoundfont(this.moduleContext, template);
+      this.ownedSynth = synth;
+      this.ownedTemplate = template;
+      this.ownedScope = this.moduleContext.audio;
+      return {synth};
+    }
     // Reuse the context + synth built for this template — re-rendering (attribute
     // changes, score swaps) must not stack up AudioContexts.
     if (
@@ -1355,6 +1472,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.ownedSynth = undefined;
     this.ownedSynthContext = undefined;
     this.ownedTemplate = undefined;
+    this.ownedScope = undefined;
     this.ownedContext = undefined;
     if (context && context.state !== 'closed') void context.close().catch(() => undefined);
   }
@@ -1399,20 +1517,6 @@ export class ScorePlayerElement extends WebMusicElement {
     if (cleanupError !== undefined) throw cleanupError;
   }
 
-  private mountModularComposition(): void {
-    this.own(() => this.releaseModularComposition());
-    this.own(() => this.teardown());
-    this.own(() => { this.rackHost?.remove(); this.rackHost = undefined; });
-    upgradeProperties(this, ['score', 'sound', 'effect', 'audioContext', 'destination', 'rate', 'volume', 'pan', 'loop']);
-    this.syncKnobAttributes();
-    this.own(provideModuleContext(this, () => this.moduleContext));
-    this.own(observeModuleContext(this, (upstream, state) => {
-      if (sameModuleScope(upstream, this.moduleUpstream)) { this.moduleUpstream = upstream; return; }
-      if (!upstream && state === 'missing' && this.moduleAudio && this.moduleContext) return;
-      this.bindModularContext(upstream, state);
-    }));
-  }
-
   private bindModularContext(upstream: ModuleContext | undefined, state: 'ready' | 'pending' | 'missing'): void {
     this.releaseModularComposition();
     if (state === 'pending') {
@@ -1437,80 +1541,14 @@ export class ScorePlayerElement extends WebMusicElement {
     this.moduleContext = upstream.derive({id: `${this.moduleId}:context`, session, target: this.moduleFacade});
     this.moduleSessionUnsubscribe = session.subscribe((event) => {
       if (event.type === 'snapshot' || event.type === 'participants' || event.type === 'source-error') this.applyLoop();
+      // A source-free player waiting for a score becomes the aggregate root
+      // once nested members join its Session.
+      if (event.type === 'participants' && !this.handle && !this.loadController && this.moduleContext &&
+        !this.explicitScore && !this.getAttribute('src') && !this.hasEditorSource() && this.isAggregateRoot(this.moduleContext)) this.requestRender();
     });
     if (this.ownedSession) this.applyRate(false);
     notifyModuleContext(this);
     this.requestRender();
-  }
-
-  private async renderModular(): Promise<void> {
-    const context = this.moduleContext;
-    if (!context?.session) return;
-    this.cancelLoad();
-    const token = this.loadToken;
-    this.replaceHandle(undefined);
-    this.releaseModuleSource();
-    this.playbackReadiness = 'loading';
-    this.playbackPublisher.notify();
-    const controller = new AbortController();
-    this.loadController = controller;
-    const pending = !this.explicitScore && this.getAttribute('src') ? context.session.holdPendingSource() : undefined;
-    this.modulePendingSource = pending;
-    // Same loading feedback as a standalone player; committing the transport clears it.
-    this.showStatus('loading', 'Loading score');
-    let score: Score | undefined;
-    try { score = await this.resolveScore(controller.signal); }
-    catch (error) { pending?.reject(error); throw error; }
-    finally { if (this.loadController === controller) this.loadController = undefined; }
-    if (token !== this.loadToken || !this.isConnected || context !== this.moduleContext) return;
-    try {
-      if (!score && pending) throw new Error('The declared score source did not produce a score.');
-      if (score) {
-      const template = this.getAttribute('sound-font');
-      const soundfont = !this.explicitSound && template?.includes('{midi}') ? createModuleSoundfont(context, template) : undefined;
-      const source = new ScorePlayerModule(score, {
-        id: this.moduleId, context, synth: this.explicitSound ?? soundfont, synthOwnership: soundfont ? 'owned' : 'borrowed', effect: this.explicitEffect,
-        audioContext: this.explicitContext, destination: this.explicitDestination,
-        onError: (error) => this.reportPlaybackError(error),
-      });
-      this.moduleSource = source;
-      source.player.setVolume(this.volumeValue);
-      source.player.setPan(this.panValue);
-      const current = () => token === this.loadToken && this.moduleSource === source && this.isConnected;
-      const subscriptions = [
-        source.subscribe(() => this.publishModuleChange()),
-        source.player.on('noteOn', (note) => { if (current()) this.emitNote('webscore:noteon', note, score!); }),
-        source.player.on('noteOff', (note) => { if (current()) this.emitNote('webscore:noteoff', note, score!); }),
-        source.player.on('timeupdate', (update) => {
-          if (!current()) return;
-          this.dispatchEvent(new CustomEvent('webscore:timeupdate', {bubbles: true, detail: {
-            ...update, seconds: update.nominalSeconds, rate: source.player.rate, playing: source.player.isPlaying(),
-          }}));
-        }),
-        source.player.on('end', () => {
-          if (!current()) return;
-          this.dispatchEvent(new CustomEvent('webscore:end', {bubbles: true}));
-          this.emitState();
-        }),
-      ];
-      this.moduleUnsubscribe = () => { for (const unsubscribe of subscriptions) unsubscribe(); };
-      }
-      pending?.resolve();
-      if (this.modulePendingSource === pending) this.modulePendingSource = undefined;
-    } catch (error) {
-      pending?.reject(error);
-      throw error;
-    }
-    const handle = mountModuleTransport(this.ensureTransportHost(), context.session, this.moduleSource, {
-      visible: this.moduleControlsVisible,
-      time: this.timeControl, volume: this.volumeControl, onError: (error) => this.reportPlaybackError(error),
-      getVolume: () => this.volumeValue, onVolumeChange: (value) => this.setVolumeValue(value),
-    });
-    if (!this.commitHandle(handle, token)) return;
-    this.setResolvedScore(score);
-    this.publishMountedPlayback();
-    this.applyLoop();
-    this.publishModuleChange();
   }
 
   private get moduleControlsVisible(): boolean {

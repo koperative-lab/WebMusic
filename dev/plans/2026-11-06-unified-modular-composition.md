@@ -117,12 +117,22 @@ run in this order on `modular-redesign`; each ends with its exit evidence,
 | 2 | U1 | Five Kernel port families, input/provider helpers, conformance kit |
 | 3 | U2 | Neutral Kernel Rack, Session root election and Session-of-one, sinks |
 | 4 | U3.1–U3.2 | Score Headless modules, inputs, outputs and legacy runtime removal |
-| 5 | U3.3 | Score Play Elements on one path |
-| 6 | U4 | Audio Play Headless and Elements |
+| 5 | U3.3 | Score Play Elements on one path (expanded, see below) |
+| 6 | U4 | Audio Play Headless and Elements (expanded, see below) |
 | 7 | U5–U6 | Score and Audio views and analysis as companions |
 | 8 | U7–U8 | Bridge modules, UI Kit and React adapters |
 | 9 | U9 | References, demos and site |
 | 10 | U10 | Enforcement, acceptance and release preparation |
+
+**2026-11-07 expansion.** Forcing the module path everywhere failed 162 tests
+(Score 126, Audio 31, site 2) because the legacy path alone implements preset
+player UI, editor document binding, standalone synth panels (LFO, envelopes),
+`.rack` and `.controller`. The owner chose to port all of it, then delete the
+legacy path; rounds 5 and 6 become as many sub-rounds as that takes (5a, 5b, …),
+each committed with a passing `npm run check`. Work order: make `composition`
+inert (module path everywhere), then port by failing cluster — standalone
+player engine and presets, editor documents, `.rack`/`.controller`, standalone
+synth panels, Rack parts and transport contracts — then delete the legacy code.
 
 ### U0 — Contract (1 session, documentation only)
 

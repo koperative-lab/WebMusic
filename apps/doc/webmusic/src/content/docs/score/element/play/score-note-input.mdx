@@ -57,14 +57,14 @@ Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chord
 
 ## Play the nearest instrument
 
-Inside a `composition="modules"` player scope, `routing="auto"` (the default)
+Inside a player scope, `routing="auto"` (the default)
 borrows the nearest module's `SCORE_NOTE_INPUT` capability. The first press
 prepares its sound and resumes its audio context; it does not start the score or
 Session transport. An instrument-less module is a boundary, so the input does
 not search outward for an unrelated sound.
 
 ```html
-<score-player composition="modules" src="/midi/Arabesque%20No.1.mid">
+<score-player src="/midi/Arabesque%20No.1.mid">
   <score-note-input keyboard></score-note-input>
   <score-synth-panel sections="sound,envelope"></score-synth-panel>
 </score-player>

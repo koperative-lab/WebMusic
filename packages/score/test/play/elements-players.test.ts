@@ -1497,7 +1497,7 @@ describe('<score-rack-control>', () => {
     host.disconnect();
   });
 
-  it('seeds an owned rack with an effect assigned before connection', () => {
+  it('seeds its module Rack with an effect assigned before connection', () => {
     const effect = Effect.chain(Effect.delay({wet: 0.25}), Effect.compressor());
     const part = {
       rackPartDeclaration: () => ({id: 'lead', score: buildScore('lead')}),
@@ -1507,7 +1507,10 @@ describe('<score-rack-control>', () => {
     (host.el as RackControlElement).effect = effect;
 
     host.connect();
-    expect((host.el as RackControlElement).rack?.effect).toBe(effect);
+    // Without an assigned Headless Rack the desk is a module Rack (DEC-068).
+    expect((host.el as RackControlElement).rack).toBeUndefined();
+    expect((host.el as RackControlElement).module).toBeDefined();
+    expect((host.el as RackControlElement).effect).toBe(effect);
     host.disconnect();
   });
 

@@ -5,7 +5,6 @@ import {createScoreEditor, type ScoreEditor} from '../../src/view/headless';
 import {ScorePlayerElement, type ScorePlayerTimeUpdateEventDetail} from '../../src/play/element/score-player';
 import {mountPresetPlayer, type PresetPlayerHandle, type PresetPlayerOptions} from '../../src/play/element/internal/preset-player';
 import {ScorePlayer} from '../../src/play/headless/score-player';
-import type {ScorePlayerScheduler} from '../../src/play/headless/score-player-scheduler';
 
 class InspectablePlayer extends ScorePlayerElement {
   readonly engines: ScorePlayer[] = [];
@@ -43,7 +42,12 @@ function player(source?: ScoreEditor): InspectablePlayer {
   document.body.append(element);
   return element;
 }
-const loopOf = (engine: ScorePlayer) => (engine as unknown as {scheduler: ScorePlayerScheduler}).scheduler.nominalLoop;
+// The whole-piece loop is the player's Session loop (DEC-068), in Session seconds.
+const loopOf = (element: ScorePlayerElement) => {
+  const loop = element.sessionTransport?.snapshot.loop;
+  return loop ? [loop.startSeconds, loop.endSeconds] : undefined;
+};
+const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
 beforeAll(() => {
   customElements.define('test-editor-player', InspectablePlayer);
   customElements.define('test-flaky-editor-player', FlakyPlayer);
@@ -116,6 +120,7 @@ describe('Score Player Element editor binding', () => {
     // The caller owns both editors; replacing or detaching does not dispose them.
     expect(first.getSnapshot().status).toBe('ready');
     element.remove();
+    await Promise.resolve();
     expect(engine.documentSource).toBeUndefined();
     expect(second.getSnapshot().status).toBe('ready');
     document.body.append(element);
@@ -214,16 +219,19 @@ describe('Score Player Element editor binding', () => {
     element.editor = source;
     document.body.append(element);
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
-    const engine = element.engines[0];
+    expect(element.engines).toHaveLength(1);
     expect(element.loop).toBe(true);
-    expect(loopOf(engine)).toEqual([0, 0.5]);
+    await settle();
+    expect(loopOf(element)).toEqual([0, 0.5]);
     source.transaction('Move', (tx) => tx.add({type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 1]}));
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
-    expect(loopOf(engine)).toEqual([0, 1]);
+    await settle();
+    expect(loopOf(element)).toEqual([0, 1]);
     element.loop = false;
     source.undo();
     await element.waitForDocumentRevision(source.getSnapshot());
-    expect(loopOf(engine)).toBeUndefined();
+    await settle();
+    expect(loopOf(element)).toBeUndefined();
   });
 
   it('dispatches one timeupdate when an applied revision clamps the position', async () => {
@@ -251,6 +259,7 @@ describe('Score Player Element editor binding', () => {
     element.editor = source;
     expect(element.hasAttribute('data-editor-state')).toBe(true);
     element.remove();
+    await Promise.resolve();
     expect(element.hasAttribute('data-editor-state')).toBe(false);
   });
 

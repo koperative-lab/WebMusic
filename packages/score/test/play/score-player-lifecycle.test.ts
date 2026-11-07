@@ -134,6 +134,8 @@ describe('score-player lifecycle with real transport owners', () => {
     expect(host.querySelector('[role="alert"]')?.closest('[hidden]')).toBeNull();
     host.loading = true;
     host.remove();
+    // Cleanup follows the layout-move microtask (DEC-068).
+    await Promise.resolve();
     expect(host.playback.snapshot().readiness).toBe('disposed');
     expect(host.querySelector('[data-kind="loading"]')).toBeNull();
   });
@@ -180,6 +182,7 @@ describe('score-player lifecycle with real transport owners', () => {
     expect(host.querySelector('[part~="play"]')).not.toBeNull();
     expect(authored.parentElement).toBe(host);
     host.remove();
+    await Promise.resolve();
     expect(host.querySelector('[data-rack-transport]')).toBeNull();
     expect(authored.parentElement).toBe(host);
   });
@@ -208,6 +211,7 @@ describe('score-player lifecycle with real transport owners', () => {
     await vi.waitFor(() => expect(source.load).toHaveBeenCalledOnce());
     const signal = source.load.mock.calls[0]![1].signal as AbortSignal;
     host.remove();
+    await Promise.resolve();
     expect(signal.aborted).toBe(true);
     expect(host.querySelector('[role="status"]')).toBeNull();
     finish(score());
@@ -286,12 +290,13 @@ describe('score-player lifecycle with real transport owners', () => {
     host.append(desk);
     document.body.append(host);
     await flush();
-    const oldRack = desk.rack!;
-    expect(oldRack).toBeDefined();
+    // The owned desk is a module Rack, not a borrowed Headless Rack (DEC-068).
+    expect(desk.rack).toBeUndefined();
+    expect(desk.module).toBeDefined();
     desk.remove();
     if (assignImmediately) host.score = score();
     await flush();
-    await expect(oldRack.play()).rejects.toThrow('disposed');
+    expect(desk.module).toBeUndefined();
     expect(host.duration).toBe(2);
     host.seek(0.5);
     expect(host.currentTime).toBe(0.5);

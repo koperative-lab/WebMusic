@@ -18,13 +18,13 @@ interface ContextRequest {
 function parentElement(element: Element): Element | undefined {
   if (element.assignedSlot) return element.assignedSlot;
   if (element.parentElement) return element.parentElement;
-  const root = element.getRootNode();
-  return 'host' in root ? (root as ShadowRoot).host : undefined;
+  const root = element.getRootNode?.();
+  return root && typeof root === 'object' && 'host' in root ? (root as ShadowRoot).host : undefined;
 }
 
 function unknownCustomElement(element: Element): boolean {
-  return element.localName.includes('-') &&
-    !element.ownerDocument.defaultView?.customElements.get(element.localName);
+  return typeof element.localName === 'string' && element.localName.includes('-') &&
+    !element.ownerDocument?.defaultView?.customElements.get(element.localName);
 }
 
 function boundary(host: Element): Element | undefined {
@@ -36,7 +36,7 @@ function boundary(host: Element): Element | undefined {
 }
 
 function dispatch(host: Element, name: string, detail?: unknown): void {
-  const Constructor = host.ownerDocument.defaultView?.CustomEvent;
+  const Constructor = host.ownerDocument?.defaultView?.CustomEvent;
   if (Constructor) host.dispatchEvent(new Constructor(name, {bubbles: true, composed: true, detail}));
 }
 
@@ -145,9 +145,9 @@ export function observeModuleContext(
   let previousState: ModuleContextState | undefined;
   let ancestry: readonly Element[] = [];
   const waiting = new Map<string, {ready?: () => void}>();
-  const registry = host.ownerDocument.defaultView?.customElements;
+  const registry = host.ownerDocument?.defaultView?.customElements;
   const roots = new Map<EventTarget, (() => void) | undefined>();
-  const Observer = host.ownerDocument.defaultView?.MutationObserver;
+  const Observer = host.ownerDocument?.defaultView?.MutationObserver;
   // Context depends only on this host's composed ancestry, the composition/
   // slot attributes along it, upgrades and provider notifications. Mutations
   // elsewhere in the document cannot change it.
@@ -164,8 +164,14 @@ export function observeModuleContext(
     unobserve?.();
   };
   const refreshRoots = (chain: readonly Element[]): void => {
-    const next = new Set<EventTarget>([host.ownerDocument, host.getRootNode()]);
-    for (const element of chain) next.add(element.getRootNode());
+    // Hosts outside a real document (server rendering, stubs) have no roots to observe.
+    const next = new Set<EventTarget>();
+    const add = (root: unknown) => {
+      if (root && typeof (root as EventTarget).addEventListener === 'function') next.add(root as EventTarget);
+    };
+    add(host.ownerDocument);
+    add(host.getRootNode?.());
+    for (const element of chain) add(element.getRootNode?.());
     if (next.size === roots.size && [...next].every(root => roots.has(root))) return;
     for (const [root, unobserve] of [...roots]) {
       if (next.has(root)) continue;
@@ -231,7 +237,7 @@ export function observeModuleTarget(
   let reading = false;
   let dirty = false;
   let selectionRoot: Node | undefined;
-  const Observer = host.ownerDocument.defaultView?.MutationObserver;
+  const Observer = host.ownerDocument?.defaultView?.MutationObserver;
   const observer = Observer ? new Observer(() => refreshSelection()) : undefined;
 
   const dispose = (): void => {
@@ -312,7 +318,7 @@ export function observeModuleTarget(
     selectionRoot = root;
     observer?.disconnect();
     observer?.observe(root, {childList: true, subtree: true});
-    if (root !== host.ownerDocument) observer?.observe(host.ownerDocument, {childList: true, subtree: true});
+    if (host.ownerDocument && root !== host.ownerDocument) observer?.observe(host.ownerDocument, {childList: true, subtree: true});
     const previous = stopElement;
     stopElement = undefined;
     try {

@@ -20,7 +20,7 @@ The Score transport widget — play/pause and a draggable seek bar over a file, 
 
 - Behavior/data collaboration: ScorePlayer / RackTransportController.
 - Reviewed UI composition: `@webmusic/ui/transport`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `loading`, `sound-font`, `volume`, `rate`, `pan`, `loop`, `time-control`, `volume-control`, `composition`, `session`, `controls`
+- Attribute controls: `src`, `format`, `loading`, `sound-font`, `volume`, `rate`, `pan`, `loop`, `time-control`, `volume-control`, `session`, `controls`
 - Properties and methods: `module`, `sessionTransport`, `loading`, `score`, `editor`, `documentBinding`, `waitForDocumentRevision(target) / retryDocumentApplication()`, `playback`, `resolvedScore`, `getPlaybackSnapshot()`, `seekNominal(seconds)`, `rack`, `controller`, `sound`, `effect`, `audioContext`, `destination`, `rate`, `volume`, `pan`, `loop`, `currentTime`, `duration`, `play()`
 - Events: `webscore:noteon`, `webscore:noteoff`, `webscore:timeupdate`, `webscore:scorechange`, `webscore:statechange`, `webscore:seek`, `webscore:stop`, `webscore:end`, `webscore:documentstatechange`, `webscore:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/play/score-player.mdx>) · [Element source](<../packages/score/src/play/element/score-player.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-play.ts>)

@@ -9,7 +9,7 @@ import {
   type ModuleRackPartHost,
 } from './internal/rack-part';
 import {WebMusicElement, upgradeProperties} from './internal/base';
-import {isModularComposition, observeModuleContext, requestModuleContext} from '@webmusic/kernel/element';
+import {observeModuleContext, requestModuleContext} from '@webmusic/kernel/element';
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import type {ModuleSession} from '@webmusic/kernel/session';
 
@@ -55,11 +55,9 @@ export class RackPartElement extends WebMusicElement {
   private pendingSession?: ModuleSession;
   private sourceLoadFailed = false;
   private sourceLoadError?: unknown;
-  private modular = false;
   private modularDesk?: Element;
 
   override disconnectedCallback(): void {
-    if (!this.modular) { super.disconnectedCallback(); return; }
     queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
   }
 
@@ -71,18 +69,19 @@ export class RackPartElement extends WebMusicElement {
   private loadFailure?: {error: unknown};
 
   protected override onMount(): void {
-    this.modular = isModularComposition(this);
     this.modularDesk = this.parentElement ?? undefined;
     // This tag is a declaration, not a visual control. Keep that contract in
     // the component itself so a page never needs a docs-only `display:none`.
     (this as unknown as HTMLElement).style?.setProperty('display', 'none');
     upgradeProperties(this, ['score', 'sound']);
     this.own(() => this.cancelLoad());
-    if (this.modular) {
+    {
       let firstReady = true;
       this.own(observeModuleContext(this, (context, state) => {
         this.reservePendingSource(context?.session);
-        if (state !== 'ready') return;
+        // A pending provider boundary decides later; outside any desk the
+        // declaration still resolves, it just has nobody to play it.
+        if (state === 'pending') return;
         if (this.modularDesk !== this.parentElement) {
           const previous = this.modularDesk;
           this.modularDesk = this.parentElement ?? undefined;
@@ -97,7 +96,7 @@ export class RackPartElement extends WebMusicElement {
         }
         else this.announce();
       }));
-    } else void this.resolve();
+    }
   }
 
   attributeChangedCallback(name?: string): void {
@@ -207,7 +206,7 @@ export class RackPartElement extends WebMusicElement {
     if (!this.parentElement || !isRackDesk(this.parentElement)) return;
     const controller = new AbortController();
     this.loadController = controller;
-    this.reservePendingSource(isModularComposition(this) ? requestModuleContext(this)?.session : undefined);
+    this.reservePendingSource(requestModuleContext(this)?.session);
     this.announce();
     try {
       const {loadScoreFromUrl} = await import('../../io/load');
