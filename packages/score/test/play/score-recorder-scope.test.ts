@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-  getModulePort, ModuleAudioEnvironment, ModuleContext, NoteOutputPort,
-  type ModuleHandle, type NoteEvent, type NoteInputPort,
+  createConnectionLease, getModulePort, ModuleAudioEnvironment, ModuleContext, NoteOutputPort,
+  type AudioOutputPort, type ModuleHandle, type NoteEvent, type NoteInputPort,
 } from '@webmusic/kernel/module';
 import {provideModuleContext} from '@webmusic/kernel/element';
 import {NoteInputElement} from '../../src/play/element/score-note-input';
@@ -121,5 +121,55 @@ describe('score-recorder in a module scope (DEC-068)', () => {
     expect((await failed).detail.error.message).toBe('no audio in jsdom');
     expect(prepare).toHaveBeenCalled();
     expect(context.registry.snapshot()).toHaveLength(0);
+  });
+
+  it('routes live monitoring and auditions through one admitted output bus', async () => {
+    const nodes: AudioNode[] = [];
+    const context = {currentTime: 0, sampleRate: 44100, state: 'running'} as unknown as AudioContext;
+    const node = () => {
+      const value = {context, gain: {value: 1}, connect: vi.fn((target: AudioNode) => target), disconnect: vi.fn()} as unknown as AudioNode;
+      nodes.push(value);
+      return value;
+    };
+    Object.assign(context, {destination: node(), createGain: vi.fn(node)});
+    const released = vi.fn();
+    const admitted: Array<{module: string; port: AudioOutputPort}> = [];
+    const scope = document.createElement('section');
+    const module = new ModuleContext({
+      id: 'scope', audio: new ModuleAudioEnvironment({create: () => context}),
+      admit: (handle, port) => {
+        admitted.push({module: handle.id, port});
+        return createConnectionLease(released);
+      },
+    });
+    releases.push(provideModuleContext(scope, () => module));
+    const take = recorder();
+    take.id = 'take';
+    const connect = vi.fn((destination: AudioNode) => {
+      connected.push(destination);
+      return () => {};
+    });
+    const connected: AudioNode[] = [];
+    take.sound = {connect, noteOn: vi.fn(), noteOff: vi.fn()};
+    scope.append(take);
+    document.body.append(scope);
+
+    take.record();
+    take.input(60, 100, true);
+    take.input(60, 0, false);
+    expect(admitted.map((entry) => [entry.module, entry.port.id])).toEqual([['take', 'output']]);
+    const bus = admitted[0]!.port.node;
+    expect(getModulePort(take.module, 'output', 'audio', 'output')).toBe(admitted[0]!.port);
+    take.stop();
+    take.shadowRoot!.querySelector<HTMLButtonElement>('[part~="play"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The audition borrows the same bus instead of opening a channel of its own.
+    expect(admitted).toHaveLength(1);
+    expect(module.registry.snapshot()).toHaveLength(0);
+    expect(nodes).toContain(bus);
+
+    take.remove();
+    expect(released).toHaveBeenCalledTimes(1);
+    expect(admitted[0]!.port.disposed).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import {TransportClock, type TransportClockReader} from '@webmusic/kernel/transport';
+import type {TickSource} from '@webmusic/kernel/tick';
 import {
   readAudioSequenceRange, retainAudioSequence, sameAudioTimeline,
   type AudioSequence, type AudioAssetReader, type AudioAssetLease,
@@ -27,6 +28,7 @@ export class AudioSequenceEngine {
   private chunkGeneration = 0;
   private used = 0;
   private timer?: ReturnType<typeof setInterval>;
+  private ticks?: TickSource;
   private nextFrame = 0;
   private nextTime = 0;
   private disposed = false;
@@ -42,7 +44,15 @@ export class AudioSequenceEngine {
   readonly preparedBytesLimit: number;
 
   constructor(private readonly getContext: () => AudioContext,
-    private readonly options: AudioClipPlayerOptions & {chunkFrames?: number; preparedBytesLimit?: number} = {}) {
+    private readonly options: AudioClipPlayerOptions & {
+      chunkFrames?: number; preparedBytesLimit?: number;
+      /**
+       * Lookahead tick delivery. A module scope's audio environment supplies
+       * one (an offline render ticks it in rendered time); without it a 25 ms
+       * main-thread interval schedules.
+       */
+      createTickSource?: (intervalMs: number) => TickSource;
+    } = {}) {
     this.chunkFrames = options.chunkFrames ?? 16384;
     this.preparedBytesLimit = options.preparedBytesLimit ?? 64 * 1024 * 1024;
     if (!Number.isSafeInteger(this.chunkFrames) || this.chunkFrames < 1 ||
@@ -120,10 +130,14 @@ export class AudioSequenceEngine {
     try {
       this.schedule();
       if (this.disposed || generation !== this.generation) return;
-      this.timer = setInterval(() => {
+      const tick = () => {
         try { this.schedule(); }
         catch (error) { if (this.disposed || generation !== this.generation) return; this.pause(); for (const notify of this.errors) notify(asError(error)); }
-      }, 25);
+      };
+      if (this.options.createTickSource) {
+        this.ticks ??= this.options.createTickSource(25);
+        this.ticks.start(tick);
+      } else this.timer = setInterval(tick, 25);
       this.notify();
     } catch (error) { if (this.disposed || generation !== this.generation) return; this.pause(); throw error; }
   }
@@ -134,6 +148,7 @@ export class AudioSequenceEngine {
     this.transport.seekTo(position, this.now());
     if (this.timer !== undefined) clearInterval(this.timer);
     this.timer = undefined;
+    this.ticks?.stop();
     for (const voice of [...this.voices]) this.releaseVoice(voice, true);
   }
   stop(): void { this.pause(); this.transport.seekTo(0, this.now()); this.notify(); }
@@ -184,6 +199,8 @@ export class AudioSequenceEngine {
     if (this.disposed) return;
     this.pause(); this.disposed = true;
     let failure: unknown;
+    try { this.ticks?.dispose(); } catch (error) { failure ??= error; }
+    this.ticks = undefined;
     const lease = this.lease;
     this.clearChunks(); this.lease = undefined;
     this.content = undefined; this.assets = undefined;

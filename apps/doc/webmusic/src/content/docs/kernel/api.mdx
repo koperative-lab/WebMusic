@@ -350,9 +350,11 @@ exactly as they do live, and `isOfflineModuleContext(context)` lets engines that
 require a live context accept it. The environment's `createTickSource` is a
 driver the render advances in rendered time: it suspends the context every
 `tickSeconds` (default 0.025, rounded to the 128-frame render quantum), ticks
-every running lookahead scheduler, then resumes. A Score module's scheduler
-therefore keeps scheduling past its first lookahead window while the render
-runs faster than real time.
+every running lookahead scheduler, then resumes. A Score module's scheduler and
+an Audio `AudioPlayer`'s document-sequence scheduler (an editor document
+played with a `moduleContext`) therefore keep scheduling past their first
+lookahead window while the render runs faster than real time. Clip buffers
+start whole and need no ticks.
 
 `renderModuleGraph(options)` adds the Session: it creates the offline
 environment, a `SessionTransport` on the offline clock (drift checks off) and a

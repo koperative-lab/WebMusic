@@ -2966,6 +2966,17 @@ renders a whole graph offline with its own Session; the offline environment
 presents its context as live until rendering and ticks lookahead schedulers in
 rendered time.
 
+**Round 17 choices (2026-11-07):** inside a provider, a `score-recorder`'s live
+monitoring and take audition share one `output` bus routed once under the
+recorder's module ID, so in a desk both are the recorder's own Rack channel —
+we chose one recorder channel over admitting each audition as a new member
+because a take is the recorder's sound, not a separate player. Bridge
+`registerAudioParticipant` activates and attaches Session scheduling only for an
+engine reporting `sharedSessionClock`, matching `<audio-player>`; other engines
+are commanded. An `AudioPlayer` document-sequence scheduler takes its lookahead
+ticks from the module environment's `createTickSource`, so offline renders
+include edited Audio documents.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

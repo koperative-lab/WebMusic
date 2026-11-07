@@ -4,6 +4,7 @@ import {
   type AudioDocumentSnapshot, type AudioDocumentSource, type AudioPositionStep, type AudioSequence, type AudioAssetSegment,
 } from '../../src/core';
 import {AudioPlayer} from '../../src/play/headless/audio-player';
+import {ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
 import {AudioSequenceEngine} from '../../src/play/headless/sequence-engine';
 
 const node = () => ({connect: vi.fn(), disconnect: vi.fn()});
@@ -331,6 +332,28 @@ describe('bounded sequence scheduling', () => {
     expect(sources).toHaveLength(started); expect(sources[0].stop).toHaveBeenCalled();
     await player.play(); expect(player.playing).toBe(true); expect(sources.at(-1)!.starts[0]).toEqual([0, 0, 1]);
     player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
+  it('schedules a module-scope document on the scope tick source, not a wall-clock interval', async () => {
+    vi.useFakeTimers();
+    const doc = document(); const {ctx, sources, advance} = context();
+    let tick: (() => void) | undefined;
+    const ticks = {start: vi.fn((next: () => void) => { tick = next; }), stop: vi.fn(() => { tick = undefined; }),
+      get running() { return !!tick; }, workerBacked: false, dispose: vi.fn()};
+    const createTickSource = vi.fn(() => ticks);
+    const moduleContext = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context: ctx, createTickSource})});
+    // Small chunks so lookahead needs more than one window.
+    const player = new AudioPlayer(undefined, {moduleContext, chunkFrames: 100} as never);
+    player.setDocumentSource(doc.source); await wait(player, doc.source); await player.play();
+    expect(createTickSource).toHaveBeenCalledWith(25);
+    const scheduled = sources.length;
+    // Only the scope's ticks advance lookahead (an offline render ticks in rendered time).
+    advance(0.5); vi.advanceTimersByTime(100);
+    expect(sources).toHaveLength(scheduled);
+    tick!();
+    expect(sources.length).toBeGreaterThan(scheduled);
+    player.pause(); expect(ticks.stop).toHaveBeenCalled();
+    player.dispose(); expect(ticks.dispose).toHaveBeenCalled();
+    doc.initialLease.release(); doc.assets.dispose();
   });
   it('counts chunk pieces of a loop straddling a boundary before scheduling voices', async () => {
     const doc = document(); const {ctx, sources} = context();

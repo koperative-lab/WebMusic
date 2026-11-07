@@ -80,8 +80,10 @@ the shared `clip-seconds` axis.
 
 **`registerAudioParticipant(session, player, {prepare, offsetSeconds?, positionScale?})`**
 returns the `SessionParticipantLease`. `player` is any `AudioParticipantPlayer`
-(`AudioPlayer` or `AudioClipPlayer`); native buffer playback attaches the
-shared scheduling anchor, other engines follow Session commands.
+(`AudioPlayer` or `AudioClipPlayer`). Native buffer playback activates and
+attaches the shared scheduling anchor; other engines — an `AudioPlayer` over an
+editor document, a media stream or a borrowed queue — follow Session commands
+and are never asked to activate, as under `<audio-player>`.
 
 </details>
 

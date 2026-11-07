@@ -80,7 +80,10 @@ enumeration, so
 
 With the `moduleContext` option the facade prepares its AudioContext from that
 scope's audio environment, installs no default speaker route and never closes the
-context. It does not register itself with a Session; its host does.
+context. An editor document's sequence scheduler takes its lookahead ticks from
+that environment's `createTickSource`, so an offline module render
+([`renderModuleGraph`](/kernel/api/#module--webmusickernelmodule)) advances it
+in rendered time. It does not register itself with a Session; its host does.
 `<audio-player>` and Bridge's [`registerAudioParticipant`](/bridge/headless/score-audio-session/) register
 it on `clip-seconds`, reporting `shared-anchor` when the buffer engine attaches
 Session scheduling and `media-follower` otherwise; `<audio-player>` registers a

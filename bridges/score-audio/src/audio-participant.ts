@@ -16,7 +16,9 @@ export interface AudioParticipantOptions {
 /**
  * Register a Headless Audio engine with a Session on the `clip-seconds` axis —
  * the same axis `<audio-player>` uses, so Score and Audio mappings agree
- * (DEC-068). Native buffer playback attaches the shared scheduling anchor.
+ * (DEC-068). Native buffer playback attaches and activates the shared
+ * scheduling anchor; other engines (document sequences, media streams,
+ * borrowed queues) are commanded by the Session without activation.
  */
 export function registerAudioParticipant(
   session: ModuleSession,
@@ -31,7 +33,13 @@ export function registerAudioParticipant(
   }, {
     axis: 'clip-seconds', identity: player, durationSeconds: () => player.duration, endPolicy: 'position',
     offsetSeconds: options.offsetSeconds, positionScale: options.positionScale,
-    prepare: options.prepare, activate: () => player.activateScheduling(),
-    ...(player.timingCapabilities.sharedSessionClock && {attachScheduling: (binding) => player.attachScheduling(binding)}),
+    prepare: options.prepare,
+    // Only native buffer playback can follow the Session's scheduling anchor;
+    // document sequences, media and external transports follow by command,
+    // as they do under `<audio-player>`.
+    ...(player.timingCapabilities.sharedSessionClock && {
+      activate: () => player.activateScheduling(),
+      attachScheduling: (binding) => player.attachScheduling(binding),
+    }),
   });
 }

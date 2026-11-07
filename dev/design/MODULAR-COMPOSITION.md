@@ -515,7 +515,7 @@ DEC-068); the Headless `Rack`, `createRack` and `PlayerController` therefore
 stay as their object types. A `score-rack-control` with an assigned `.rack` is
 backed by that Rack; without one it is a module Rack.
 
-### Companion, queue and offline contracts (rounds 11–15)
+### Companion, queue and offline contracts (rounds 11–17)
 
 - **Companions.** Score views and analysis share one follower in Score core;
   Kernel `observeCompanionInput` resolves `.inputModule`, then `input`, then
@@ -525,7 +525,9 @@ backed by that Rack; without one it is a module Rack.
 - **Note graph.** `score-note-input` publishes a `notes` note output;
   `score-recorder` records a selected note output (`input`, `port`,
   `.inputModule`) and is a note Sink with a `notes` input. In a provider its
-  audition is a Session-free scope member.
+  live monitoring and audition share one `output` bus routed under the
+  recorder's module ID (its own channel in a desk); the audition is a
+  Session-free scope member.
 - **Groups.** A playlist has one queue bus `output`; a mixer lists
   `channel:<id>` taps; a player over either lists the group's output as its
   own, observed and never rerouted. A borrowed queue is one Session participant
@@ -537,7 +539,10 @@ backed by that Rack; without one it is a module Rack.
   changed duration.
 - **Offline.** `renderModuleGraph()` builds in an offline scope with its own
   Session; the offline environment presents its context as live until
-  rendering and ticks lookahead schedulers in rendered time.
+  rendering and ticks lookahead schedulers in rendered time — Score schedulers
+  and Audio document-sequence schedulers alike. Bridge
+  `registerAudioParticipant` activates Session scheduling only for engines
+  that report `sharedSessionClock`.
 
 ## Acceptance
 

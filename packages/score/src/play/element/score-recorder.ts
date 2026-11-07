@@ -21,7 +21,10 @@ import {
 import {mountRecorder, type RecorderHandle} from '@webmusic/ui/recorder';
 import {observeModuleContext, observeModuleInput} from '@webmusic/kernel/element';
 import {
+  AudioOutputPort,
   NoteInputPort,
+  routeModuleOutput,
+  type ConnectionLease,
   type ModuleContext,
   type ModuleHandle,
   type ModulePort,
@@ -78,7 +81,14 @@ export class ScoreRecorderElement extends HTMLElementBase {
   private readonly moduleId = `score-recorder-${++ScoreRecorderElement.nextModuleId}`;
   /** Note sink: events delivered to this port are captured while armed. */
   private readonly noteInput = new NoteInputPort({accept: (event) => this.captureNote(event)}, {id: 'notes', multiplicity: 'sum'});
-  private readonly recorderModule: ModuleHandle = createModuleFacade(() => this.id || this.moduleId, Object.freeze([this.noteInput]));
+  private readonly recorderModule: ModuleHandle = createModuleFacade(() => this.id || this.moduleId, () => this.output
+    ? Object.freeze([this.noteInput, this.output.port]) : Object.freeze([this.noteInput]));
+  /**
+   * In a module scope, live monitoring and take auditions share one `output`
+   * bus routed once under the recorder's module ID, so inside a Rack part both
+   * land on one Rack channel (DEC-068).
+   */
+  private output?: {bus: GainNode; port: AudioOutputPort; route: ConnectionLease};
   private readonly portNotes = new Map<string, number>();
   private scope?: ModuleContext;
   private stopScope?: () => void;
@@ -158,6 +168,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.stopPlayback();
     this.live?.dispose();
     this.live = undefined;
+    this.releaseOutput();
     this.session.cancel();
     this.ui?.destroy();
     this.ui = undefined;
@@ -196,7 +207,34 @@ export class ScoreRecorderElement extends HTMLElementBase {
       this.stopPlayback();
       this.live?.dispose();
       this.live = undefined;
+      this.releaseOutput();
     });
+  }
+
+  /** Create (once per scope) the bus monitoring and auditions play into. */
+  private ensureOutput(scope: ModuleContext): GainNode {
+    if (this.output) return this.output.bus;
+    const context = scope.audio.prepare() as AudioContext;
+    const bus = context.createGain();
+    const port = new AudioOutputPort(bus, {id: 'output'});
+    try {
+      this.output = {bus, port, route: routeModuleOutput(scope, this.recorderModule, port)};
+    } catch (error) {
+      port.dispose();
+      bus.disconnect();
+      throw error;
+    }
+    return bus;
+  }
+
+  private releaseOutput(): void {
+    const output = this.output;
+    if (!output) return;
+    this.output = undefined;
+    try { output.route.release(); } finally {
+      output.port.dispose();
+      output.bus.disconnect();
+    }
   }
 
   private bindInput(): void {
@@ -245,11 +283,11 @@ export class ScoreRecorderElement extends HTMLElementBase {
     if (this.session.capture(midi, 0, false)) this.refresh();
   }
 
-  /** The AudioContext and route monitoring and auditions use: explicit, else the scope's. */
+  /** The AudioContext and route monitoring uses: explicit, else the scope's output bus. */
   private audioRoute(): {context?: AudioContext; destination?: AudioNode} {
     if (this.explicitContext || !this.scope) return {context: this.explicitContext};
-    const context = this.scope.audio.prepare() as AudioContext;
-    return {context, destination: this.scope.destination?.() ?? undefined};
+    const bus = this.ensureOutput(this.scope);
+    return {context: bus.context as AudioContext, destination: bus};
   }
 
   get bpm(): number {
@@ -283,6 +321,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.explicitContext = context;
     this.live?.dispose();
     this.live = undefined;
+    this.releaseOutput();
   }
   get audioContext(): AudioContext | undefined {
     return this.explicitContext;
@@ -397,14 +436,24 @@ export class ScoreRecorderElement extends HTMLElementBase {
     const generation = ++this.playbackGeneration;
     this.playbackFailure = undefined;
     let playback: ScorePlayer;
-    if (this.scope && !this.explicitContext) {
+    const scope = this.explicitContext ? undefined : this.scope;
+    let bus: GainNode | undefined;
+    if (scope) {
+      try { bus = this.ensureOutput(scope); } catch (error) {
+        this.reportPlaybackFailure(error);
+        return;
+      }
+    }
+    if (scope && bus) {
       // In a module scope the take auditions as a Session-free member of that
-      // scope, so it lands on the scope's route (a Rack channel, a desk or the
-      // device) without moving the scope's transport.
+      // scope through the recorder's output bus, so it lands on the
+      // recorder's route (a Rack channel, a desk or the device) without
+      // moving the scope's transport.
       const id = `${this.recorderModule.id}:take-${++this.auditionSequence}`;
+      const destination = bus;
       const module = new ScorePlayerModule(this.takeScore, {
         synth: this.soundRef, id,
-        context: this.scope.derive({id: `${id}:context`, session: null, transport: null, target: null}),
+        context: scope.derive({id: `${id}:context`, session: null, transport: null, target: null, admit: null, destination: () => destination}),
       });
       this.auditionModule = module;
       playback = module.player;
@@ -431,14 +480,18 @@ export class ScoreRecorderElement extends HTMLElementBase {
     }).catch((error: unknown) => {
       if (this.playback !== playback || generation !== this.playbackGeneration) return;
       this.stopPlayback();
-      this.playbackFailure = error instanceof Error ? error.message : String(error);
-      this.refresh();
-      this.dispatchEvent(new CustomEvent<ScoreRecorderErrorDetail>('webscore:error', {
-        detail: {operation: 'play', error},
-        bubbles: true,
-        composed: true,
-      }));
+      this.reportPlaybackFailure(error);
     });
+  }
+
+  private reportPlaybackFailure(error: unknown): void {
+    this.playbackFailure = error instanceof Error ? error.message : String(error);
+    this.refresh();
+    this.dispatchEvent(new CustomEvent<ScoreRecorderErrorDetail>('webscore:error', {
+      detail: {operation: 'play', error},
+      bubbles: true,
+      composed: true,
+    }));
   }
 
   private stopPlayback(): void {
@@ -506,9 +559,9 @@ export function defineScoreRecorderElement(tag = 'score-recorder'): void {
 }
 
 /** A frozen module handle whose ID follows the element's DOM id (DEC-068). */
-function createModuleFacade(id: () => string, ports: readonly ModulePort[]): ModuleHandle {
+function createModuleFacade(id: () => string, ports: () => readonly ModulePort[]): ModuleHandle {
   return Object.freeze({
     get id() { return id(); },
-    ports: () => ports,
+    ports,
   });
 }

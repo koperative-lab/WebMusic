@@ -54,10 +54,11 @@ see [Score setup](/score/#drop-in-web-components).
 ## Ports and composition
 
 `<score-recorder>` is a note **Sink** whose completed take is a `Score`. Its
-`.module` lists one port, a `notes` note input that captures delivered events
-while a take is armed, so a project edge or `NoteInputPort.connect()` can feed
-it. It never registers a Session participant: recording and auditioning a take
-leave the scope's transport alone.
+`.module` lists a `notes` note input that captures delivered events while a
+take is armed, so a project edge or `NoteInputPort.connect()` can feed it.
+Inside a provider it also lists an `output` audio port once monitoring or an
+audition first sounds. It never registers a Session participant: recording and
+auditioning a take leave the scope's transport alone.
 
 | Connection | Form | Behavior |
 | --- | --- | --- |
@@ -71,12 +72,15 @@ An input that changes or disappears mid-take discards its unmatched presses and
 keeps completed notes. Use one path per source: a note surface nested inside the
 recorder and also named by `input` is captured twice.
 
-Inside a provider (a `<score-player>`, a Rack part or a desk), monitoring and
-take audition use that scope's AudioContext. The audition plays as a
-Session-free member of the scope, so it lands on the scope's route — a Rack
-part's channel, a desk or the device — without starting the scope's transport.
-An explicit `.audioContext` keeps the recorder's own path. Live monitoring
-follows the scope's default destination; a Rack part admits only the audition.
+Inside a provider (a `<score-player>`, a Rack part or a desk), live monitoring
+and take audition share one `output` bus in that scope's AudioContext. The bus
+is routed once under the recorder's module ID (its DOM `id`, else a generated
+one): inside a desk it is the recorder's own Rack channel, with the desk's
+fader, pan and inserts; elsewhere it follows the scope's default destination.
+The audition plays as a Session-free member of the scope through that bus, so
+it never starts the scope's transport. Moving the recorder to another scope
+releases the route; an explicit `.audioContext` keeps the recorder's own
+device path and lists no `output` port.
 
 ```html
 <score-player src="/midi/Arabesque%20No.1.mid">

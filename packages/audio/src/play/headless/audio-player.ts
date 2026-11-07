@@ -213,7 +213,10 @@ export class AudioPlayer {
         // Document playback flows through this player's own inserts and module
         // output, so it is routed, patched and tapped like a clip (DEC-068).
         const engineOptions = {...this.options,
-          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop};
+          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop,
+          // A module scope's environment delivers lookahead ticks (rendered
+          // time in an offline render).
+          ...(this.options.moduleContext?.audio.createTickSource ? {createTickSource: this.options.moduleContext.audio.createTickSource} : {})};
         Object.defineProperty(engineOptions, 'destination', {enumerable: true, get: () => this.documentOutputInput()});
         engine = new AudioSequenceEngine(() => this.audioContext, engineOptions);
       } catch (error) {

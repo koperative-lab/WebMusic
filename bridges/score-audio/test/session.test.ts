@@ -43,4 +43,25 @@ describe('createScoreAudioSession', () => {
     lease.release();
     session.dispose();
   });
+
+  it('commands a player without shared scheduling (a document sequence) instead of activating it', async () => {
+    const session = new SessionTransport(() => 0, {driftCheckIntervalMs: 0});
+    const calls: string[] = [];
+    let playing = false;
+    const lease = registerAudioParticipant(session, {
+      play: () => { playing = true; calls.push('play'); }, pause: () => { playing = false; }, stop: () => { playing = false; },
+      seek: () => {}, setRate: () => {},
+      get seconds() { return 0; }, get playing() { return playing; }, clock: undefined, duration: 4,
+      // An AudioPlayer over a document has no scheduling to activate.
+      activateScheduling: async () => { throw new Error('The selected transport cannot activate shared Session scheduling.'); },
+      attachScheduling: () => { throw new Error('unsupported'); },
+      timingCapabilities: {sharedSessionClock: false},
+    } as never, {prepare: () => { calls.push('prepare'); }});
+    await session.play();
+    expect(calls).toEqual(['prepare', 'play']);
+    expect(session.snapshot.paused).toBe(false);
+    lease.release();
+    session.dispose();
+  });
 });
+
