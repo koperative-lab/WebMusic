@@ -1,9 +1,18 @@
 import {getAudioContextConstructor} from '../audio-context';
-import type {SessionTransport} from '../session';
+import type {ModuleSession} from '../session';
 import type {AudioOutputPort} from './audio-port';
 import {ModuleCapabilities} from './capability';
 import {createConnectionLease, type ConnectionLease} from './lease';
 import {assertModuleId, ModuleRegistry, type ModuleHandle} from './registry';
+import {createTransportPort, type TransportPort} from './transport-port';
+
+// One lent port per Session, so every consumer of a scope observes the same object.
+const sessionPorts = new WeakMap<ModuleSession, TransportPort>();
+function sessionPort(session: ModuleSession): TransportPort {
+  let port = sessionPorts.get(session);
+  if (!port) { port = createTransportPort(session, {commands: true}); sessionPorts.set(session, port); }
+  return port;
+}
 
 export interface ModuleAudioEnvironmentOptions {
   context?: BaseAudioContext;
@@ -70,21 +79,25 @@ export interface ModuleContextOptions {
   id: string;
   audio: ModuleAudioEnvironment;
   registry?: ModuleRegistry;
-  session?: SessionTransport;
+  session?: ModuleSession;
   destination?: () => AudioNode | undefined;
   admit?: ModuleAdmission;
   target?: ModuleHandle;
   capabilities?: ModuleCapabilities;
+  /** Transport lent to consumers. Defaults to the Session's command-enabled port; null lends none. */
+  transport?: TransportPort | null;
 }
 
 export interface DerivedModuleContextOptions {
   id: string;
   registry?: ModuleRegistry;
-  session?: SessionTransport | null;
+  session?: ModuleSession | null;
   destination?: () => AudioNode | undefined;
   admit?: ModuleAdmission | null;
   target?: ModuleHandle | null;
   capabilities?: ModuleCapabilities;
+  /** Omit to inherit (or follow a replaced Session); null lends no transport. */
+  transport?: TransportPort | null;
 }
 
 /** Explicit borrowed context. Inheritance is an explicit derive operation, never a DOM lookup. */
@@ -92,11 +105,12 @@ export class ModuleContext {
   readonly id: string;
   readonly audio: ModuleAudioEnvironment;
   readonly registry: ModuleRegistry;
-  readonly session?: SessionTransport;
+  readonly session?: ModuleSession;
   readonly destination?: () => AudioNode | undefined;
   readonly admit?: ModuleAdmission;
   readonly target?: ModuleHandle;
   readonly capabilities: ModuleCapabilities;
+  readonly #transport?: TransportPort | null;
 
   constructor(options: ModuleContextOptions) {
     assertModuleId(options.id);
@@ -108,11 +122,23 @@ export class ModuleContext {
     this.admit = options.admit;
     this.target = options.target;
     this.capabilities = options.capabilities ?? new ModuleCapabilities();
+    this.#transport = options.transport;
     Object.freeze(this);
   }
 
+  /** The transport port this scope lends, if any; observing it grants no command authority beyond its own `commands`. */
+  get transport(): TransportPort | undefined {
+    if (this.#transport === null) return undefined;
+    return this.#transport ?? (this.session ? sessionPort(this.session) : undefined);
+  }
+
   derive(options: DerivedModuleContextOptions): ModuleContext {
+    const sessionChanged = options.session !== undefined && (options.session ?? undefined) !== this.session;
+    // An explicit transport wins; a replaced Session drops the inherited one.
+    const transport = options.transport !== undefined ? options.transport
+      : sessionChanged ? undefined : this.#transport;
     return new ModuleContext({
+      transport,
       id: options.id,
       audio: this.audio,
       registry: options.registry ?? this.registry,
@@ -130,11 +156,13 @@ export class ModuleContext {
  * environment, Session, registry, admission and destination resolver (a new
  * target alone keeps the scope). `destination`: only the default destination
  * resolver changed, so existing members can re-route in place. `scope`: any
- * other change, or a missing side, requires rebinding.
+ * other change (including the lent transport port), or a missing side,
+ * requires rebinding.
  */
 export function moduleScopeChange(previous: ModuleContext | undefined, next: ModuleContext | undefined): 'none' | 'destination' | 'scope' {
   if (!previous || !next || previous.audio !== next.audio || previous.session !== next.session ||
-    previous.registry !== next.registry || previous.admit !== next.admit) return 'scope';
+    previous.registry !== next.registry || previous.admit !== next.admit ||
+    previous.transport !== next.transport) return 'scope';
   return previous.destination === next.destination ? 'none' : 'destination';
 }
 

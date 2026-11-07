@@ -7,7 +7,7 @@ import {
   type AudioOutputPort,
 } from '@webmusic/kernel/module';
 import type {InsertChain} from '@webmusic/kernel/effect';
-import type {SessionTransport} from '@webmusic/kernel/session';
+import type {ModuleSession} from '@webmusic/kernel/session';
 import type {SyncFollowerTransport} from '@webmusic/kernel/sync';
 import type {Score} from '../../core';
 import type {ScorePlayerOptions} from './audio-contracts';
@@ -38,7 +38,7 @@ export class ScorePlayerModule implements ModuleHandle {
   private readonly onError?: (error: unknown) => void;
   private readonly listeners = new Set<() => void>();
   private readonly registration: ConnectionLease;
-  private participant?: ReturnType<SessionTransport['register']>;
+  private participant?: ReturnType<ModuleSession['register']>;
   private route?: ConnectionLease;
   private preparing?: Promise<void>;
   private disposed = false;

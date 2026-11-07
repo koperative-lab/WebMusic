@@ -55,7 +55,7 @@ import {getAudioContextConstructor} from '@webmusic/kernel/audio-context';
 import type {TempoClock, TempoGrid, TransportClockReader} from '@webmusic/kernel/transport';
 import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, routeModuleOutput, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
-import {SessionTransport, type SessionParticipantLease, type SessionPendingSourceLease} from '@webmusic/kernel/session';
+import {SessionTransport, type ModuleSession, type SessionParticipantLease, type SessionPendingSourceLease} from '@webmusic/kernel/session';
 import {isModularComposition, provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {
   mountTransport,
@@ -170,7 +170,7 @@ export class AudioPlayerElement extends WebMusicElement {
   private moduleLoopKey?: string;
 
   get module(): ModuleHandle | undefined { return this.modular ? this.moduleHandle : undefined; }
-  get sessionTransport(): SessionTransport | undefined { return this.moduleContext?.session; }
+  get sessionTransport(): ModuleSession | undefined { return this.moduleContext?.session; }
 
   protected override onMount(): void {
     // Register rollback before lazy-property setters can rebuild resources.
@@ -642,8 +642,8 @@ export class AudioPlayerElement extends WebMusicElement {
    * fall back to a borrowed provider's authority.
    */
   private sessionCommand(
-    session: SessionTransport | undefined,
-    command: (session: SessionTransport) => Promise<unknown>,
+    session: ModuleSession | undefined,
+    command: (session: ModuleSession) => Promise<unknown>,
   ): void {
     if (!session) return;
     try {

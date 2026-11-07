@@ -106,6 +106,30 @@ interface Member {
   settle(): void;
 }
 
+/**
+ * The Session authority as modules borrow it through a ModuleContext. Kernel
+ * modules depend on this interface, not on the {@link SessionTransport} class,
+ * so a provider can lend a Session it does not implement itself.
+ */
+export interface ModuleSession {
+  readonly clock: TransportClockReader;
+  readonly position: number;
+  readonly snapshot: SessionTransportSnapshot;
+  readonly participantCount: number;
+  readonly scheduling: SessionSchedulingBinding;
+  subscribe(listener: (event: SessionTransportEvent) => void): () => void;
+  register(transport: SyncFollowerTransport, options: SessionParticipantOptions): SessionParticipantLease;
+  holdPendingSource(): SessionPendingSourceLease;
+  dispatch(command: TransportCommand): Promise<TransportCommit>;
+  play(): Promise<TransportCommit>;
+  pause(): Promise<TransportCommit>;
+  stop(): Promise<TransportCommit>;
+  seek(position: number): Promise<TransportCommit>;
+  setRate(rate: number): Promise<TransportCommit>;
+  setLoop(loop: SyncLoopRegion | null): Promise<TransportCommit>;
+  preload(): Promise<void>;
+}
+
 // An inactive lease with an unresolved start retains its identity until its
 // late start has been cancelled. Old cleanup cannot pause a replacement owner.
 const owners = new WeakMap<object, Member>();
@@ -116,7 +140,7 @@ const owners = new WeakMap<object, Member>();
  * It creates no audio resources and never elects a member as a hidden master.
  * All adapters must use the same reference clock supplied by `now`.
  */
-export class SessionTransport {
+export class SessionTransport implements ModuleSession {
   readonly #now: () => number;
   readonly #clock: TransportClock;
   readonly #reader: TransportClockReader;

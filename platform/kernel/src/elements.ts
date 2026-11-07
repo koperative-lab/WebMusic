@@ -25,8 +25,11 @@ export {
   hasModuleContextBoundary,
   notifyModuleContext,
   observeModuleTarget,
+  observeModuleInput,
   notifyModuleChange,
   type ModuleContextState,
+  type ModuleInputState,
+  type ObserveModuleInputOptions,
 } from './element-module';
 
 /** Cleanup owned by one connected lifetime of a {@link WebMusicElement}. */

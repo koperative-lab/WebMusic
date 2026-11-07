@@ -1,5 +1,5 @@
 import {mountTransport, type TransportBinding} from '@webmusic/ui/transport';
-import type {SessionTransport} from '@webmusic/kernel/session';
+import type {ModuleSession} from '@webmusic/kernel/session';
 import type {ScorePlayerModule} from '../../headless/score-module';
 import type {PresetPlayerHandle, TimeControl, VolumeControl} from './preset-player';
 
@@ -12,7 +12,7 @@ export function setModuleTransportVisibility(element: HTMLElement, visible: bool
 /** A control view of Session authority; participant engines are never commanded here. */
 export function mountModuleTransport(
   container: HTMLElement,
-  session: SessionTransport,
+  session: ModuleSession,
   module: ScorePlayerModule | undefined,
   options: {visible: boolean; time: TimeControl; volume: VolumeControl; getVolume(): number; onVolumeChange(value: number): void; onError(error: unknown): void},
 ): PresetPlayerHandle {

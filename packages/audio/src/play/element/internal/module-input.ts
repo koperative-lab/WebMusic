@@ -1,4 +1,4 @@
-import {observeModuleContext, observeModuleTarget} from '@webmusic/kernel/element';
+import {observeModuleInput} from '@webmusic/kernel/element';
 import type {AudioOutputPort, ConnectionLease, ModuleHandle} from '@webmusic/kernel/module';
 
 export interface ModuleAudioInput {
@@ -15,97 +15,47 @@ export function bindModuleAudioInput(
   isCurrent: () => boolean = () => true,
 ): () => void {
   let active = true;
-  let generation = 0;
-  let target: ModuleHandle | undefined;
-  let port: AudioOutputPort | undefined;
   let tap: ConnectionLease | undefined;
   let analyser: AnalyserNode | undefined;
-  let unsubscribe: (() => void) | undefined;
-  let stopDiscovery: (() => void) | undefined;
-  let preparing = false;
-  let initialized = false;
-  const current = (revision: number) => active && isCurrent() && generation === revision;
+  const live = () => active && isCurrent();
   const clearTap = () => {
     const previousTap = tap;
     const previousAnalyser = analyser;
-    tap = undefined; analyser = undefined; port = undefined;
+    tap = undefined; analyser = undefined;
     try { previousTap?.release(); } finally { previousAnalyser?.disconnect(); }
   };
-  const dispose = () => {
-    if (!active) return;
-    active = false; generation++;
-    const discovery = stopDiscovery;
-    const subscription = unsubscribe;
-    stopDiscovery = undefined; unsubscribe = undefined; target = undefined;
-    try { discovery?.(); }
-    finally { try { subscription?.(); } finally { clearTap(); } }
-  };
-  const refresh = () => {
-    const module = target;
-    if (!active || !isCurrent() || !module || preparing) return;
-    const revision = generation;
-    preparing = true;
+  const stop = observeModuleInput(host, {family: 'audio', direction: 'output', port: 'output', assigned, isCurrent}, (state) => {
+    if (!live()) return;
+    const {module, error} = state;
+    const port = state.port as AudioOutputPort | undefined;
+    if (error !== undefined || !port) {
+      clearTap();
+      if (live()) update(error !== undefined ? {module, error} : {module});
+      return;
+    }
     let candidate: AnalyserNode | undefined;
     let lease: ConnectionLease | undefined;
     try {
-      const next = module.getPort?.(host.getAttribute('port') ?? 'output');
-      if (!current(revision)) return;
-      if (!next || next.disposed) {
-        clearTap();
-        if (current(revision)) update({module});
-        return;
-      }
-      if (next === port) return;
-      candidate = next.context.createAnalyser();
-      if (!current(revision)) return;
-      lease = next.tap(candidate);
-      if (!current(revision)) return;
+      candidate = port.context.createAnalyser();
+      if (!live()) return;
+      lease = port.tap(candidate);
+      if (!live()) return;
       clearTap();
-      if (!current(revision)) return;
-      analyser = candidate; tap = lease; port = next;
+      if (!live()) return;
+      analyser = candidate; tap = lease;
       candidate = undefined; lease = undefined;
       update({module, analyser});
-    } catch (error) {
-      if (!current(revision)) return;
+    } catch (failure) {
+      if (!live()) return;
       clearTap();
-      if (current(revision)) update({module, error});
+      if (live()) update({module, error: failure});
     } finally {
       try { lease?.release(); } finally { candidate?.disconnect(); }
-      if (generation === revision) preparing = false;
-      if (!isCurrent()) dispose();
     }
+  });
+  return () => {
+    if (!active) return;
+    active = false;
+    try { stop(); } finally { clearTap(); }
   };
-  const attach = (module: ModuleHandle | undefined) => {
-    if (!active || !isCurrent()) return;
-    if (initialized && target === module) { if (module && !preparing) refresh(); return; }
-    initialized = true;
-    const revision = ++generation;
-    preparing = false;
-    const previous = unsubscribe;
-    unsubscribe = undefined;
-    target = module;
-    try { clearTap(); } finally { previous?.(); }
-    if (!current(revision)) return;
-    update({module});
-    if (!current(revision) || !module) return;
-    const subscription = module.subscribe?.(() => { refresh(); });
-    if (!current(revision)) { subscription?.(); return; }
-    unsubscribe = subscription;
-    refresh();
-  };
-  try {
-    if (assigned !== undefined) attach(assigned ?? undefined);
-    else {
-      const discovery = host.hasAttribute('input')
-        ? observeModuleTarget(host, host.getAttribute('input') ?? '', attach)
-        : observeModuleContext(host, (context) => attach(context?.target));
-      if (active && isCurrent()) stopDiscovery = discovery;
-      else discovery();
-    }
-    if (!isCurrent()) dispose();
-  } catch (error) {
-    dispose();
-    throw error;
-  }
-  return dispose;
 }

@@ -1,4 +1,5 @@
 import {createConnectionLease, type ConnectionLease} from './lease';
+import type {PortMultiplicity, PortReadiness} from './port';
 
 // Web Audio coalesces identical connect calls. Shared leases must coalesce too.
 const edges = new WeakMap<AudioNode, Map<AudioNode, number>>();
@@ -53,7 +54,11 @@ export class AudioOutputPort {
   readonly node: AudioNode;
   readonly context: BaseAudioContext;
   readonly kind = 'audio' as const;
+  readonly family = 'audio' as const;
   readonly direction = 'output' as const;
+  /** One main route; sends and taps are separate branches. */
+  readonly multiplicity = 'single' as const;
+  readonly schemaVersion = 1 as const;
   readonly #onCleanupError?: (error: unknown) => void;
   readonly #branches = new Set<ConnectionLease>();
   #defaultDestination?: AudioNode;
@@ -72,6 +77,7 @@ export class AudioOutputPort {
     Object.freeze(this);
   }
   get disposed(): boolean { return this.#disposed; }
+  get readiness(): PortReadiness { return this.#disposed ? 'detached' : 'ready'; }
   get defaultDestination(): AudioNode | undefined { return this.#defaultDestination; }
   get replaced(): boolean { return this.#replacement !== undefined; }
 
@@ -180,5 +186,87 @@ export class AudioOutputPort {
   }
   #report(error: unknown): void {
     try { this.#onCleanupError?.(error); } catch { /* Complete remaining cleanup. */ }
+  }
+}
+
+export interface AudioInputPortOptions {
+  id?: string;
+  /** `sum` (default) mixes several producers; `single` rejects a second one. */
+  multiplicity?: PortMultiplicity;
+  /** Declared processing latency in seconds; never a measured device latency. */
+  latencySeconds?: number;
+}
+
+/** How a producer reaches an input: as its main route, or as an extra branch. */
+export type AudioConnectionMode = 'main' | 'send';
+
+/**
+ * A typed audio input over a borrowed node. The port owns only the connection
+ * leases it admitted; it never disconnects or disposes the node itself.
+ */
+export class AudioInputPort {
+  readonly id: string;
+  readonly node: AudioNode;
+  readonly context: BaseAudioContext;
+  readonly family = 'audio' as const;
+  readonly direction = 'input' as const;
+  readonly multiplicity: PortMultiplicity;
+  readonly schemaVersion = 1 as const;
+  readonly latencySeconds: number;
+  readonly #producers = new Map<AudioOutputPort, ConnectionLease>();
+  #disposed = false;
+
+  constructor(node: AudioNode, options: AudioInputPortOptions = {}) {
+    const latency = options.latencySeconds ?? 0;
+    if (!Number.isFinite(latency) || latency < 0) throw new RangeError('latencySeconds must be nonnegative finite seconds');
+    const multiplicity = options.multiplicity ?? 'sum';
+    if (multiplicity !== 'single' && multiplicity !== 'sum') throw new TypeError(`Unknown port multiplicity: ${String(multiplicity)}`);
+    this.node = node;
+    this.context = node.context;
+    this.id = options.id ?? 'input';
+    this.multiplicity = multiplicity;
+    this.latencySeconds = latency;
+    Object.freeze(this);
+  }
+
+  get disposed(): boolean { return this.#disposed; }
+  get readiness(): PortReadiness { return this.#disposed ? 'detached' : 'ready'; }
+  get channelCount(): number { return this.node.channelCount; }
+  get channelInterpretation(): ChannelInterpretation { return this.node.channelInterpretation; }
+  get producers(): readonly AudioOutputPort[] { return Object.freeze([...this.#producers.keys()]); }
+
+  /**
+   * Admit a producer. `main` claims the producer's main route through
+   * {@link AudioOutputPort.replace}; `send` adds a branch. Validation happens
+   * before any edge changes, so a rejected producer keeps its current route.
+   */
+  connect(output: AudioOutputPort, mode: AudioConnectionMode = 'main'): ConnectionLease {
+    if (this.#disposed) throw new Error('AudioInputPort is disposed');
+    if (output.disposed) throw new Error('AudioOutputPort is disposed');
+    if (output.context !== this.context) throw new Error('Audio endpoints must use the same context');
+    if (this.#producers.has(output)) throw new Error(`Audio output is already connected to input: ${this.id}`);
+    if (this.multiplicity === 'single' && this.#producers.size > 0) {
+      throw new Error(`Audio input accepts a single producer: ${this.id}`);
+    }
+    if (mode !== 'main' && mode !== 'send') throw new TypeError(`Unknown audio connection mode: ${String(mode)}`);
+    const edge = mode === 'main' ? output.replace(this.node) : output.send(this.node);
+    const lease = createConnectionLease(() => {
+      if (this.#producers.get(output) === lease) this.#producers.delete(output);
+      edge.release();
+    });
+    this.#producers.set(output, lease);
+    return lease;
+  }
+
+  /** Release every admitted producer; the borrowed node stays connected to its own consumers. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    let failure: unknown;
+    for (const lease of [...this.#producers.values()]) {
+      try { lease.release(); } catch (error) { failure ??= error; }
+    }
+    this.#producers.clear();
+    if (failure !== undefined) throw failure;
   }
 }

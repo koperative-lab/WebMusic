@@ -11,7 +11,7 @@ import {
 import {WebMusicElement, upgradeProperties} from './internal/base';
 import {isModularComposition, observeModuleContext, requestModuleContext} from '@webmusic/kernel/element';
 import type {ModuleHandle} from '@webmusic/kernel/module';
-import type {SessionTransport} from '@webmusic/kernel/session';
+import type {ModuleSession} from '@webmusic/kernel/session';
 
 export interface RackPartErrorDetail {
   operation: 'rack-part';
@@ -51,8 +51,8 @@ export class RackPartElement extends WebMusicElement {
   private voiced?: {name: string; synth: HeadlessSynth};
   private loadToken = 0;
   private loadController?: AbortController;
-  private pendingSource?: ReturnType<SessionTransport['holdPendingSource']>;
-  private pendingSession?: SessionTransport;
+  private pendingSource?: ReturnType<ModuleSession['holdPendingSource']>;
+  private pendingSession?: ModuleSession;
   private sourceLoadFailed = false;
   private sourceLoadError?: unknown;
   private modular = false;
@@ -253,7 +253,7 @@ export class RackPartElement extends WebMusicElement {
   }
 
   /** A fetch can survive a layout move, but its readiness belongs to the current Session. */
-  private reservePendingSource(session: SessionTransport | undefined): void {
+  private reservePendingSource(session: ModuleSession | undefined): void {
     if (session === this.pendingSession && this.pendingSource?.active) return;
     this.pendingSource?.release();
     this.pendingSource = undefined;

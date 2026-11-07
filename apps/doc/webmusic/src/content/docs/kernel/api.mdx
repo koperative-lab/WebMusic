@@ -69,6 +69,15 @@ Browser-only [`observeElementTarget`](#element-target-discovery) and
 [`observeElementSource`](#borrowed-element-sources) reuse the same root-scoped
 discovery and source-change protocol without importing a domain model.
 
+`observeModuleInput(host, {family, port, direction?, assigned?, isCurrent?}, update)`
+resolves the module an Element consumes — the explicit `assigned` object
+(`null` unbinds), then the host's `input` selector, then the nearest provider's
+target — and the named port of one family on it, honoring the host's `port`
+attribute. `update({module?, port?, error?})` runs when the module or the port
+identity changes, including when a port detaches. The caller owns whatever it
+builds on the port; disposing the observation releases only its discovery and
+module subscription.
+
 ## worker — @webmusic/kernel/worker
 
 `WorkerLike` is the minimal structural surface a worker must expose
@@ -211,15 +220,23 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 | --- | --- |
 | `createCapabilityKey<T>(name)` | Create a typed identity token; equal diagnostic names do not alias. |
 | `ModuleCapabilities` | Immutable `with(key, value)` directory with `get`/`has`; values are borrowed. |
-| `ModuleHandle`, `createModuleHandle()` | Borrow `id`, optional `params`, `inserts`, capabilities, named `getPort`, explicit `prepare` and `subscribe`; no disposal authority. |
+| `ModuleHandle`, `createModuleHandle()` | Borrow `id`, optional `params`, `inserts`, capabilities, the audio-output shortcut `getPort`, `ports()` enumeration of every family, explicit `prepare` and `subscribe`; no disposal authority. |
+| `getModulePort(module, name, family, direction?)` | Resolve a port by name and family from `ports()`, falling back to `getPort` for audio outputs. |
+| `ModulePort`, `ModulePortMap`, `PortFamily`, `assertPortInfo()` | Port declarations shared by all families: `id`, `family`, `direction`, `multiplicity`, `schemaVersion`, `readiness`. |
 | `ModuleRegistry` | `register(module)` returns a `ConnectionLease`; `get(id)`, `snapshot()`, `revision` and `subscribe` describe one scope. Duplicate ids reject. `dispose()` unregisters without disposing modules. |
 | `ModuleAudioEnvironment` | Optional borrowed `context` or lazy `create` factory. `peek()` observes; `prepare()` explicitly allocates; `dispose()` closes only an owned context. |
-| `ModuleContext` | Explicit `id`, audio environment, registry, optional Session, destination callback, admission, target and capabilities. `derive(options)` defines inheritance without DOM search. |
-| `moduleScopeChange(previous, next)` | `'none'` when both contexts share audio environment, Session, registry, admission and destination resolver (a republished target alone keeps the scope); `'destination'` when only the destination resolver changed, so members can re-route in place; `'scope'` for any other change or a missing side. |
+| `ModuleContext` | Explicit `id`, audio environment, registry, optional Session (the `ModuleSession` interface), destination callback, admission, target, capabilities and lent `transport` port. `derive(options)` defines inheritance without DOM search. |
+| `moduleScopeChange(previous, next)` | `'none'` when both contexts share audio environment, Session, registry, admission, lent transport port and destination resolver (a republished target alone keeps the scope); `'destination'` when only the destination resolver changed, so members can re-route in place; `'scope'` for any other change or a missing side. |
 | `sameModuleScope(left, right)` | Shorthand for `moduleScopeChange(left, right) === 'none'`. |
 | `routeModuleOutput(context, module, port)` | Normal route for one output: `context.admit(module, port)` when present, otherwise `port.setDefault()` to the context destination or the environment's speakers. The returned lease retracts only the default it installed. |
 | `createConnectionLease(cleanup)` | Revocable, idempotent relationship with `active` and `release()`. Endpoints stay borrowed. |
 | `AudioOutputPort` | Stable named output with one default route, at most one replacement claimant and independent taps/sends. |
+| `AudioInputPort` | Typed input over a borrowed node with multiplicity and declared latency; `connect(output, 'main' \| 'send')`. |
+| `NoteOutputPort` · `NoteInputPort` · `assertNoteEvent()` | Occurrence-owned note events; a released connection cancels only what it delivered. |
+| `SourcePublisher` · `SourcePort` · `SOURCE_SCHEMAS` | Revisioned source snapshots under a schema ID; payload types stay in their domain. |
+| `createTransportPort(session, {commands?})` · `TransportPort` | Session observation in a named axis with optional lent commands and committed/superseded/failed outcomes. |
+| `createControlPort(params)` · `ControlPort` | A parameter surface exposed as the module's control port. |
+| `checkModuleConformance(create, options?)` | Framework-neutral contract checks for a module factory; returns every failure. |
 | `ParamHandle` | Numeric base-value authority with native CV bindings, scheduled automation and subscriptions. |
 | `ParamSurface` | Read-only iterable collection of handles with `get(id)`; it does not own the handles. |
 | `ParamAudioBus` | One same-context full-value control bus shared by current and future AudioParam targets. |
@@ -244,6 +261,55 @@ independent leased branches without replacing the audible route. Identical manag
 edges share reference counts. Cross-context edges, self-connections and cycles
 among managed edges reject. `dispose()` releases managed routes without disposing
 the source node or foreign graph.
+
+### Port families
+
+Every port declares `id`, `family` (`audio`, `note`, `control`, `transport` or
+`source`), `direction`, `multiplicity` (`single` or `sum`), `schemaVersion` and
+`readiness` (`unresolved`, `preparing`, `ready`, `error`, `detached`).
+`assertPortInfo(port)` validates these fields. A module lists its ports through
+`ports()`; `getModulePort(module, name, family, direction?)` finds one.
+
+`new AudioInputPort(node, {id?, multiplicity?, latencySeconds?})` admits
+producers with `connect(output, mode)`: `'main'` claims the producer's main
+route through `replace()`, `'send'` adds a branch. A second producer on a
+`single` input and a different context reject before any route changes.
+`dispose()` releases only admitted edges; the node stays borrowed.
+
+A `NoteEvent` carries `occurrenceId`, `sourceId`, `pitch` (`midi` 0–127 and
+optional `cents`), `velocity` 0–1, `gate` (`on`, `off`, `cancel`), a named
+`axis`, `time` and scheduling `epoch`. `NoteOutputPort.emit(event)` validates it,
+tracks held occurrences and rejects `off`/`cancel` for an occurrence that is not
+held; `dispose(time?)` cancels what is still held. `new NoteInputPort({accept},
+{multiplicity?})` delivers events to its handler; each `connect(output)` lease
+remembers the occurrences it delivered and cancels exactly those on release, so
+the same pitch from another source keeps sounding.
+
+`new SourcePublisher(schemaId, {id?, schemaVersion?})` is the owner side of a
+source port. `loading()`, `ready(value)`, `fail(error)` and `clear()` each commit
+a new revision before listeners run and return it, so late asynchronous results
+can be compared against the current revision. `SOURCE_SCHEMAS` names
+`webmusic.score`, `webmusic.score-document`, `webmusic.audio-clip` and
+`webmusic.audio-document`; Kernel never imports their payload types.
+
+`createTransportPort(session, {id?, commands?})` projects a `ModuleSession` into
+`snapshot()` (`axis`, `referenceTime`, `position`, `durationSeconds`, `playing`,
+`rate`, `loop`, `ended`, `pending`, `schedulingMode`), `positionAt(time)` and
+`subscribe(listener)`. Only `commands: true` lends `play`, `pause`, `stop`,
+`seek`, `setRate` and `setLoop`; each resolves to `{status, revision, snapshot,
+error?}` with `status` `committed`, `superseded` or `failed` instead of
+rejecting. A `ModuleContext` lends one command-enabled port per Session as
+`context.transport`; `derive({transport: null})` lends none.
+
+### Module conformance
+
+`checkModuleConformance(create, {prepare?, repetitions?, expectedId?, borrowedPorts?})`
+creates `repetitions` (default 2) instances from `create()`, which returns
+`{module, dispose?}`, and checks ID validity, the frozen handle view, port
+declarations and uniqueness, stable `ports()` identity, `getPort` consistency,
+idempotent unsubscribe, optional repeated `prepare()`, idempotent disposal and
+that every owned port is `detached` afterwards. It resolves to
+`{passed, instances, failures}` and never throws for a failed check.
 
 ### Shared parameters
 
@@ -543,7 +609,9 @@ constructing them from labels. Presentation subscriptions never own the graph.
 ## session — @webmusic/kernel/session
 
 `SessionTransport` owns a source-free conductor and delegates command sequencing
-to `TransportGroup`. It creates no fake clip, score, audio output or AudioContext.
+to `TransportGroup`. It implements `ModuleSession`, the interface a
+`ModuleContext` lends to modules and the type of each player Element's
+`sessionTransport`. It creates no fake clip, score, audio output or AudioContext.
 The injected `now` must use the same reference clock as every participant.
 
 ```ts

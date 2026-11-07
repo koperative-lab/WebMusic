@@ -149,17 +149,19 @@ run in this order on `modular-redesign`; each ends with its exit evidence,
 1. Port types for all five families, `ModuleHandle` port enumeration, transport
    interface on `ModuleContext`, standard lifecycle states; move
    `SCORE_NOTE_INPUT`'s contract into the Kernel note family.
-2. Element helpers: generic `observeModuleInput(host, family)` replacing the
-   Audio-only `bindModuleAudioInput`; one provider-scope helper for audio
-   environment fallback, `moduleScopeChange` and rebind; the module conformance
-   kit (test-only entry, not published).
+2. Element helpers: generic `observeModuleInput(host, family)` under the
+   Audio-only `bindModuleAudioInput`; the module conformance kit
+   (`checkModuleConformance`, public in `/module` so third-party modules can run
+   it). The provider-scope helper moved to U2, where Session election changes
+   provider logic.
 
 Exit: Kernel tests for each family, port admission validation (context, axis,
 schema), and the conformance kit used by Kernel's own modules.
 
 ### U2 — Kernel Rack, Session and sinks (2 sessions)
 
-1. Neutral `RackModule`: channels keyed by module ID, master InsertChain,
+1. One provider-scope helper for audio environment fallback, Session election,
+   `moduleScopeChange` and rebind, shared by every provider Element. Neutral `RackModule`: channels keyed by module ID, master InsertChain,
    `channelInserts`, sends, channel and master taps, mute/solo, nested-Rack
    admission. Session root election and Session-of-one; per-participant
    precision reporting that never claims `shared-anchor` for callback timing.

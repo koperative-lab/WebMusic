@@ -1,5 +1,6 @@
 import type {ModuleContext} from './module/context';
-import type {ModuleHandle} from './module/registry';
+import type {PortDirection, PortFamily} from './module/port';
+import {getModulePort, type ModuleHandle, type ModulePortMap} from './module/registry';
 import {observeElementTarget} from './element-target';
 
 const requestEvent = 'webmusic-context-request';
@@ -326,6 +327,122 @@ export function observeModuleTarget(
   };
   try { refreshSelection(); } catch (error) {
     try { dispose(); } catch { /* See above. */ }
+    throw error;
+  }
+  return dispose;
+}
+
+/** What an input-observing Element currently borrows. */
+export interface ModuleInputState<F extends PortFamily> {
+  readonly module?: ModuleHandle;
+  readonly port?: ModulePortMap[F];
+  readonly error?: unknown;
+}
+
+export interface ObserveModuleInputOptions<F extends PortFamily> {
+  family: F;
+  direction?: PortDirection;
+  /** Port name when the host has no `port` attribute. */
+  port: string;
+  /** Explicit object binding: a module binds it, null unbinds, undefined discovers. */
+  assigned?: ModuleHandle | null;
+  /** Host-level generation guard; a false result stops the observation. */
+  isCurrent?: () => boolean;
+}
+
+/**
+ * Resolve the module an Element consumes — explicit object, then the `input`
+ * selector, then the nearest provider's target — and the named port of one
+ * family on it. `update` runs when the module or the port identity changes,
+ * including when a port detaches. The caller owns whatever it builds on the
+ * port (a tap, a subscription); this observation owns only its discovery.
+ */
+export function observeModuleInput<F extends PortFamily>(
+  host: Element,
+  options: ObserveModuleInputOptions<F>,
+  update: (state: ModuleInputState<F>) => void,
+): () => void {
+  const isCurrent = options.isCurrent ?? (() => true);
+  let active = true;
+  let generation = 0;
+  let initialized = false;
+  let target: ModuleHandle | undefined;
+  let port: ModulePortMap[F] | undefined;
+  let unsubscribe: (() => void) | undefined;
+  let stopDiscovery: (() => void) | undefined;
+  let resolving = false;
+  let dirty = false;
+  const current = (revision: number) => active && isCurrent() && generation === revision;
+  const dispose = (): void => {
+    if (!active) return;
+    active = false;
+    generation++;
+    const discovery = stopDiscovery;
+    const subscription = unsubscribe;
+    stopDiscovery = unsubscribe = undefined;
+    target = port = undefined;
+    try { discovery?.(); } finally { subscription?.(); }
+  };
+  const resolvePort = (): void => {
+    const module = target;
+    if (!active || !isCurrent() || !module) return;
+    if (resolving) { dirty = true; return; }
+    resolving = true;
+    const revision = generation;
+    try {
+      do {
+        dirty = false;
+        let next: ModulePortMap[F] | undefined;
+        try {
+          next = getModulePort(module, host.getAttribute('port') ?? options.port, options.family, options.direction);
+        } catch (error) {
+          if (!current(revision)) return;
+          port = undefined;
+          update({module, error});
+          continue;
+        }
+        if (!current(revision)) return;
+        if (next && next.readiness === 'detached') next = undefined;
+        if (next === port) continue;
+        port = next;
+        update(next ? {module, port: next} : {module});
+      } while (dirty && current(revision));
+    } finally {
+      if (generation === revision) resolving = false;
+      if (active && !isCurrent()) dispose();
+    }
+  };
+  const attach = (module: ModuleHandle | undefined): void => {
+    if (!active || !isCurrent()) return;
+    if (initialized && target === module) { resolvePort(); return; }
+    initialized = true;
+    const revision = ++generation;
+    resolving = false;
+    const previous = unsubscribe;
+    unsubscribe = undefined;
+    target = module;
+    port = undefined;
+    previous?.();
+    if (!current(revision)) return;
+    update(module ? {module} : {});
+    if (!current(revision) || !module) return;
+    const subscription = module.subscribe?.(() => resolvePort());
+    if (!current(revision)) { subscription?.(); return; }
+    unsubscribe = subscription;
+    resolvePort();
+  };
+  try {
+    if (options.assigned !== undefined) attach(options.assigned ?? undefined);
+    else {
+      const discovery = host.hasAttribute('input')
+        ? observeModuleTarget(host, host.getAttribute('input') ?? '', attach)
+        : observeModuleContext(host, (context) => attach(context?.target));
+      if (active && isCurrent()) stopDiscovery = discovery;
+      else discovery();
+    }
+    if (!isCurrent()) dispose();
+  } catch (error) {
+    dispose();
     throw error;
   }
   return dispose;

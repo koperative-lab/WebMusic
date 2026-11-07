@@ -30,7 +30,7 @@ import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
 import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
-import {SessionTransport} from '@webmusic/kernel/session';
+import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
 import {ScorePlayerModule} from '../headless/score-module';
 import {mountModuleTransport, setModuleTransportVisibility} from './internal/module-transport';
 import {createModuleSoundfont} from './internal/lazy-module-soundfont';
@@ -255,7 +255,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   /** Borrow the current command authority without preparing audio. */
-  get sessionTransport(): SessionTransport | undefined {
+  get sessionTransport(): ModuleSession | undefined {
     return this.moduleContext?.session;
   }
 

@@ -1,8 +1,25 @@
 import type {InsertChain} from '../effect';
-import type {AudioOutputPort} from './audio-port';
+import type {AudioInputPort, AudioOutputPort} from './audio-port';
+import type {ControlPort} from './control-port';
+import type {NoteInputPort, NoteOutputPort} from './note-port';
+import type {PortDirection, PortFamily} from './port';
+import type {SourcePort} from './source-port';
+import type {TransportPort} from './transport-port';
 import type {ModuleCapabilities} from './capability';
 import {createConnectionLease, type ConnectionLease} from './lease';
 import type {ParamSurface} from './parameter';
+
+/** Ports by family; each family's input and output types. */
+export interface ModulePortMap {
+  audio: AudioOutputPort | AudioInputPort;
+  note: NoteOutputPort | NoteInputPort;
+  control: ControlPort;
+  transport: TransportPort;
+  source: SourcePort;
+}
+
+/** Any port a module can expose. */
+export type ModulePort = ModulePortMap[PortFamily];
 
 /** Borrowed module view. Commands are explicit capabilities; disposal rights are not included. */
 export interface ModuleHandle {
@@ -10,9 +27,30 @@ export interface ModuleHandle {
   readonly params?: ParamSurface;
   readonly inserts?: InsertChain;
   readonly capabilities?: ModuleCapabilities;
+  /** Audio output shortcut; the same port also appears in {@link ModuleHandle.ports}. */
   getPort?(name: string): AudioOutputPort | undefined;
+  /** Every currently available port of every family. Order is stable for one revision. */
+  ports?(): readonly ModulePort[];
   prepare?(): Promise<void> | void;
+  /** Called after any port, parameter or readiness change. */
   subscribe?(listener: () => void): () => void;
+}
+
+/**
+ * Resolve a module's port by name and family (and optionally direction).
+ * Enumerated ports win; an audio output falls back to the `getPort` shortcut.
+ */
+export function getModulePort<F extends PortFamily>(
+  module: ModuleHandle,
+  name: string,
+  family: F,
+  direction?: PortDirection,
+): ModulePortMap[F] | undefined {
+  const listed = module.ports?.().find(port => port.id === name && port.family === family &&
+    (direction === undefined || port.direction === direction));
+  if (listed) return listed as ModulePortMap[F];
+  if (family === 'audio' && direction !== 'input') return module.getPort?.(name) as ModulePortMap[F] | undefined;
+  return undefined;
 }
 
 export function createModuleHandle(module: ModuleHandle): ModuleHandle {
@@ -24,6 +62,7 @@ export function createModuleHandle(module: ModuleHandle): ModuleHandle {
     get inserts() { return module.inserts; },
     get capabilities() { return module.capabilities; },
     getPort: module.getPort?.bind(module),
+    ports: module.ports?.bind(module),
     prepare: module.prepare?.bind(module),
     subscribe: module.subscribe?.bind(module),
   });
