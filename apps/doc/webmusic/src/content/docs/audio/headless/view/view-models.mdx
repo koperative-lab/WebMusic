@@ -31,6 +31,12 @@ waveform.timeline.setZoom(100);     // pixels per second
 const columns = waveform.columns(); // one column per visible timeline pixel
 ```
 
+## Ports and composition
+
+`WaveformViewModel` and `SpectrogramViewModel` are pure view state, not modules:
+no ports and no Session. They take a clip or spectrogram data, and their
+`timeline` controls the viewport, never playback.
+
 ## WaveformViewModel
 
 Reads the peaks pyramid and emits one `{min, max}` per screen column, picking

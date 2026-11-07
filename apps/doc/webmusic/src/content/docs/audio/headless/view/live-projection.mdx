@@ -41,6 +41,12 @@ const dispose = () => {
 };
 ```
 
+## Ports and composition
+
+The live view controller is not a module: it captures frames from a borrowed
+`AnalyserNode` at the caller's cadence and has no ports or Session role. To analyse a module, tap its audio output: `port.tap(analyser)` on an `AudioOutputPort` adds a leased branch without changing the audible route.
+`<audio-live-view>` does this for the module named by `input`.
+
 ## Capacity is fixed on purpose
 
 `LiveScrollBuffer` derives its capacity once, from `windowSeconds ×

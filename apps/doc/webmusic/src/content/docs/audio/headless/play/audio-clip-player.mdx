@@ -55,6 +55,20 @@ which can happen during `play()`, `preload()` or access to `analyser`. The bridg
 reads it live rather than snapshotting it. Reading `analyser` materializes the graph
 and throws after disposal; it is not a resource-free inspection.
 
+## Ports and composition
+
+`AudioClipPlayer` is an engine, not a module: it has no `.module`. Its prepared
+output is `outputPort`, an `AudioOutputPort` named `main`; `peekOutputPort()`
+observes it without preparing. With the `moduleContext` option it takes its
+AudioContext from that scope's audio environment and never closes it, while its
+default route stays the `destination` option or the context's speakers until a
+Rack, mixer or [`routeModuleOutput`](/kernel/api/#module--webmusickernelmodule) takes it over. It joins a Session
+only through an adapter: Bridge's [`registerAudioParticipant`](/bridge/headless/score-audio-session/)
+registers it on `clip-seconds`, reporting `shared-anchor` for the buffer engine
+and `media-follower` for the media engine. The
+[`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition) facade
+supplies a `ModuleHandle` around one.
+
 ## Scratch sessions
 
 `beginScratch()` optionally borrows a scratch session over the player's decoded

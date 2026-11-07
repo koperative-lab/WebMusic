@@ -15,10 +15,10 @@ Delivery owner: [STATUS](../STATUS.md), MOD-02 through MOD-15; the
 [roadmap](../plans/2026-11-06-unified-modular-composition.md) sequences MOD-15.
 
 Delivery state: sections up to "Declarative composition" describe the first
-three deliveries, which are implemented behind `composition="modules"`. The
-"Single composition model" section is the accepted target that replaces the
-opt-in; each of its parts names the roadmap round that implements it. Until that
-round lands, the current reference pages describe actual behavior.
+three deliveries, originally implemented behind the retired
+`composition="modules"` opt-in. The "Single composition model" section replaced
+the opt-in under MOD-15 (rounds 1–9 delivered; round 10 enforces it); every
+instance now composes this way and the reference pages describe that behavior.
 
 ## User task and boundary
 
@@ -240,10 +240,10 @@ they do not acquire audio-rate capability by being shown beside native controls.
 
 ## Session time and commands
 
-In the new opt-in composition, the outermost player provides Session authority;
+The outermost player provides Session authority;
 nested players borrow the nearest Session unless explicitly independent.
-Rack provides mixing and passes through that authority. In the current opt-in
-implementation a Rack without a Session provider does not silently synchronize
+Rack provides mixing and passes through that authority. Historically (before
+DEC-068) a Rack without a Session provider does not silently synchronize
 its independently owned players; the single model makes an outermost Rack the
 Session provider instead (see "Session root and standalone players").
 
@@ -331,21 +331,20 @@ immediate retirement/reuse behavior.
 
 ## Declarative composition and compatibility
 
-The first delivery enables this composition through `composition="modules"`.
-The opt-in isolates new discovery/routing from the legacy descendant-Rack
-selection path; both must never run for one instance. Configure composition
-and scope before connecting Elements. The MIDI URLs are application assets;
-the [runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+The first delivery enabled this composition through `composition="modules"`;
+DEC-068 retired that attribute and the legacy descendant-Rack selection path, so
+the markup below composes without it. Configure scope before connecting
+Elements. The [runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
 provides a complete demonstration.
 
 ```html
-<score-player id="session" composition="modules">
+<score-player id="session">
   <score-rack-control id="desk">
-    <score-player id="lead" src="lead.mid">
+    <score-player id="lead" src="/midi/Arabesque%20No.1.mid">
       <score-effect id="leadDelay" type="delay" time="0.25"></score-effect>
       <score-synth-panel sections="sound,envelope,effects"></score-synth-panel>
     </score-player>
-    <score-rack-part id="bass" src="bass.mid"></score-rack-part>
+    <score-rack-part id="bass" src="/midi/Arabesque%20No.1.mid" sound="triangle"></score-rack-part>
     <score-effect slot="master" type="reverb"></score-effect>
   </score-rack-control>
 </score-player>

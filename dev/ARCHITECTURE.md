@@ -276,11 +276,12 @@ is not an implemented guarantee.
 
 Bridge owns domain adaptation; Kernel owns domain-neutral roles and coordination:
 
-- `TransportGroup` provides revisioned commands, command FIFO, generations,
-  intent recovery, multiple followers, affine offset/scale mapping, native-loop
-  phase mapping and drift correction.
-- `ScoreAudioSync` selects domain axes and restricts the shared rate; reverse
-  adapters translate clip offsets and Score nominal seconds.
+- `SessionTransport` owns the one timeline; its internal follower group provides
+  revisioned commands, command FIFO, generations, intent recovery, affine
+  offset/scale mapping, native-loop phase mapping and drift correction.
+- `createScoreAudioSession` and `registerAudioParticipant` register Score and
+  Audio engines as Session participants on their named axes (Score nominal
+  seconds, clip seconds) with explicit offset/scale mappings (DEC-068).
 - Domain adapters `timeMapMapping` / `beatGridMapping` implement `TimelineMapping`;
   Bridge pair adapters expose constant offsets. Kernel follower mappings do not
   implement arbitrary nonlinear score-to-recording alignment.
@@ -373,7 +374,10 @@ The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 ### Modular composition
 
 [DEC-063](DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority)
-defines opt-in `composition="modules"`. Kernel `/module`, `/session` and
+introduced modular composition;
+[DEC-068](DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
+makes it the only model: every Element and Headless runtime is a module with
+typed audio, note, control, transport and source ports. Kernel `/module`, `/session` and
 `/effect` supply the shared runtime; `/element` supplies scoped browser discovery.
 [Modular composition](design/MODULAR-COMPOSITION.md) owns the context, typed-port,
 route-lease, effect/parameter and Session invariants. DOM layout, resource
@@ -385,8 +389,8 @@ Neutral audio/control ports may interoperate without either domain importing
 the other. Bridge still owns domain-aware time/data adaptation, and UI still
 consumes structural bindings without Kernel imports. Headless owns graphs and
 commands; Elements add scoped discovery and presentation. Sharing a context or
-controlling a group does not imply shared-clock injection. Existing public
-behavior remains governed by the Play owners outside opt-in composition.
+controlling a group does not imply shared-clock injection. A standalone
+player is a Session of one; there is no separate non-modular path.
 [STATUS](STATUS.md) owns delivery and verification; full ADSR, modulation,
 persistence and precision remain later stages.
 

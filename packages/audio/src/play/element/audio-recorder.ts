@@ -73,7 +73,7 @@ interface AudioRecorderEventMap {
 
 export class AudioRecorderElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'device-id', 'echo-cancellation', 'sample-rate', 'max-seconds', 'auto-export'];
+    return ['input', 'player', 'device-id', 'echo-cancellation', 'sample-rate', 'max-seconds', 'auto-export'];
   }
 
   protected root?: ShadowRoot;
@@ -114,7 +114,7 @@ export class AudioRecorderElement extends WebMusicElement {
   }
 
   attributeChangedCallback(name?: string): void {
-    if (name === 'player') this.connection.refresh();
+    if (name === 'input' || name === 'player') this.connection.refresh();
     // No attribute reconfigures a running take: the option bag is read when the
     // next one starts and `auto-export` when it stops. Only the status line,
     // which shows the pending limit, has to catch up.

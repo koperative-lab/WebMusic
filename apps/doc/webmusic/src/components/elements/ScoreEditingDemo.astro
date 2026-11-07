@@ -15,8 +15,8 @@ const playerId = `${idPrefix}-player`;
   <section data-editing-demo data-editing-src={source} aria-label="Shared MIDI editing workflow">
     <div data-editing-composition data-pg-fragment>
       <score-player data-editing-player id={playerId} time-control="full"></score-player>
-      <score-grid-view data-editing-grid player={`#${playerId}`} editable note-height="14"></score-grid-view>
-      <score-view data-editing-staff player={`#${playerId}`} type="staff"></score-view>
+      <score-grid-view data-editing-grid input={`#${playerId}`} editable note-height="14"></score-grid-view>
+      <score-view data-editing-staff input={`#${playerId}`} type="staff"></score-view>
     </div>
     <p data-editing-status role="status">Loading Arabesque No. 1.</p>
     <div class="editing-actions">

@@ -385,7 +385,7 @@ describe('playlist companion binding', () => {
 
   it('does not start standalone playback while an explicit target is missing', async () => {
     const element = document.createElement('audio-playlist') as AudioPlaylistElement;
-    element.setAttribute('player', '#later-deck');
+    element.setAttribute('input', '#later-deck');
     element.setAttribute('autoplay', '');
     element.entries = [{id: 'a', clip: clip()}];
     document.body.append(element);
@@ -397,7 +397,7 @@ describe('playlist companion binding', () => {
 
   it('follows a unique late target, replacement, and playerchange without disposing borrowed owners', async () => {
     const element = document.createElement('audio-playlist') as AudioPlaylistElement;
-    element.setAttribute('player', '#queue-deck');
+    element.setAttribute('input', '#queue-deck');
     document.body.append(element);
     const first = new AudioPlayer(), second = new AudioPlayer(), third = new AudioPlayer();
     const target = document.createElement('div') as HTMLDivElement & {player: AudioPlayer};

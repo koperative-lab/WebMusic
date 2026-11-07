@@ -202,7 +202,7 @@ A queue: play an ordered set of clips one after another, with auto-advance, prev
 
 - Behavior/data collaboration: AudioPlaylist.
 - Reviewed UI composition: `@webmusic/ui/playlist`.
-- Attribute controls: `player`, `src`, `loop`, `autoplay`, `volume`, `rate`, `prefetch`, `engine`, `skip-failed`
+- Attribute controls: `input`, `player`, `src`, `loop`, `autoplay`, `volume`, `rate`, `prefetch`, `engine`, `skip-failed`
 - Properties and methods: `player`, `entries`, `playlist`, `loading`, `loadError`, `activePlayer`, `index`, `clip`, `analyser`
 - Events: `webaudio:trackchange`, `webaudio:loadstatechange`, `webaudio:sourcechange`, `webaudio:playerchange`, `webaudio:trackend`, `webaudio:playlistend`, `webaudio:timeupdate`, `webaudio:seek`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-playlist.mdx>) · [Element source](<../packages/audio/src/play/element/audio-playlist.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)
@@ -235,7 +235,7 @@ A record button with a live level bar — opens the microphone, captures the tak
 
 - Behavior/data collaboration: AudioRecorder.
 - Reviewed UI composition: `@webmusic/ui/recorder`.
-- Attribute controls: `player`, `device-id`, `echo-cancellation`, `sample-rate`, `max-seconds`, `auto-export`
+- Attribute controls: `input`, `player`, `device-id`, `echo-cancellation`, `sample-rate`, `max-seconds`, `auto-export`
 - Properties and methods: `player`, `recorder`, `take`, `recording`, `playing`, `level`
 - Events: `webaudio:recordingstart`, `webaudio:level`, `webaudio:recorded`, `webaudio:exported`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-recorder.mdx>) · [Element source](<../packages/audio/src/play/element/audio-recorder.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)

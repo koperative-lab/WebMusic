@@ -9,12 +9,12 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
       <p class="doc-status wm-demo-status" data-aligned-status role="status">Preparing score…</p>
       <div class="aligned-demo__pan" tabindex="0" role="region" aria-label="Pan notes and keyboards together">
         <div class="aligned-demo__track" data-aligned-track>
-          <score-pitch-view data-aligned-before type="keyboard" direction="down" player="#aligned-waterfall-player" low="48" high="83"
+          <score-pitch-view data-aligned-before type="keyboard" direction="down" input="#aligned-waterfall-player" low="48" high="83"
             white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" scroll="true" follow="none"></score-pitch-view>
-          <score-view type="waterfall" direction="down" player="#aligned-waterfall-player" min-pitch="48" max-pitch="83"
+          <score-view type="waterfall" direction="down" input="#aligned-waterfall-player" min-pitch="48" max-pitch="83"
             white-note-width="32" black-note-width="20" pixels-per-second="64" note-spacing="0"
             height="180"></score-view>
-          <score-pitch-view data-aligned-after type="keyboard" direction="up" player="#aligned-waterfall-player" low="48" high="83"
+          <score-pitch-view data-aligned-after type="keyboard" direction="up" input="#aligned-waterfall-player" low="48" high="83"
             white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" scroll="true" follow="none"></score-pitch-view>
         </div>
       </div>

@@ -68,14 +68,8 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'off',
         note: 'Mark application-owned preparation, such as external decode or spectrum analysis, with the loading animation. This starts no request; clearing it restores automatic source/data readiness.',
       },
-      {
-        name: 'player',
-        kind: 'text',
-        placeholder: '#my-player',
-        fallback: 'no playhead, and no analyser for type="meter"',
-        note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing and invalid syntax emits webaudio:error. Live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
-      },
-      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
+      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
+      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing audio-player by containment', note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing, invalid syntax emits webaudio:error, and neither falls back to containment. The meter borrows its .analyser.'},
       {
         name: 'interactive',
         kind: 'bool',
@@ -296,7 +290,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'webaudio:seek', note: '{seconds, region?}: keys, ordinary clicks and seek drags announce requests before the command. Scratch-session clicks and scrub drags report accepted seconds afterward; fallback scrub clicks keep request order. pan never seeks.'},
       {name: 'webaudio:regionchange', note: "{regions} after an annotate drag — the element's whole list, not just the new one."},
       {name: 'webaudio:viewportchange', note: '{startSeconds, endSeconds} whenever the window moves, by user pan/zoom or by panTo()/setZoom().'},
-      {name: 'webaudio:error', note: '{error} from a failed src / peaks-src load, a failed render or an invalid player selector.'},
+      {name: 'webaudio:error', note: '{error} from a failed src / peaks-src load, a failed render or an invalid input selector.'},
     ],
   },
 
@@ -306,8 +300,8 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
     params: [
       {name: 'src', kind: 'text', placeholder: 'song.wav', fallback: 'nothing drawn until .clip or .editor', note: 'Decoded audio drawn read-only; conflicts with .editor.'},
       FORMAT,
-      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'no playhead', note: 'Follow one selected player; with an editor, only while it plays the same revision. A ruler click asks it to seek.'},
-      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
+      {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
+      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing audio-player by containment', note: 'Follow one selected player; with an editor, only while it plays the same revision. A ruler click asks it to seek. An unresolved explicit input never falls back.'},
       {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
       {name: 'height', kind: 'text', placeholder: '240', fallback: 'ruler plus 180 px of channel lanes', note: 'Host height in px; the channel lanes take what the ruler leaves.'},
       {name: 'editable', kind: 'bool', fallback: 'off — read-only drawing',
@@ -360,14 +354,8 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'waveform',
         note: 'How each captured column is painted. Unknown values fall back to waveform; changing it starts a fresh history.',
       },
-      {
-        name: 'source',
-        kind: 'text',
-        placeholder: '#my-player',
-        fallback: 'no analyser — the strip says so and stays still',
-        note: 'Selector of an element exposing a tap: .analyser, .inputAnalyser, .recorder.inputAnalyser or .player.analyser.',
-      },
-      {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player', note: 'Module-grammar alias of the selector (DEC-068). With none, the enclosing audio-player scope is followed by containment.'},
+      {name: 'source', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
+      {name: 'input', kind: 'text', placeholder: '#rec', fallback: 'follow the enclosing audio-player by containment', note: 'Selector of an element exposing a tap: .analyser, .inputAnalyser, .recorder.inputAnalyser or .player.analyser. Changing it starts a fresh history.'},
       {
         name: 'window-seconds',
         kind: 'number',

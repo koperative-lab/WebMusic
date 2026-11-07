@@ -31,6 +31,13 @@ const snapshot = display.capture(meter, performance.now()); // {type: 'vu', vu, 
 meter.dispose(); // the borrowed analyser stays connected
 ```
 
+## Ports and composition
+
+The meter controller and display are not modules. The controller borrows an
+`AnalyserNode` or, given `context`, owns a transparent splice whose `input` and
+`output` are plain `AudioNode`s, not Kernel ports. To analyse a module, tap its audio output: `port.tap(analyser)` on an `AudioOutputPort` adds a leased branch without changing the audible route. `<audio-meter>` does
+this for the module named by `input` or assigned to `.inputModule`.
+
 ## API
 
 ### Options and state

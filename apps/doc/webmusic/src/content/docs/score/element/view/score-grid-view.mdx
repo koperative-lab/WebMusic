@@ -49,12 +49,38 @@ restores the attributes and reloads the piece, discarding edits.
 </script>
 
 <score-player id="grid-player"></score-player>
-<score-grid-view player="#grid-player" editable snap="1/16" velocity-lane></score-grid-view>
+<score-grid-view input="#grid-player" editable snap="1/16" velocity-lane></score-grid-view>
 ```
 
 `defineAllViewElements()` from the same entry also registers this tag. A
-read-only grid needs no editor: `<score-grid-view player="#p">` borrows the
+read-only grid needs no editor: `<score-grid-view input="#p">` borrows the
 player's score, and `src` or `.score` supply one directly.
+
+## Ports and composition
+
+`<score-grid-view>` is a **View** companion. It declares no ports and provides no module
+context to children. It borrows the position, sounding notes and, without an editor, the `webmusic.score` source of one Score playback owner — a
+`<score-player>` or a `<score-rack-part>` — and sends no transport commands. It
+never registers with or creates a Session.
+
+| Connection | Form | Behavior |
+| --- | --- | --- |
+| Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
+| Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
+
+Playback resolves the explicit selector, then containment, then nothing. An
+`input` that is missing, invalid or ambiguous stays unbound, reported by
+`data-player-state`, and never falls back to the enclosing scope. Inside a
+source-free outer player, nest the view in the member that plays or name that
+member with `input`. This tag reads no `port` attribute and has no input
+object property.
+
+```html
+<score-player src="/midi/Arabesque%20No.1.mid">
+  <score-grid-view></score-grid-view>
+</score-player>
+```
 
 ## Data and editing
 
@@ -185,7 +211,8 @@ stale submission is rejected rather than applied to newer content.
 
 ## Playback
 
-`player` selects one player in the same Document or ShadowRoot. Its position
+`input` selects one player in the same Document or ShadowRoot; without it, the
+grid follows the enclosing player or Rack part. Its position
 draws a playhead, and sounding notes fill their whole row. The grid never sends
 playback commands. Without an editor, the player's snapshot supplies the
 position, and the grid derives sounding notes from the drawn score.
@@ -207,7 +234,7 @@ Numeric attributes ignore missing or non-numeric values and use their defaults.
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
-| `player` | attribute | none | Unique selector of a player to follow; without other input the grid borrows its score. |
+| `input` | attribute | containment | Unique selector of a player or Rack part to follow; without other data the grid borrows its score. |
 | `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. A fixed height scrolls a taller grid inside the host. |
 | `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
 | `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`. The getter returns them in that order; the setter writes the attribute and throws `RangeError` for an unknown name. |
@@ -218,14 +245,14 @@ Numeric attributes ignore missing or non-numeric values and use their defaults.
 | `note-height` / `.noteHeight` | attribute / property | 16 | Row height in px per semitone, 6–48. The getter returns the mounted grid's current value. |
 | `min-pitch` / `max-pitch` | attributes | MIDI 48–84, widened to two semitones beyond the notes | Integer MIDI rows 0–127; values outside are ignored. A single bound limits the computed opposite bound. A crossing range shows an error status. |
 | `note-color` / `active-note-color` | attributes | Score View tokens | Idle and sounding note fills as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`; they replace the token defaults. |
-| `.score` | writable property | none | Assign a loaded Score; overrides `src` and player data. Throws while `.editor` is assigned. |
+| `.score` | writable property | none | Assign a loaded Score; overrides `src` and borrowed input data. Throws while `.editor` is assigned. |
 | `.editor` | writable property | none | Borrow any `ScoreEditorPort`, such as a `ScoreEditor`; never disposed. `undefined` detaches it. Throws `TypeError` for other values and an `Error` on a source conflict. |
 | `.interactionSession` | writable property | grid-owned session | Borrow a same-document `ScoreInteractionSession` to share selection and drafts. The getter returns the supplied or grid-created session. |
 | `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |
 | `data-editor-state` | reflected state | absent | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`, as on [`<score-view>`](/score/element/view/score-view/#follow-an-editor). |
 | `data-editable-state` | reflected state | absent | `readonly`, `ready` or `unavailable` while an editor is assigned or `editable` is set; `editable` without a ready editor, or a grid that cannot mount, is `unavailable`. |
 | `data-playback-state` | reflected state | absent | With an editor: `unbound`, `pending` or `ready` player compatibility. |
-| `data-player-state` | reflected state | absent | Player selector resolution and source readiness, shared with the other View Elements. |
+| `data-player-state` | reflected state | absent | Input resolution and source readiness, shared with the other View Elements. |
 
 **Events.** All four are `CustomEvent`s that bubble and are composed.
 

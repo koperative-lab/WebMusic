@@ -55,7 +55,14 @@ Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chord
 <score-note-input layout="chords" keyboard></score-note-input>
 ```
 
-## Play the nearest instrument
+## Ports and composition
+
+`<score-note-input>` is a note **Source**. It declares no ports and provides no
+module context; it plays the instrument of one module through that module's
+`SCORE_NOTE_INPUT` capability — for a player, the voices behind its `notes`
+port. It never joins or commands a Session: the transport keeps running or
+stays paused while you play. Target resolution runs `.moduleTarget`, then
+`target="#id"`, then containment, then none.
 
 Inside a player scope, `routing="auto"` (the default)
 borrows the nearest module's `SCORE_NOTE_INPUT` capability. The first press

@@ -54,6 +54,14 @@ cleanup of a metronome that drives a player (see [Clock input](/score/headless/p
 
 </details>
 
+## Ports and composition
+
+`Metronome` and `TempoController` are not modules: they expose no ports and do
+not join a Session. A `Metronome` is a timer callback that drives
+`InteractivePlayer.advance()` or a `TempoController`; it does not follow a
+Session timeline. Session transport belongs to the provider that owns the
+Session, such as a [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition) composition root.
+
 ## TempoController
 
 `TempoController` is the tap side of tempo, DOM-free: press timings in, a BPM

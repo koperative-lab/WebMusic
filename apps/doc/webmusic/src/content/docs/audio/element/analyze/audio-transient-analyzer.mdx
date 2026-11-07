@@ -29,20 +29,49 @@ tool does not estimate BPM or align a beat grid.
 </script>
 
 <audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
-<audio-transient-analyzer player="#session" sensitivity="0.55" min-interval-ms="160"></audio-transient-analyzer>
+<audio-transient-analyzer input="#session" sensitivity="0.55" min-interval-ms="160"></audio-transient-analyzer>
 ```
 
 The demo pairs one player with this tool. Start playback, then adjust the
 Sensitivity control or use Freeze and Clear on the real component. Copy
 includes both Elements, and Reset restores their demo settings.
 
+## Ports and composition
+
+`<audio-transient-analyzer>` is an **Analyzer** module. It consumes one `audio`
+output and keeps its observations in its own presentation, so it exposes no
+ports of its own and provides no context to children. It resolves its input in this order:
+
+1. `.analyser`: a caller-owned `AnalyserNode`, sampled directly.
+2. `.inputModule`: a `ModuleHandle`; `null` explicitly unbinds and `undefined`
+   resumes discovery.
+3. `input="#id"`: one same-root element exposing `.module`, such as an
+   `<audio-player>`, `<audio-mixer>` or `<audio-recorder>`. `port` names its
+   audio output; the default `output` is answered by all three, and a mixer
+   also answers `master`.
+4. Containment: nested in an `<audio-player>` or `<audio-mixer>`, the tool
+   taps the nearest provider's output.
+
+An invalid, ambiguous or missing explicit input stays unbound and never falls
+back to containment; late insertion, upgrade and replacement are observed. The
+tool adds its own side tap on the port's context and never reroutes, prepares or
+schedules the source: a player's port appears once it prepares on play or
+preload. It registers no Session participant. Inside a provider it follows that
+scope's Session, so seek, pause and end reset its readings; a sibling linked
+only through `input` samples whatever reaches the port.
+
+```html
+<audio-player src="/mp3/Arabesque%20No.1.mp3" controls>
+  <audio-transient-analyzer></audio-transient-analyzer>
+</audio-player>
+```
+
 ## Signal and lifetime
 
-The tool borrows the bound player's analyser while playing, or a caller-owned
-`.analyser` in preference to it. The `player` selector must resolve uniquely
-in the current Document or ShadowRoot; late targets and source replacement
-are observed. Neither the element nor its presenter starts playback, opens a
-microphone, creates an `AudioContext`, or changes borrowed analyser settings.
+The tool samples the analyser on its tapped input while signal flows, or a
+caller-owned `.analyser` in preference to it. Neither the element nor its
+presenter starts playback, opens a microphone, creates an `AudioContext`, or
+changes borrowed analyser settings.
 
 Sampling is approximately every 50 ms. Positive FFT-bin change and rising
 RMS contribute to a normalized `0..1` strength; sensitivity changes its
@@ -50,8 +79,8 @@ acceptance threshold, and `min-interval-ms` suppresses hits too close to a
 previous hit. Silence is shown separately from an unavailable analyser.
 The recent plot keeps at most 64 sampled observations, not a clip-wide event
 timeline. Freeze stops sampling but keeps the current history; unfreezing
-resets the detector's comparison frame before new cues. When following a
-player, pause, seek and source change invalidate old readings. Replacing an
+resets the detector's comparison frame before new cues. Inside a provider,
+Session pause, seek and end invalidate old readings, as does a source change. Replacing an
 explicit analyser, graph loss, hiding the document or disconnect also releases
 old evidence and polling/subscriptions. A stalled source is reported and
 retried without disposing the borrowed graph.
@@ -63,34 +92,22 @@ the status region but are visually hidden, and the plot's axis captions are
 visually hidden too; unavailable feedback remains visible. Freeze and Clear are
 icon buttons; Freeze reports its state through its pressed appearance.
 
-While waiting for a source or playback, the shared outlined-square animation keeps
-its description accessible to assistive technology. Pending fetch/decode on a linked
-`audio-player` shows the four-square loading animation; load failures remain visible.
-Controls and retained readings stay available, and both animations respect reduced
-motion. An explicit `.analyser` takes precedence over the player's readiness state.
-## Tap a module output
-
-`input="#desk" port="master"` selects a module's prepared output. The default
-port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
-`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
-selector discovery. This can observe a neutral Score output as well as Audio.
-
-The tool adds a side tap, preserving the audible route. It does not call the
-module's `prepare()` or request a second context merely to display a pending
-surface. Missing explicit targets/ports remain pending without ancestor fallback.
-Removing the analyzer releases only its tap and UI resources. Existing explicit
-`.analyser` and legacy `player` modes retain their documented ownership.
-
+While waiting for an input, its prepared port or playback, the shared
+outlined-square animation keeps its description accessible to assistive
+technology and respects reduced motion. Input failures dispatch
+`webaudio:error`. Controls and retained readings stay available.
 
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Behavior |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for a playback owner whose analyser is borrowed while playing; default absent. |
+| `input` | attribute | Same-root selector of one module element whose audio output is tapped; default absent, which uses containment. |
+| `port` | attribute | Audio output name on the input module; default `output`. |
+| `.inputModule` | property | `ModuleHandle` preferred over `input`; `null` unbinds and `undefined` restores selector or containment discovery. |
 | `sensitivity` | attribute | Detection sensitivity in `0..1`, default `0.55`; invalid values use the default. Higher sensitivity lowers the cue threshold. |
 | `min-interval-ms` | attribute | Minimum spacing between accepted cues in milliseconds, clamped to `50..1000`; default `160`. Invalid values use the default. |
-| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over player binding; getter returns the explicitly assigned node. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over module input; getter returns the explicitly assigned node. |
 | `.sensitivity`, `.minIntervalMs` | properties | Reflected detection settings with the bounds above. |
 | `.sample` | read-only property | Latest `{strength, hit}` observation, or `undefined` before a frame. Strength is normalized `0..1`. |
 | `.hitCount` | read-only property | Accepted cues since the last reset or source/transport invalidation. |

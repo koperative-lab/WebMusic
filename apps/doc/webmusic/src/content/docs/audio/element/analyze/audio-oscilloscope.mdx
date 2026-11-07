@@ -26,7 +26,7 @@ inspection tool, not a history or transport timeline.
 </script>
 
 <audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
-<audio-oscilloscope player="#session" timebase-ms="10" trigger-edge="rising"></audio-oscilloscope>
+<audio-oscilloscope input="#session" timebase-ms="10" trigger-edge="rising"></audio-oscilloscope>
 ```
 
 The demo pairs one player with the scope. Start playback for live samples;
@@ -34,26 +34,53 @@ the tool's trigger, timebase, Freeze and pointer/keyboard probe work on its
 current frame. Copy includes both Elements, and Reset restores the demo
 settings.
 
+## Ports and composition
+
+`<audio-oscilloscope>` is an **Analyzer** module. It consumes one `audio`
+output and keeps its observations in its own presentation, so it exposes no
+ports of its own and provides no context to children. It resolves its input in this order:
+
+1. `.analyser`: a caller-owned `AnalyserNode`, sampled directly.
+2. `.inputModule`: a `ModuleHandle`; `null` explicitly unbinds and `undefined`
+   resumes discovery.
+3. `input="#id"`: one same-root element exposing `.module`, such as an
+   `<audio-player>`, `<audio-mixer>` or `<audio-recorder>`. `port` names its
+   audio output; the default `output` is answered by all three, and a mixer
+   also answers `master`.
+4. Containment: nested in an `<audio-player>` or `<audio-mixer>`, the scope
+   taps the nearest provider's output.
+
+An invalid, ambiguous or missing explicit input stays unbound and never falls
+back to containment; late insertion, upgrade and replacement are observed. The
+scope adds its own side tap on the port's context and never reroutes, prepares or
+schedules the source: a player's port appears once it prepares on play or
+preload. It registers no Session participant. Inside a provider it follows that
+scope's Session, so seek, pause and end reset its readings; a sibling linked
+only through `input` samples whatever reaches the port.
+
+```html
+<audio-player src="/mp3/Arabesque%20No.1.mp3" controls>
+  <audio-oscilloscope></audio-oscilloscope>
+</audio-player>
+```
+
 ## Signal and lifetime
 
-The scope borrows the bound player's `AnalyserNode` while the player is
-playing. A caller can assign `.analyser` for another live graph; that explicit
-node takes precedence and is sampled while connected. The `player` selector
-must resolve uniquely in the current Document or ShadowRoot, including after
-late insertion or upgrade. Invalid or ambiguous targets leave it unbound.
-The scope never starts playback, creates an `AudioContext`, or retunes a
-borrowed node's FFT settings.
+The scope samples the analyser on its tapped input while signal flows. A
+caller can assign `.analyser` for another live graph; that explicit node takes
+precedence and is sampled while connected. The scope never starts playback,
+creates an `AudioContext`, or retunes a borrowed node's FFT settings.
 
 About every 50 ms it copies one `getFloatTimeDomainData()` window. Timebase is
 clamped to the samples available from that analyser; a trigger chooses a
 matching threshold crossing in that bounded window, or the latest available
 window when no edge matches. The displayed time axis starts at the selected
 window's left edge, **not** at the player's clip position. Freeze stops this
-tool's polling and holds a copied frame. When following a player, pause, seek
-and source replacement clear stale readings; replacing an explicit analyser,
+tool's polling and holds a copied frame. Inside a provider, Session pause,
+seek and end, and any source replacement, clear stale readings; replacing an explicit analyser,
 document hiding and graph loss also clear them. A stopped frame source reports
 unavailable and is retried. Disconnect stops only this tool's poller, observers
-and presenter, never the borrowed player or graph.
+tap and presenter, never the player or its graph.
 
 The monochrome surface keeps Time and Amplitude in fixed readout slots and
 omits a repeated title. Routine Live, Paused and Frozen messages are cleared;
@@ -63,37 +90,25 @@ uses its pressed state to indicate a held frame. The trigger edge is a group of
 three square icon cells (Rising edge, Falling edge, Trigger off); the current
 edge is pressed and inverted.
 
-While waiting for a source or playback, the shared outlined-square animation keeps
-its description accessible to assistive technology. Pending fetch/decode on a linked
-`audio-player` shows the four-square loading animation; load failures remain visible.
-Controls and retained readings stay available, and both animations respect reduced
-motion. An explicit `.analyser` takes precedence over the player's readiness state.
-## Tap a module output
-
-`input="#desk" port="master"` selects a module's prepared output. The default
-port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
-`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
-selector discovery. This can observe a neutral Score output as well as Audio.
-
-The tool adds a side tap, preserving the audible route. It does not call the
-module's `prepare()` or request a second context merely to display a pending
-surface. Missing explicit targets/ports remain pending without ancestor fallback.
-Removing the analyzer releases only its tap and UI resources. Existing explicit
-`.analyser` and legacy `player` modes retain their documented ownership.
-
+While waiting for an input, its prepared port or playback, the shared
+outlined-square animation keeps its description accessible to assistive
+technology and respects reduced motion. Input failures dispatch
+`webaudio:error`. Controls and retained readings stay available.
 
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Behavior |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for a playback owner whose analyser is borrowed while playing; default absent. |
+| `input` | attribute | Same-root selector of one module element whose audio output is tapped; default absent, which uses containment. |
+| `port` | attribute | Audio output name on the input module; default `output`. |
+| `.inputModule` | property | `ModuleHandle` preferred over `input`; `null` unbinds and `undefined` restores selector or containment discovery. |
 | `frozen` | boolean attribute | Stop this tool's polling and retain its current display; default absent. Transport/source changes release the freeze. |
 | `timebase-ms` | attribute | Requested visible window in milliseconds, default `10`; invalid or non-positive values use `10`. The effective value is clamped to the analyser's sampled window. |
 | `trigger-level` | attribute | Threshold in linear sample amplitude, clamped to `-1..1`; default `0`. Invalid values use `0`. |
 | `trigger-edge` | attribute | `rising` (default), `falling` or `off`; other values use rising. `off` displays the latest untriggered window. |
 | `aria-label` | attribute | Accessible group name; default `Oscilloscope`. |
-| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over the bound player's node; getter exposes the current node. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over module input; getter exposes the current node. |
 | `.frozen`, `.timebaseMs`, `.triggerLevel`, `.triggerEdge` | properties | Reflected display controls with the parsing and bounds above. |
 | `.trace` | read-only property | Latest `{samples, timebaseMs, triggered, silent}` copied display window, or `undefined` without a frame. `silent` distinguishes a sampled quiet window from missing input. |
 | `.selectedTimeMs` | read-only property | Probe position in milliseconds from the left edge of the displayed window. |

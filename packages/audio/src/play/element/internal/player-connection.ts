@@ -42,8 +42,12 @@ export class AudioPlayerConnection {
     private readonly implicit = true,
   ) {}
 
-  /** A `player` attribute or an assigned object links explicitly. */
-  get explicit(): boolean { return this.assigned !== undefined || this.host.hasAttribute('player'); }
+  /** An `input` attribute (or the retired `player` alias) or an assigned object links explicitly. */
+  get explicit(): boolean { return this.assigned !== undefined || this.selector !== null; }
+
+  private get selector(): string | null {
+    return this.host.getAttribute('input') ?? this.host.getAttribute('player');
+  }
 
   get player(): AudioPlayer | undefined { return this.owner; }
 
@@ -99,7 +103,7 @@ export class AudioPlayerConnection {
   refresh(): void {
     if (!this.active) return;
     let target = this.assigned;
-    const selector = this.host.getAttribute('player');
+    const selector = this.selector;
     if (!target && selector) {
       try {
         const root = this.host.getRootNode?.() as ParentNode | undefined;

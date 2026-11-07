@@ -43,6 +43,44 @@ from musical completion; listen for `end` when the timeline members finish.
 Construction is lazy, but reading `context` realizes the graph. Preloading and
 playback may need a user gesture to resume the context.
 
+## Ports and composition
+
+`Rack` is not a module: it has no `ModuleHandle`, ports or Session participant,
+and its members keep separate clocks. `<score-player>`'s `.rack` borrows one as
+an explicit ensemble. The module bus is
+`new ScoreRackModule(upstream, {id?, effect?, onError?})`: the Kernel
+[`RackModule`](/kernel/api/#racks-provider-scopes-and-sinks) with Score `Effect`
+recipes on its master compatibility slot. It registers in the `upstream`
+`ModuleContext` and lends `.context`, a child scope whose admission gives every
+module routed inside it a channel keyed by its module ID. It passes the upstream
+Session through, owns none and never registers members a second time.
+
+| Family | Port | Direction | Present |
+| --- | --- | --- | --- |
+| control | `params` (`master-volume`) | input | Always |
+| audio | `master` (`getPort` aliases `main`, `output`) | output | After `prepare()` |
+| audio | `channel:<module id>` | output | Per admitted channel, after its inserts |
+
+`channelInserts(id)` exposes the admitted channel's `InsertChain` after its
+fader and before the master bus. Source inserts remain source-owned; master
+inserts process the sum. The desk owns each channel chain and disposes it when
+that channel detaches. An unknown or unprepared channel returns undefined.
+
+The module also exposes the master `.inserts`, explicit `prepare()`,
+`subscribe` and `dispose()`; the `Rack` API below keeps its Score-member and
+transport-axis contracts.
+
+`admit(module, port)` borrows a same-context Score or Audio output and returns a
+routing `ConnectionLease`. `list()` reports channels; `setVolume(id, value)`,
+`mute(id, flag)`, `solo(id, flag)` and `setMasterVolume(value)` control channel/
+master gains. `setEffect(recipe)` changes only the master compatibility slot.
+Disposal releases the bus and admissions, never borrowed engines. A nested bus
+is one upstream channel. See [modular composition](/bridge/modular-composition/).
+Admission rejects an ID claimed during readiness callbacks and retires only the
+uncommitted candidate. Initial preparation also rejects an upstream admission
+revoked before commit. A child bus that was already prepared retains its own
+lifetime when its parent later releases the borrowed admission.
+
 ## Reusable effects on the master bus
 
 `Rack` accepts the same lazy `Effect` recipes as `ScorePlayer` and
@@ -105,32 +143,6 @@ off();
 transport.destroy();
 rack.dispose();
 ```
-
-## Source-free module bus
-
-`channelInserts(id)` exposes the admitted channel's `InsertChain` after its
-fader and before the master bus. Source inserts remain source-owned; master
-inserts process the sum. The desk owns each channel chain and disposes it when
-that channel detaches. An unknown or unprepared channel returns undefined.
-
-`ScoreRackModule(upstreamContext, {id?, effect?, onError?})` is the opt-in bus
-adapter; the existing `Rack` API below keeps its Score-member and transport-axis
-contracts. The module exposes a derived `.context` for children, `.inserts`,
-`getPort('master' | 'main' | 'output')`, explicit `prepare()`, `subscribe` and
-`dispose()`. It passes through the upstream Session and never registers its
-members a second time.
-
-`admit(module, port)` borrows a same-context Score or Audio output and returns a
-routing `ConnectionLease`. `list()` reports channels; `setVolume(id, value)`,
-`mute(id, flag)`, `solo(id, flag)` and `setMasterVolume(value)` control channel/
-master gains. `setEffect(recipe)` changes only the master compatibility slot.
-Disposal releases the bus and admissions, never borrowed engines. A nested bus
-is one upstream channel. See [modular composition](/bridge/modular-composition/).
-Admission rejects an ID claimed during readiness callbacks and retires only the
-uncommitted candidate. Initial preparation also rejects an upstream admission
-revoked before commit. A child bus that was already prepared retains its own
-lifetime when its parent later releases the borrowed admission.
-
 
 <details class="component-section">
 <summary>API</summary>

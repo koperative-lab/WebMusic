@@ -89,13 +89,13 @@ export function mountBridgeComposition(
     if (!pair || !attached) return;
     const roll = document.createElement("score-view");
     roll.setAttribute("type", "piano-roll");
-    roll.setAttribute("player", `#${owner.id}`);
+    roll.setAttribute("input", `#${owner.id}`);
     roll.setAttribute(
       "aria-label",
       "Score view borrowing the current score player",
     );
     const analysis = document.createElement("score-chord-analysis");
-    analysis.setAttribute("player", `#${owner.id}`);
+    analysis.setAttribute("input", `#${owner.id}`);
     analysis.setAttribute(
       "aria-label",
       "Chord analysis borrowing the same score",

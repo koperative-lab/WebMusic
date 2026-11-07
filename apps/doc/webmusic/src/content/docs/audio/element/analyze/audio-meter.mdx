@@ -35,7 +35,7 @@ meter has no inspection gestures and makes no certified measurement claim.
 </script>
 
 <audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
-<audio-meter player="#session" type="spectrogram" theme="color"></audio-meter>
+<audio-meter input="#session" type="spectrogram" theme="color"></audio-meter>
 ```
 
 The demo pairs one real player with this meter. Its Parameters switch the
@@ -43,6 +43,30 @@ display type and theme and tune each display. Copy includes both Elements;
 Reset restores the demo settings. `@webmusic/audio/analyze/auto` also registers
 the tag. Existing `view/element` and `view/auto` imports remain compatibility
 paths to the same implementation and must not register a second meter.
+
+## Ports and composition
+
+`<audio-meter>` is an **Analyzer** module: it consumes one `audio` output,
+exposes no ports of its own and provides no context to children. Direct input
+comes first: `.context` builds an owned transparent tap and `.analyser` borrows
+a node. Then `.player` borrows an `AudioMeterPlayer` object. Otherwise the meter
+taps a module output, resolved as `.inputModule` (`null` unbinds), then
+`input="#id"` with an optional `port` (default `output`; a mixer also answers
+`master`), then containment in the nearest `<audio-player>` or `<audio-mixer>`.
+
+An invalid, ambiguous or missing explicit input stays unbound and never falls
+back to containment. The meter adds a side tap on the port's context, preserving
+the audible route; it does not call the module's `prepare()` or request a second
+context merely to show a pending surface, and it registers no Session
+participant. Removing it releases only its tap and UI resources. Any module
+output can be tapped, including a neutral Score output.
+
+```html
+<audio-mixer id="desk">
+  <audio-player id="piano" src="/mp3/Arabesque%20No.1.mp3"></audio-player>
+</audio-mixer>
+<audio-meter input="#desk" port="master" type="loudness"></audio-meter>
+```
 
 ## Display types
 
@@ -83,9 +107,9 @@ preset, and `--wm-meter-min-height`; the host accepts ordinary page CSS for
 its width. The canvas re-renders on every box change.
 
 ```html
-<audio-meter player="#session" type="vu" size="sm"></audio-meter>
-<audio-meter player="#session" type="stereometer" size="lg"></audio-meter>
-<audio-meter player="#session" type="spectrogram" width="480" height="12rem"></audio-meter>
+<audio-meter input="#session" type="vu" size="sm"></audio-meter>
+<audio-meter input="#session" type="stereometer" size="lg"></audio-meter>
+<audio-meter input="#session" type="spectrogram" width="480" height="12rem"></audio-meter>
 ```
 
 ## Themes and tokens
@@ -104,13 +128,12 @@ effect without reloading.
 
 ## Signal and ownership
 
-The `player` selector must match one element in the meter's Document or
-ShadowRoot. The meter borrows the player's current analyser, follows late
-upgrade and source replacement, and never owns its transport. `.player` can
-instead borrow a nonvisual player directly and takes precedence over the
-selector. A missing or ambiguous selector shows the shared outlined-square waiting animation; invalid
-selector syntax emits `webaudio:error`. Loading on a linked `audio-player` shows the
-shared four-square indicator and player load failures remain visible. A connected
+With module input the meter reads its own analyser on the tapped port and
+never owns the source's transport. `.player` instead borrows a nonvisual
+`AudioMeterPlayer` directly and takes precedence over module input. A missing,
+ambiguous or invalid input, or a port that is not yet prepared, shows the shared
+outlined-square waiting animation. Loading on a borrowed `.player` shows the
+shared four-square indicator and its load failures remain visible. A connected
 silent analyser is ready and continues its normal display. Descriptions remain
 available to screen readers, and both animations honor reduced-motion preferences.
 The meter waits for pending source preparation before reading its tap. A failed
@@ -121,10 +144,10 @@ For another live graph, assign `.analyser` to borrow an `AnalyserNode`, or
 assign `.context` to create an owned transparent input -> analyser -> output
 tap. The caller supplies that context and connects the tap into its graph;
 the meter does not create an `AudioContext`. Direct `.analyser` or `.context`
-input takes precedence over player binding until cleared. Assigning a
-nonempty `.player` clears direct input. Disconnect or rebind releases the
-presenter, subscriptions and only owned nodes; it never closes or disconnects
-the borrowed player, analyser or context.
+input takes precedence over `.player` and module input until cleared.
+Assigning a nonempty `.player` clears direct input. Disconnect or rebind
+releases the presenter, subscriptions, input tap and only owned nodes; it never
+closes or disconnects the borrowed player, analyser or context.
 
 ```ts
 // For a caller-owned graph that should pass through the meter:
@@ -172,26 +195,13 @@ named peak is the loudest bin refined by parabolic interpolation. The
 oscilloscope trigger aligns within the available window and cannot promise a
 sample-accurate edge.
 
-## Tap a module output
-
-`input="#desk" port="master"` selects a module's prepared output. The default
-port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
-`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
-selector discovery. This can observe a neutral Score output as well as Audio.
-
-The tool adds a side tap, preserving the audible route. It does not call the
-module's `prepare()` or request a second context merely to display a pending
-surface. Missing explicit targets/ports remain pending without ancestor fallback.
-Removing the analyzer releases only its tap and UI resources. Existing explicit
-`.analyser` and legacy `player` modes retain their documented ownership.
-
-
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Behavior |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for one player Element in the current root; default absent. Late insertion, upgrade, replacement and removal are observed. |
+| `input` | attribute | Same-root selector of one module element whose audio output is tapped; default absent, which uses containment. Late insertion, upgrade, replacement and removal are observed. |
+| `port` | attribute | Audio output name on the input module; default `output`. |
 | `type` | attribute | `vu` (default), `loudness`, `waveform`, `oscilloscope`, `spectrum`, `spectrogram` or `stereometer`; other values use `vu`. Changes the reduction and paint, not the graph or stage. |
 | `theme` | attribute | `mono` (default) or `color`. Re-resolves the palette on change. |
 | `size` | attribute | `sm`, `md` (default) or `lg`: caps the adaptive height at the matching `--wm-surface-*` tier (72, 144 or 216px); other values read as `md`. Ignored while `height` or a height token is set. |
@@ -210,7 +220,8 @@ Removing the analyzer releases only its tap and UI resources. Existing explicit
 | `smoothing-time-constant` | attribute | Owned tap analyser smoothing in `0..1`; default `0.8`. Does not retune a borrowed analyser. |
 | `level-scale` | attribute | Non-negative display gain for `readLevel()` on the underlying controller, the waveform columns and the stereometer points; default `1.8`. The oscilloscope stays 1:1. |
 | `peak-decay` | attribute | Non-negative per-frame decrement of the VU hold tick and the loudness peak hold, in normalized scale units; default `0.012`. |
-| `.player` | property | Borrow an `AudioMeterPlayer`; takes precedence over selector binding. Clearing it returns to the selector. |
+| `.inputModule` | property | `ModuleHandle` preferred over `input`; `null` unbinds and `undefined` restores selector or containment discovery. |
+| `.player` | property | Borrow an `AudioMeterPlayer`; takes precedence over module input. Clearing it returns to module input. |
 | `.analyser` | property | Borrow an existing `AnalyserNode`; the getter exposes the current analyser, if any. The meter adds at most one output edge to it for the stereo branch and removes only that edge. |
 | `.context` | property | Caller-supplied `BaseAudioContext` used to build an owned transparent tap. |
 | `.input`, `.output` | read-only properties | Stable tap splice points when using `.context`; absent for a borrowed analyser. |
@@ -221,8 +232,7 @@ Removing the analyzer releases only its tap and UI resources. Existing explicit
 
 `AudioMeterPlayer` exposes an optional `analyser`, optional `loading` and `loadError`
 readiness, and optional `on('sourcechange' | 'load', listener)` subscriptions.
-Element selector bindings also observe `webaudio:loadstatechange`. Readiness never
-creates a graph or requests playback.
+Readiness never creates a graph or requests playback.
 
 Removing a tuning attribute restores its default. Invalid live tuning reports
 an error and keeps the previous working graph and settings. The controller's

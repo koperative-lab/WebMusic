@@ -9,7 +9,7 @@ import AnalysisFeaturePlayground from '../../../../../components/elements/Analys
 
 <AnalysisFeaturePlayground tag="score-chord-analysis" />
 
-Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the selected player’s held MIDI notes. Choose the mode in external Parameters. Degree labels require an explicit key and never infer harmonic function.
+Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the input player’s held MIDI notes. Choose the mode in external Parameters. Degree labels require an explicit key and never infer harmonic function.
 
 ## Import
 
@@ -22,10 +22,38 @@ Inspect complete, spelled triads and seventh chords, including their bass and in
 </script>
 
 <score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
-<score-chord-analysis player="#piece" window="1"></score-chord-analysis>
+<score-chord-analysis input="#piece" window="1"></score-chord-analysis>
 ```
 
-Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window leaves room for complete chord and note labels; adjust `window` to change the visible passage without changing the musical grouping. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the player connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
+Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window leaves room for complete chord and note labels; adjust `window` to change the visible passage without changing the musical grouping. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the `input` connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
+
+## Ports and composition
+
+`<score-chord-analysis>` is an **Analyzer** companion. It declares no ports and provides no
+module context to children; its readings stay in its own surface and
+`.analysis`. It borrows the `webmusic.score` source, position and note activity
+of one Score playback owner — a `<score-player>` or a `<score-rack-part>` — and
+never registers with, creates or commands a Session directly.
+
+| Connection | Form | Behavior |
+| --- | --- | --- |
+| Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
+| Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Standalone data | `.score`, `src` | Inspection without playback; takes precedence over borrowed data |
+
+Playback resolves the explicit selector, then containment, then nothing. An
+`input` that is missing, invalid or ambiguous stays unbound, reported by
+`data-player-state`, and never falls back to the enclosing scope. Inside a
+source-free outer player, nest the tool in the member that plays or name that
+member with `input`. Seek requests go to the borrowed owner, which commits them
+on its Session. This tag reads no `port` attribute and has no input object
+property.
+
+```html
+<score-player src="/mxl/Arabesque%20No.1.mxl">
+  <score-chord-analysis window="1"></score-chord-analysis>
+</score-player>
+```
 
 ## Musical reading
 
@@ -47,7 +75,7 @@ Named chords appear above their source pitch names, including octaves. An unmatc
 
 ## Binding and lifetime
 
-Explicit `.score` wins over `src`, then the selected player's resolved Score. Native bindings prefer the player's `.playback` [shared source](/score/api/#shared-playback-observation), including its initial readiness, data, position and note identities. Late, upgraded or replaced targets are rebound. Invalid or ambiguous selectors stay unbound. Targets without an available native source retain the compatibility snapshot/event path; they do not promise an initial snapshot.
+Explicit `.score` wins over `src`, then the input player's resolved Score. Native bindings prefer the player's `.playback` [shared source](/score/api/#shared-playback-observation), including its initial readiness, data, position and note identities. Late, upgraded or replaced targets and containment scopes are rebound. Invalid or ambiguous `input` selectors stay unbound. Targets without an available native source retain the compatibility snapshot/event path; they do not promise an initial snapshot.
 
 Failed explicit loading does not fall back to unrelated player data; empty input and errors are shown by the surface. Superseded loads cannot restore old input. An explicit Score different from the native player's Score suppresses mismatched activity and cannot seek that owner. Pointer selection and keyboard navigation use `seekNominal()` when available, otherwise convert nominal seconds by the current rate before `seek()`. Failed commands restore the previous local position unless newer state has arrived. Standalone navigation still emits a seek request.
 
@@ -60,9 +88,9 @@ The component owns its URL request, analysis projection, target observer, subscr
 
 | Attribute | Values / default | Behavior |
 | --- | --- | --- |
-| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed player data. |
+| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed input data. |
 | `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
-| `player` | selector, absent | Borrow one target's available Score, position and note activity in the current Document or ShadowRoot. |
+| `input` | selector, absent | Explicit input: borrow one player's or Rack part's available Score, position and note activity in the current Document or ShadowRoot. Absent, the enclosing player or Rack part is borrowed by containment. |
 | `density` | `comfortable` / `compact`, `comfortable` | Typography and spacing for this surface. |
 | `scheme` | `light` / `dark`, inherited | Pin the surface palette; removal follows the page. |
 | `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Auto follows a `data-motion` ancestor and reduced-motion preference. |
@@ -82,7 +110,7 @@ Unknown presentation values fall back to their documented defaults. Invalid musi
 
 | Property | Type | Behavior |
 | --- | --- | --- |
-| `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed player data. |
+| `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed input data. |
 | `.selection` | read-only `AnalysisSelection \| undefined` | Local selected band/passage: `id`, `startQuarters`, `endQuarters`. |
 | `.analysis` | read-only `AnalysisInspection \| undefined` | Selected `kind`, `selection`, `headline`, `detail`, `evidence` and `candidates`; full provenance remains available beyond the compact lane readout. |
 | `.density` | `comfortable \| compact` | Reflected density. |

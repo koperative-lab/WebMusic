@@ -41,15 +41,41 @@ restores the attributes and reloads the piece, discarding edits.
 </script>
 
 <score-player id="sheet-player"></score-player>
-<score-sheet-view player="#sheet-player" editable></score-sheet-view>
+<score-sheet-view input="#sheet-player" editable></score-sheet-view>
 ```
 
 A read-only sheet needs only data: `<score-sheet-view src="/mxl/Arabesque%20No.1.mxl"></score-sheet-view>`.
 No optional peer is involved; engraving uses the package's own staff engraver.
 
+## Ports and composition
+
+`<score-sheet-view>` is a **View** companion. It declares no ports and provides no module
+context to children. It borrows the position, sounding notes and, without an editor, the `webmusic.score` source of one Score playback owner — a
+`<score-player>` or a `<score-rack-part>` — and sends no transport commands. It
+never registers with or creates a Session.
+
+| Connection | Form | Behavior |
+| --- | --- | --- |
+| Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
+| Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
+
+Playback resolves the explicit selector, then containment, then nothing. An
+`input` that is missing, invalid or ambiguous stays unbound, reported by
+`data-player-state`, and never falls back to the enclosing scope. Inside a
+source-free outer player, nest the view in the member that plays or name that
+member with `input`. This tag reads no `port` attribute and has no input
+object property.
+
+```html
+<score-player src="/mxl/Arabesque%20No.1.mxl">
+  <score-sheet-view layout="flow"></score-sheet-view>
+</score-player>
+```
+
 ## Data and layout
 
-Data comes from `.score`, `src`, the selected player's score, or a borrowed
+Data comes from `.score`, `src`, the input player's score, or a borrowed
 `.editor`, with the same precedence and conflicts as
 [`<score-view>`](/score/element/view/score-view/). MusicXML or MXL gives the
 best notation: MIDI carries no key signature, staff assignment or spelling, so
@@ -113,7 +139,8 @@ offered.
 
 ## Playback
 
-`player` selects one player in the same Document or ShadowRoot. Sounding notes
+`input` selects one player in the same Document or ShadowRoot; without it, the
+sheet follows the enclosing player or Rack part. Sounding notes
 take the active ink and a cursor marks the position in its system;
 `follow-cursor` (default on) scrolls the sounding system into view. The sheet
 never sends playback commands. With an editor, the player contributes time only
@@ -126,7 +153,7 @@ while its applied document matches the editor's committed revision, as for
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
-| `player` | attribute | none | Unique selector of a player to follow; without other input the sheet borrows its score. |
+| `input` | attribute | containment | Unique selector of a player or Rack part to follow; without other data the sheet borrows its score. |
 | `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. |
 | `layout` / `.layout` | attribute / property | `page` | `page` or `flow`; other values read as `page`. |
 | `zoom` / `.zoom` | attribute / property | fit (`0`) | Staff size factor clamped to 0.5–3. Absent, zero or invalid fits a page to the width (page) or uses 1 (flow). |
@@ -134,7 +161,7 @@ while its applied document matches the editor's committed revision, as for
 | `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
 | `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `pitch`, `input`, `duration`, `tie`, `accidental`, `delete`, `history`, `zoom`. Unknown tokens are ignored; the getter returns them in that order. |
 | `note-color` / `active-note-color` | attributes | sheet tokens | Notation ink and sounding ink as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`. |
-| `.score` | writable property | none | Assign a loaded Score; overrides `src` and player data. Throws while `.editor` is assigned. |
+| `.score` | writable property | none | Assign a loaded Score; overrides `src` and borrowed input data. Throws while `.editor` is assigned. |
 | `.editor` | writable property | none | Borrow any `ScoreEditorPort`; never disposed. `undefined` detaches it. |
 | `.interactionSession` | writable property | sheet-owned session | Borrow a same-document session to share selection and drafts, for example with a grid. |
 | `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |

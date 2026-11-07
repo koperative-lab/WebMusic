@@ -37,6 +37,12 @@ repeated work after edits, and the [Worker client](#analysis-in-a-worker) moves
 large offline jobs away from the UI thread. For a live signal with custom UI,
 use the [realtime analyzer](/audio/headless/analyze/realtime-analyzer/).
 
+None of these surfaces is a module. Report functions and sessions take an
+`AudioClip`; the realtime analyzer polls an `AnalyserNode` that a caller taps
+from a module's audio output port. The Analyze Elements are companions that tap
+the module named by `input` or found from the nearest provider
+([modular composition](/bridge/modular-composition/)).
+
 The [Analyze Elements](/audio/element/#analyze) instead inspect a live signal:
 sampled level dynamics, probeable FFT bins, or a sounding note against an A4
 reference. They do not replace these report APIs. To show estimated beat

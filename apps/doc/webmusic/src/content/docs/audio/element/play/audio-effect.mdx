@@ -26,11 +26,29 @@ shared example above includes both Score and Audio declarations on one bus.
 ```
 
 Register the target owner and Score panel through their owning entries as in
-[the runnable composition](/bridge/modular-composition/). The target must expose
-an `InsertChain`; an explicit missing target stays pending. Without `target`,
-the nearest module context supplies the owner: a player owns its local insert,
-a rack/mixer supplies its master insert. Ordinary HTML `slot` has no routing
-semantics here.
+[the runnable composition](/bridge/modular-composition/).
+
+## Ports and composition
+
+`<audio-effect>` is a **Processor** declaration. It has no ports or context of
+its own: it adds one slot to its owner's `InsertChain`, which processes that
+owner's `audio` output in place. `.module` lends the realized instance's
+`control` parameters (`ParamSurface`) to panels. The owner resolves as
+`.moduleTarget`, then `target="#id"` (one same-root element whose `.module`
+has an `InsertChain`), then containment: inside an `<audio-player>` the
+player's own chain, inside an `<audio-mixer>` or Score Rack its master chain.
+An explicit missing or unresolved target stays pending and never falls back.
+The declaration registers no Session participant. A recipe attribute replaces
+its slot transactionally, a live parameter edit changes the instance in place,
+and a new owner releases the old slot and joins the new chain.
+This element has no `slot` routing attribute, and ordinary HTML `slot` has no
+routing semantics here.
+
+```html
+<audio-player src="/wav/Arabesque%20No.1.wav" controls>
+  <audio-effect type="filter" frequency="1200"></audio-effect>
+</audio-player>
+```
 
 <details class="component-section">
 <summary>API</summary>

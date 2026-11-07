@@ -78,6 +78,15 @@ const dispose = () => engine.dispose();
 // The context owner retains its eventual cleanup path.
 ```
 
+## Ports and composition
+
+`BufferEngine` and `MediaEngine` are transports beneath a player, not modules:
+they expose no `ModuleHandle` or ports. Their `timingCapabilities` decide the
+timing a hosting participant reports. `BufferEngine` declares
+`sharedSessionClock: true` and attaches Session scheduling, so its player joins
+as `shared-anchor`; `MediaEngine` cannot attach, so its player joins as a
+`media-follower`.
+
 ## Time, ownership and contract source
 
 Engine position is audio media time. Only a buffer reader maps it against the

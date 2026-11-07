@@ -26,12 +26,34 @@ shared example above includes both Score and Audio declarations on one bus.
 ```
 
 Register the target owner and Score panel through their owning entries as in
-[the runnable composition](/bridge/modular-composition/). The target must expose
-an `InsertChain`; an explicit missing target stays pending. Without `target`,
-the nearest module context supplies the owner: a player owns its local insert,
-and a rack/mixer supplies its master insert. An effect written inside a
-`<score-rack-part>` belongs to that part's post-fader channel inserts instead;
-`slot="master"` keeps it on the desk master.
+[the runnable composition](/bridge/modular-composition/).
+
+## Ports and composition
+
+`<score-effect>` is a **Processor** declaration: one slot in its owner's
+`InsertChain`. It declares no ports of its own and provides no module context.
+The realized instance belongs to the chain; `.module` borrows it, with its
+`ParamSurface`, for a panel's `target="#id"`. Owner resolution runs:
+
+1. `.moduleTarget`, an explicit `ModuleHandle` (`null` unbinds);
+2. `target="#id"`, a unique module selector in the current root;
+3. containment: the nearest module context's target, so a player supplies its
+   own insert chain and a Rack or mixer its master insert;
+4. none.
+
+Inside a `<score-rack-part>`, containment selects that part's post-fader
+channel inserts instead; `slot="master"` keeps the effect on the desk master.
+The owner must expose an `InsertChain`. An explicit target that is missing or
+ambiguous stays pending and never falls back to containment. The declaration
+takes no part in Session timing; it processes whatever audio its owner's chain
+carries.
+
+```html
+<score-player src="/midi/Arabesque%20No.1.mid">
+  <score-effect id="room" type="reverb" seconds="2" wet="0.25"></score-effect>
+  <score-synth-panel target="#room" sections="effects"></score-synth-panel>
+</score-player>
+```
 
 <details class="component-section">
 <summary>API</summary>

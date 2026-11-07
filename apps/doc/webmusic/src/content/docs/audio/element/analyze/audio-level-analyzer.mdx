@@ -27,64 +27,80 @@ current API establishes inter-sample true peak.
 </script>
 
 <audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
-<audio-level-analyzer player="#session" threshold-dbfs="-12"></audio-level-analyzer>
+<audio-level-analyzer input="#session" threshold-dbfs="-12"></audio-level-analyzer>
 ```
 
 The demo pairs one player with this tool. Start playback for live samples;
 the tool's Freeze, Reset and Peak threshold controls operate on its own
 display. Copy includes both elements, and Reset restores their demo settings.
 
+## Ports and composition
+
+`<audio-level-analyzer>` is an **Analyzer** module. It consumes one `audio`
+output and keeps its observations in its own presentation, so it exposes no
+ports of its own and provides no context to children. It resolves its input in this order:
+
+1. `.analyser`: a caller-owned `AnalyserNode`, sampled directly.
+2. `.inputModule`: a `ModuleHandle`; `null` explicitly unbinds and `undefined`
+   resumes discovery.
+3. `input="#id"`: one same-root element exposing `.module`, such as an
+   `<audio-player>`, `<audio-mixer>` or `<audio-recorder>`. `port` names its
+   audio output; the default `output` is answered by all three, and a mixer
+   also answers `master`.
+4. Containment: nested in an `<audio-player>` or `<audio-mixer>`, the tool
+   taps the nearest provider's output.
+
+An invalid, ambiguous or missing explicit input stays unbound and never falls
+back to containment; late insertion, upgrade and replacement are observed. The
+tool adds its own side tap on the port's context and never reroutes, prepares or
+schedules the source: a player's port appears once it prepares on play or
+preload. It registers no Session participant. Inside a provider it follows that
+scope's Session, so seek, pause and end reset its readings; a sibling linked
+only through `input` samples whatever reaches the port.
+
+```html
+<audio-player src="/mp3/Arabesque%20No.1.mp3" controls>
+  <audio-level-analyzer></audio-level-analyzer>
+</audio-player>
+```
+
 ## Signal and lifetime
 
-The element borrows the bound player's `AnalyserNode` while that player is
-playing. Assign `.analyser` to inspect a caller-owned graph instead; an
-explicit analyser takes precedence and is sampled while the element remains
-connected. The element does not create an `AudioContext`, decode a clip, seek,
-or own the borrowed node. It samples about every 50 ms, so the RMS and peak
+The element samples the analyser on its tapped input while signal flows.
+Assign `.analyser` to inspect a caller-owned graph instead; an explicit
+analyser takes precedence and is sampled while the element remains connected.
+The element does not create an `AudioContext`, decode a clip, seek, or own a
+borrowed node. It samples about every 50 ms, so the RMS and peak
 describe sampled windows, not continuous loudness or inter-sample true peak.
 The crest value is sample peak minus RMS in dB.
 
 Freeze holds the current display while sampling continues. Reset starts
 the held peak again from the current sample. A pause, seek, source change or
 missing live input clears stale samples; a frame stall marks the signal
-unavailable. The element stops its own polling and subscriptions on rebind or
-disconnect without stopping the player. `player` must resolve uniquely in
-the current Document or ShadowRoot; invalid or ambiguous selectors remain
-unbound, and later target changes are observed.
+unavailable. The element stops its own polling, tap and subscriptions on
+rebind or disconnect without stopping the player.
 
 RMS, Peak hold and Crest stay in fixed positions above the history. The
 monochrome surface omits a repeated title and routine Live, Paused or Frozen
 messages. No signal stays in the status region but is visually hidden;
-unavailable and invalid-selector feedback remains visible. Freeze and Reset hold
+unavailable feedback remains visible. Freeze and Reset hold
 are icon buttons in one non-wrapping row with the threshold fader.
 
-While waiting for a source or playback, the shared outlined-square animation keeps
-its description accessible to assistive technology. Pending fetch/decode on a linked
-`audio-player` shows the four-square loading animation; load failures remain visible.
-Controls and retained readings stay available, and both animations respect reduced
-motion. An explicit `.analyser` takes precedence over the player's readiness state.
-## Tap a module output
-
-`input="#desk" port="master"` selects a module's prepared output. The default
-port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
-`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
-selector discovery. This can observe a neutral Score output as well as Audio.
-
-The tool adds a side tap, preserving the audible route. It does not call the
-module's `prepare()` or request a second context merely to display a pending
-surface. Missing explicit targets/ports remain pending without ancestor fallback.
-Removing the analyzer releases only its tap and UI resources. Existing explicit
-`.analyser` and legacy `player` modes retain their documented ownership.
-
+While waiting for an input, its prepared port or playback, the shared
+outlined-square animation keeps its description accessible to assistive
+technology and respects reduced motion. Input failures dispatch
+`webaudio:error`. Controls and retained readings stay available.
 
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Behavior |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for the playback owner whose analyser is borrowed while playing. |
+| `input` | attribute | Same-root selector of one module element whose audio output is tapped; default absent, which uses containment. |
+| `port` | attribute | Audio output name on the input module; default `output`. |
+| `.inputModule` | property | `ModuleHandle` preferred over `input`; `null` unbinds and `undefined` restores selector or containment discovery. |
 | `threshold-dbfs` | attribute | Sample-peak comparison threshold in dBFS, clamped to `-60..0`; default `-12`. Invalid values use `-12`. |
-| `.analyser` | property | Caller-owned `AnalyserNode`; takes precedence over the player's analyser. |
+| `.analyser` | property | Caller-owned `AnalyserNode`; takes precedence over module input. |
 | `.thresholdDbfs` | property | Reflected peak threshold in dBFS. |
 | `.sample` | read-only property | Latest `{rmsDbfs, peakDbfs}` sample, or `undefined` without a live sample. |
 | `.heldPeakDbfs` | read-only property | Greatest sampled peak since the latest reset, or `undefined` before a sample. |

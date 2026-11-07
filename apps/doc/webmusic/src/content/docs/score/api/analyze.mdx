@@ -30,6 +30,14 @@ Whole-score summaries, histograms and rhythmic-vocabulary reports use the [repor
 
 The score algorithms below take a `Score` (from an importer, or built with `@webmusic/score`) and return plain data. The following examples assume a `score` that holds a I–IV–V–I progression in C major.
 
+## Ports and composition
+
+Nothing in this capability is a module. The algorithms are data functions. The
+Headless follower and trackers consume the payload of a Score module's `source`
+port (`ScorePlaybackSource`, `webmusic.score`) or its note events, and the
+analysis Elements are companions that resolve that source from `input` or the
+nearest provider ([modular composition](/bridge/modular-composition/)).
+
 ## Summarize a score
 
 `summarizeScore` returns metadata, counts, duration, tempo, meter, key, and pitch range — handy for logs, APIs, CLI tools, and background jobs.

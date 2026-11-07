@@ -13,6 +13,8 @@ Draw what is being heard **right now**. The newest column sits at the right edge
 
 This is the capability's missing cardinality. Every other surface here draws data that already exists — a decoded clip, a peaks pyramid, a precomputed spectrogram. The only live path was [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs), which is **instantaneous**: it has no time axis at all, so nothing could show what the microphone did a second ago. This element is the only live time-axis surface in the package.
 
+## Import
+
 ```html
 <script type="module">
   import { defineAudioLiveViewElement } from '@webmusic/audio/view/element';
@@ -20,8 +22,8 @@ This is the capability's missing cardinality. Every other surface here draws dat
 </script>
 
 <audio-recorder id="rec"></audio-recorder>
-<audio-live-view source="#rec" type="waveform" window-seconds="4"></audio-live-view>
-<audio-live-view source="#rec" type="spectrogram" color-map="magma"></audio-live-view>
+<audio-live-view input="#rec" type="waveform" window-seconds="4"></audio-live-view>
+<audio-live-view input="#rec" type="spectrogram" color-map="magma"></audio-live-view>
 ```
 
 Two drawings live under one `type`, exactly as `<audio-view>` keeps waveform and spectrogram under one attribute: both are "append one column per frame and scroll", and they differ only in how a column is painted. `waveform` reduces each frame to a min/max band; `spectrogram` paints one bin per row, low frequencies at the bottom, coloured through `color-map`. An unknown `type` falls back to `waveform`.
@@ -32,11 +34,29 @@ only waveform/spectrogram pixels; published `@webmusic/ui` `CanvasStage` owns ca
 DPR/resize, RAF, accessible label, status overlay and teardown. The Element resolves attributes and
 the analyser source, then composes those three ports.
 
-## The analyser is borrowed
+## Ports and composition
 
-`source="#id"` looks for a tap on the target in this order: `.analyser`, `.inputAnalyser`, `.recorder?.inputAnalyser`, `.player?.analyser` — so a player, a meter and a recorder all resolve without demanding one spelling. You can also assign `.analyser` directly, which overrides `source`.
+`<audio-live-view>` is a **View** of a live signal. It exposes no ports,
+provides no context to children and registers no Session participant; it has
+no transport and sends no commands. Its analyser resolves in this order:
+
+1. `.analyser`: an `AnalyserNode` assigned directly.
+2. `input="#id"`: one same-root element, read for a tap in this order:
+   `.analyser`, `.inputAnalyser`, `.recorder?.inputAnalyser`,
+   `.player?.analyser`, so a player, a meter and a recorder all resolve
+   without demanding one spelling.
+3. Containment: without `input`, the enclosing `<audio-player>`.
+
+An invalid or ambiguous `input` shows an error and never falls back to the
+enclosing player.
 
 The node is **borrowed**. This element never creates, mutates or disposes it, so several views can read the same tap and disconnecting one leaves the others (and the recording) untouched.
+
+```html
+<audio-player src="/mp3/Arabesque%20No.1.mp3" controls>
+  <audio-live-view type="spectrogram"></audio-live-view>
+</audio-player>
+```
 
 <details class="component-section">
 <summary>API</summary>
@@ -44,12 +64,12 @@ The node is **borrowed**. This element never creates, mutates or disposes it, so
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `type` | attribute / property | `waveform` | `waveform` or `spectrogram`; unknown values fall back to `waveform`. Changing it starts a fresh history. |
-| `source` | attribute | — | CSS selector of an element exposing an `AnalyserNode`. Changing it starts a fresh history. |
+| `input` | attribute | — | CSS selector of an element exposing an `AnalyserNode`; absent, the enclosing `<audio-player>` is used. Changing it starts a fresh history. |
 | `window-seconds` | attribute / `.windowSeconds` | `5` | Seconds of history the strip holds, minimum `0.5`. Changing it starts a fresh history. |
 | `height` | attribute | `4rem` | Strip height — a bare number is `px`, or any CSS length. |
 | `wave-color` | attribute | `currentColor` | Column fill for `type="waveform"`. |
 | `color-map` | attribute | `viridis` | Palette for `type="spectrogram"` (`viridis` · `magma` · `grayscale` · `gray`; an unknown name falls back to `viridis`). |
-| `.analyser` | property | — | Borrow an `AnalyserNode` directly; overrides `source`. Never disposed here. |
+| `.analyser` | property | — | Borrow an `AnalyserNode` directly; overrides `input`. Never disposed here. |
 | `.live` | property (getter) | — | Whether an analyser is currently resolved. |
 | `webaudio:error` | event | — | `detail = { error }` if presenter sizing/animation or the draw adapter fails. `{ bubbles, composed }`. |
 
@@ -87,7 +107,7 @@ function draw(frame) {
 }
 ```
 
-The `source` selector must match one element in the current Document or ShadowRoot.
+The `input` selector must match one element in the current Document or ShadowRoot.
 Late insertion, replacement and source readiness events refresh the borrowed analyser.
 Invalid or ambiguous selectors show an error. Disconnect releases discovery and event
 subscriptions without stopping the source. An explicit `.analyser` takes precedence over
@@ -115,7 +135,7 @@ audio-live-view {
 ```
 
 ```html
-<audio-live-view source="#rec" type="spectrogram" height="120" color-map="magma"></audio-live-view>
+<audio-live-view input="#rec" type="spectrogram" height="120" color-map="magma"></audio-live-view>
 ```
 
 Column width is the strip width divided by the ring's capacity, so a shorter `window-seconds` gives

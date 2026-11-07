@@ -28,6 +28,22 @@ const clip = await recorder.stop(); // Promise resolves to the captured take
 recorder.dispose();
 ```
 
+## Ports and composition
+
+`recorder.module` is the microphone as a source module: `id`, `getPort`,
+`ports()` and `subscribe`, which fires when capture starts and stops. It has no
+`prepare()`; the port exists only while capturing.
+
+| Family | Port | Direction | Present |
+| --- | --- | --- | --- |
+| audio | `output` (alias `main`) | output | From `start()` until `stop()` or disposal |
+
+The port has no default route, so the microphone reaches the speakers only when a
+consumer patches it into an effect, mixer or analyser. Pass the scope's context
+through `audioContext` (an `AudioContext` or a factory) so the port shares that
+graph; a borrowed context is never closed. The recorder is a capture owner, not a
+Session participant.
+
 ## The sample rate is not known until start
 
 `maxRecordedFrames` is a frame count, so converting a duration into one needs

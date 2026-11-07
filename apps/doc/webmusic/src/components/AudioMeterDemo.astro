@@ -1,11 +1,11 @@
 ---
 // One central player supplies both read-only monitors through their public
-// selector binding. Neither meter creates another player or audio route.
+// input selector. Neither meter creates another player or audio route.
 import ElementPlayground from './ElementPlayground.astro';
 
 const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
 
-const BORROWED = 'this meter borrows the player’s analyser, and a borrowed node keeps its own FFT settings — only an owned .context tap reads this';
+const BORROWED = 'this meter reads its input tap’s analyser, which keeps its own FFT settings — only an owned .context tap reads this';
 
 const INERT = {
   'fft-size': BORROWED,
@@ -21,8 +21,8 @@ const INERT = {
 >
   <audio-player id="wa-meter-player" src={SRC} controls></audio-player>
   <div class="wa-demo__meters">
-    <audio-meter player="#wa-meter-player" id="wa-meter-level"></audio-meter>
-    <audio-meter player="#wa-meter-player" id="wa-meter-spectrum" type="spectrum"></audio-meter>
+    <audio-meter input="#wa-meter-player" id="wa-meter-level"></audio-meter>
+    <audio-meter input="#wa-meter-player" id="wa-meter-spectrum" type="spectrum"></audio-meter>
   </div>
 </ElementPlayground>
 

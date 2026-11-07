@@ -8,7 +8,7 @@ const companions = [{tag: 'score-player', target: 'score-player'}];
 <ElementPlayground tag="score-pitch-view" markup="[data-pitch-composition]" companions={companions} class="pg-pitch-view">
   <div data-pitch-composition data-pg-fragment>
     <score-player id={playerId} src={SRC}></score-player>
-    <score-pitch-view player={`#${playerId}`}></score-pitch-view>
+    <score-pitch-view input={`#${playerId}`}></score-pitch-view>
   </div>
 </ElementPlayground>
 

@@ -41,6 +41,13 @@ const edited = score.edit((tx) => tx.updateNote(id, {dynamic: 'mf'}));
 const next = session.update(edited);   // reuses unchanged-part caches
 ```
 
+## Ports and composition
+
+`createAnalysisSession` is pure data, not a module: it has no ports and joins no
+transport Session; the name refers to its cache. Its results feed presentation
+directly, and [`createAnalysisFollower`](/score/headless/analyze/analysis-follower/)
+holds one while it follows a Score module's `source` port.
+
 ## Why identity matters
 
 `Score.edit` and `Score.withPart` return a new `Score` whose **untouched parts

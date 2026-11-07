@@ -22,6 +22,13 @@ another object's seconds, and a pure helper returns data without running anythin
 Do not infer a shared session clock, emitter or disposal method from the Headless
 label. Each owning page states its contract and related public types.
 
+Under [modular composition](/bridge/modular-composition/) (DEC-068) the module
+surfaces are `AudioPlayer.module`, `AudioMixer.module` and `AudioRecorder.module`,
+each lending an audio output port. Engines, analysers, view models and editors
+are not modules. A player Element or Bridge's `registerAudioParticipant`
+registers an engine with the Session; every leaf page's Ports and composition
+section states the details.
+
 The export tables below are a manual export-ownership map, checked against the
 public barrel. The Headless documentation gate searches recognized **value
 names** on this page and across the capability's pages; it does not prove that

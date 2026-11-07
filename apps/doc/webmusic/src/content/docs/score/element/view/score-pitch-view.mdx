@@ -11,7 +11,7 @@ import PitchViewPlayground from '../../../../../components/elements/PitchViewPla
 
 `<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources.
 
-Without a resolved `player` or `source`, the view shows the shared outlined-square waiting
+Without a resolved input, the view shows the shared outlined-square waiting
 animation. A native source that is loading shows the four-square loading animation;
 source errors remain visible. A ready source with no held notes keeps its normal pitch
 surface; on the staff and fretboard its empty sentence (such as “No sounding notes”) is a
@@ -30,14 +30,40 @@ technology; reduced-motion preferences stop the animation.
 </script>
 
 <score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>
-<score-pitch-view player="#piece" type="keyboard"></score-pitch-view>
+<score-pitch-view input="#piece" type="keyboard"></score-pitch-view>
 ```
 
 The demo contains one player and one pitch view. Change `type` in external Parameters. Type-specific rows appear only when relevant; their attribute values survive switching types. The player has its own parameter group. Copy includes both tags, and Reset restores their original attributes.
 
+## Ports and composition
+
+`<score-pitch-view>` is a **View** companion. It declares no ports and provides no module
+context to children. It borrows the held notes and playback state of one Score playback owner — a
+`<score-player>` or a `<score-rack-part>` — and sends no transport commands. It
+never registers with or creates a Session.
+
+| Connection | Form | Behavior |
+| --- | --- | --- |
+| Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
+| Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Note events | `input="#id"` on a note source | Any element dispatching `webscore:noteon` / `webscore:noteoff`, such as [`<score-note-input>`](/score/element/play/score-note-input/) |
+
+Playback resolves the explicit selector, then containment, then nothing. An
+`input` that is missing, invalid or ambiguous stays unbound, reported by
+`data-player-state`, and never falls back to the enclosing scope. Inside a
+source-free outer player, nest the view in the member that plays or name that
+member with `input`. The view has no `src` or `.score`. This tag reads no `port` attribute and has no input
+object property.
+
+```html
+<score-player src="/midi/Arabesque%20No.1.mid">
+  <score-pitch-view type="keyboard" low="48" high="84"></score-pitch-view>
+</score-player>
+```
+
 ## Data and lifetime
 
-`player` must match exactly one target in the current Document or ShadowRoot. A nonempty `player` overrides the legacy `source` selector. Native snapshots initialize held notes; note and state events reconcile them after pause, seek, stop, end and source replacement. Late/replaced targets are rebound; invalid or ambiguous selectors remain unbound. Overlapping occurrences of the same MIDI pitch are counted, so releasing one does not erase another.
+An `input` selector must match exactly one target in the current Document or ShadowRoot; without one, the view follows the enclosing player or Rack part. Native snapshots initialize held notes; note and state events reconcile them after pause, seek, stop, end and source replacement. Late/replaced targets and containment scopes are rebound; invalid or ambiguous selectors remain unbound and never fall back to containment. Overlapping occurrences of the same MIDI pitch are counted, so releasing one does not erase another.
 
 The component has no `src`, `.score`, note command or transport command. Changing `type` replaces only the presentation and keeps the current held-note state. Disconnect releases its observer, subscriptions and presenter without stopping the player. To enter notes, use [`<score-note-input>`](/score/element/play/score-note-input/).
 
@@ -117,8 +143,7 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | --- | --- | --- | --- |
 | `type` | `keyboard` | All | `keyboard`, `staff` or `fretboard`; unknown values use keyboard. |
 | `direction` | `down` | Keyboard | Key-front direction: `up`, `down`, `left` or `right`; invalid values use `down`. Low pitches stay left or bottom. |
-| `player` | absent | All | Unique selector for a held-note/state source; takes precedence over `source`. |
-| `source` | absent | All | Legacy selector fallback when `player` is empty. |
+| `input` | absent | All | Explicit input: unique selector for a player, Rack part or note-event source. Absent, the enclosing player or Rack part is followed by containment. |
 | `low` / `high` | `48` / `71` | Keyboard | Requested lowest/highest MIDI key, rounded. |
 | `system` | `grand` | Staff | `grand`, `treble` or `bass`. |
 | `spelling` | `sharp` | All | `sharp` or `flat`; no key inference. |

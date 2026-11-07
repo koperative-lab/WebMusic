@@ -26,12 +26,38 @@ The view is read-only. It can [follow an editor](#follow-an-editor) and draw its
 </script>
 
 <score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
-<score-view player="#piece" type="staff"></score-view>
+<score-view input="#piece" type="staff"></score-view>
 ```
 
 The demo starts in staff mode with `public/mxl/Arabesque No.1.mxl`, the *Arabesque No. 1* notation source with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
 
 The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes.
+
+## Ports and composition
+
+`<score-view>` is a **View** companion. It declares no ports and provides no module
+context to children. It borrows the `webmusic.score` source and position of one Score playback owner — a
+`<score-player>` or a `<score-rack-part>` — and sends no transport commands. It
+never registers with or creates a Session.
+
+| Connection | Form | Behavior |
+| --- | --- | --- |
+| Containment | Nested inside a player or Rack part | Borrows the nearest one; no attribute needed |
+| Explicit input | `input="#id"` | One unique element in the same Document or ShadowRoot |
+| Explicit data | `.editor`, `.score`, `src` | Takes precedence over borrowed data; `.editor` excludes the other two |
+
+Playback resolves the explicit selector, then containment, then nothing. An
+`input` that is missing, invalid or ambiguous stays unbound, reported by
+`data-player-state`, and never falls back to the enclosing scope. Inside a
+source-free outer player, nest the view in the member that plays or name that
+member with `input`. This tag reads no `port` attribute and has no input
+object property.
+
+```html
+<score-player src="/mxl/Arabesque%20No.1.mxl">
+  <score-view type="staff"></score-view>
+</score-player>
+```
 
 ## Annotations and compact layout
 
@@ -50,7 +76,7 @@ this option retains the loaded score and playback position. On the other types
 the attribute is retained but has no effect.
 
 ```html
-<score-view player="#piece" type="staff" show-annotations="true"></score-view>
+<score-view input="#piece" type="staff" show-annotations="true"></score-view>
 ```
 
 Hidden annotations reserve no drawing space. Staff height is recomputed from
@@ -215,13 +241,13 @@ Use the same structure with a score file in your application:
 <score-player id="falling-piece" src="/midi/Arabesque%20No.1.mid"></score-player>
 <div class="shared-pan" tabindex="0" role="region" aria-label="Pan notes and keyboards together">
   <div class="pitch-track">
-    <score-pitch-view type="keyboard" direction="down" player="#falling-piece" low="48" high="83"
+    <score-pitch-view type="keyboard" direction="down" input="#falling-piece" low="48" high="83"
       white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
       scroll="true" follow="none"></score-pitch-view>
-    <score-view type="waterfall" direction="down" player="#falling-piece"
+    <score-view type="waterfall" direction="down" input="#falling-piece"
       min-pitch="48" max-pitch="83" white-note-width="32" black-note-width="20"
       pixels-per-second="64" note-spacing="0" height="180"></score-view>
-    <score-pitch-view type="keyboard" direction="up" player="#falling-piece" low="48" high="83"
+    <score-pitch-view type="keyboard" direction="up" input="#falling-piece" low="48" high="83"
       white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
       scroll="true" follow="none"></score-pitch-view>
   </div>
@@ -262,9 +288,9 @@ the score or creating another transport.
 
 ## Data and playback
 
-Without an editor, source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
+Without an editor, source precedence is explicit `.score`, then `src`, then the input player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A view with only an input borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
 
-The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource or sends seek commands.
+An `input` selector must resolve uniquely in the current Document or ShadowRoot; without one, the view borrows the enclosing player or Rack part. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets and containment scopes rebind; invalid or ambiguous selectors remain unbound and never fall back to containment. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource or sends seek commands.
 
 Native binding prefers the target's `.playback` [shared source](/score/api/#shared-playback-observation).
 An available source suppresses duplicate legacy events. A target without a source,
@@ -294,8 +320,8 @@ group configures the staff; the grid and player have their own groups.
 
 ```html
 <score-player id="notes-player"></score-player>
-<score-grid-view id="notes-grid" player="#notes-player" editable></score-grid-view>
-<score-view id="notes-staff" player="#notes-player" type="staff"></score-view>
+<score-grid-view id="notes-grid" input="#notes-player" editable></score-grid-view>
+<score-view id="notes-staff" input="#notes-player" type="staff"></score-view>
 <script type="module">
   import {defineScorePlayerElement} from '@webmusic/score/play/element';
   import {defineScoreGridViewElement, defineScoreViewElement} from '@webmusic/score/view/element';
@@ -341,7 +367,7 @@ while playback catches up.
 | Member | Kind | Description |
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
-| `player` | attribute | Unique source/position selector; explicit score input retains precedence. |
+| `input` | attribute | Explicit source/position input: a unique player or Rack part selector; explicit score input retains precedence. Absent, the enclosing player or Rack part is followed by containment. |
 | `.editor` | writable property | Follow an editor from `loadScoreEditor`/`createScoreEditor` (any `ScoreEditorPort`) read-only; borrowed, never disposed. `undefined` detaches it. Cannot coexist with independent `.score` or `src`. There is no `editor` attribute. |
 | `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession` whose draft the view draws; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff` or `waterfall`; unknown or removed values (such as `map` or `thumbnail`) use piano-roll. |
@@ -359,7 +385,7 @@ while playback catches up.
 | `black-note-width` | attribute | Waterfall accidental pitch-column width; defaults to 0.62 × natural-note width and cannot exceed it. Alone, derives natural-note width as `value / 0.62`. A positive explicit width disables fitting. |
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. |
-| `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
+| `.score` | writable property | Assign a loaded Score; overrides `src` and borrowed input data, cancelling obsolete loads. |
 | `data-editor-state` | reflected state | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`. `unavailable` (a disposed or not-ready editor) is pending: the view shows no stale content and a polite waiting status. `invalid` (the editing binding could not be created) and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
 | `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. A draft does not make the player binding `mismatched`; the player is compared with committed document content. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys (including `showAnnotations` outside `staff`) throw `TypeError` before changing the view. |

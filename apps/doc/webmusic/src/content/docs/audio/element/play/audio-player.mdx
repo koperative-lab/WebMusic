@@ -12,9 +12,10 @@ import AudioCustomStyleDemo from '../../../../../components/AudioCustomStyleDemo
 
 `<audio-player>` is the central Audio transport. It owns a stable
 [`AudioPlayer`](/audio/headless/play/audio-player/) and controls one selected clip,
-playlist, mix or editing sequence. Connect playlist, mixer and recorder components using
-`player="#session"` or a `.player` object reference. The player supplies the shared
-play/pause, seek and time controls; companions supply their own tasks.
+playlist, mix or editing sequence. Nest playlist, recorder, view and analysis
+companions inside it, or link them with `input="#session"`; a mixer links as its
+mix backend with `player="#session"`. The player supplies the shared play/pause,
+seek and time controls; companions supply their own tasks.
 
 A `src` URL or `.clip` selects one clip. Linked playlist/mixer components select
 their backend, preserving its state. A linked recorder auditions its take through
@@ -35,17 +36,64 @@ this player. Views and meters follow the same owner.
 <audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
 ```
 
+## Ports and composition
+
+`<audio-player>` is a **Source** module and a module provider: its children
+resolve their module context through it, and the outermost player is the
+**Session provider**. A standalone player is a Session of one.
+
+| Port | Family | Direction | Notes |
+| --- | --- | --- | --- |
+| `output` (alias `main`) | `audio` | output | The player's own chain after its inserts, created when it prepares (play or `preload`). Absent while the player is empty or drives a linked playlist or mixer backend; a source-free root has no fabricated output. |
+
+Containment connects in both directions. Nested players, playlists, recorders,
+views, analysers and `<audio-effect>` declarations attach to the nearest player;
+an effect without `target` takes an insert slot in this player's chain. This
+player's `output` joins the enclosing provider's admission (inside an
+`<audio-mixer>`, a channel keyed by the player's `id`) or its default
+destination. `.module` exposes the handle and `.sessionTransport` the owned or
+borrowed Session; reading either prepares no audio.
+
+The outermost player owns a `SessionTransport`; nested players borrow the
+nearest Session, through layout wrappers and mixer scopes, unless
+`session="local"` starts an independent boundary. A player with a clip or an
+editor document registers its engine once as a participant on the
+`clip-seconds` axis; a borrowed `.player` joins the same way. The decoded-buffer engine reports `shared-anchor`
+timing; the media-element engine and document sequences report
+`media-follower`. A source-free outer player conducts its nested members, and a
+player that drives a borrowed queue or mix keeps that transport's own
+commands, rate and loop. `play(when)` defers the Session start to `when`.
+
+Play, pause, stop, seek and rate commands delegate to the Session in Session
+seconds; a failed command, preparation or activation is reported as
+`webaudio:error`. `rate` and `loop` set Session rate and loop only on a player
+that owns its Session. `controls="auto"` hides an inherited leaf's transport,
+`show` adds a second control view of the same authority and `hide` suppresses
+local chrome; none registers another participant. A provider's new default
+destination re-routes the output in place, keeping engine and membership; a new
+admission, Session or audio environment withdraws the route and joins the new
+scope. See [modular composition](/bridge/modular-composition/) for a running
+mixed example.
+
+```html
+<audio-player src="/wav/Arabesque%20No.1.wav" controls>
+  <audio-view type="waveform" interactive></audio-view>
+  <audio-meter type="vu"></audio-meter>
+</audio-player>
+```
+
 ## Linked composition
 
 ```html
 <audio-player id="session"></audio-player>
-<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
-<audio-meter player="#session"></audio-meter>
+<audio-playlist input="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+<audio-live-view input="#session" type="waveform"></audio-live-view>
 ```
 
-Register Play tags from `@webmusic/audio/play/element` and the meter from
-`@webmusic/audio/analyze/element`. The former `view/element` meter import still
-works for compatibility. Use a mixer instead of the playlist for simultaneous
+Register Play tags from `@webmusic/audio/play/element` and the live view from
+`@webmusic/audio/view/element`. The live view reads the player's `.analyser`,
+which follows the queue; a module tap such as `<audio-meter>` needs the
+player's own `output` port, which a queue or mix backend does not provide. Use a mixer instead of the playlist for simultaneous
 stems. One player selects one backend: assigning a clip replaces the queue/mix
 connection. Separate sessions use separate player IDs.
 
@@ -58,7 +106,7 @@ Headless engine for one clip.
 
 ```html
 <audio-player id="audition"></audio-player>
-<audio-clip-view id="take-view" player="#audition" editable></audio-clip-view>
+<audio-clip-view id="take-view" input="#audition" editable></audio-clip-view>
 <script type="module">
   import '@webmusic/audio/play/auto';
   import '@webmusic/audio/view/auto';
@@ -150,42 +198,6 @@ shared `--wm-*` tokens instead re-skins this element along with the rest of the
 capability. This one is restyled entirely from page CSS:
 
 <AudioCustomStyleDemo />
-
-## Module composition
-
-Every player is a module scope (DEC-068). The outermost player owns a
-`SessionTransport` — a standalone player is a Session of one — and nested
-players borrow the nearest Session, including through layout wrappers and mixer
-scopes. A player with a clip or an editor document registers its engine once as
-a participant; a borrowed `.player` joins the same way. Document playback goes
-through the player's own inserts and module output. A source-free outer player
-conducts its nested members. A player that selected an external transport (a
-queue or mix it borrows) keeps that transport's own commands, rate and loop.
-`session="local"` creates an independent boundary. A nested playlist or
-recorder attaches to the enclosing player through its scope; `player=` links
-explicitly. `play(when)` defers the Session start to `when`.
-
-`controls="auto"` hides the transport of an inherited leaf, `show` displays a
-second control view of the same authority, and `hide` suppresses local chrome.
-These controls do not register another participant. `.sessionTransport` exposes
-the borrowed/owned authority and `.module` exposes the local capability handle;
-a source-free root has no fabricated audio output.
-
-Play/pause/stop/seek/rate commands delegate to the Session; a failed
-delegated command is reported as `webaudio:error`. Seek is
-on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
-Unknown/live duration remains explicit on the Session snapshot instead of being
-reported as a known finite clip. Discovery does not prepare audio. See
-[modular composition](/bridge/modular-composition/) for a running mixed example.
-
-The `rate` and `loop` attributes set Session rate and whole-Session loop only on
-a player that owns its Session: a module root or a `session="local"` boundary. On
-an inherited leaf they leave the borrowed Session unchanged. A provider's new
-default destination re-routes the leaf in place, keeping its engine and Session
-membership. A new admission, Session or audio environment withdraws the old
-route and joins the new scope. Each failed preparation or activation attempt is
-reported as `webaudio:error`.
-
 
 <details class="component-section">
 <summary>API</summary>

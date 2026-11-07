@@ -490,16 +490,18 @@ implicitly acquire document editing.
 | `HeadlessSynth`, `ScorePlayerOptions`, `PlayerTimeUpdate`, `PlaybackTransport`, `InteractivePlayerOptions`, `RackOptions`, `RackAddOptions`, `LfoControllerOptions`, `LfoControllerState`, `LfoTarget`, `LfoShape`, `SynthPanelLfoErrorDetail`, `RenderOptions`, `RecordedNote`, `RecordToScoreOptions`, `EffectNode`, `ReverbOptions` / `DelayOptions` / `FilterOptions` / `DistortionOptions` / `CompressorOptions` / `LimiterOptions` / `AnalyserOptions` / `BitcrusherOptions` / `TremoloOptions` / `ChorusOptions`, `FmOptions` / `WavetableOptions` / `NoiseOptions` / `MidiOutOptions`, `ClockOptions` / `MidiInputOptions`, `ScoreFormat`, … | Types | Option, event, and contract shapes. |
 
 
-## Module composition
+## Ports and composition
 
-The opt-in [module composition](/bridge/modular-composition/) keeps transport,
-audio routing, realized effect slots, parameter controls and analysis taps as
-separate borrowed relationships. Kernel owns neutral
-[ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
+[Modular composition](/bridge/modular-composition/) is the only composition
+model (DEC-068): transport, audio routing, realized effect slots, parameter
+controls and analysis taps are separate borrowed relationships. Kernel owns the
+neutral [ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
 
-`ScorePlayerModule` adapts one real engine; [its owning reference](/score/headless/play/score-player/#module-adapter)
-documents context, preparation, ports and disposal. `ScoreRackModule` supplies
-[a hierarchical audio bus](/score/headless/play/rack/#source-free-module-bus)
-without another transport registration. `ScoreEffectElement` and
+This entry's module runtimes are `ScorePlayerModule`, which adapts one real
+engine ([ports and Session role](/score/headless/play/score-player/#ports-and-composition));
+`ScoreRackModule`, [a hierarchical audio bus](/score/headless/play/rack/#ports-and-composition)
+without another transport registration; and the note modules `MidiNoteSource`
+and `MidiNoteSink` ([note ports](/score/headless/play/score-player/#note-sources-and-sinks)).
+Engines, sounds, effect recipes and controllers are what those modules consume. `ScoreEffectElement` and
 `defineScoreEffectElement` are Element exports for
 [one insert declaration](/score/element/play/score-effect/).

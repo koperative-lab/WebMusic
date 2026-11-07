@@ -33,7 +33,7 @@ describe('Audio Analyze live-tool demos', () => {
     const page = read(`src/content/docs/audio/element/analyze/${tag}.mdx`);
     expect(page).toContain(`<AudioAnalyzeFeaturePlayground tag="${tag}" />`);
     expect(page).toContain(`<audio-player id="session" src="${mp3}"`);
-    expect(page).toContain(`<${tag} player="#session"`);
+    expect(page).toContain(`<${tag} input="#session"`);
   });
 
   it('copies the complete player/companion composition and registers real tags', () => {
@@ -41,7 +41,7 @@ describe('Audio Analyze live-tool demos', () => {
     expect(demo).toContain('markup="[data-demo-composition]"');
     expect(demo).toContain('<ElementComposition>');
     expect(demo.match(/<audio-player\b/g)).toHaveLength(1);
-    for (const tag of tags) expect(demo).toContain(`<${tag} player={`);
+    for (const tag of tags) expect(demo).toContain(`<${tag} input={`);
     expect(demo).toContain('defineAudioPlayerElement()');
     expect(demo).toContain('defineAllAudioElements()');
     expect(demo).not.toContain('<audio-analysis ');

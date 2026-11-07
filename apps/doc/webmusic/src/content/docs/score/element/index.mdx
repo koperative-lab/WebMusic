@@ -51,14 +51,18 @@ recorder page owns that composition and its recording contract.
 
 [`<score-effect>`](/score/element/play/score-effect/) is a nonvisual insert declaration,
 registered by `defineScoreEffectElement()` from `@webmusic/score/play/element` and included
-in the auto-registration entry. Every player is a module scope;
+in the auto-registration entry. Every player is a module scope
+(DEC-068): the outermost player owns the Session, nested players borrow it
+unless `session="local"`, and nested effects, note inputs, panels, views and
+analysis connect to the nearest provider by containment. Each Element page has
+a **Ports and composition** section with its ports and explicit forms;
 [the shared example](/bridge/modular-composition/) shows inherited transport,
 master inserts, attached parameter panels and output taps.
 
 ## Analyze
 
 Choose one tool for the musical question you want to inspect. Each tag renders
-one surface, can borrow an existing player, and keeps its own selection without
+one surface, can borrow an enclosing or `input`-named player, and keeps its own selection without
 editing the score.
 
 | Purpose | Component | What it does |
@@ -83,27 +87,31 @@ Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headl
 </script>
 
 <score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>
-<score-chord-analysis player="#piece"></score-chord-analysis>
-<score-pitch-view type="keyboard" player="#piece" low="48" high="84"></score-pitch-view>
-<score-pitch-view type="staff" player="#piece" system="grand"></score-pitch-view>
+<score-chord-analysis input="#piece"></score-chord-analysis>
+<score-pitch-view type="keyboard" input="#piece" low="48" high="84"></score-pitch-view>
+<score-pitch-view type="staff" input="#piece" system="grand"></score-pitch-view>
 ```
 
 The player loads once. Score-based companions borrow its resolved data and position; pitch views borrow its held notes. Each is an ordinary sibling that can be placed, styled or omitted independently. Configuration belongs to each tag’s attributes and application-owned controls. Each tag-owned live demo pairs that Analyze component with one player; the example above shows an optional composition. No Analyze component mounts an internal keyboard, staff, fretboard, tab bar or settings dock.
 
-Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The chord component in `mode="live"` reads sounding note activity and does not seek score time. Its default `mode="score"` shares the same data/selection contract as the other three score lanes.
+Score input precedence is explicit `.score`, then `src`, then the input player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The chord component in `mode="live"` reads sounding note activity and does not seek score time. Its default `mode="score"` shares the same data/selection contract as the other three score lanes.
 
-### Shared player connection
+### Shared input connection
 
 Native bindings consume the [nonvisual playback source](/score/api/#shared-playback-observation).
 They obtain data and an initial snapshot before waiting for another note/time
 event, and follow replacements without fetching the player's URL again. Explicit
-`.score` takes precedence over `src`, then borrowed player data. Failed explicit
+`.score` takes precedence over `src`, then borrowed input data. Failed explicit
 loading does not silently fall back to another source. When explicit data differs
 from a native player's Score, navigation rejects the mismatch rather than seeking
 with unrelated geometry. Omit the companion `src` to share the loaded Score.
 
-`player` selects one unique target in the same Document or ShadowRoot. Discovery
-follows late insertion, upgrade and replacement until disconnect. The read-only
+A companion nested inside a `<score-player>` or `<score-rack-part>` borrows it by
+containment, without any attribute. `input="#id"` instead selects one unique
+target in the same Document or ShadowRoot. Resolution runs explicit selector,
+then containment, then none; an `input` that is missing, invalid or ambiguous
+stays unbound and never falls back to the enclosing scope. Discovery follows
+late insertion, upgrade and replacement until disconnect. The read-only
 `data-player-state` attribute exposes target resolution (`missing`, `invalid`,
 `ambiguous`, `ready`) and native source readiness. Legacy events remain usable
 when a target has no source or reports `unavailable`, including custom player
@@ -136,9 +144,9 @@ use.
 
 `defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
 Each type stays on its owning page, with its controls in external Parameters.
-`score-view` and `score-grid-view` borrow resolved score data and position; `score-pitch-view` borrows held
-notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
-it does not borrow the player's loaded score.
+`score-view`, `score-grid-view` and `score-sheet-view` borrow resolved score data and position;
+`score-pitch-view` borrows held notes. Each connects to an enclosing player or Rack part by
+containment, or to the player named by `input`.
 
 Editing is part of View. Load an editor with
 [`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url) (or create
@@ -151,9 +159,9 @@ editor read-only.
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
-<score-view type="staff" player="#p"></score-view>
-<score-view type="waterfall" player="#p"></score-view>
-<score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
+<score-view type="staff" input="#p"></score-view>
+<score-view type="waterfall" input="#p"></score-view>
+<score-pitch-view type="keyboard" input="#p" low="48" high="84"></score-pitch-view>
 ```
 
 No follower creates another player. Each component can be placed or omitted

@@ -76,7 +76,7 @@ const PLUMBING = /^(?:class|style|part|slot|role|tabindex|data-|aria-)/;
  * `id` is printed on a nested element and hidden on the root.
  *
  * On the root it is the demo naming its own element so its own wiring can find
- * it — `<score-view id="score-view">` beside `player="#score-player"` — and it is
+ * it — `<score-view id="score-view">` beside `input="#score-player"` — and it is
  * not part of what the element does. Nested, it is how a composition tells its
  * children apart: `<score-rack-part id="lead">` is the name of the fader the desk
  * draws for it, and a reader copying the markup needs it.

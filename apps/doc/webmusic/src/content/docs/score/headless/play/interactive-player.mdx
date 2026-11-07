@@ -44,6 +44,15 @@ The source contract is `InteractivePlayer`, `InteractivePlayerOptions`,
 `@webmusic/score/play/headless`. The [Play API](/score/api/play/) covers
 stateless recording and score conversion.
 
+## Ports and composition
+
+`InteractivePlayer` is not a module: it exposes no `ModuleHandle` or ports and
+never registers with a Session, because it has no transport for one to conduct.
+The caller, a [`Metronome`](/score/headless/play/metronome/) or another input
+drives each `advance()`. To sound inside a module scope, pass that scope's
+context and destination through the `audioContext` and `destination` options.
+Comparing named sources is `select(id)` while a metronome drives `advance()`.
+
 ## Time and resource roles
 
 Sources borrow immutable scores and index them on a written beat grid.

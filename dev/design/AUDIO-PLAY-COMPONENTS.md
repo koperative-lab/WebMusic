@@ -10,11 +10,12 @@ Source: [Audio Play](../../packages/audio/src/play/).
 Public owners: [Play Elements](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#play)
 and [Headless inventory](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx).
 
-DEC-063 adds opt-in [modular composition](MODULAR-COMPOSITION.md). Its
-source-free aggregate role uses Headless SessionTransport; the mixer has real
-channel/master buses and independent inserts. The existing single-backend
-facade, borrowed queue/mix and no-additional-clock contracts below remain the
-legacy baseline outside `composition="modules"`. STATUS records verification.
+DEC-063 introduced [modular composition](MODULAR-COMPOSITION.md) and DEC-068
+makes it the only model. The source-free aggregate role uses Headless
+SessionTransport; the mixer has real channel/master buses and independent
+inserts; a standalone player is a Session of one. The single-backend facade,
+borrowed queue/mix and no-additional-clock contracts below hold inside that
+model. STATUS records verification.
 
 ## User tasks and composition
 

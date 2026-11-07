@@ -8,11 +8,11 @@ Related decisions: DEC-016, DEC-045 and DEC-053.
 Source and public types: [Play source](../../packages/score/src/play/).
 Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
-DEC-063 adds opt-in [modular composition](MODULAR-COMPOSITION.md): nested
-players, shared effect instances and Session membership. The existing behavior
-below, including legacy Rack seek axes and standalone Synth Panel ports/sections,
-remains the compatibility baseline outside `composition="modules"`. Current
-public signatures belong to the owning references; STATUS records verification.
+DEC-063 introduced [modular composition](MODULAR-COMPOSITION.md): nested
+players, shared effect instances and Session membership. DEC-068 makes it the
+only model; the behavior below, including Rack seek axes and standalone Synth
+Panel sections, now runs on the module path. Current public signatures belong to
+the owning references; STATUS records verification.
 
 ## User task and boundary
 

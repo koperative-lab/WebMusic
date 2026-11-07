@@ -293,14 +293,15 @@ every later read.
 
 `BufferEngine` owns one and exposes it read-only as a `TransportClockReader`.
 That reader gives a coordinator the engine's reference mapping. The kernel's
-`TransportGroup` — which `@webmusic/bridge` drives to run a score and a clip
-as one transport — anchors the follower by *reading* the exact affine map the
-engine plays by and handing the result to a sample-accurate
-`source.start(when)`, rather than sampling `player.seconds` and chasing the
-difference. Each engine still owns its own transport clock; a common context
+`SessionTransport` — the one timeline every participant joins, including a
+score and a clip composed by `@webmusic/bridge` — anchors a participant by
+*reading* the exact affine map the engine plays by and handing the result to a
+sample-accurate `source.start(when)`, rather than sampling `player.seconds` and
+chasing the difference. Each engine still owns its own transport clock; a common context
 and scheduled start alone do not prove audible synchronization. This package
-neither knows nor cares that the group exists; it only has to expose an honest
-clock.
+neither knows nor cares which Session it joins; it only has to expose an honest
+clock and report its real timing mode (`shared-anchor` for the buffer engine,
+`media-follower` for the media-element engine).
 
 Two invariants are worth knowing because they are load-bearing:
 
@@ -432,6 +433,25 @@ import the side-effect-free `/element` classes and register your own tags.
 and `/headless` never reach it. One documented exception: `view/render/meter.ts`
 imports it statically, so a `/view/render` consumer resolves the presenter peer
 even when only the canvas waveform or spectrogram is wanted.
+
+### Modules and ports
+
+Every Element and Headless runtime is a module (DEC-068). `AudioPlayer.module`
+exposes the player's `audio` output; the player Element provides the Session
+`transport` and its clip to nested companions; `<audio-mixer>` is a Rack whose
+master and channels are audio ports; analysers, the meter and views consume an
+audio port, the transport and the clip. Containment connects a child to the nearest
+provider; `input="#id"` and `port="name"` name an explicit input instead. The
+outermost player or mixer owns the Session; a standalone player is a Session of
+one.
+
+```html
+<audio-player id="deck" src="/mp3/Arabesque%20No.1.mp3" controls="show">
+  <audio-effect type="filter" frequency="6000"></audio-effect>
+  <audio-view type="waveform"></audio-view>
+</audio-player>
+<audio-spectrum-analyzer input="#deck"></audio-spectrum-analyzer>
+```
 
 ### Optional engines stay out of the graph
 

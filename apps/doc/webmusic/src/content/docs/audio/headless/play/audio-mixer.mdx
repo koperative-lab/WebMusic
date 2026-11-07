@@ -92,6 +92,23 @@ The public barrel and `packages/audio/src/play/headless/mixer.ts` define the val
 contracts described below. The reference does not turn private implementation
 fields into public API.
 
+## Ports and composition
+
+`mixer.module` is the mixer's `ModuleHandle`: `id`, master `inserts`, `prepare()`
+(which builds the master bus) and `subscribe` to mix changes. Like the player
+facade it implements the `getPort` shortcut and no `ports()` enumeration.
+
+| Family | Port | Direction | Present |
+| --- | --- | --- | --- |
+| audio | `master` (alias `output`) | output | After `prepare()` or the first read of `outputPort` |
+
+With the `moduleContext` option the mixer prepares its AudioContext from that
+scope and installs no default speaker route. `admitAudio(id, port)` makes it the
+admission for another module's output, never a transport participant. The
+Headless mixer registers with no Session; `<audio-mixer>` registers a mixer it
+owns with declared members as a `media-follower` participant on the
+`mix-seconds` axis.
+
 ## Module admissions and master inserts
 
 `channelInserts(id)` exposes the admitted channel's `InsertChain` after its

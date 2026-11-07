@@ -21,7 +21,8 @@ describe('Score Analyze live-tool demos', () => {
       const page = read(`src/content/docs/score/element/analyze/${tag}.mdx`);
       expect(page).toContain(`<AnalysisFeaturePlayground tag="${tag}" />`);
       expect(page).toContain('<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>');
-      expect(page).toContain(`<${tag} player="#piece"`);
+      expect(page).toContain(`<${tag} input="#piece"`);
+      expect(page).not.toContain(' player="#');
       expect(page).not.toContain('/xml/pattern-recurrence.musicxml');
     }
   });
@@ -33,7 +34,8 @@ describe('Score Analyze live-tool demos', () => {
     expect(demo.match(/<score-player\b/g)).toHaveLength(1);
     expect(demo).toContain('const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;');
     expect(demo).toContain('<score-player id={playerId} src={SRC}></score-player>');
-    for (const tag of tags) expect(demo).toContain(`<${tag} player={`);
+    for (const tag of tags) expect(demo).toContain(`<${tag} input={`);
+    expect(demo).not.toContain(' player={');
     expect(demo).not.toContain('<motif-analysis');
     expect(demo).not.toContain('<rhythm-pattern-analysis');
     expect(demo).not.toContain('<score-live-chord-analysis');

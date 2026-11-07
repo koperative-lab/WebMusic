@@ -114,6 +114,32 @@ creates from those assignments.
 <score-synth-panel sections="sound,effects,envelope,eq,lfo,macros"></score-synth-panel>
 ```
 
+## Ports and composition
+
+`<score-synth-panel>` is a control surface for a module, not a module itself:
+it declares no ports, provides no module context and takes no part in Session
+timing. In attached mode it edits the borrowed module's `control` parameters,
+insert chain and envelope handles in place. Resolution runs:
+
+1. `mode="insert"`, which forces the standalone panel graph;
+2. `.moduleTarget`, an explicit `ModuleHandle` (`null` unbinds);
+3. `target="#id"`, such as a player or a realized `<score-effect>`;
+4. containment: the nearest module context's target — a player's synth and
+   inserts, or a Rack's master;
+5. outside any module scope, the standalone panel.
+
+An explicit or contained target that has not resolved reports
+`.bindingState === 'unresolved'` and never builds a fallback graph. See
+[Attach to an existing module](#attach-to-an-existing-module) for the section
+behavior.
+
+```html
+<score-player src="/midi/Arabesque%20No.1.mid">
+  <score-note-input layout="piano" start="48" end="71"></score-note-input>
+  <score-synth-panel sections="sound,envelope"></score-synth-panel>
+</score-player>
+```
+
 ## Audio routing and parameter updates
 
 Connect a source to `.input` and `.output` to your destination after configuring a context.

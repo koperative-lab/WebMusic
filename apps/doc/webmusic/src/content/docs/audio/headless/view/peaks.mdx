@@ -34,6 +34,11 @@ caller must handle the absence instead of drawing a flat line. A decoded clip
 with zero samples returns a pyramid with an empty base level; its represented
 duration is zero, and waveform projections return no columns.
 
+## Ports and composition
+
+`computeClipPeaks` and `peaksDuration` are pure functions over an `AudioClip`,
+not modules. Their result feeds waveform views; no port or Session is involved.
+
 ## Intentionally local
 
 This is a second implementation of peaks: the analyze capability computes them

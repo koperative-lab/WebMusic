@@ -396,7 +396,7 @@ describe('recorder companion binding', () => {
   });
 
   it('does not create an audition player while an explicit target is unresolved', async () => {
-    const element = mount({player: '#missing-recorder-deck'});
+    const element = mount({input: '#missing-recorder-deck'});
     await element.start();
     feed(128);
     await element.stop();
@@ -426,7 +426,7 @@ describe('recorder companion binding', () => {
 describe('<audio-recorder> passive source feedback', () => {
   it('keeps permission failure visible and replaces it with loading when retried', async () => {
     getUserMedia.mockRejectedValueOnce(new Error('Microphone permission denied'));
-    const element = mount({player: '#missing-recorder-owner'});
+    const element = mount({input: '#missing-recorder-owner'});
     const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
     await element.start();
     expect(feedback().dataset.kind).toBe('error');
@@ -443,7 +443,7 @@ describe('<audio-recorder> passive source feedback', () => {
     let grant!: (stream: MediaStream) => void;
     getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
     const stopTrack = vi.fn();
-    const element = mount({player: '#missing-recorder-owner'});
+    const element = mount({input: '#missing-recorder-owner'});
     const pending = element.start();
     await element.stop();
     expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('waiting');
@@ -457,7 +457,7 @@ describe('<audio-recorder> passive source feedback', () => {
   it('animates pending microphone startup and retains independent capture with a missing owner', async () => {
     let grant!: (stream: MediaStream) => void;
     getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
-    const element = mount({player: '#missing-recorder-owner'});
+    const element = mount({input: '#missing-recorder-owner'});
     const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
     const record = element.shadowRoot!.querySelector<HTMLButtonElement>('[part="record"]')!;
     expect(feedback().dataset.kind).toBe('waiting');

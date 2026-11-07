@@ -2,7 +2,7 @@
 // <audio-live-view> — it draws what an AnalyserNode hears right now, so the demo
 // ships the thing making the sound: an <audio-player> next to it.
 //
-// The component follows player readiness and tap replacement through `source`.
+// The component follows player readiness and tap replacement through `input`.
 import ElementPlayground from '../ElementPlayground.astro';
 
 const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
@@ -15,7 +15,7 @@ const PLAYER_ID = 'pg-live-view-player';
 >
   <audio-player id={PLAYER_ID} src={SRC} controls></audio-player>
   <audio-live-view
-    source={`#${PLAYER_ID}`}
+    input={`#${PLAYER_ID}`}
     type="waveform"
     window-seconds="4"
     height="120"

@@ -55,6 +55,15 @@ In an application, keep the editor for the document lifetime and dispose it
 during teardown. Immutable Score values retained by the caller remain readable.
 Importing a replacement creates a new editor with a new document identity.
 
+## Ports and composition
+
+`ScoreEditor` is a document owner, not a module: it exposes no ports and joins no
+Session. A player borrows it as its `ScoreDocumentSource` through
+`ScorePlayer.setDocumentSource(editor)`, or
+[`ScorePlayerModule.setDocumentSource(editor)`](/score/headless/play/score-player/#ports-and-composition),
+which keeps the module's engine and clock and republishes its `source` port.
+Views borrow the same editor.
+
 ## Load from a URL
 
 `loadScoreEditor(url, options?)` fetches one MIDI, MusicXML, MXL or ABC file,

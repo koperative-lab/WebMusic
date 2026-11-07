@@ -61,6 +61,16 @@ Sound cannot reconnect until its backend has been globally disconnected or
 disposed. Built-in recipes can create fresh backends on a later connection;
 an adopted instance must itself remain reusable.
 
+## Ports and composition
+
+`Sound` is an instrument backend, not a module: it has no `ModuleHandle`, ports
+or Session membership. A [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition)
+consumes it as its `synth`. The module's audio `main` output carries the sound,
+its control `params` port exposes the Sound's `params`, and
+`ScorePlayer.sessionTiming` reports the participant timing it allows:
+`shared-anchor` when the backend schedules and cancels attacks on the audio
+clock, otherwise `callback`.
+
 ## Time and environment
 
 `Sound` has no transport, cursor, or event emitter. A caller supplies MIDI pitch,

@@ -20,7 +20,8 @@ see [Audio setup](/audio/#drop-in-web-components).
 ## Play
 
 Use one [`audio-player`](/audio/element/play/audio-player/) for transport and
-connect the task-specific controls through `player="#session"` or `.player`.
+nest the task-specific controls inside it, or link them with `input="#session"`
+or `.player`; a mixer links as a mix backend with `player="#session"`.
 The player delegates to one clip, document sequence, queue or mix backend. The linked playlist and
 mixer display selection and mix controls without a duplicate transport bar.
 
@@ -50,10 +51,11 @@ master inserts, attached parameter panels and output taps.
 
 ## Analyze
 
-The five Analyze Elements are live tools. They borrow the graph of one
-[`<audio-player>`](/audio/element/play/audio-player/) while it plays, without
-loading another URL or adding a transport. Choose the measurement or playing
-task and place the surface beside the player:
+The five Analyze Elements are live tools. Each taps the audio output of one
+module, such as an [`<audio-player>`](/audio/element/play/audio-player/), chosen
+with `input="#id"` or by nesting the tool inside it, without loading another URL
+or adding a transport. Choose the measurement or playing task and place the
+surface inside or beside the player:
 
 | Element | Live task |
 | --- | --- |
@@ -63,8 +65,8 @@ task and place the surface beside the player:
 | [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) | Probe a live log-frequency FFT; freeze the frame or hold peaks. |
 | [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/) | Inspect approximate live attack strength and adjust detection sensitivity. |
 
-These tools work on a borrowed live `AnalyserNode`, including when a caller
-supplies `.analyser` directly. A stream can feed them without decoded clip
+These tools sample a live `AnalyserNode`: their own side tap on the input's
+audio port, or a node a caller supplies through `.analyser`. A stream can feed them without decoded clip
 samples, but an `AudioContext` and signal graph must already exist. They do
 not seek the player. The sampled level is not integrated LUFS or true peak;
 FFT bins are not calibrated acoustic SPL. A streaming transient cue is not a
@@ -89,11 +91,11 @@ point regions and assign them to [`<audio-view>.regions`](/audio/element/view/au
 </script>
 
 <audio-player id="session" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
-<audio-level-analyzer player="#session"></audio-level-analyzer>
-<audio-meter player="#session"></audio-meter>
-<audio-oscilloscope player="#session"></audio-oscilloscope>
-<audio-spectrum-analyzer player="#session"></audio-spectrum-analyzer>
-<audio-transient-analyzer player="#session"></audio-transient-analyzer>
+<audio-level-analyzer input="#session"></audio-level-analyzer>
+<audio-meter input="#session"></audio-meter>
+<audio-oscilloscope input="#session"></audio-oscilloscope>
+<audio-spectrum-analyzer input="#session"></audio-spectrum-analyzer>
+<audio-transient-analyzer input="#session"></audio-transient-analyzer>
 ```
 
 `import '@webmusic/audio/analyze/auto'` registers the five tags at their default
@@ -120,8 +122,9 @@ The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<
 | [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) | The waveform clip editor — range selection, split, trim, delete, silence, clipboard, amplify, fades, gain envelopes, markers, range processing, snap, zoom and history over a borrowed editor. |
 | [`<audio-live-view>`](/audio/element/view/audio-live-view/) | A scrolling projection of a live `AnalyserNode` — waveform or spectrogram. The only live *time-axis* surface here. |
 
-Inputs are component-specific. `<audio-view>` binds to playback through `player`;
-`<audio-live-view>` borrows an analyser through `source` or `.analyser`.
+Every View follows a player through `input="#id"` or by nesting inside an
+`<audio-player>`; `<audio-live-view>` can also borrow an analyser through
+`.analyser`. An invalid explicit `input` never falls back to the enclosing player.
 Use `<audio-view>`'s `.regions` and `annotate` support to display or create regions.
 Load an editor with [`loadAudioClipEditor`](/audio/headless/view/audio-clip-editor/#load-from-a-url)
 (or create one with `createAudioClipEditor`) and assign it to the `.editor`
@@ -143,7 +146,7 @@ These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + st
 in Audio Headless/render adapters; the presenters own generic DOM, canvas
 sizing/DPR, accessible interaction, status and cleanup.
 
-Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/) with `player="#id"` and the waveform and spectrogram **follow the playhead** as it plays; its `meter` type taps that player's analyser. This binding is event-based and uses no player-package imports. For browser renderers, code-only view models, colormaps and layout math behind the tags, see the [View API](/audio/api/view/). Existing `@webmusic/audio/view/element` and `/view/auto` imports still expose/register `<audio-meter>` for compatibility; the Analyze entry above is its canonical home.
+Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/) with `input="#id"`, or nest it inside one, and the waveform and spectrogram **follow the playhead** as it plays; its `meter` type taps that player's analyser. This binding is event-based and uses no player-package imports. For browser renderers, code-only view models, colormaps and layout math behind the tags, see the [View API](/audio/api/view/). Existing `@webmusic/audio/view/element` and `/view/auto` imports still expose/register `<audio-meter>` for compatibility; the Analyze entry above is its canonical home.
 
 | Element | Register | Renders |
 | --- | --- | --- |

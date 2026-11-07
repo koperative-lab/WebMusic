@@ -66,7 +66,7 @@ The admission rule, enforced by review against the ledger in
 
 Review new work against existing modules before adding another shared mechanism.
 The ledger records the extraction boundary, including the role-contract basis for
-`kernel/sync`. Decision reasons belong in [DECISIONS.md](../../dev/DECISIONS.md).
+the Session participant contracts. Decision reasons belong in [DECISIONS.md](../../dev/DECISIONS.md).
 
 The counterpart rule matters as much: **policy that legitimately differs
 between the families stays with the families.** The `/audio-context` constructor
@@ -91,14 +91,15 @@ Common mechanisms do not make distinct domain policies interchangeable.
 | `@webmusic/kernel/meter` | `AnalyserMeter` tap, RMS/peak with peak hold, `aggregateSpectrumBars` |
 | `@webmusic/kernel/transport` | `TransportClock` affine anchor math, `TimelineMapping`, constant-tempo `TempoGrid` helpers and the read-only `TempoClock` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
-| `@webmusic/kernel/sync` | `TransportGroup` master/follower choreography + `MirrorClockMaster` |
 | `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |
 
-Pure time math remains in `/transport`, wakeups in `/tick`, and existing
-master/follower coordination in `/sync`. The modular entries add composition
-around those foundations: `/module` defines runtime capabilities and managed
-resources, `/effect` manages effect instances, `/session` coordinates playback,
-and `/element` adds browser discovery. Consumers may implement the structural
+Pure time math remains in `/transport` and wakeups in `/tick`. The modular
+entries build the one composition model (DEC-068) on those foundations:
+`/module` defines module handles, the five port families (audio, note, control,
+transport, source), Racks, provider scopes, sinks and the conformance kit;
+`/effect` manages effect instances; `/session` owns the single timeline every
+participant joins; and `/element` adds browser discovery and explicit `input`
+resolution. Consumers may implement the structural
 contracts without adopting an Element or a shared domain base class.
 
 ## Modular composition
@@ -196,9 +197,9 @@ nothing.
 
 ## The clock spine
 
-`transport` + `tick` + `sync` are the part of the kernel the rest of the
+`transport` + `tick` + `session` are the part of the kernel the rest of the
 project's alignment rests on. They are three separate concerns: what time
-*is*, how work gets *woken up*, and how several transports *agree*.
+*is*, how work gets *woken up*, and how several participants *agree*.
 
 ### TransportClock — one affine anchor
 
@@ -295,10 +296,16 @@ The surface is deliberately tiny: `start(onTick)` / `stop()` / `dispose()`,
 plus `running` and `workerBacked`. It delivers ticks; it holds no opinion
 about what the tick does.
 
-### TransportGroup — master, followers, and the join dance
+### Session internals — the join dance
 
-`sync` captures the domain-neutral choreography from cross-domain coordination
-work. Its implementation references only Kernel types. One **master** whose
+`SessionTransport` owns one timeline and registers each participant through
+`register(transport, options)`, which reports the participant's real
+`ParticipantTiming` (`shared-anchor`, `callback`, `media-follower` or
+`external`). Internally it delegates the follower choreography to a private
+`TransportGroup`, described here because its rules define how participants
+join; it is not a public entry.
+
+Its implementation references only Kernel types. One **master** whose
 clock is the group's timeline, N **followers** that join it, all positions on
 the master's axis against one shared reference clock.
 
@@ -368,7 +375,10 @@ the master continues. Drift compares local phase and reports master-axis seconds
 The group does not configure native loops, consume nonlinear mappings or perform
 audio warping. Group-level loop re-entry still waits for a delivered watcher tick.
 
-### MirrorClockMaster — the sampled fallback, once
+### Clockless transports — the sampled fallback
+
+The Session's own clock is always readable, so public composition never needs
+this adapter; it remains a Kernel internal for transports without a clock.
 
 A transport with no readable clock is adapted into the required-clock role by
 dead-reckoning a mirror `TransportClock` across the command surface and
@@ -447,8 +457,11 @@ you can honestly advertise (`TimedPlayerLike`, `StatefulPlayerLike`,
 exported `is*Player()` guards, never by poking optional members.
 
 To take part in synchronized playback, implement `SyncFollowerTransport`
-(honor `play(when)` sample-accurately) or `SyncMasterTransport` (expose a
-`TransportClockReader`; wrap a clockless transport in `MirrorClockMaster`).
+(honor `play(when)` sample-accurately when you can) and register it on a
+`SessionTransport` with the `ParticipantTiming` you honestly provide. To join a
+module graph, expose a `ModuleHandle` whose `ports()` enumerate its audio, note,
+control, transport and source ports, and run the Kernel conformance kit
+(`checkModuleConformance`) in your tests.
 
 ## Gates
 

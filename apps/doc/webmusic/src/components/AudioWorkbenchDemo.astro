@@ -14,7 +14,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   </div>
   <LiveDemoCanvas>
     <audio-player id="wa-wb-player" controls></audio-player>
-    <audio-view id="wa-wb-view" player="#wa-wb-player" type="waveform" pixels-per-second="90" interactive></audio-view>
+    <audio-view id="wa-wb-view" input="#wa-wb-player" type="waveform" pixels-per-second="90" interactive></audio-view>
     <p role="status" data-workbench-status></p>
   </LiveDemoCanvas>
 </div>

@@ -37,7 +37,7 @@ if (!playlist.getAttribute('src')?.trim()) {
 >
   <AudioPlayStage>
     <audio-player id="playlist-session"></audio-player>
-    <audio-playlist player="#playlist-session" loop>
+    <audio-playlist input="#playlist-session" loop>
       {ENTRIES.map((entry) => (
         <li data-id={entry.id} data-src={entry.src} data-label={entry.label} data-streaming={entry.streaming ? '' : undefined}>{entry.label}</li>
       ))}

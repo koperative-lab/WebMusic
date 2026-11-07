@@ -35,6 +35,13 @@ analyzer.start((frame) => {
 analyzer.stop();
 ```
 
+## Ports and composition
+
+`createRealtimeAnalyzer` is not a module and consumes no port directly: it polls
+an `AnalyserNode`, or a source exposing `analyser`, and reports frames. To analyse a module, tap its audio output: `port.tap(analyser)` on an `AudioOutputPort` adds a leased branch without changing the audible route.
+The Audio analysis Elements do this for the module named by `input` or found
+from the nearest provider, then pass the analyser to this sampler.
+
 ## Frames, and what may be missing
 
 Every frame carries `time`, `rms`, `peak` and `centroid`. Three payloads are

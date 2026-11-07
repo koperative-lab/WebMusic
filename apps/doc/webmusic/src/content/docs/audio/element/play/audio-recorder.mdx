@@ -34,7 +34,7 @@ permission result cannot start capture again.
   defineAudioRecorderElement();
 </script>
 <audio-player id="session"></audio-player>
-<audio-recorder player="#session"></audio-recorder>
+<audio-recorder input="#session"></audio-recorder>
 ```
 
 ```ts
@@ -54,12 +54,35 @@ recorder.addEventListener('webaudio:recorded', (e) => {
 });
 ```
 
+## Ports and composition
+
+`<audio-recorder>` is a microphone **Source**. It provides no context to
+children, and its `.module` exposes the current take's capture:
+
+| Port | Family | Direction | Notes |
+| --- | --- | --- | --- |
+| `output` (alias `main`) | `audio` | output | Live microphone signal while capturing; absent while idle. It is not routed to a destination, so tap it with an analyser or patch it explicitly. |
+
+Inside a module scope the microphone borrows that scope's `AudioContext`
+(unless `sample-rate` asks for another rate), so its port can feed the scope's
+analysers and effects; it creates no private context there. Take audition links
+to one player, resolved as `.player`, then `input="#id"`, then containment in
+the nearest `<audio-player>`; an unresolved explicit selector stays detached.
+The recorder registers no Session participant: audition plays through the
+linked player and its Session.
+
+```html
+<audio-player id="session"></audio-player>
+<audio-recorder id="rec" input="#session"></audio-recorder>
+<audio-level-analyzer input="#rec"></audio-level-analyzer>
+```
+
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Description |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for the central player used for take audition. Late insertion/upgrade and replacement are observed. |
+| `input` | attribute | Unique selector for the central player used for take audition. Late insertion/upgrade and replacement are observed. Absent, the enclosing `audio-player` is used. |
 | `.player` | property | Assign/read the borrowed central `AudioPlayer` or its Element; explicit assignment overrides the selector. |
 | `device-id` | attribute | Capture from a specific input device (a `MediaDeviceInfo.deviceId`). |
 | `echo-cancellation` | attribute | Boolean constraint passed to `getUserMedia`. Absent leaves the engine default. |
@@ -68,6 +91,7 @@ recorder.addEventListener('webaudio:recorded', (e) => {
 | `auto-export` | attribute | Export each take to WAV on stop and emit `webaudio:exported`. |
 | `.recording` / `.playing` / `.level` | property (get) | Live state: capturing, playing the take back, and the raw input level. |
 | `.recorder` / `.take` | property (get) | The underlying `AudioRecorder` and the last captured `AudioClip`. |
+| `.module` | property (get) | The current take's microphone as a `ModuleHandle`, whose `output` port exists while capturing; `undefined` while idle. |
 | `.start()` / `.stop()` / `.toggle()` | method | Drive capture from code instead of the button. `stop()` resolves with the take. |
 | `.playTake()` / `.stopPlayback()` / `.togglePlayback()` | method | Select and audition the take through the linked player. Stop affects that audition only while the player still selects this take. |
 | `.exportTake(options?)` / `.downloadTake(fileName?)` | method | Encode the take as WAV, and hand it to the browser as a download. |
@@ -83,7 +107,7 @@ The element's class is `AudioRecorderElement` and its factory is
 
 A failure releases the failed engine and commits idle state before `webaudio:error` is dispatched, so an error listener may call `start()` to retry. Live `level` is linear RMS over all retained channels, not a left-channel-only reading or a loudness measurement.
 
-With `player="#session"`, take audition delegates to the central player instead
+With `input="#session"` or inside a player, take audition delegates to the central player instead
 of creating an independent playback engine. Capture remains recorder-owned.
 Disconnecting does not dispose the borrowed player; a take already handed to it
 remains player-owned. Without a connection, the recorder owns its audition player.

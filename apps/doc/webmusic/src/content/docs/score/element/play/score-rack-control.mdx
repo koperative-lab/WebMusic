@@ -16,8 +16,8 @@ player, and the composition is the markup:
 ```html
 <score-player>                       <!-- the transport, for every part at once -->
   <score-rack-control>                     <!-- the desk, and the rack's owner -->
-    <score-rack-part id="lead" src="lead.mid" sound="triangle"></score-rack-part>
-    <score-rack-part id="bass" src="bass.mid" sound="sawtooth"></score-rack-part>
+    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle"></score-rack-part>
+    <score-rack-part id="bass" src="/midi/Arabesque%20No.1.mid" sound="sawtooth"></score-rack-part>
   </score-rack-control>
 </score-player>
 ```
@@ -69,7 +69,50 @@ for reduced motion, with descriptions retained for assistive technology.
 
 <score-player>
   <score-rack-control>
-    <score-rack-part id="lead" src="lead.mid" sound="triangle"></score-rack-part>
+    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle"></score-rack-part>
+  </score-rack-control>
+</score-player>
+```
+
+## Ports and composition
+
+`<score-rack-control>` is a **Rack**. Without an assigned `.rack` it builds a
+`ScoreRackModule` in the enclosing scope, exposes it as `.module` and provides
+that Rack's context to its children. Each direct `<score-rack-part>` becomes one
+`ScorePlayerModule` (its id is the part `id`), admitted into one channel; the
+part's `.module` borrows it and lists the same ports as a
+[player's module](/score/element/play/score-player/#ports-and-composition). The
+desk's own ports:
+
+| Port | Family | Direction | Notes |
+| --- | --- | --- | --- |
+| `params` | `control` | input | The `master-volume` parameter |
+| `master` | `audio` | output | Master insert output, once prepared; routed to the enclosing destination |
+| `channel:<id>` | `audio` | output | Post-insert tap of one admitted channel |
+
+The desk holds no Session of its own. It passes the ancestor's Session through,
+so parts join the enclosing player's Session rather than choosing a child as
+master; without an enclosing player the parts have no transport. Nesting another
+bus admits that one bus output and does not duplicate descendant registrations.
+
+Containment places a direct `<score-effect>` or `audio-effect` on the master
+chain. Inside a `<score-rack-part>`, an effect belongs to that part's
+post-fader channel inserts unless it sets `slot="master"`, and a view or
+analysis tool borrows that part's playback. Elsewhere, `input="#lead"` names a
+part for a companion, and an audio analyser can read the bus with
+`input="#desk" port="master"`. Assigning a Headless `Rack` to `.rack` backs the
+same mixer surface with that borrowed Rack instead and provides no module
+context: declarations become its members and an enclosing player drives it. See
+[the mixed example](/bridge/modular-composition/).
+
+```html
+<score-player>
+  <score-rack-control id="desk">
+    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle">
+      <score-effect type="delay" time="0.25" wet="0.2"></score-effect>
+      <score-view type="piano-roll"></score-view>
+    </score-rack-part>
+    <score-rack-part id="pad" src="/midi/Arabesque%20No.1.mid" sound="sine"></score-rack-part>
   </score-rack-control>
 </score-player>
 ```
@@ -125,22 +168,6 @@ document.querySelector<RackControlElement>('score-rack-control')!.rack = rack;
 
 Add or remove a member later and the desk redraws its strips; move a level from anywhere and the
 faders follow.
-
-## A module bus inside a Session
-
-Without an assigned `.rack`, this desk provides a `ScoreRackModule` through
-`.module`. It admits Score or Audio module outputs into channel gains and one
-master insert/output bus. Nesting another bus admits that one bus output;
-it does not duplicate descendant transport registrations. The desk passes the
-ancestor Session through rather than choosing a child as master.
-
-Direct `score-effect` or `audio-effect` declarations target the master chain.
-An external analyzer can use `input="#desk" port="master"`. A local player owns
-its own insert; moving an effect under that player changes its declared owner,
-not its HTML slot semantics. Direct `score-rack-part` declarations also work in module mode: each resolves
-to one actual ScorePlayerModule, with its `.module` available for explicit
-targeting. Assigning a Headless `Rack` to `.rack` backs the same mixer surface with that borrowed Rack instead: declarations become its members and an enclosing player drives it. See [the mixed example](/bridge/modular-composition/).
-
 
 <details class="component-section">
 <summary>API</summary>

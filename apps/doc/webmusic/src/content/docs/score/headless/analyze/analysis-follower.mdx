@@ -61,6 +61,15 @@ same score’s tempo map. The follower reads snapshots without predicting frames
 use [createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) separately
 if presentation needs interpolation.
 
+## Ports and composition
+
+The follower is an analysis companion, not a module: it exposes no
+`ModuleHandle` or ports and never registers with a Session. Its `playback` input
+is the payload of a Score module's `source` port (`webmusic.score`), the same
+`ScorePlaybackSource` as `player.playback`, and it navigates only through that
+source's `seekNominal`. The analysis Elements resolve the same source from their
+`input` or the nearest provider.
+
 ## Navigation outcomes
 
 `seekNominal(seconds)` and `seekQuarters(quarters)` return

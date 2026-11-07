@@ -317,7 +317,7 @@ describe('agent context release and output contracts', () => {
     expect(bundles.components.pages).toContain('agent-context/uikit/transport-time/transport.md');
     expect(bundles.components.pages).not.toContain('agent-context/score/api/io.md');
     expect(bundles.patterns.sections.find(({title}) => title === 'Style a custom music interface').headings).toContain('Theme with CSS custom properties');
-    expect(patterns).toContain('<score-view player="#shared-player">');
+    expect(patterns).toContain('<score-view input="#shared-player">');
     expect(patterns).toContain('## Customize With Hooks');
     expect(patterns).toContain('## Parse in a Worker');
     expect(patterns).not.toContain('## API Reference — @webmusic/score/io');

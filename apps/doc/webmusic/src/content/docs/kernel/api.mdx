@@ -131,7 +131,7 @@ A generic consumer narrows once with a guard and gets the non-optional
 members; a failed guard means the capability is absent, never an error.
 Implementers advertise a tier by making its members non-optional. Both
 families pin their players against the tiers they advertise at the type
-level (`ScorePlayer`/`TonePlayer`: timed, rate-controlled, disposable;
+level (`ScorePlayer`: timed, rate-controlled, disposable;
 `AudioClipPlayer`: all five), so drift fails `typecheck`.
 
 ```ts
@@ -251,6 +251,18 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 `ModuleContext` construction does not allocate nodes. `derive()` shares its audio
 environment and inherits unspecified relationships; explicit null clears Session,
 admission or target where allowed. A child registry is a separate explicit scope.
+
+### Ports and composition
+
+This entry exports the neutral module runtimes. `RackModule` has a control
+`params` port (`master-volume`), an audio `master` output after `prepare()` and
+one `channel:<id>` output per admitted module. `DeviceSink` and `CaptureSink`
+each expose one audio `input` after `prepare()`. They receive their scope
+explicitly: a Rack borrows its upstream `ModuleContext` and its Session, and the
+sinks borrow a `ModuleAudioEnvironment`. None owns a Session;
+`createProviderScope` elects the owner. Domain modules are documented with their
+engines, for example [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition)
+and [`AudioPlayer.module`](/audio/headless/play/audio-player/#ports-and-composition).
 
 ### Output routing
 
@@ -640,8 +652,8 @@ constructing them from labels. Presentation subscriptions never own the graph.
 
 ## session — @webmusic/kernel/session
 
-`SessionTransport` owns a source-free conductor and delegates command sequencing
-to `TransportGroup`. Each participant declares its real `timing`
+`SessionTransport` owns a source-free conductor and an internal command group
+that sequences participant commands. Each participant declares its real `timing`
 (`ParticipantTiming`: `shared-anchor`, `callback`, `media-follower` or
 `external`; default `shared-anchor` with `attachScheduling`, otherwise
 `media-follower`). The snapshot counts them in `participantTiming`, and
@@ -667,7 +679,7 @@ audio.dispose();
 
 | API | Contract |
 | --- | --- |
-| `new SessionTransport(now, options?)` | TransportGroup scheduling options plus optional finite `range: {startSeconds, endSeconds}`. |
+| `new SessionTransport(now, options?)` | `leadInSeconds` (default 0.06), `driftToleranceSeconds` (0.03), `driftCheckIntervalMs` (250), `loop`, `tick`, `onOperationError`, plus optional finite `range: {startSeconds, endSeconds}`. |
 | `register(follower, metadata)` | Borrow one `SyncFollowerTransport`; returns a unique `SessionParticipantLease`. |
 | `holdPendingSource()` | Reserve asynchronous data readiness without inventing an engine or incrementing participant count. |
 | `preload()` | Explicitly prepare current participants; registration in a paused Session does not allocate resources. |
@@ -817,9 +829,8 @@ modulation use [`ControlLFO`](#control-generators) instead.
 
 Under each `SessionTransport` a command group drives the participants on a
 shared lead-in, checks drift on a cadence and re-seeks a follower that has
-slipped past tolerance. It is a Session internal: the former public
-Kernel `sync` entry (`TransportGroup`, `MirrorClockMaster`) is removed
-in 0.3.0 (DEC-068), and its participant and command contracts —
+slipped past tolerance. It is a Session internal (DEC-068); its participant
+and command contracts —
 `SyncFollowerTransport`, `FollowerOptions`, `SyncLoopRegion`,
 `TransportCommand`, `TransportCommit`, `TransportEvent`, `TransportSnapshot` —
 are exported from `@webmusic/kernel/session`. Commands are serialized, so a
@@ -892,8 +903,8 @@ arbitrary nonlinear `TimelineMapping`, implement audio warping, or make tick-wat
 local seconds, rate and scheduling behavior; incorrect metadata can produce
 incorrect alignment even when its shape is valid.
 
-`MirrorClockMaster` adapts a transport that has **no readable clock** into the
-master role: it dead-reckons a mirror `TransportClock` across the command
+Internally, a transport that has **no readable clock** is adapted into the
+master role by a mirror clock: it dead-reckons a mirror `TransportClock` across the command
 surface and reconciles it against the transport's real position at drift checks
 or periodic lifecycle samples when drift checks are disabled. Once forward
 motion has established an observed position step, a long enough stationary
@@ -1060,7 +1071,7 @@ const when = tempo.nextGridTime(context.currentTime); // the next beat, in conte
 An Audio player exposes the same pairing for its applied document as
 [`tempoClock`](/audio/headless/play/audio-player/); the grid itself is edited in
 [`<audio-clip-view>`](/audio/element/view/audio-clip-view/#beat-grid).
-`TransportGroup` still coordinates positions, not beats.
+The Session still coordinates positions, not beats.
 
 ## tick — @webmusic/kernel/tick
 

@@ -26,7 +26,7 @@ Start playback:
 import {loadScoreFromUrl} from '@webmusic/score/io';
 import {playScore} from '@webmusic/score/play/headless';
 
-const score = await loadScoreFromUrl('song.musicxml'); // MIDI/MusicXML/MXL/ABC
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl'); // MIDI/MusicXML/MXL/ABC
 const player = await playScore(score);                 // create and start playback
 // Later, when playback is no longer needed: player.dispose();
 ```
@@ -203,7 +203,7 @@ import {
   serializeMusicXML,
 } from '@webmusic/score/io';
 
-const score = await loadScoreFromUrl('song.mid');                  // infers format
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid');                  // infers format
 const score2 = await loadScore(bytesOrText, {format: 'musicxml'}); // from data
 ```
 
@@ -335,9 +335,9 @@ defineAllViewElements();
 ```
 
 ```html
-<score-player id="p" src="song.mid"></score-player>
-<score-view type="piano-roll" player="#p"></score-view>
-<score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
+<score-player id="p" src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-view type="piano-roll" input="#p"></score-view>
+<score-pitch-view type="keyboard" input="#p" low="48" high="84"></score-pitch-view>
 ```
 
 - **`<score-view>`** selects `piano-roll` (default), `staff` or `waterfall`.
@@ -593,8 +593,8 @@ defineAllElements();              // …or the whole set (what './play/auto' cal
 ```
 
 ```html
-<score-player src="song.mid"></score-player>
-<score-player src="song.musicxml" sound-font="/samples/{midi}.m4a"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-player src="/mxl/Arabesque%20No.1.mxl" sound-font="/samples/{midi}.m4a"></score-player>
 <score-rack-control></score-rack-control>
 <score-note-input layout="piano" keyboard start="48" end="71"></score-note-input>
 ```
@@ -609,6 +609,20 @@ defineAllElements();              // …or the whole set (what './play/auto' cal
 
 Assign `.score`, `.sound`, `.effect`, or `.rack` as properties to override
 attribute-driven defaults.
+
+Every Element and Headless runtime is a module (DEC-068). A player's module
+exposes `note`, `audio`, `transport` and `source` ports; views, analysis and
+panels nested inside it connect by containment, and `input="#id"` names an
+explicit input from elsewhere in the page. The outermost player owns the
+Session; nested players and Racks borrow it unless `session="local"`.
+
+```html
+<score-player id="piece" src="/midi/Arabesque%20No.1.mid">
+  <score-effect type="reverb" wet="0.2"></score-effect>
+  <score-view type="piano-roll"></score-view>
+</score-player>
+<score-chord-analysis input="#piece"></score-chord-analysis>
+```
 
 The former `<simple-score-player>` compatibility tag is retired; use
 `<score-player>` for transport.
@@ -687,10 +701,10 @@ defineAllAnalysisElements();
 ```
 
 ```html
-<score-player id="p" src="song.mid"></score-player>
-<score-chord-analysis player="#p"></score-chord-analysis>
-<score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
-<score-pitch-view type="staff" player="#p"></score-pitch-view>
+<score-player id="p" src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-chord-analysis input="#p"></score-chord-analysis>
+<score-pitch-view type="keyboard" input="#p" low="48" high="84"></score-pitch-view>
+<score-pitch-view type="staff" input="#p"></score-pitch-view>
 ```
 
 The analysis tool and pitch views are explicit siblings. Register the View tags
@@ -775,7 +789,7 @@ registers every playback element and exposes the `WebMusicScorePlay` global:
 ```html
 <script src="https://unpkg.com/@webmusic/score/dist/play/auto.global.js"></script>
 
-<score-player src="song.mid"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid"></score-player>
 <score-note-input layout="piano" keyboard></score-note-input>
 
 <script>

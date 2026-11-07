@@ -1,9 +1,9 @@
 // Complete observed-attribute catalogs for atomic Score Analyze components.
 import type {ElementParamCatalog, ParamSpec, MemberSpec} from './types';
 const ENTRY = '@webmusic/score/analyze/element';
-const SRC = {name: 'src', kind: 'text', placeholder: 'song.mid', fallback: 'borrow player data, else await .score', note: 'Explicit score URL; overrides the selected player’s resolved score.'} as const;
+const SRC = {name: 'src', kind: 'text', placeholder: 'song.mid', fallback: 'borrow input data, else await .score', note: 'Explicit score URL; overrides the score borrowed from the input player.'} as const;
 const FORMAT = {name: 'format', kind: 'enum', options: ['midi', 'mxl', 'musicxml', 'abc'], fallback: 'extension, else byte detection', note: 'Parser override for an explicit source URL.'} as const;
-const PLAYER = {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'standalone data or waiting for notes', note: 'Unique player selector in the current Document or ShadowRoot; borrow available data and state.'} as const;
+const PLAYER = {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'} as const;
 const DENSITY = {name: 'density', kind: 'enum', options: ['comfortable', 'compact'], fallback: 'comfortable', note: 'Type and spacing defaults for this single surface.'} as const;
 const SCHEME = {name: 'scheme', kind: 'enum', options: ['light', 'dark'], fallback: 'inherit the page', note: 'Explicit palette for this surface.'} as const;
 const SPELLING = {name: 'spelling', kind: 'enum', options: ['auto', 'sharp', 'flat'], fallback: 'auto', note: 'Pitch-name spelling; automatic uses the available key context.'} as const;
@@ -22,12 +22,12 @@ const TONIC = {name: 'tonic', kind: 'text', placeholder: 'C', fallback: 'choose 
 const SCALE = {name: 'scale', kind: 'enum', options: ['major', 'natural-minor', 'harmonic-minor', 'melodic-minor-ascending', 'melodic-minor-descending'], fallback: 'major', note: 'Textbook scale form used to spell degrees and check selected notes.'} as const;
 const BEAT_GROUPS = {name: 'beat-groups', kind: 'text', placeholder: '2+3', fallback: 'conventional simple/compound grouping', note: 'Positive denominator-unit groups such as 2+3; each grouping applies to the numerator it sums to, and several groupings are separated by spaces or commas.'} as const;
 const SUBDIVISION = {name: 'subdivision', kind: 'enum', options: ['1', '2', '3', '4'], fallback: '2', note: 'Equal subdivisions of each metrical beat.'} as const;
-const INPUT = {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part', note: 'Module-grammar alias of player (DEC-068). With neither, the enclosing player or Rack part scope is followed by containment.'} as const;
+const INPUT = {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part', note: 'Explicit input: one unique player or Rack part in the current Document or ShadowRoot; borrow its score, position and notes. Absent, containment selects the enclosing scope; an unresolved selector never falls back.'} as const;
 const CORE: readonly ParamSpec[] = [SRC, FORMAT, PLAYER, INPUT, DENSITY, SCHEME];
 const LANE: readonly ParamSpec[] = [...CORE, MOTION, WINDOW];
 const DISPLAY_PROPERTIES: readonly MemberSpec[] = [{name: 'density', note: 'Reflects density.'}, {name: 'scheme', note: 'Reflects scheme; undefined removes the override.'}];
 const LANE_PROPERTIES: readonly MemberSpec[] = [
-  {name: 'score', note: 'Explicit Score overrides src and player data.'},
+  {name: 'score', note: 'Explicit Score overrides src and borrowed input data.'},
   ...DISPLAY_PROPERTIES,
   {name: 'motion', note: 'Reflects motion.'},
   {name: 'window', note: 'Visible duration in seconds or auto.'},

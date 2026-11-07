@@ -18,11 +18,11 @@ const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
 >
   <ElementComposition>
     <audio-player id={playerId} src={SRC} controls></audio-player>
-    {tag === 'audio-meter' && <audio-meter player={`#${playerId}`}></audio-meter>}
-    {tag === 'audio-level-analyzer' && <audio-level-analyzer player={`#${playerId}`}></audio-level-analyzer>}
-    {tag === 'audio-spectrum-analyzer' && <audio-spectrum-analyzer player={`#${playerId}`}></audio-spectrum-analyzer>}
-    {tag === 'audio-oscilloscope' && <audio-oscilloscope player={`#${playerId}`}></audio-oscilloscope>}
-    {tag === 'audio-transient-analyzer' && <audio-transient-analyzer player={`#${playerId}`}></audio-transient-analyzer>}
+    {tag === 'audio-meter' && <audio-meter input={`#${playerId}`}></audio-meter>}
+    {tag === 'audio-level-analyzer' && <audio-level-analyzer input={`#${playerId}`}></audio-level-analyzer>}
+    {tag === 'audio-spectrum-analyzer' && <audio-spectrum-analyzer input={`#${playerId}`}></audio-spectrum-analyzer>}
+    {tag === 'audio-oscilloscope' && <audio-oscilloscope input={`#${playerId}`}></audio-oscilloscope>}
+    {tag === 'audio-transient-analyzer' && <audio-transient-analyzer input={`#${playerId}`}></audio-transient-analyzer>}
   </ElementComposition>
 </ElementPlayground>
 

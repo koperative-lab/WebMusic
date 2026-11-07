@@ -59,6 +59,14 @@ does not impose a uniform option validator: stated clamps apply, while other
 invalid values can fail in the underlying Web Audio API. Custom factories are
 responsible for cleaning allocations made before they throw.
 
+## Ports and composition
+
+`Effect` is a recipe, not a module, and adds no port. A module's `InsertChain`
+(its `inserts`) realizes it between the module's source and its audio output
+port, as described under [realized insert instances](#realized-insert-instances).
+`<score-effect>` declares one insert on the module found by containment or named
+by `target`. `EqController` is likewise a graph helper, not a module.
+
 ## EqController
 
 `EqController` owns a chain of biquad bands and exposes both halves an EQ UI

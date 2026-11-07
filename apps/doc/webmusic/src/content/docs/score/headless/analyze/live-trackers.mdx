@@ -48,6 +48,15 @@ chord.reset();
 key.reset();
 ```
 
+## Ports and composition
+
+The trackers are pure state, not modules, and never join a Session. Feed them
+from any note producer: `ScorePlayer`'s `noteOn`/`noteOff` events as above, or a
+Kernel `NoteOutputPort` such as the `notes` port of
+[`MidiNoteSource`](/score/headless/play/score-player/#note-sources-and-sinks),
+whose `subscribe(listener)` delivers each `NoteEvent` with its `gate` (`on`,
+`off` or `cancel`) and `pitch.midi`.
+
 ## createLiveChordTracker — what is sounding
 
 Tracks the set of notes held right now and names it. `onUpdate` fires on every

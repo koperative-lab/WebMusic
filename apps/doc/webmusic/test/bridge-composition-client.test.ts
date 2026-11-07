@@ -300,7 +300,7 @@ describe("reference playback composition lifecycle", () => {
     const owner = root.querySelector("[data-playback-owner]") as HTMLElement & {
       playback: ScorePlaybackSource;
     };
-    expect(root.querySelector("score-view")!.getAttribute("player")).toBe(
+    expect(root.querySelector("score-view")!.getAttribute("input")).toBe(
       `#${owner.id}`,
     );
     expect(root.querySelector("score-chord-analysis")!.hasAttribute("src")).toBe(

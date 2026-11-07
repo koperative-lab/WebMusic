@@ -134,7 +134,8 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     tag: 'audio-playlist',
     entry: ENTRY,
     params: [
-      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'standalone compatibility mode', note: 'Unique central audio-player selector. Explicit .player takes precedence; late insertion and replacement are observed.'},
+      {name: 'input', kind: 'text', placeholder: '#session', fallback: 'the enclosing audio-player by containment, else standalone', note: 'Unique central audio-player selector. Explicit .player takes precedence; late insertion and replacement are observed; an unresolved selector stays detached.'},
+      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {
         name: 'src',
         kind: 'text',
@@ -199,7 +200,7 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       {name: 'loadError', note: 'Read-only selected-entry Error; cleared by retry, source replacement or disposal.'},
       {name: 'activePlayer', note: 'The current entry’s low-level AudioClipPlayer, replaced on advance.'},
       {name: 'index', note: 'Index of the current entry, or -1 when the queue is empty.'},
-      {name: 'clip', note: 'PlayerLike facade: the current entry’s AudioClip, so <audio-view player="#id"> can bind to the queue.'},
+      {name: 'clip', note: 'PlayerLike facade: the current entry’s AudioClip, so <audio-view input="#id"> can bind to the queue.'},
       {name: 'analyser', note: 'The active entry’s AnalyserNode, or undefined between entries.'},
     ],
     events: [
@@ -264,7 +265,8 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     tag: 'audio-recorder',
     entry: ENTRY,
     params: [
-      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'standalone compatibility mode', note: 'Unique central audio-player selector. Explicit .player takes precedence; late insertion and replacement are observed.'},
+      {name: 'input', kind: 'text', placeholder: '#session', fallback: 'the enclosing audio-player by containment, else an owned audition player', note: 'Unique central audio-player selector used for take audition. Explicit .player takes precedence; late insertion and replacement are observed.'},
+      {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use input', note: 'Retired alias of input (DEC-068), still read for existing markup; write input instead.'},
       {
         name: 'device-id',
         kind: 'text',

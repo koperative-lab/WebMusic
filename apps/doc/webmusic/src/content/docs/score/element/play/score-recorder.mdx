@@ -51,6 +51,17 @@ visible, and loading descriptions remain available to assistive technology.
 `@webmusic/score/play/auto` and `/global` register the Play elements together;
 see [Score setup](/score/#drop-in-web-components).
 
+## Ports and composition
+
+`<score-recorder>` is a note **Sink** whose completed take is a `Score`. The
+Element does not yet join a module scope: it declares no ports, provides no
+module context, reads no `input`, `target` or `port` attribute and registers no
+Session participant. Its live monitoring `.player` and its take audition use
+the recorder's own audio path, so placing it inside a `<score-player>` does not
+connect it to that player's instrument or transport. Note events arrive through
+the paths below. For a module-graph capture of a note output port, use
+the Headless `recordNoteOutput()` with a `ScoreRecorderSession`.
+
 ## Connect a note source
 
 Choose one feed path for each input:

@@ -11,8 +11,8 @@ import ScorePlayerPlayground from '../../../../../components/elements/ScorePlaye
 
 `<score-player>` is the Score transport: play/pause and a draggable seek bar, over music it loads and schedules itself. Point `src` at a file (or hand it a `Score`) and it plays — no JavaScript wiring, and no other element required.
 
-In native score mode, View and Analyze companions resolve this player with
-`player="#id"` and borrow its score, state and note events. One player can drive
+In native score mode, View and Analyze companions nested inside this player, or
+naming it with `input="#id"`, borrow its score, state and note events. One player can drive
 [`<score-view>`](/score/element/view/score-view/),
 [`<score-pitch-view>`](/score/element/view/score-pitch-view/) and
 [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) together.
@@ -57,6 +57,73 @@ if (player) player.effect = Effect.chain(
 That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
 
 `@webmusic/score/play/auto` registers this element (and the other Score elements) on import instead; `@webmusic/score/play/global` is the prebuilt `<script>`-tag bundle for pages with no build step.
+
+## Ports and composition
+
+`<score-player>` is a **Source** and, when outermost, the **Session provider**
+(DEC-068). It provides a module context to its children: the Session, its own
+insert chain and note input as the default target, and itself as the playback
+owner that nested views and analysis borrow. With a source, it registers one
+`ScorePlayerModule`, whose ports `.module` lists:
+
+| Port | Family | Direction | Notes |
+| --- | --- | --- | --- |
+| `main` | `audio` | output | Present once the engine is prepared and routed; post-insert output |
+| `notes` | `note` | input | Live occurrences reach this player's exact voices |
+| `source` | `source` | output | Schema `webmusic.score`; the same data as `.playback` |
+| `transport` | `transport` | output | The scope's Session, lent without extra command authority |
+| `params` | `control` | input | Present when the synth exposes parameters |
+
+A source-free player lists no ports. Containment connects nested
+[`<score-effect>`](/score/element/play/score-effect/) declarations to this
+player's insert chain, [`<score-note-input>`](/score/element/play/score-note-input/)
+and [`<score-synth-panel>`](/score/element/play/score-synth-panel/) to its
+instrument, and companions to its playback. A companion elsewhere names it with
+`input="#id"`. Its Session participant reports `shared-anchor` timing for
+audio-clock synths (including the default oscillator) and `callback` otherwise.
+
+```html
+<score-player id="piece" src="/midi/Arabesque%20No.1.mid">
+  <score-effect type="reverb" wet="0.2"></score-effect>
+  <score-view type="piano-roll"></score-view>
+</score-player>
+<score-chord-analysis input="#piece"></score-chord-analysis>
+```
+
+The outermost player owns a `SessionTransport` — a standalone player is a Session of one — and a nested
+player borrows the nearest Session, including through layout wrappers and mixer
+scopes. A player with a source registers its actual engine once as a
+participant; its transport bar sends play, pause, stop and seek to the Session.
+A source-free outer player conducts its nested members. `session="local"`
+creates an independent boundary. A borrowed `.controller`, an explicit `.rack`
+and a custom `mountScore()` handle whose engine is not a native `ScorePlayer`
+keep their own transport and do not join the Session. Removing the element
+releases its engine and Session after the current task, so a synchronous move
+within the same scope keeps them.
+
+`controls="auto"` hides the transport of an inherited leaf, `show` displays a
+second control view of the same authority, and `hide` suppresses local chrome.
+These controls do not register another participant. `.sessionTransport` exposes
+the borrowed/owned authority and `.module` exposes the local capability handle;
+a source-free root has no fabricated audio output.
+
+Play/pause/stop/seek/rate commands delegate to the Session. Seek is
+on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
+Unknown/live duration remains explicit on the Session snapshot instead of being
+reported as a known finite clip. Discovery does not prepare audio. See
+[modular composition](/bridge/modular-composition/) for a running mixed example.
+
+An owning root's whole-session `loop` follows the finite aggregate duration,
+including sources that finish loading later and subsequent membership changes.
+When a provider becomes pending, the leaf withdraws its old source and controls;
+it cannot keep commanding the former Session through stale chrome.
+
+Changing an owning root's AudioContext creates a new paused Session and updates
+descendant scopes. Same-context destination changes update its route scope.
+Closed contexts, context/destination mismatches and conflicts with a prepared
+borrowed provider reject before replacing the current configuration. If a
+destination belongs to the previous context, clear it before assigning a new
+context. Borrowed contexts and destination nodes remain caller-owned.
 
 ## Four ways to drive it
 
@@ -106,7 +173,7 @@ and any views. No application revision-copying code is required:
 
 ```html
 <score-player id="audition"></score-player>
-<score-grid-view player="#audition" editable></score-grid-view>
+<score-grid-view input="#audition" editable></score-grid-view>
 <script type="module">
   import {defineScorePlayerElement} from '@webmusic/score/play/element';
   import {defineScoreGridViewElement} from '@webmusic/score/view/element';
@@ -171,9 +238,9 @@ when you need the data actually selected for playback.
 Companions can borrow that data without repeating `src`:
 
 ```html
-<score-player id="shared-player" src="/example.musicxml"></score-player>
-<score-view player="#shared-player"></score-view>
-<score-chord-analysis player="#shared-player"></score-chord-analysis>
+<score-player id="shared-player" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-view input="#shared-player"></score-view>
+<score-chord-analysis input="#shared-player"></score-chord-analysis>
 ```
 
 Register each tag through its owning `/element` entry. A follower borrows the
@@ -198,45 +265,6 @@ Native and Rack `play()` await preparation and startup. Borrowed controller
 mode delegates its command and resolves immediately; the controller's error
 channel is forwarded as `webscore:error`.
 
-## Module composition
-
-Every player is a module scope (DEC-068). The outermost player owns a
-`SessionTransport` — a standalone player is a Session of one — and a nested
-player borrows the nearest Session, including through layout wrappers and mixer
-scopes. A player with a source registers its actual engine once as a
-participant; its transport bar sends play, pause, stop and seek to the Session.
-A source-free outer player conducts its nested members. `session="local"`
-creates an independent boundary. A borrowed `.controller`, an explicit `.rack`
-and a custom `mountScore()` handle whose engine is not a native `ScorePlayer`
-keep their own transport and do not join the Session. Removing the element
-releases its engine and Session after the current task, so a synchronous move
-within the same scope keeps them.
-
-`controls="auto"` hides the transport of an inherited leaf, `show` displays a
-second control view of the same authority, and `hide` suppresses local chrome.
-These controls do not register another participant. `.sessionTransport` exposes
-the borrowed/owned authority and `.module` exposes the local capability handle;
-a source-free root has no fabricated audio output.
-
-Play/pause/stop/seek/rate commands delegate to the Session. Seek is
-on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
-Unknown/live duration remains explicit on the Session snapshot instead of being
-reported as a known finite clip. Discovery does not prepare audio. See
-[modular composition](/bridge/modular-composition/) for a running mixed example.
-
-An owning root's whole-session `loop` follows the finite aggregate duration,
-including sources that finish loading later and subsequent membership changes.
-When a provider becomes pending, the leaf withdraws its old source and controls;
-it cannot keep commanding the former Session through stale chrome.
-
-Changing an owning root's AudioContext creates a new paused Session and updates
-descendant scopes. Same-context destination changes update its route scope.
-Closed contexts, context/destination mismatches and conflicts with a prepared
-borrowed provider reject before replacing the current configuration. If a
-destination belongs to the previous context, clear it before assigning a new
-context. Borrowed contexts and destination nodes remain caller-owned.
-
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -257,6 +285,9 @@ The source attributes are read only while a source is being resolved; assigning 
 | `.playback` | read-only property | stable source | Resolved data and revisioned snapshots/subscriptions; optional `seekNominal` uses nominal seconds. See [shared source](/score/api/#shared-playback-observation). |
 | `.resolvedScore` | read-only property | `undefined` | Current mounted `Score`, including one loaded from `src`; undefined during source replacement and in Rack/controller modes. `.score` still returns only explicit assignment. |
 | `.sessionTransport` | read-only property | `undefined` | Current borrowed/owned modular Session; undefined outside module mode, while its provider is pending, or after teardown. |
+| `.module` | read-only property | `undefined` until scoped | This player's `ModuleHandle`: its ports, inserts, parameters and note-input capability. See [Ports and composition](#ports-and-composition). |
+| `session` | attribute | borrow | `local` starts an independent Session boundary instead of borrowing the nearest one. |
+| `controls` | attribute | `auto` | `auto` hides the transport of an inherited leaf, `show` displays it, `hide` suppresses local chrome. |
 | `.rack` | property | — | A borrowed [`Rack`](/score/headless/play/rack/) whose members share these transport commands. Overrides the nested desk, `.score` and `src`. |
 | `.controller` | property | — | A borrowed [`PlayerController`](/score/headless/play/player-controller/). Overrides every other source; see [Four ways to drive it](#four-ways-to-drive-it). |
 | `.sound` | property | — | A `Sound` / `HeadlessSynth` timbre. Overrides `sound-font`. |

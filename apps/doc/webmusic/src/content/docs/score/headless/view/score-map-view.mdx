@@ -45,6 +45,14 @@ data. Calling `setScore(undefined)` restores source following. If explicit and
 borrowed Score identities differ, `readiness` becomes `'mismatched'` and bound
 navigation fails without seeking that player.
 
+## Ports and composition
+
+`createScoreMapView` is a view companion, not a module: it exposes no ports and
+never joins a Session. Its `playback` input is the payload of a Score module's
+`source` port (`webmusic.score`), the same `ScorePlaybackSource` as
+`player.playback`, and `seekQuarters()` navigates only through that source's own
+seek command.
+
 ## Navigation and adapters
 
 The map’s cells and marks use quarter notes. `seekQuarters()` clamps a finite

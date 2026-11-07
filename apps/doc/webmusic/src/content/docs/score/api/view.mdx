@@ -32,6 +32,12 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
+Views are companions, not modules. Headless views and the View Elements
+consume the payload of a Score module's `source` port (`ScorePlaybackSource`,
+`webmusic.score`) or a borrowed `ScoreEditorPort`; the Elements resolve it from
+`input` or the nearest provider ([modular composition](/bridge/modular-composition/)).
+Renderers draw caller-supplied data and own no port.
+
 The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
 
 ## Prepare a score

@@ -153,6 +153,14 @@ cancellation and disposal release their asset leases even when an adapter callba
 disposes the session or changes the document. Session disposal is terminal before
 cleanup callbacks run, including for new synchronous subscriptions.
 
+## Ports and composition
+
+`AudioClipEditor` is a document owner, not a module: it exposes no ports and
+joins no Session. A player borrows it as its `AudioDocumentSource` through
+`AudioPlayer.setDocumentSource(editor)` or `<audio-player>`'s `.editor`, and
+plays the edited sequence through its own module output; views borrow the same
+editor.
+
 ## Explicit range processing
 
 Register processors in construction options, then call `processRange` with an

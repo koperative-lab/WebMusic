@@ -45,6 +45,14 @@ call `setPlayback(player.playback)`. The caller owns and releases the player.
 The source supplies the initial snapshot and subsequent updates, including
 paused held notes and overlapping equal pitches.
 
+## Ports and composition
+
+`createPitchView` is a view companion, not a module: it exposes no ports and
+never joins a Session. Its `playback` input is the payload of a Score module's
+`source` port (`webmusic.score`), the same `ScorePlaybackSource` as
+`player.playback`; manual `noteOn`/`noteOff` serve live input without one.
+`<score-pitch-view>` resolves that source from `input` or the nearest provider.
+
 ## State ownership
 
 Manual notes are counted: two attacks at MIDI 60 need two releases before the

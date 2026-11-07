@@ -22,9 +22,9 @@ borrowed by default, so `dispose()` invokes only a route cleanup returned by
 `connect()` and never its global `disconnect()` / `dispose()` unless you choose
 `synthOwnership: 'owned'`.
 
-An application that already owns a Tone.js instrument can play it through
-`Sound.from(toneInstrument)`; the former `TonePlayer` adapter over Tone's own
-Transport is removed in 0.3.0 (DEC-068) because the Session owns transport time.
+An application that already owns a Tone.js instrument plays it through
+`Sound.from(toneInstrument)`; the Session, not Tone's Transport, owns transport
+time (DEC-068).
 
 
 <ScorePlayerPlayground />
@@ -171,7 +171,39 @@ and scheduled retiming; other backends cancel/retrigger at the new anchor. A tim
 stall beyond lookahead can miss deadlines, and this contract does not measure
 output-device latency or guarantee acoustic alignment.
 
-## Module adapter
+## Ports and composition
+
+`ScorePlayer` is the engine, not a module. Its `ModuleHandle` is
+`new ScorePlayerModule(score, {context, ...})`; `<score-player>`'s `.module`
+forwards to one. The module receives its `ModuleContext` explicitly and registers
+in `context.registry`; when the context carries a Session, it registers the engine
+once as a participant on `score-nominal-seconds`. The composition root creates
+that context and owns the Session, for example with
+[`createProviderScope`](/kernel/api/#racks-provider-scopes-and-sinks); a module
+never creates one.
+
+| Family | Port | Direction | Present |
+| --- | --- | --- | --- |
+| audio | `main` | output | After `prepare()` routes it through the scope |
+| note | `notes` | input | Always |
+| source | `source` (`webmusic.score`) | output | Always; its value is `player.playback` |
+| transport | `transport` | output | When the context lends the Session's port |
+| control | `params` | input | When the synth exposes parameters |
+
+```ts
+import {createProviderScope} from '@webmusic/kernel/module';
+import {loadScoreFromUrl} from '@webmusic/score/io';
+import {ScorePlayerModule} from '@webmusic/score/play/headless';
+
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
+const scope = createProviderScope({id: 'arabesque', parent: undefined});
+const module = new ScorePlayerModule(score, {context: scope.context});
+await scope.session.play(); // from a user gesture: prepares the module, then starts
+
+// Teardown: the module first, then the Session and audio environment.
+module.dispose();
+scope.dispose();
+```
 
 `ScorePlayerModule` wraps one real `ScorePlayer` in a `ModuleContext`. Construct
 it with `(score, {context, id?, player?, offsetSeconds?, positionScale?, ...playerOptions})`; an explicit player

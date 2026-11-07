@@ -7,6 +7,10 @@ description: MIDI, MusicXML, MXL and ABC import/export for Score.
 MusicXML, compressed MusicXML and ABC data into immutable `Score` objects from
 `@webmusic/score`, and serializes scores back to those formats.
 
+These are data functions, not modules: a loaded `Score` is what a
+[`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition)
+or `<score-player>` plays and what the views draw.
+
 The MusicXML implementation keeps one stable public parser/serializer boundary
 over separate preserve-order XML traversal, measure timing, Score construction,
 and multi-voice serialization modules. This prevents document-order concerns

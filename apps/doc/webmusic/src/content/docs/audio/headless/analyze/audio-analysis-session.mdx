@@ -37,6 +37,12 @@ guarantee that CPU-heavy analysis yields to rendering; use a worker when isolati
 from the main thread is required. A failed update leaves the previous committed
 clip/cache available.
 
+## Ports and composition
+
+`createAudioAnalysisSession` is pure data, not a module: it reads an `AudioClip`
+and returns results, with no ports and no transport Session; the name refers to
+its caches. Its results feed views and editors, as the beat grid below shows.
+
 ## Show a beat grid in a view
 
 The session returns beat positions as data. Convert them to point `Region`s

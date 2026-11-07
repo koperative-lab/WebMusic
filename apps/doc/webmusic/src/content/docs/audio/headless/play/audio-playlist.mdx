@@ -45,6 +45,16 @@ await playlist.play();
 const dispose = () => playlist.dispose();
 ```
 
+## Ports and composition
+
+`AudioPlaylist` is a queue source, not a module: it has no `ModuleHandle`, ports
+or Session participant of its own. An
+[`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition) facade
+borrows it with `setTransport(queue)`; that facade's `.module` then exposes no
+audio output, because the queue's engines keep their own routes.
+`<audio-playlist>` attaches to the enclosing `<audio-player>` or to the one named
+by `input`.
+
 ## Loading is injected
 
 `headless` may not import `play/api`, so the playlist does not know how to

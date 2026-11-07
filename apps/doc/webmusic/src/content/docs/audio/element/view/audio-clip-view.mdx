@@ -54,12 +54,30 @@ recording, discarding edits.
 </script>
 
 <audio-player id="clip-player"></audio-player>
-<audio-clip-view player="#clip-player" editable grid snap="grid"></audio-clip-view>
+<audio-clip-view input="#clip-player" editable grid snap="grid"></audio-clip-view>
 ```
 
 `defineAllAudioElements()` from the same entry also registers this tag, and
 `@webmusic/audio/view/auto` registers it on import. A read-only clip view needs
 no editor: `src` decodes a file and `.clip` takes a decoded `AudioClip`.
+
+## Ports and composition
+
+`<audio-clip-view>` is a **View** module and, with `editable`, an editor
+surface over a borrowed `.editor`. It exposes no ports and provides no context
+to children. It follows one player chosen by `input="#id"` or, without `input`,
+by containment in the nearest `<audio-player>`. It registers no Session
+participant: ruler seeks and beat jumps are commands to that player, which
+delegates them to its Session. Edits change only the editor's document; a
+player bound to the same `.editor` applies each committed revision, as
+described under [Playback](#playback). Nesting is equivalent to the `input`
+link in the import example:
+
+```html
+<audio-player id="clip-player">
+  <audio-clip-view editable grid snap="grid"></audio-clip-view>
+</audio-player>
+```
 
 ## Data and editing
 
@@ -192,7 +210,9 @@ a keyboard or toolbar alternative.
 
 ## Playback
 
-`player` selects one player in the same Document or ShadowRoot. A click on the
+`input` selects one player in the same Document or ShadowRoot; without it the
+clip view follows the enclosing `<audio-player>`, and an invalid or ambiguous
+`input` never falls back to it. A click on the
 ruler asks it to seek (to the nearest beat with `quantize`), and PageUp/PageDown
 beat jumps move it while playback is shown; the clip view sends no other
 playback command. With an
@@ -213,7 +233,7 @@ Numeric attributes ignore missing or non-numeric values and use their defaults.
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `src` / `format` | attributes | none | Decode one URL read-only, with an optional decoder override. Conflicts with `.editor`. |
-| `player` | attribute | none | Unique selector of a player to follow. |
+| `input` | attribute | none | Unique selector of a player to follow; absent, the enclosing `<audio-player>` is followed. |
 | `width` / `height` | attributes | 100% / ruler + 180 px lanes | Bare numbers are px; CSS lengths pass through. |
 | `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
 | `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `split`, `delete`, `clipboard`, `trim`, `silence`, `gain`, `fade`, `envelope`, `markers`, `grid`, `process`, `snap`, `zoom`, `history`. The getter returns them in that order; the setter throws `RangeError` for an unknown name. |

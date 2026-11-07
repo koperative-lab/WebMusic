@@ -29,7 +29,7 @@ keep visible failure feedback, and background prefetch marks only its own row.
 </script>
 
 <audio-player id="session"></audio-player>
-<audio-playlist player="#session" loop>
+<audio-playlist input="#session" loop>
   <li data-id="wav-1" data-src="/wav/Arabesque%20No.1.wav">Arabesque No. 1 WAV · pass 1</li>
   <li data-id="wav-2" data-src="/wav/Arabesque%20No.1.wav">Arabesque No. 1 WAV · pass 2</li>
   <li data-id="mp3" data-src="/mp3/Arabesque%20No.1.mp3" data-streaming>Arabesque No. 1 MP3 · streamed</li>
@@ -39,7 +39,7 @@ keep visible failure feedback, and background prefetch marks only its own row.
 The entries live in light DOM, so the markup degrades to a plain list without JavaScript. A comma-separated `src` works for the simple case, and `.entries` takes over from code:
 
 ```html
-<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+<audio-playlist input="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
 ```
 
 ```ts
@@ -57,12 +57,32 @@ list.entries = [
 await list.play();
 ```
 
+## Ports and composition
+
+`<audio-playlist>` is a queue **Source** companion. It has no module handle or
+ports of its own and provides no context to children. It links to one player,
+resolved as an assigned `.player` object, then `input="#id"`, then containment
+in the nearest enclosing `<audio-player>`. An unresolved explicit selector
+stays detached and never falls back to containment.
+
+A linked queue becomes that player's borrowed backend: the player's controls
+drive it, the player keeps the queue's own transport commands, rate and loop,
+and audio flows through the queue's graph rather than the player's `output`
+port. Without a link, the playlist shows its own transport and joins no
+Session.
+
+```html
+<audio-player controls>
+  <audio-playlist src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3" loop></audio-playlist>
+</audio-player>
+```
+
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Description |
 | --- | --- | --- |
-| `player` | attribute | Unique selector for the central `audio-player`; late insertion, upgrade and replacement are observed. |
+| `input` | attribute | Unique selector for the central `audio-player`; late insertion, upgrade and replacement are observed. Absent, the enclosing `audio-player` is used. |
 | `src` | attribute | A comma or whitespace separated list of URLs. Ignored when `.entries` is assigned. |
 | `loop` | attribute | Live list-loop policy: restart after the last entry and let previous/next wrap, without resetting the current entry. |
 | `autoplay` | attribute | Start on mount or when enabled, using the current selection. Disabling does not pause active playback. Browsers may still block playback. |
@@ -78,7 +98,7 @@ await list.play();
 | `.play()` / `.pause()` / `.stop()` | method | Transport for the queue as a whole. |
 | `.next()` / `.previous()` / `.select(idOrIndex)` | method | Move between entries, retaining playback intent. Invalid select ids or non-integer/out-of-range indices reject with RangeError and preserve the old entry. |
 | `.seek(seconds)` | method | Seek within the current entry. |
-| `.clip` / `.seconds` / `.currentTime` / `.duration` / `.analyser` | property | The `PlayerLike` facade, so [`<audio-view player="#id">`](/audio/element/view/audio-view/) can visualize the queue itself rather than one entry. |
+| `.clip` / `.seconds` / `.currentTime` / `.duration` / `.analyser` | property | The `PlayerLike` facade, so [`<audio-view input="#id">`](/audio/element/view/audio-view/) can visualize the queue itself rather than one entry. |
 | `.loading` / `.loadError` | property (get) | Selected entry fetch/decode state and last failure; background prefetch does not make the selected entry busy or failed. Retry and source replacement clear its error. |
 | `webaudio:trackchange` | event | `detail = { id, index }` — a different entry became current, including the first. |
 | `webaudio:trackend` | event | `detail = { id, index }` — one entry played to its natural end. The queue advances next. |

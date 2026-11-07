@@ -13,9 +13,11 @@ mixes real Score and Audio sources into one bus, including an original
 reverb and one filter; the two room panels borrow the same reverb parameters.
 The spectrum analyzer taps that bus without replacing its audible route.
 
-This opt-in API is prepared for `0.3.0`. Use matching built workspace packages
-until publication; published `0.2.0` foundations do not provide the required
-module and Session entries. This page does not establish registry availability.
+Modular composition is the only composition model in `0.3.0`: every Element and
+Headless runtime on this page is a module, and the same markup works with no
+opt-in attribute. Use matching built workspace packages until publication;
+published `0.2.0` foundations do not provide the module and Session entries.
+This page does not establish registry availability.
 
 <ModularCompositionDemo />
 
@@ -33,8 +35,8 @@ module and Session entries. This page does not establish registry availability.
 The MIDI and WAV are existing local demo assets. Both domain adapters explicitly
 use offset 0 and scale 1 on their stable seconds axes. Score uses nominal Score
 seconds and Audio uses clip seconds; this 1:1 mapping does not establish beat
-alignment between independently authored performances. For explicit master/follower
-assembly and semantic conversion, use [the Bridge composition](/bridge/composition/).
+alignment between independently authored performances. For a Score/Audio Session
+assembled in code and for semantic conversion, use [the Bridge composition](/bridge/composition/).
 The spectrum is a sampled FFT display, not calibrated sound pressure.
 
 ## Write the composition
@@ -66,6 +68,37 @@ outer one owns the Session; ordinary layout wrappers preserve that scope. A chil
 with `session="local"` establishes an independent Session boundary. Configure
 scope before connecting a playing composition; moving a running engine between
 authorities is not a silent handoff.
+
+## One composition model
+
+Every component takes one or more module roles and exposes typed ports. The
+roles are Session provider, Source, Instrument, Processor, Modulator, Rack,
+Analyzer, View and Sink; a player is a Source with its own insert chain and, when
+outermost, the Session provider.
+
+| Port family | Carries | Typical producer → consumer |
+| --- | --- | --- |
+| `audio` | An `AudioNode` in one context | Player, Rack part, microphone → effect, Rack, analyser, device or capture sink |
+| `note` | Occurrence-owned note on/off events | Note input, Web MIDI, metronome → the nearest instrument |
+| `control` | Borrowed `ParamHandle`s and modulation | LFO, envelope, macro → effect and synth parameters; panels borrow the same handles |
+| `transport` | The Session's revisioned snapshot and commands | Session provider → views, analysers, nested controls |
+| `source` | Revisioned domain data (`webmusic.score`, `webmusic.audio-clip`, …) | Player → views, analysis, editors |
+
+Markup names relationships with one grammar:
+
+| Form | Meaning |
+| --- | --- |
+| Containment | Connects to the nearest provider that offers the needed family |
+| `input="#id"`, `port="name"` | Explicit input of any family; an invalid selector never falls back |
+| `target="#id"` | Parameter or insert target for effects and panels |
+| `slot="channel"` · `slot="master"` | Insert placement inside a Rack |
+| `session="local"` | Independent Session boundary |
+| `controls="auto"` · `"show"` · `"hide"` | Transport visibility only |
+
+Resolution order is explicit object, explicit selector, containment, none. A
+view inside a provider that holds several sources and has no `input` stays
+unresolved instead of choosing the first. A standalone player is a Session of
+one; it has no separate clock path.
 
 ## Independent relationships
 

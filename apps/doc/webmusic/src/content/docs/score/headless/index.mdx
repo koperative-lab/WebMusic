@@ -13,6 +13,14 @@ engines, sessions, controllers and their supporting helpers imported from
 | [Analyze](#analyze) | Analysis sessions, playback followers, live trackers, workers and presentation prediction. |
 | [View](#view) | Score windows, map navigation, current-pitch views, held-note tracking and the `ScoreEditor` document owner with its URL loader. |
 
+Under [modular composition](/bridge/modular-composition/) (DEC-068) the module
+runtimes here are `ScorePlayerModule` (one engine with audio, note, source,
+transport and control ports), the `ScoreRackModule` bus and the note modules
+`MidiNoteSource` and `MidiNoteSink`. Each receives an explicit `ModuleContext`;
+the composition root owns the Session. The other objects are engines,
+controllers or data that those modules and their companions consume; every leaf
+page's Ports and composition section says which.
+
 Use these objects when your application owns the interaction or presentation
 layer. The references document inputs, commands, state, event payloads and
 resource/time roles; pure helpers describe their inputs and results instead
@@ -211,4 +219,4 @@ caller-owned element, so by rule they are `/render` adapters, and they are
 documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the
 code-facing surface.
 
-`ScorePlayerModule` is documented with [ScorePlayer](/score/headless/play/score-player/#module-adapter); `ScoreRackModule` with [Rack](/score/headless/play/rack/#source-free-module-bus). Both use explicit module contexts and Session ownership.
+`ScorePlayerModule` is documented with [ScorePlayer](/score/headless/play/score-player/#ports-and-composition); `ScoreRackModule` with [Rack](/score/headless/play/rack/#ports-and-composition). Both use explicit module contexts and Session ownership.

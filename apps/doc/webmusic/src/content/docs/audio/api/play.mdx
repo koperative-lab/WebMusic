@@ -302,15 +302,18 @@ The playlist's runtime values and types, the meter controller, both engines,
 and effect builders are documented under [Headless Play](/audio/headless/#play).
 
 
-## Module composition
+## Ports and composition
 
-The opt-in [module composition](/bridge/modular-composition/) keeps transport,
-audio routing, realized effect slots, parameter controls and analysis taps as
-separate borrowed relationships. Kernel owns neutral
-[ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
+[Modular composition](/bridge/modular-composition/) is the only composition
+model (DEC-068): transport, audio routing, realized effect slots, parameter
+controls and analysis taps are separate borrowed relationships. Kernel owns the
+neutral [ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
 
-The [player](/audio/headless/play/audio-player/#realized-effects-and-module-output)
-and [mixer](/audio/headless/play/audio-mixer/#module-admissions-and-master-inserts)
-expose prepared module/output/insert capabilities. `AudioEffectElement` and
+The [player](/audio/headless/play/audio-player/#ports-and-composition) and
+[mixer](/audio/headless/play/audio-mixer/#ports-and-composition) expose `.module`
+with one audio output and their prepared inserts; the
+[recorder](/audio/headless/play/audio-recorder/#ports-and-composition)'s
+`.module` lends the microphone while capturing. Loaders, WAV and export
+functions are data operations whose clips feed those modules. `AudioEffectElement` and
 `defineAudioEffectElement` belong to the Element entry and declare
 [one realized insert](/audio/element/play/audio-effect/).

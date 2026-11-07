@@ -68,6 +68,16 @@ The public barrel and `packages/audio/src/play/headless/effects.ts, play/core/ef
 contracts described below. The reference does not turn private implementation
 fields into public API.
 
+## Ports and composition
+
+Effect recipes are not modules and add no ports. A module's `InsertChain`
+realizes them between its source and its audio output: `AudioPlayer`'s
+`module.inserts`, `AudioClipPlayer.insertChain`, the mixer's master
+`insertChain` or a channel's `channelInserts(id)`. The realized instance takes
+that module's place in the graph and Session. `<audio-effect>` declares one
+insert on the module found by containment, named by `target` or assigned to
+`.moduleTarget`.
+
 ## Realized insert instances
 
 Built-in recipes expose optional `parameterDescriptors` for their realized

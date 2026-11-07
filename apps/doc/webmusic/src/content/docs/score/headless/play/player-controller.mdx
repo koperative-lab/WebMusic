@@ -93,6 +93,15 @@ destroyed controller as an active view binding.
 
 </details>
 
+## Ports and composition
+
+`PlayerController` is not a module. It is an event-driven transport surface over
+one borrowed `ScorePlayer`; `<score-player>`'s `.controller` borrows it to drive
+that engine instead of creating its own. In a Session composition, wrap the
+engine in a [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition) and send
+transport commands to the Session: while the engine follows a Session, its direct
+transport commands reject.
+
 ## Related
 
 - [ScorePlayer](/score/headless/play/score-player/) — owned clock, time fields and audio lifecycle.

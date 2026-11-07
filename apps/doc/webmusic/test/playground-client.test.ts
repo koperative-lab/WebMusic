@@ -325,7 +325,7 @@ function fixture(tag = 'score-view') {
   player.id = 'owner';
   player.setAttribute('src', 'demo.mid');
   const target = document.createElement(tag);
-  target.setAttribute('player', '#owner');
+  target.setAttribute('input', '#owner');
   composition.append(player, target);
   stage.append(composition);
   panel.append(stage);
@@ -395,7 +395,7 @@ describe('type-specific Element playground parameters', () => {
     const copy = document.createElement('template');
     copy.innerHTML = markup;
     expect(copy.content.querySelector('score-player')?.getAttribute('src')).toBe(source);
-    expect(copy.content.querySelector('score-view')?.getAttribute('player')).toBe('#owner');
+    expect(copy.content.querySelector('score-view')?.getAttribute('input')).toBe('#owner');
     expect(copy.content.querySelector('score-view')?.getAttribute('active-note-color')).toBe('#f59e0b');
   });
   it('follows the effective type, retains hidden values, and leaves shared controls visible', async () => {
@@ -411,7 +411,7 @@ describe('type-specific Element playground parameters', () => {
     expect(f.target.getAttribute('default-key')).toBe('3');
     f.change('type', 'staff');
     expect(f.input('default-key').value).toBe('3');
-    for (const name of ['src', 'format', 'player', 'type', 'width', 'height']) expect(f.row(name).hidden).toBe(false);
+    for (const name of ['src', 'format', 'input', 'type', 'width', 'height']) expect(f.row(name).hidden).toBe(false);
     for (const removed of ['map', 'thumbnail']) {
       f.target.setAttribute('type', removed); await Promise.resolve();
       expect(f.row('default-key').hidden).toBe(true);
@@ -428,11 +428,11 @@ describe('type-specific Element playground parameters', () => {
     f.playerSrc.value = 'other.mid'; f.playerSrc.dispatchEvent(new Event('change', {bubbles: true}));
     f.change('type', 'staff'); f.copy.click(); await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('<score-player id="owner" src="other.mid">'));
-    expect(writeText.mock.calls[0]?.[0]).toMatch(/<score-pitch-view\s+player="#owner"\s+type="staff"\s+frets="9"\s*>/);
+    expect(writeText.mock.calls[0]?.[0]).toMatch(/<score-pitch-view\s+input="#owner"\s+type="staff"\s+frets="9"\s*>/);
     expect(f.row('frets').hidden).toBe(true);
     f.reset.click();
     expect(f.player.getAttribute('src')).toBe('demo.mid');
-    expect(f.target.getAttribute('player')).toBe('#owner');
+    expect(f.target.getAttribute('input')).toBe('#owner');
     expect(f.target.hasAttribute('type')).toBe(false);
     expect(f.target.hasAttribute('frets')).toBe(false);
     expect(f.row('low').hidden).toBe(false);

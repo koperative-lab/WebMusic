@@ -13,7 +13,7 @@ const features = ['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', '
   <section data-sheet-demo data-sheet-src={source} aria-label="Score sheet editing">
     <div data-sheet-composition data-pg-fragment>
       <score-player data-sheet-player id="sheet-player" time-control="full"></score-player>
-      <score-sheet-view data-sheet-view player="#sheet-player" editable tools={features.join(' ')}></score-sheet-view>
+      <score-sheet-view data-sheet-view input="#sheet-player" editable tools={features.join(' ')}></score-sheet-view>
     </div>
     <p data-sheet-status role="alert" hidden></p>
   </section>

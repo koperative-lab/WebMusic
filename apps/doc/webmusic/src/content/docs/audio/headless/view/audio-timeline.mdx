@@ -35,6 +35,13 @@ const {startSeconds, endSeconds} = timeline.visibleRange();
 const dispose = () => binding.unsubscribe();
 ```
 
+## Ports and composition
+
+`AudioTimeline` is view state, not a module: it has no ports and joins no
+Session. `bindPlayerToAudioTimeline` follows a structural player's `timeupdate`
+and `end` events, such as an `AudioPlayer` or `AudioClipPlayer`, and issues no
+transport commands; under a Session, send seeks to the Session.
+
 ## Zoom anchors, it does not jump
 
 `setZoom(pixelsPerSecond, anchorSeconds)` keeps the anchor where it is on

@@ -17,6 +17,11 @@ The view capability has these entry points — the [package subpath table](/audi
 
 The `@webmusic/audio/view` root supplies stateless data functions and public types; `/element` is the opt-in styled Web Component entry. These boundaries keep code-only consumers free of element registration and skin code.
 
+Nothing here is a module. Renderers, view models and editors draw or own data;
+the View Elements are companions that follow the module named by `input` or
+found from the nearest provider, and the live view and meter tap that module's
+audio output port ([modular composition](/bridge/modular-composition/)).
+
 ---
 
 The three retained renderer factories take a target `HTMLElement`, the data to draw and an options

@@ -47,6 +47,15 @@ off();
 view.dispose();
 ```
 
+## Ports and composition
+
+`createScoreView` is a view companion, not a module: it exposes no ports and
+never joins a Session. Its `playback` option is the payload of a Score module's
+`source` port (`webmusic.score`), the same `ScorePlaybackSource` as
+`player.playback`. An editing view borrows a `ScoreEditorPort` instead of a
+Score. `seek()` moves only the local projection; the score View Elements resolve
+their source from `input` or the nearest provider.
+
 ## Notation and annotations
 
 Selecting `type: 'staff'` does not engrave notation inside this object.
