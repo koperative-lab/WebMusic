@@ -1,3 +1,4 @@
+import type {TickSource} from '../tick';
 import {AudioInputPort} from './audio-port';
 import {ModuleAudioEnvironment} from './context';
 import {assertModuleId, type ModuleHandle, type ModulePort} from './registry';
@@ -173,20 +174,68 @@ export interface OfflineEnvironmentOptions {
   channels?: number;
   /** Injected constructor for environments without `OfflineAudioContext`. */
   create?: (channels: number, length: number, sampleRate: number) => OfflineAudioContext;
+  /**
+   * Rendered seconds between scheduler ticks (default 0.025). Lookahead
+   * schedulers in this environment are ticked at each step while rendering.
+   */
+  tickSeconds?: number;
 }
 
 /** An offline environment for realizing a module graph and rendering it once. */
 export interface OfflineModuleEnvironment {
   readonly environment: ModuleAudioEnvironment;
   readonly context: OfflineAudioContext;
-  /** Render everything connected to the offline destination. */
+  /** Render everything connected to the offline destination, ticking schedulers in rendered time. */
   render(): Promise<AudioBuffer>;
+}
+
+const offlineContexts = new WeakSet<object>();
+
+/**
+ * Whether a context belongs to an offline module environment (DEC-068).
+ * Engines that otherwise require a live AudioContext accept these: the
+ * environment presents them as live until rendering and ticks their
+ * schedulers in rendered time.
+ */
+export function isOfflineModuleContext(context: BaseAudioContext | undefined): boolean {
+  return !!context && offlineContexts.has(context);
+}
+
+/** Tick sources an offline render advances itself, in rendered time. */
+class OfflineTicks {
+  readonly #running = new Set<() => void>();
+  create(): TickSource {
+    let callback: (() => void) | undefined;
+    let disposed = false;
+    const running = this.#running;
+    const deliver = () => callback?.();
+    return {
+      start(onTick) {
+        if (disposed) throw new Error('Tick source is disposed');
+        callback = onTick;
+        running.add(deliver);
+      },
+      stop() { running.delete(deliver); },
+      get running() { return running.has(deliver); },
+      workerBacked: false,
+      dispose() { disposed = true; running.delete(deliver); callback = undefined; },
+    };
+  }
+  get active(): boolean { return this.#running.size > 0; }
+  tick(): void {
+    for (const deliver of [...this.#running]) {
+      try { deliver(); } catch { /* One scheduler cannot stall the render. */ }
+    }
+  }
 }
 
 /**
  * Create the offline audio environment that render and export paths realize
  * module graphs in. The environment owns the offline context; modules borrow
- * it exactly as they borrow a live environment.
+ * it exactly as they borrow a live environment. Until rendering starts the
+ * context reports `running` and `resume()` resolves, so modules prepare and
+ * start exactly as they do live; rendering then ticks every lookahead
+ * scheduler at each rendered step.
  */
 export function createOfflineModuleEnvironment(options: OfflineEnvironmentOptions): OfflineModuleEnvironment {
   const channels = options.channels ?? 2;
@@ -199,16 +248,50 @@ export function createOfflineModuleEnvironment(options: OfflineEnvironmentOption
     length = Math.ceil(seconds * options.sampleRate);
   }
   if (!Number.isInteger(length) || length < 1) throw new RangeError('length must be a positive integer number of frames');
+  const step = options.tickSeconds ?? 0.025;
+  if (!Number.isFinite(step) || step <= 0) throw new RangeError('tickSeconds must be positive');
   const create = options.create ?? ((count: number, frames: number, rate: number) => {
     const Offline = (globalThis as {OfflineAudioContext?: typeof OfflineAudioContext}).OfflineAudioContext;
     if (!Offline) throw new Error('OfflineAudioContext is unavailable in this environment');
     return new Offline(count, frames, rate);
   });
   const context = create(channels, length, options.sampleRate);
-  const environment = new ModuleAudioEnvironment({context});
+  offlineContexts.add(context);
+  const ticks = new OfflineTicks();
+  // Before rendering, present the context as a live one: preparation paths
+  // resume a suspended context, which an unrendered offline context rejects.
+  const nativeResume = typeof context.resume === 'function' ? context.resume.bind(context) : undefined;
+  const nativeState = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(context) ?? {}, 'state')?.get;
+  let rendering = false;
+  try {
+    Object.defineProperty(context, 'state', {configurable: true,
+      get: () => rendering && nativeState ? nativeState.call(context) as AudioContextState : 'running'});
+    Object.defineProperty(context, 'resume', {configurable: true, value: () => rendering && nativeResume ? nativeResume() : Promise.resolve()});
+  } catch { /* A sealed injected context keeps its own state and resume. */ }
+  const environment = new ModuleAudioEnvironment({context, createTickSource: () => ticks.create()});
+  const frames = length;
   let rendered: Promise<AudioBuffer> | undefined;
   return Object.freeze({
     environment, context,
-    render: () => (rendered ??= context.startRendering()),
+    render: () => (rendered ??= (() => {
+      rendering = true;
+      const end = frames / options.sampleRate;
+      if (typeof context.suspend === 'function' && nativeResume) {
+        // One suspension per step; each ticks the schedulers, then resumes.
+        const quantum = 128 / options.sampleRate;
+        let previous = -1;
+        for (let time = step; time < end; time += step) {
+          const at = Math.floor(time / quantum) * quantum;
+          if (at <= previous) continue;
+          previous = at;
+          void context.suspend(at).then(() => {
+            ticks.tick();
+            return nativeResume();
+          }).catch(() => {});
+        }
+      }
+      ticks.tick();
+      return context.startRendering();
+    })()),
   });
 }

@@ -1,3 +1,4 @@
+import {isOfflineModuleContext} from '@webmusic/kernel/module';
 import type {Score, TimePosition} from '../../core';
 import type {ReverbOptions} from './audio-contracts';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
@@ -44,7 +45,7 @@ export function assertLiveAudioContext(
   if (context.state === 'closed') {
     throw new Error(`${label} is closed and cannot drive live playback.`);
   }
-  if (typeof (context as Partial<OfflineAudioContext>).startRendering === 'function') {
+  if (typeof (context as Partial<OfflineAudioContext>).startRendering === 'function' && !isOfflineModuleContext(context)) {
     throw new Error(`${label} must be a live AudioContext, not an OfflineAudioContext.`);
   }
 }

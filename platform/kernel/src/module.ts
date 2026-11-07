@@ -21,3 +21,4 @@ export * from './module/project-editor';
 export * from './module/rack';
 export * from './module/provider-scope';
 export * from './module/sinks';
+export * from './module/offline-render';

@@ -223,7 +223,7 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 | `getModulePort(module, name, family, direction?)` | Resolve a port by name and family from `ports()`, falling back to `getPort` for audio outputs. |
 | `ModulePort`, `ModulePortMap`, `PortFamily`, `assertPortInfo()` | Port declarations shared by all families: `id`, `family`, `direction`, `multiplicity`, `schemaVersion`, `readiness`. |
 | `ModuleRegistry` | `register(module)` returns a `ConnectionLease`; `get(id)`, `snapshot()`, `revision` and `subscribe` describe one scope. Duplicate ids reject. `dispose()` unregisters without disposing modules. |
-| `ModuleAudioEnvironment` | Optional borrowed `context` or lazy `create` factory. `peek()` observes; `prepare()` explicitly allocates; `dispose()` closes only an owned context. |
+| `ModuleAudioEnvironment` | Optional borrowed `context` or lazy `create` factory, and an optional `createTickSource(intervalMs)` time driver that lookahead schedulers in the environment use. `peek()` observes; `prepare()` explicitly allocates; `dispose()` closes only an owned context. |
 | `ModuleContext` | Explicit `id`, audio environment, registry, optional Session (the `ModuleSession` interface), destination callback, admission, target, capabilities and lent `transport` port. `derive(options)` defines inheritance without DOM search. |
 | `moduleScopeChange(previous, next)` | `'none'` when both contexts share audio environment, Session, registry, admission, lent transport port and destination resolver (a republished target alone keeps the scope); `'destination'` when only the destination resolver changed, so members can re-route in place; `'scope'` for any other change or a missing side. |
 | `sameModuleScope(left, right)` | Shorthand for `moduleScopeChange(left, right) === 'none'`. |
@@ -239,6 +239,7 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 | `RackModule` | Neutral mixing desk: one channel per admitted module ID with fader, pan, post-fader inserts and a `channel:<id>` tap, a real master bus and master inserts. |
 | `createProviderScope(options)` | Session election for provider Elements: the outermost provider owns the Session (and, without a parent, the audio environment); `local` forces an owned Session. |
 | `DeviceSink` · `CaptureSink` · `createOfflineModuleEnvironment()` | Output sinks: the device destination with optional device selection, MediaRecorder capture in the same context, and an offline environment for rendering a module graph. |
+| `renderModuleGraph({build, sampleRate, durationSeconds, …})` · `isOfflineModuleContext(context)` | Build a whole module graph in an offline scope with its own Session, start that Session and render it once to an `AudioBuffer`; whether a context belongs to an offline module environment. |
 | `ParamHandle` | Numeric base-value authority with native CV bindings, scheduled automation and subscriptions. |
 | `ParamSurface` | Read-only iterable collection of handles with `get(id)`; it does not own the handles. |
 | `ParamAudioBus` | One same-context full-value control bus shared by current and future AudioParam targets. |
@@ -341,9 +342,42 @@ created.
 (`supportsDeviceSelection`). `new CaptureSink(environment, {id?, mimeType?, recorder?})`
 records producers connected to its input through a MediaStream destination in
 the same context: `start()`, then `stop()` resolves with the encoded `Blob`.
-`createOfflineModuleEnvironment({sampleRate, durationSeconds, channels?, create?})`
+`createOfflineModuleEnvironment({sampleRate, durationSeconds, channels?, create?, tickSeconds?})`
 returns `{environment, context, render()}`; modules borrow `environment` like a
-live one and `render()` starts rendering once.
+live one and `render()` starts rendering once. Until rendering starts the
+context reports `running` and `resume()` resolves, so modules prepare and start
+exactly as they do live, and `isOfflineModuleContext(context)` lets engines that
+require a live context accept it. The environment's `createTickSource` is a
+driver the render advances in rendered time: it suspends the context every
+`tickSeconds` (default 0.025, rounded to the 128-frame render quantum), ticks
+every running lookahead scheduler, then resumes. A Score module's scheduler
+therefore keeps scheduling past its first lookahead window while the render
+runs faster than real time.
+
+`renderModuleGraph(options)` adds the Session: it creates the offline
+environment, a `SessionTransport` on the offline clock (drift checks off) and a
+root `ModuleContext` (`id`, default `offline`), awaits `build(scope)` — create
+players, Racks and effects with that scope exactly as live, and return a
+cleanup — seeks to `startSeconds` when given, plays the Session and renders.
+The Session is stopped and disposed and the cleanup runs afterwards, whether or
+not rendering succeeded; modules the cleanup does not dispose stay yours.
+
+```ts
+import {renderModuleGraph} from '@webmusic/kernel/module';
+import {loadScoreFromUrl} from '@webmusic/score/io';
+import {ScorePlayerModule, ScoreRackModule} from '@webmusic/score/play/headless';
+
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid');
+const buffer = await renderModuleGraph({
+  sampleRate: 44100,
+  durationSeconds: 30,
+  build(scope) {
+    const desk = new ScoreRackModule(scope, {id: 'desk'});
+    const piano = new ScorePlayerModule(score, {id: 'piano', context: desk.context});
+    return () => { piano.dispose(); desk.dispose(); };
+  },
+});
+```
 
 ### Module conformance
 

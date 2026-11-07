@@ -352,7 +352,7 @@ piece. The remote editor uses the existing asset's absolute published URL,
 including the `/WebMusic/` base path, instead of the sandbox's origin. The editor
 preview is disabled by default.
 
-`renderScoreToBuffer` plays the same `score · sound · effect` stack through an `OfflineAudioContext` — deterministically and faster than real time — and hands back an `AudioBuffer`. `bufferToWav` (or `renderScoreToWav`) encodes it as a downloadable 16-bit PCM WAV. This closes the loop alongside the notation/MIDI serializers: load/build → play → **export audio**.
+`renderScoreToBuffer` plays the same `score · sound · effect` stack through an `OfflineAudioContext` — deterministically and faster than real time — and hands back an `AudioBuffer`. To render a whole module graph instead — Racks, channel inserts, several players and Audio clips in one Session — build it in Kernel's [`renderModuleGraph`](/kernel/api/#module--webmusickernelmodule) scope; `ScorePlayerModule` schedules in rendered time there. `bufferToWav` (or `renderScoreToWav`) encodes it as a downloadable 16-bit PCM WAV. This closes the loop alongside the notation/MIDI serializers: load/build → play → **export audio**.
 
 <ApiSandbox code={renderCode} />
 

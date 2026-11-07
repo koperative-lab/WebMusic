@@ -1,3 +1,4 @@
+import type {TickSource} from '../tick';
 import {getAudioContextConstructor} from '../audio-context';
 import type {ModuleSession} from '../session';
 import type {AudioOutputPort} from './audio-port';
@@ -19,6 +20,12 @@ export interface ModuleAudioEnvironmentOptions {
   create?: () => BaseAudioContext;
   /** Factory-created contexts are owned by default. Explicitly injected contexts always remain borrowed. */
   owned?: boolean;
+  /**
+   * The time driver lookahead schedulers in this environment use. Absent, a
+   * module uses Kernel's default tick source; an offline environment supplies
+   * one it advances in rendered time.
+   */
+  createTickSource?: (intervalMs: number) => TickSource;
 }
 
 /** Explicit lazy allocation. Reading/discovering this environment never allocates or resumes audio. */
@@ -28,9 +35,12 @@ export class ModuleAudioEnvironment {
   readonly #owned: boolean;
   #disposed = false;
   #preparing = false;
+  /** Tick driver for lookahead schedulers; undefined selects the default. */
+  readonly createTickSource?: (intervalMs: number) => TickSource;
 
   constructor(options: ModuleAudioEnvironmentOptions = {}) {
     this.#context = options.context;
+    this.createTickSource = options.createTickSource;
     this.#owned = !options.context && (options.owned ?? true);
     this.#create = options.create ?? (() => {
       const Constructor = getAudioContextConstructor();

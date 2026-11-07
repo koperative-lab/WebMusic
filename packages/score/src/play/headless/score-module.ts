@@ -72,7 +72,11 @@ export class ScorePlayerModule implements ModuleHandle {
     this.context = options.context;
     this.onError = options.onError;
     this.ownsPlayer = !options.player;
-    this.player = options.player ?? new ScorePlayer(score, options);
+    // Lookahead scheduling follows the environment's time driver (an offline
+    // render ticks it in rendered time).
+    this.player = options.player ?? new ScorePlayer(score, {
+      ...options, createTickSource: options.createTickSource ?? options.context.audio.createTickSource,
+    });
     this.noteTarget = {
       prepare: async () => {
         await this.prepare();
