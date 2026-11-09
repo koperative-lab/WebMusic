@@ -50,6 +50,13 @@ registry provenance attestation.
 
 ## Quality gate
 
+A release passes three gates in order on one clean commit, defined in
+[PUBLISHING.md](PUBLISHING.md#release-gates): CI on that exact commit, the local
+automated gate, then the owner's manual acceptance of that commit, verified with
+`npm run release:acceptance`. Nothing is published before all three pass. Every
+version developed before a release carries its own unit tests, CI coverage and
+manual checks ([version workflow](../DEVELOPMENT.md#version-workflow)).
+
 Run `npm run check` for the complete local gate. The exact command chain is
 owned by the root [package.json](../../package.json); command selection and test
 coverage are explained in [dev/DEVELOPMENT.md](../DEVELOPMENT.md).

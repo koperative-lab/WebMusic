@@ -4,38 +4,35 @@ import {AudioPlayer, type AudioClipPlayer} from '@webmusic/audio/play/headless';
 import {loadClipFromUrl} from '@webmusic/audio/play';
 import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
 import {createScoreAudioSession, registerAudioParticipant} from '@webmusic/bridge';
+import {createAudioClip} from '@webmusic/audio';
+import {defineAllAudioElements as defineAudioPlay, type AudioPlayerElement} from '@webmusic/audio/play/element';
+import {defineAllAudioElements as defineAudioView, type AudioClipViewElement} from '@webmusic/audio/view/element';
+import {mountTransport} from '@webmusic/ui/transport';
 import type {MountContext} from '../model';
-import {addAction, addReadout, arabesqueAudioUrl, every, loadArabesqueScore} from './shared';
+import {addAction, addReadout, arabesqueAudioUrl, every, loadArabesqueScore, reportErrors, setMarkup, stopPlayers} from './shared';
 
-/** Plays a rendered buffer on the device; the check's own listening aid. */
-class ResultPlayback {
-  private context?: AudioContext;
-  private source?: AudioBufferSourceNode;
-  buffer?: AudioBuffer;
-
-  async play(): Promise<void> {
-    if (!this.buffer) throw new Error('Render first.');
-    this.stop();
-    this.context ??= new AudioContext();
-    await this.context.resume();
-    const source = this.context.createBufferSource();
-    source.buffer = this.buffer;
-    source.connect(this.context.destination);
-    source.start();
-    this.source = source;
-  }
-
-  stop(): void {
-    try { this.source?.stop(); } catch { /* already ended */ }
-    this.source?.disconnect();
-    this.source = undefined;
-  }
-
-  dispose(): void {
-    this.stop();
-    void this.context?.close().catch(() => {});
-    this.context = undefined;
-  }
+/**
+ * The rendered result, heard and seen through the package's own player and
+ * waveform view in the live canvas.
+ */
+function resultCanvas(context: MountContext, label: string): (buffer: AudioBuffer) => void {
+  defineAudioPlay();
+  defineAudioView();
+  setMarkup(context.canvas, `
+    <audio-player id="mt-result" controls aria-label="${label}"></audio-player>
+    <audio-clip-view input="#mt-result" aria-label="${label} waveform"></audio-clip-view>`);
+  const player = context.canvas.querySelector<AudioPlayerElement>('#mt-result')!;
+  // The view draws its own `.clip` and follows the player for the playhead.
+  const view = context.canvas.querySelector<AudioClipViewElement>('audio-clip-view')!;
+  const stopErrors = reportErrors(context);
+  context.signal.addEventListener('abort', () => { stopErrors(); stopPlayers(context.canvas); }, {once: true});
+  return (buffer) => {
+    player.stop();
+    const clip = createAudioClip({sampleRate: buffer.sampleRate,
+      channelData: Array.from({length: buffer.numberOfChannels}, (_, channel) => buffer.getChannelData(channel).slice())});
+    player.clip = clip;
+    view.clip = clip;
+  };
 }
 
 /** Peak level per window, so a stalled scheduler shows as silence. */
@@ -49,20 +46,15 @@ function windows(buffer: AudioBuffer, seconds: readonly number[]): string {
   }).join(' · ');
 }
 
-function playbackActions(context: MountContext, playback: ResultPlayback): void {
-  addAction(context, {zh: '播放结果', en: 'Play result'}, () => playback.play());
-  addAction(context, {zh: '停止', en: 'Stop'}, () => playback.stop());
-}
-
 /** H1: a Rack, a Score player and its scheduler rendered offline in one Session. */
-export function mountOfflineScore(context: MountContext): () => void {
-  const playback = new ResultPlayback();
-  const time = addReadout(context, {zh: '渲染耗时', en: 'Render time'});
-  const level = addReadout(context, {zh: '各秒峰值', en: 'Peak per second'});
-  addAction(context, {zh: '渲染 12 秒', en: 'Render 12 s'}, async () => {
+export function mountOfflineScore(context: MountContext): void {
+  const show = resultCanvas(context, 'Rendered module graph');
+  const time = addReadout(context, 'Render time');
+  const level = addReadout(context, 'Peak per second');
+  addAction(context, 'Render 12 s', async () => {
     const score = await loadArabesqueScore('midi');
     const started = performance.now();
-    playback.buffer = await renderModuleGraph({
+    const buffer = await renderModuleGraph({
       sampleRate: 44100, durationSeconds: 12,
       build(scope) {
         const rack = new ScoreRackModule(scope, {id: 'desk'});
@@ -71,10 +63,9 @@ export function mountOfflineScore(context: MountContext): () => void {
       },
     });
     time(`${Math.round(performance.now() - started)} ms`);
-    level(windows(playback.buffer, [0, 3, 6, 9, 11]));
+    level(windows(buffer, [0, 3, 6, 9, 11]));
+    show(buffer);
   }, true);
-  playbackActions(context, playback);
-  return () => playback.dispose();
 }
 
 /** Correlation and level of rendered[a…] against source[b…]. */
@@ -89,12 +80,12 @@ function match(rendered: Float32Array, source: Float32Array, sampleRate: number,
 }
 
 /** H2: the WAV as an editor document with 1–2 s cut, rendered offline through a Rack channel. */
-export function mountOfflineDocument(context: MountContext): () => void {
-  const playback = new ResultPlayback();
-  const before = addReadout(context, {zh: '剪辑前匹配', en: 'Before-cut match'});
-  const after = addReadout(context, {zh: '剪辑后匹配', en: 'After-cut match'});
-  const control = addReadout(context, {zh: '对照（应不匹配）', en: 'Control (should not match)'});
-  addAction(context, {zh: '渲染剪辑后的文档', en: 'Render edited document'}, async () => {
+export function mountOfflineDocument(context: MountContext): void {
+  const show = resultCanvas(context, 'Rendered edited document');
+  const before = addReadout(context, 'Before-cut match');
+  const after = addReadout(context, 'After-cut match');
+  const control = addReadout(context, 'Control (should not match)');
+  addAction(context, 'Render edited document', async () => {
     const editor = await loadAudioClipEditor(arabesqueAudioUrl(), {signal: context.signal});
     try {
       const sampleRate = editor.getSnapshot().content.sampleRate;
@@ -103,7 +94,7 @@ export function mountOfflineDocument(context: MountContext): () => void {
       const edited = editor.getSnapshot();
       const original = (await loadClipFromUrl(arabesqueAudioUrl(), {streaming: false})).channelData(0);
       if (!original) throw new Error('The recording has no decoded samples.');
-      playback.buffer = await renderModuleGraph({
+      const buffer = await renderModuleGraph({
         sampleRate, durationSeconds: 8,
         async build(scope) {
           const rack = new ScoreRackModule(scope, {id: 'desk'});
@@ -119,7 +110,7 @@ export function mountOfflineDocument(context: MountContext): () => void {
         },
       });
       // Find the Session's start lead, then compare around the cut.
-      const rendered = playback.buffer.getChannelData(0);
+      const rendered = buffer.getChannelData(0);
       let lead = 0; let best = -1;
       for (let lag = 0; lag < Math.floor(0.4 * sampleRate); lag++) {
         let xy = 0; let xx = 0; let yy = 0;
@@ -134,12 +125,11 @@ export function mountOfflineDocument(context: MountContext): () => void {
       before(match(rendered, original, sampleRate, 0.1 + offset, 0.1, 0.8));
       after(match(rendered, original, sampleRate, 1.1 + offset, 2.1, 2));
       control(match(rendered, original, sampleRate, 1.1 + offset, 1.1, 2));
+      show(buffer);
     } finally {
       editor.dispose();
     }
   }, true);
-  playbackActions(context, playback);
-  return () => playback.dispose();
 }
 
 /** H3: one Session over a Score engine and an Audio clip, commanded from code. */
@@ -150,16 +140,32 @@ export async function mountScoreAudioSession(context: MountContext): Promise<() 
   ]);
   const composition = createScoreAudioSession(score, clip, {onOperationError: (_operation, error) => context.fail(error)});
   if (context.signal.aborted) { composition.dispose(); return () => {}; }
-  addAction(context, {zh: '播放', en: 'Play'}, () => composition.session.play(), true);
-  addAction(context, {zh: '暂停', en: 'Pause'}, () => composition.session.pause());
-  addAction(context, {zh: '从 30 秒播放', en: 'Play from 30 s'}, async () => {
+  const session = composition.session;
+  const transport = mountTransport(context.canvas, {
+    snapshot: () => {
+      const state = session.snapshot;
+      const duration = state.durationSeconds ?? 0;
+      return {playing: !state.paused, seconds: state.position, duration,
+        progress: duration > 0 ? Math.min(1, state.position / duration) : 0};
+    },
+    play: () => session.play().then(() => undefined),
+    pause: () => { void session.pause().catch((error: unknown) => context.fail(error)); },
+    seekFraction: (value) => session.seek(value * (session.snapshot.durationSeconds ?? 0)).then(() => undefined),
+    // The Session publishes state changes; its position advances between them.
+    subscribe: (notify) => {
+      const offSession = session.subscribe(() => notify());
+      const timer = setInterval(notify, 100);
+      return () => { offSession(); clearInterval(timer); };
+    },
+  }, {label: 'Score + Audio Session', showTime: true, seekControl: 'surface', onError: (error) => context.fail(error)});
+  addAction(context, 'Play from 30 s', async () => {
     await composition.session.seek(30);
     await composition.session.play();
   });
-  const state = addReadout(context, {zh: 'Session', en: 'Session'});
+  const state = addReadout(context, 'Session');
   every(context.signal, 200, () => {
     const snapshot = composition.session.snapshot;
     state(`${snapshot.paused ? 'paused' : 'playing'} · ${snapshot.position.toFixed(1)} s · ${snapshot.participantCount} participants`);
   });
-  return () => composition.dispose();
+  return () => { transport.destroy(); composition.dispose(); };
 }

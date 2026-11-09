@@ -76,6 +76,42 @@ When behavior or an accepted design changes, update its owning document and
 for remaining work. Preserve dated audit findings and historical plans as
 evidence rather than turning them into competing live checklists.
 
+## Version workflow
+
+Every version an agent or contributor develops — a numbered round, a fix
+series or a release candidate — is delivered with its own three layers of
+verification, set up by whoever wrote the change. None of them is left for
+later:
+
+1. **Unit and regression tests** in the owning workspace's `test/` directory.
+   Each changed contract gets a test that fails without the change and passes
+   with it; run the test against the unfixed source once to prove that.
+2. **Automated CI coverage.** Tests run through the workspace `test` script, so
+   `npm test`, and therefore `npm run check`, runs them;
+   [CI](#continuous-integration) runs `npm run check` on every push. A new
+   workspace, script or gate joins `check` (or the workflow) in the same change;
+   a test that only runs locally does not count.
+3. **Manual acceptance checks** for what only a person can judge — sound,
+   timing by ear, real devices, background tabs, touch, screen readers. Add or
+   update the check in the [manual acceptance runner](../apps/test/README.md):
+   an English entry in `apps/test/src/checks.ts` with steps and expected
+   results, and a live canvas built from the packages' own Elements and
+   Headless objects with Arabesque No. 1. Before handing off, mount the changed
+   checks yourself in a browser against the built packages and fix what you
+   find; then tell the owner which checks to run.
+
+Hand-off reports the commit, the commands run with their results, and the
+manual checks the owner should run. Manual results are never committed: the
+runner exports a Markdown report that the owner keeps outside Git (the
+`acceptance-reports/` folder is ignored for this).
+
+A release is a version that has passed the three
+[release gates](release/PUBLISHING.md#release-gates) in order: CI on the exact
+commit, the local automated gate, then the owner's manual acceptance report for
+that commit, verified with `npm run release:acceptance`. Nothing is published,
+tagged or deployed before all three pass, and only on the owner's explicit
+instruction.
+
 ## Commands
 
 The root [package.json](../package.json) owns command definitions. This table
@@ -109,7 +145,9 @@ helps select commands; it does not define another execution chain.
 | `npm run check:dev-server` | Test startup reuse, explicit restart, build failure, and concurrent starts. |
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
-| `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site. |
+| `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site and shows the version, commit and working tree under test. |
+| `npm run check:acceptance` | Test the release verifier and build the manual acceptance runner. Included in source checks. |
+| `npm run release:acceptance -- <report.md>` | Release gate 3: verify a manual acceptance report against this checkout's version and HEAD commit, a clean tree and the current check catalog. |
 | `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
 | `npm run audit:production` | Run the production dependency audit manually; it is outside `npm run check`. |

@@ -37,7 +37,7 @@ export function mountRecorderInDesk(context: MountContext): () => void {
   const stopErrors = reportErrors(context);
   const desk = context.canvas.querySelector<DeskElement>('#mt-rec-desk')!;
   wireMonitoredInput(context.canvas.querySelector('#keys')!, context.canvas.querySelector('#rec')!);
-  const channels = addReadout(context, {zh: '调音台通道', en: 'Desk channels'});
+  const channels = addReadout(context, 'Desk channels');
   every(context.signal, 250, () => {
     const list = desk.module?.list() ?? [];
     channels(list.length ? list.map((channel) => channel.muted ? `${channel.id} (muted)` : channel.id).join(' · ') : '—');

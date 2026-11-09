@@ -1,15 +1,17 @@
 /* Runner chrome in the WebMusic visual language (dev/design/VISUAL-DESIGN.md):
    neutral tokens, square one-height controls, hairlines, no shadows. Colour
-   only marks meaning — a failed check and an error line. */
+   only marks meaning — a failed check, an error line and an unaccepted build. */
 :root {
-  color-scheme: light dark;
-  --mt-ink: var(--wm-foreground, light-dark(#111, #eee));
-  --mt-muted: var(--wm-foreground-muted, light-dark(#777, #aaa));
-  --mt-line: var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333)));
-  --mt-surface: var(--wm-surface, light-dark(#fff, #111));
-  --mt-raised: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
-  --mt-on-ink: var(--wm-accent-foreground, light-dark(#fff, #111));
-  --mt-error: var(--wm-error, light-dark(#c62828, #ef5350));
+  /* The runner is light only: every package component under test inherits
+     this colour scheme, so its light-dark() tokens resolve to light. */
+  color-scheme: light;
+  --mt-ink: #111;
+  --mt-muted: #6b6b6b;
+  --mt-line: #d8d8d8;
+  --mt-surface: #fff;
+  --mt-raised: #f4f4f4;
+  --mt-on-ink: #fff;
+  --mt-error: #c62828;
   --mt-size: var(--wm-control-size, 2rem);
   --mt-radius: var(--wm-control-radius, 0);
   --mt-font: var(--wm-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
@@ -41,6 +43,9 @@ a { color: inherit; }
 .mt-bar > * { display: inline-flex; align-items: center; padding-inline: .75rem; }
 .mt-bar > .mt-action { border-width: 0 0 0 1px; }
 .mt-brand { font: 600 .75rem var(--mt-mono); text-transform: uppercase; letter-spacing: .12em; text-decoration: none; }
+.mt-build { font: .75rem var(--mt-mono); border-left: 1px solid var(--mt-line); }
+.mt-build--warn { color: var(--mt-error); }
+.mt-loading { padding: 1rem 1.5rem; }
 
 .mt-body { display: grid; grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr); min-height: calc(100vh - var(--mt-size)); }
 .mt-nav {
@@ -71,14 +76,24 @@ a { color: inherit; }
 /* One frame per panel; a caption header one control tall. */
 .mt-panel { border: 1px solid var(--mt-line); margin-bottom: 1rem; min-width: 0; }
 .mt-panel__head { display: flex; align-items: center; min-height: var(--mt-size); padding-inline: .75rem; border-bottom: 1px solid var(--mt-line); }
-.mt-canvas { display: grid; gap: 1rem; padding: 1rem; min-width: 0; }
+/* The live canvas: the package components under test on a plain stage. */
+.mt-live > .mt-panel__head { gap: .75rem; }
+.mt-inventory { font: .7rem var(--mt-mono); color: var(--mt-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mt-canvas {
+  display: grid; gap: 1rem; padding: 1rem; min-width: 0; min-height: 6rem; background: var(--mt-surface);
+  background-image: radial-gradient(var(--mt-line) 1px, transparent 1px); background-size: 16px 16px;
+}
 .mt-canvas > * { min-width: 0; max-width: 100%; }
 .mt-canvas > :not([hidden]) { display: block; }
 .mt-canvas score-player, .mt-canvas score-rack-control { display: block; }
 .mt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.mt-empty { margin: 0; padding: 1rem; color: var(--mt-muted); }
 .mt-error { margin: 0; padding: .5rem .75rem; color: var(--mt-error); font: .85rem var(--mt-mono); border-top: 1px solid var(--mt-line); }
 .mt-error[hidden] { display: none; }
+.mt-error--block { border: 1px solid var(--mt-error); margin-bottom: 1rem; font-family: var(--mt-font); }
+
+.mt-facts { display: grid; grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr); gap: .35rem 1rem; margin: 0; padding: .75rem; }
+.mt-facts dt { align-self: center; text-transform: none; letter-spacing: .04em; }
+.mt-facts dd { margin: 0; overflow-wrap: anywhere; }
 
 .mt-parameters, .mt-form { display: grid; gap: .75rem; padding: .75rem; }
 .mt-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -102,6 +117,7 @@ select.mt-field {
   font: 600 .7rem var(--mt-mono); text-transform: uppercase; letter-spacing: .1em; text-decoration: none; cursor: pointer;
 }
 .mt-action--primary { background: var(--mt-ink); color: var(--mt-on-ink); }
+.mt-action--quiet { min-height: calc(var(--mt-size) - .5rem); border-color: var(--mt-line); }
 .mt-action:disabled { opacity: .3; cursor: default; }
 .mt-pager { justify-content: space-between; padding-inline: 0; }
 
@@ -120,5 +136,3 @@ select.mt-field {
   .mt-columns, .mt-form, .mt-pair { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* A check that works only through Parameters has no component panel. */
-.mt-panel:has(> .mt-canvas:empty):has(> .mt-error[hidden]) { display: none; }

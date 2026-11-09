@@ -69,6 +69,9 @@ playwright-report/
 playwright/.cache/
 test-results/
 blob-report/
+# Manual acceptance reports exported from apps/test: kept by the person who
+# accepted the build, read by `npm run release:acceptance`, never committed.
+/acceptance-reports/
 
 # npm pack output for this workspace; keep unrelated archives used as fixtures.
 webmusic-*.tgz

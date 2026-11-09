@@ -2,7 +2,7 @@
   "name": "webmusic-test",
   "private": true,
   "type": "module",
-  "description": "Manual acceptance runner for WebMusic: live compositions and a check-by-check result record",
+  "description": "Manual acceptance runner for WebMusic: live canvases of package components and a Markdown report keyed to the build",
   "scripts": {
     "dev": "vite --port 4331 --strictPort",
     "build": "vite build",

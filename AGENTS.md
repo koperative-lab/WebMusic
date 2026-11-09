@@ -160,7 +160,7 @@ owning leaf page; do not copy a complete member table into another document.
 | Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
 | Any new or changed visible UI | The owning presenter, renderer or Element | [Visual design](dev/design/VISUAL-DESIGN.md) before coding, then the [frontend workflow](.agent/workflows/frontend-review.md) for rendered acceptance |
 | Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
-| Manual device acceptance | [apps/test/src/](apps/test/src/) | [Runner README](apps/test/README.md), the current device acceptance audit and STATUS VERIFY-01; manual checks live here, not in the documentation site |
+| Manual device acceptance | [apps/test/src/](apps/test/src/) | [Runner README](apps/test/README.md), the current device acceptance audit and STATUS VERIFY-01; manual checks live here, not in the documentation site, and their results never enter Git |
 | A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
 
 Tests normally live in each owning workspace's `test/` directory. Read the
@@ -261,6 +261,27 @@ rebuild and restart; `npm run docs:dev` reuses or starts with existing output.
   check does not establish audible timing, complete API semantics, browser/device
   interaction or accessibility. Local versions and tags do not prove external
   publication or deployment.
+
+## Deliver every version through its gates
+
+[DEVELOPMENT](dev/DEVELOPMENT.md#version-workflow) and
+[PUBLISHING](dev/release/PUBLISHING.md#release-gates) own the details; these
+rules apply to every version an agent develops:
+
+- **Set up all three layers yourself.** Unit or regression tests that fail
+  without the change; their run in CI through `npm run check`; and manual
+  checks in the [acceptance runner](apps/test/README.md) for anything audible,
+  visible, device-dependent or assistive — English entries in
+  `apps/test/src/checks.ts`, each with a live canvas of the packages' own
+  components. Mount the changed checks in a browser yourself before handing off.
+- **Hand off** the commit, the commands run and their results, and the manual
+  checks the owner should run on that commit.
+- **Never commit manual results.** The runner exports a Markdown report keyed
+  to version and commit; the owner keeps it outside Git.
+- **Release only through the gates, in order:** CI green on the exact commit,
+  the local automated gate, then the owner's manual acceptance report for that
+  commit, verified with `npm run release:acceptance`. Never publish, tag or
+  deploy before all three pass or without the owner's explicit instruction.
 
 ## Keep current guidance separate from history
 

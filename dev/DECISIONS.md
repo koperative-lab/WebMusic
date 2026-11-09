@@ -2996,6 +2996,19 @@ editor document is its own Session source like a clip, never a borrowed group.
 candidate, since a `Sound` declares its capabilities only once its backend
 exists. A Session transport control redraws every frame while the Session runs.
 
+**Round 20 choices (2026-11-09):** every version an agent delivers carries its
+own unit tests, runs them in CI through `npm run check`, and adds or updates the
+manual checks for what only a person can judge; a release passes three gates
+in order — CI on the exact commit, the local automated gate, then a person's
+manual acceptance of that commit — and nothing is published before all three.
+Manual results are never committed: we chose a Markdown report held by the
+person who accepted the build, verified by `npm run release:acceptance` against
+the release commit, over an audit table in Git, because a stored table goes
+stale against the next commit and mixes evidence of different builds. The
+runner keys its stored results to version, commit and working tree for the
+same reason, is light and English only, and builds every check from the
+packages' own components.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

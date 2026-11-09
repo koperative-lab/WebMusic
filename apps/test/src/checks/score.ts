@@ -38,16 +38,16 @@ export async function mountInPlaceReplacement(context: MountContext): Promise<()
   const sound = (type: SoundId) => Sound.oscillator({type, gain: 0.25});
   player.sound = sound('triangle');
   player.score = scores.whole;
-  addChoice<SoundId>(context, {zh: '音色', en: 'Sound'}, [
-    {id: 'triangle', label: {zh: '三角波', en: 'Triangle'}},
-    {id: 'sine', label: {zh: '正弦波', en: 'Sine'}},
-    {id: 'square', label: {zh: '方波', en: 'Square'}},
+  addChoice<SoundId>(context, 'Sound', [
+    {id: 'triangle', label: 'Triangle'},
+    {id: 'sine', label: 'Sine'},
+    {id: 'square', label: 'Square'},
   ], 'triangle', (id) => { player.sound = sound(id); });
-  addChoice<ScoreId>(context, {zh: '乐谱', en: 'Score'}, [
-    {id: 'whole', label: {zh: '全曲', en: 'Whole piece'}},
-    {id: 'opening', label: {zh: '开头 16 拍', en: 'Opening 16 beats'}},
+  addChoice<ScoreId>(context, 'Score', [
+    {id: 'whole', label: 'Whole piece'},
+    {id: 'opening', label: 'Opening 16 beats'},
   ], 'whole', (id) => { player.score = scores[id]; });
-  const state = addReadout(context, {zh: '位置 / 时长', en: 'Position / duration'});
+  const state = addReadout(context, 'Position / duration');
   const timed = player as unknown as {currentTime?: number; duration?: number};
   every(context.signal, 200, () => {
     const position = timed.currentTime;

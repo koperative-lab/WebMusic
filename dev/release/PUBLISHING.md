@@ -46,9 +46,31 @@ If a version change is needed, follow the preparation steps in
 [RELEASING.md](RELEASING.md#version-policy). Use a clean reviewed release
 commit, including its lockfile, and record its SHA before validation.
 
-## Validate the release checkout
+## Release gates
 
-Run from the repository root:
+A release passes three gates, in this order, on one clean commit. Publication
+starts only after all three pass, and only on the owner's explicit instruction.
+A change to source, manifests or build outputs after a gate sends the release
+back to gate 1 with the new commit.
+
+### Gate 1: CI on the exact commit
+
+Push the release commit and wait for the [CI workflow](../../.github/workflows/ci.yml)
+to finish for that SHA. Every job must succeed: quality on both Node versions
+(`npm run check`, external install, dependency audit) and the website build.
+
+```sh
+release_commit="$(git rev-parse HEAD)"
+gh run list --commit "$release_commit" --workflow ci.yml
+gh run view <run-id> --json conclusion,jobs
+```
+
+A run for another commit, a cancelled run or a re-run that has not finished
+does not pass this gate.
+
+### Gate 2: the automated gate on the release checkout
+
+Run from the repository root, on the same commit with a clean tree:
 
 ```sh
 npm ci
@@ -59,7 +81,8 @@ npm run check:external-install
 ```
 
 `check` builds the packages and checks their source, tests, export maps,
-licenses, original demo assets and release metadata. `docs:build` verifies the
+licenses, original demo assets, the manual acceptance runner and release
+metadata. `docs:build` verifies the
 public asset inventory and validates the documentation build. Review changed
 media against the [asset provenance and regeneration rules](../../apps/doc/webmusic/ASSETS.md);
 changing manifest hashes alone does not approve replacement files.
@@ -82,9 +105,28 @@ faults hidden by workspace links;
 it is not a registry-publication or provenance check. It requires network
 access. Add `-- --keep` to retain its temporary project for diagnosis.
 
-Review the result of the active CI run for the same commit separately. Do not
-modify source, manifests or build outputs between validation and publication;
-if they change, repeat the affected validation before publishing.
+### Gate 3: manual acceptance of the exact commit
+
+The owner runs the [manual acceptance runner](../../apps/test/README.md) on the
+release commit (`npm run test:manual`), confirms on its first page that the
+build shows that version, commit and a clean working tree, works through every
+check on the minimum environments named in the current device acceptance
+record, and downloads the Markdown report. The report stays outside Git, for
+example in the ignored `acceptance-reports/` folder. Then:
+
+```sh
+npm run release:acceptance -- acceptance-reports/webmusic-x.y.z-abcdef0-acceptance.md
+```
+
+It passes only when the report names this checkout's version and HEAD commit,
+was taken on a clean tree, this checkout is clean, and under the current check
+catalog no check failed, every check passed in at least one environment and
+every skip has a note. A failure is fixed in a new commit, which starts again
+at gate 1; the owner then re-runs the affected checks on that commit and
+exports a new report.
+
+Do not modify source, manifests or build outputs between the gates and
+publication; if they change, the release returns to gate 1.
 
 ## Publish order
 
@@ -99,8 +141,9 @@ Use the order owned by
 | 4 | `@webmusic/audio` | `packages/audio` |
 | 5 | `@webmusic/bridge` | `bridges/score-audio` |
 
-Score and Audio may publish in parallel once their prerequisites are
-available. Publish the bridge after its peer prerequisites. Check registry
+Publish only after all three [release gates](#release-gates) have passed for
+the commit being published. Score and Audio may publish in parallel once their
+prerequisites are available. Publish the bridge after its peer prerequisites. Check registry
 visibility of each prerequisite version before publishing its consumers.
 
 ## Per package

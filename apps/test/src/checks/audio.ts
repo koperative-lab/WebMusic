@@ -22,10 +22,10 @@ export function mountAudioPlayer(context: MountContext): () => void {
   defineAudio();
   setMarkup(context.canvas, `<audio-player id="mt-audio" src="${arabesqueAudioUrl()}" controls aria-label="Arabesque No. 1 recording"></audio-player>`);
   const player = context.canvas.querySelector<AudioPlayerElement>('#mt-audio')!;
-  addChoice(context, {zh: '速度', en: 'Rate'}, [
-    {id: '0.75', label: {zh: '0.75×', en: '0.75×'}},
-    {id: '1', label: {zh: '1×', en: '1×'}},
-    {id: '1.25', label: {zh: '1.25×', en: '1.25×'}},
+  addChoice(context, 'Rate', [
+    {id: '0.75', label: '0.75×'},
+    {id: '1', label: '1×'},
+    {id: '1.25', label: '1.25×'},
   ], '1', (rate) => { player.setAttribute('rate', rate); });
   return finish(context);
 }

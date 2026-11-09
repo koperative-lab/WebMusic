@@ -1,6 +1,6 @@
 import {arabesqueUrl} from '../../../doc/webmusic/src/components/headless/arabesque-score';
 import {arabesqueAudioUrl} from '../../../doc/webmusic/src/components/headless/arabesque-audio';
-import type {Lang, MountContext, Text} from '../model';
+import type {MountContext} from '../model';
 
 export {arabesqueAudioUrl, arabesqueUrl};
 export {arabesqueExcerpt, loadArabesqueScore} from '../../../doc/webmusic/src/components/headless/arabesque-score';
@@ -35,23 +35,23 @@ export function stopPlayers(root: HTMLElement): void {
   }
 }
 
-function field(parameters: HTMLElement, label: Text, lang: Lang): HTMLElement {
+function field(parameters: HTMLElement, label: string): HTMLElement {
   const row = document.createElement('div');
   row.className = 'mt-param';
   const caption = document.createElement('span');
   caption.className = 'mt-caption';
-  caption.textContent = label[lang];
+  caption.textContent = label;
   row.append(caption);
   parameters.append(row);
   return row;
 }
 
 /** One secondary action in Parameters. */
-export function addAction(context: MountContext, label: Text, run: (button: HTMLButtonElement) => unknown, primary = false): HTMLButtonElement {
+export function addAction(context: MountContext, label: string, run: (button: HTMLButtonElement) => unknown, primary = false): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = primary ? 'mt-action mt-action--primary' : 'mt-action';
-  button.textContent = label[context.lang];
+  button.textContent = label;
   button.addEventListener('click', () => {
     button.disabled = true;
     Promise.resolve(run(button)).catch((error: unknown) => context.fail(error)).finally(() => { button.disabled = false; });
@@ -68,18 +68,18 @@ export function addAction(context: MountContext, label: Text, run: (button: HTML
 
 /** A hairline grid of square choices; the current one is inverted. */
 export function addChoice<T extends string>(
-  context: MountContext, label: Text, options: readonly {id: T; label: Text}[], current: T,
+  context: MountContext, label: string, options: readonly {id: T; label: string}[], current: T,
   choose: (id: T) => unknown,
 ): void {
-  const row = field(context.parameters, label, context.lang);
+  const row = field(context.parameters, label);
   const grid = document.createElement('div');
   grid.className = 'mt-choice';
   grid.setAttribute('role', 'group');
-  grid.setAttribute('aria-label', label[context.lang]);
+  grid.setAttribute('aria-label', label);
   const buttons = options.map((option) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = option.label[context.lang];
+    button.textContent = option.label;
     button.setAttribute('aria-pressed', String(option.id === current));
     button.addEventListener('click', () => {
       for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
@@ -92,8 +92,8 @@ export function addChoice<T extends string>(
 }
 
 /** A mono value readout in Parameters; returns its setter. */
-export function addReadout(context: MountContext, label: Text, initial = '—'): (value: string) => void {
-  const row = field(context.parameters, label, context.lang);
+export function addReadout(context: MountContext, label: string, initial = '—'): (value: string) => void {
+  const row = field(context.parameters, label);
   const value = document.createElement('output');
   value.className = 'mt-value';
   value.textContent = initial;
