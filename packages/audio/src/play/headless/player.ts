@@ -168,7 +168,8 @@ export class AudioClipPlayer {
   /**
    * Start playback. `when` is an absolute `AudioContext.currentTime` at which
    * sound should begin (sample-accurate on the buffer engine; the media
-   * engine starts as soon as it can). Omitted or already past starts now.
+   * engine waits it out on a timer, then starts the element). Omitted or
+   * already past starts now.
    */
   play(when?: number): Promise<void> {
     this.assertLocalAuthority();

@@ -211,7 +211,11 @@ export class AudioPlaylist {
 
   // --- transport ---
 
-  play(): Promise<void> {
+  /**
+   * Start the selected entry. `when` is an AudioContext time for a scheduled
+   * start, the shared instant a Session arms its members for; omitted starts now.
+   */
+  play(when?: number): Promise<void> {
     if (this.disposed || this.states.length === 0) return Promise.resolve();
     this.wantsPlayback = true;
     if (this.currentIndex < 0) this.currentIndex = 0;
@@ -225,7 +229,7 @@ export class AudioPlaylist {
     const request = {generation: this.generation, promise};
     this.playRequest = request;
     // Publish before loaders or event listeners can reenter play.
-    void this.playCurrent(request.generation).then(
+    void this.playCurrent(request.generation, when).then(
       () => {
         if (this.playRequest === request) this.playRequest = null;
         resolve();
@@ -534,7 +538,7 @@ export class AudioPlaylist {
     return !this.disposed && generation === this.generation && this.wantsPlayback;
   }
 
-  private async playCurrent(generation: number): Promise<void> {
+  private async playCurrent(generation: number, when?: number): Promise<void> {
     // A failed pass is bounded even for a looping queue. Retrying is an
     // explicit new play request, rather than an endless microtask chain.
     let remaining = this.states.length;
@@ -542,7 +546,8 @@ export class AudioPlaylist {
       const player = await this.ensurePlayer();
       if (!this.isCurrentPlayback(generation)) return;
       if (player && player === this.player) {
-        await this.guard(() => player.play());
+        // A skipped failed entry ends the scheduled start: a later entry starts now.
+        await this.guard(() => player.play(when));
         this.notify();
         if (this.isCurrentPlayback(generation) && this.player === player) this.schedulePrefetch();
         return;

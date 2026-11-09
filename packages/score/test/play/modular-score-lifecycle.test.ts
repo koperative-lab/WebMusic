@@ -429,6 +429,27 @@ describe('Score modular scope and source lifecycle', () => {
     player.remove(); await settle();
   });
 
+  it('swaps in place a sound whose capabilities appear only once connected', async () => {
+    const f = fixture(); f.session.dispose();
+    // A Sound builds its backend on connect; until then it reports no capabilities.
+    const lazy = () => {
+      let connected = false;
+      return {connect: vi.fn(() => { connected = true; return vi.fn(() => { connected = false; }); }),
+        noteOn: vi.fn(), noteOff: vi.fn(), dispose: vi.fn(), cancelScheduledNote: vi.fn(), noteOffById: vi.fn(),
+        get supportsScheduledCancellation() { return connected; }} as unknown as HeadlessSynth;
+    };
+    const player = document.createElement('score-player') as ScorePlayerElement;
+    player.audioContext = f.context; player.sound = lazy(); player.score = score(2);
+    document.body.append(player); await settle();
+    await player.module!.prepare!();
+    const engine = player.module!.getPort!('main');
+    const next = lazy();
+    player.sound = next; await settle();
+    expect(next.connect).toHaveBeenCalledOnce();
+    expect(player.module!.getPort!('main')).toBe(engine);
+    player.remove(); await settle();
+  });
+
   it('rebuilds when a new sound changes the engine timing class', async () => {
     const f = fixture(); f.session.dispose();
     const player = document.createElement('score-player') as ScorePlayerElement;

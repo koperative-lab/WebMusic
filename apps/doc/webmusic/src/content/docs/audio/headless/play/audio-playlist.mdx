@@ -159,7 +159,7 @@ fields into public API.
 | Member | Kind | Description |
 | --- | --- | --- |
 | `setEntries(entries)` | void | Reconciles by id/source; changed current material replaces its player, removal stops it. |
-| `play()` | `Promise<void>` | Starts/resumes selected entry; concurrent starts share pending work, resolution is not playlist completion. |
+| `play(when?)` | `Promise<void>` | Starts/resumes selected entry; concurrent starts share pending work, resolution is not playlist completion. `when` is an `AudioContext.currentTime` to start at (a Session's shared start instant); omitted starts now, and an entry reached by skipping a failed one starts now. |
 | `pause()` | void | Holds current playback. |
 | `stop()` | void | Stops current playback. |
 | `toggle()` | `Promise<void>` | Pause or play according to current state. |

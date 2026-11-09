@@ -242,7 +242,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `.transport` | readonly property | Currently borrowed AudioPlayerTransport, if any. |
 | `.effect` | property | An `Effect` recipe for the owned clip compatibility insert; reassigning updates that insert and preserves explicit slots. A caller-owned `.player` keeps its own effect. While the owned player drives a borrowed queue or mix, the recipe waits for the next owned clip; the group keeps its own effects. |
 | `.load(input)` | method | Load a non-URL `ArrayBuffer` / `Blob` imperatively. |
-| `.play(when?)` | method | Start playback. `when` is an absolute `AudioContext.currentTime`, sample-accurate on the buffer engine — the scheduling primitive a sync bridge needs. |
+| `.play(when?)` | method | Start playback. `when` is an absolute `AudioContext.currentTime`, sample-accurate on the buffer engine; the streaming engine waits it out on a timer before starting its media element. A clip, an editor document or a borrowed queue starts through the player's Session. |
 | `.pause()` / `.stop()` | method | Transport. |
 | `.seek(seconds)` | method | Seek in content seconds (queue: current-entry seconds; mix: group axis). |
 | `.seconds` / `.currentTime` / `.duration` / `.playing` | readonly property | Read the active backend; empty input reports zero and false. |

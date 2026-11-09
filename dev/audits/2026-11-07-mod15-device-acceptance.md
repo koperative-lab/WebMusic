@@ -1,7 +1,7 @@
 # MOD-15 device acceptance (2026-11-07)
 
 This record holds the device half of VERIFY-01 for the DEC-068 single
-composition model (MOD-15, rounds 1–18 on `modular-redesign`). Its first section
+composition model (MOD-15, rounds 1–19 on `modular-redesign`). Its first section
 records what automated and scripted browser checks already established. The
 manual checks cover what only a person with ears, real devices and assistive
 technology can accept. They run in the
@@ -59,7 +59,43 @@ block the microphone on plain-HTTP network addresses.
 ## Results
 
 Paste the runner's **Copy Markdown** output here, one block per testing date.
-No device results have been recorded yet.
+
+### 2026-11-09, first sitting (round 18 build)
+
+One environment; its device, browser, output and microphone fields were left
+blank. G1–G3 were not run. Notes are the owner's, translated.
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| A1 | Pass | Sound correct, but two effect panels show and the progress bar does not follow playback |
+| A2–A4, B1–B2, C1–C2 | Pass | |
+| D1 | Pass | Sound passes, but the player display is wrong |
+| D2–D3 | Pass | |
+| D4 | Pass | Long stutter during playback |
+| E1 | Pass | |
+| E2 | Pass | Error: “TransportGroup: 4 consecutive drift corrections failed to converge (drift 0.0600s, master rate 1)…” |
+| E3 | Pass | |
+| E4 | **Fail** | No sound on playback |
+| F1 | Skip | |
+| F2 | Pass | |
+| F3 | Pass | Same drift error as E2 (0.0542 s) |
+| H1–H3 | Pass | |
+| G1–G3 | Not run | |
+
+Round 19 traced and fixed every note; each fix has a regression test that fails
+without it, and was checked in the built-in Chromium against the runner:
+
+| Note | Cause | Fix and check |
+| --- | --- | --- |
+| A1 bar frozen | A source-free Session root's transport redrew only on Session events; the Session publishes state changes, not position | The control redraws every frame while the Session runs; the readout advanced 0:03 → 0:05 with the desk playing |
+| A1 two panels | The desk composition showed A3's second panel in every A check | A1, A2 and A4 show one reverb panel; A3 keeps two |
+| D1 display | Showing a Session-bound player's transport cleared the inline `display: flex` its presenter paints, so the bar and time wrapped onto separate rows | Visibility restores the node's own inline display; the D1 transport is one row again |
+| D4 stutter | A `Sound` reports its capabilities only once connected, so a fresh sound looked like a timing-class change; the player was rebuilt and the staff view re-engraved the whole piece (about 450 ms on the main thread per change) | `ScorePlayer.replaceSynth` compares the connected candidate; a sound change now takes 1–6 ms with no long task and the new sound is live on the same engine |
+| E2/F3 drift error | The Session starts members at a shared instant 60 ms ahead; the playlist ignored that start time and its entry ran 60 ms early, so every drift re-join landed early again | `AudioPlaylist.play(when)` passes the instant to the entry; the streaming engine waits it out before starting its media element. Over WAV, WAV and the streamed MP3: no re-join, offset 0, 0 and −0.023 s, no error |
+| E4 silent | An `<audio-player>` treated its editor document's sequence engine as a borrowed group, so Play bypassed the Session and its output was never routed | A document is the player's own Session source; Play starts the Session and the output route is active (analyser peak 0.10 from the on-screen button) |
+
+To re-check: A1, D1, D4, E2, E4 and F3, then G1–G3, preferably with the
+environment fields filled in.
 
 When every check passes on the minimum environments, VERIFY-01 for MOD-15 can be
 closed in STATUS and the release work moves to RELEASE-01 (remote CI for the

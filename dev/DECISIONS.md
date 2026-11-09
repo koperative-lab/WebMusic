@@ -2986,6 +2986,16 @@ copying it. A `ScorePlayer` that follows a Session never takes a direct
 transport command, including while it replaces its score; the module stops the
 Session first.
 
+**Round 19 choices (2026-11-09):** a Session start instant reaches every member
+that can honour it — `AudioPlaylist.play(when)` forwards it to the entry, and the
+streaming engine, which cannot schedule a media element on the audio clock,
+waits it out on a timer — rather than widening the drift tolerance, because a
+constant 60 ms offset is audible against other members. An `<audio-player>`'s
+editor document is its own Session source like a clip, never a borrowed group.
+`ScorePlayer.replaceSynth` decides the timing class from the connected
+candidate, since a `Sound` declares its capabilities only once its backend
+exists. A Session transport control redraws every frame while the Session runs.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

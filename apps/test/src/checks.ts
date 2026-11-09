@@ -4,6 +4,7 @@
 import type {Check, Group} from './model';
 
 const desk = () => import('./checks/desk').then((module) => module.mountComposedDesk);
+const sharedEffectDesk = () => import('./checks/desk').then((module) => module.mountSharedEffectDesk);
 const rackParts = () => import('./checks/rack').then((module) => module.mountRackParts);
 const recorderDesk = () => import('./checks/rack').then((module) => module.mountRecorderInDesk);
 const notes = () => import('./checks/notes').then((module) => module.mountNoteRecorder);
@@ -56,7 +57,7 @@ export const CHECKS: readonly Check[] = [
     ],
   },
   {
-    id: 'A3', group: 'A', mount: desk,
+    id: 'A3', group: 'A', mount: sharedEffectDesk,
     title: {zh: '两个面板编辑同一个混响', en: 'Two panels edit one shared reverb'},
     steps: [
       {zh: '播放中在左边面板改混响的 wet。', en: 'While playing, change the reverb wet in the left panel.'},

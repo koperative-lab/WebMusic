@@ -160,6 +160,17 @@ describe('Audio Player Element source recovery', () => {
     expect(() => element.player!.setEffect(undefined)).not.toThrow();
     expect(element.player!.insertChain).toBeDefined();
   });
+  it('starts an editor document through its Session, so its output is routed (MOD-14)', async () => {
+    const source = editor(); const ctx = context(); const element = document.createElement('audio-player') as AudioPlayerElement;
+    element.audioContext = ctx; element.editor = source; document.body.append(element);
+    expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied'); await flush();
+    await element.play(); await flush();
+    // Play is a Session command: the document is a source, not a borrowed group.
+    expect(element.sessionTransport!.snapshot.paused).toBe(false);
+    const output = vi.mocked(ctx.createAnalyser).mock.results.at(-1)!.value as {connect: ReturnType<typeof vi.fn>};
+    expect(output.connect).toHaveBeenCalledWith(ctx.destination);
+    element.pause();
+  });
   it('preloads an editor-bound sequence after its first applied revision', async () => {
     const source = editor(); const ctx = context(); const element = document.createElement('audio-player') as AudioPlayerElement;
     element.setAttribute('preload', ''); element.audioContext = ctx; element.editor = source; document.body.append(element);

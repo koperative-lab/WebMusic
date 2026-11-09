@@ -298,6 +298,30 @@ describe('MediaEngine play/seek contract', () => {
     engine.dispose();
   });
 
+  it('waits out a scheduled start before starting the element, and a pause cancels it', async () => {
+    vi.useFakeTimers();
+    try {
+      const adapter = loopAdapter(10);
+      const context = {createGain: () => ({disconnect: vi.fn()}), currentTime: 1} as unknown as BaseAudioContext;
+      const engine = new MediaEngine(context, streamingClip(), {adapterFactory: () => adapter});
+      const started = engine.play(0, 1.06);
+      await vi.advanceTimersByTimeAsync(30);
+      expect(adapter.playCalls).toBe(0);
+      await vi.advanceTimersByTimeAsync(40);
+      await started;
+      expect(adapter.playCalls).toBe(1);
+      engine.pause();
+      const cancelled = engine.play(0, 1.06);
+      engine.pause();
+      await vi.advanceTimersByTimeAsync(100);
+      await cancelled;
+      expect(adapter.playCalls).toBe(1);
+      engine.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('still applies the offset when starting from a paused state', async () => {
     const adapter = loopAdapter(10);
     const engine = new MediaEngine(fakeContext(), streamingClip(), {

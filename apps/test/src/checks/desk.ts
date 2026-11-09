@@ -4,8 +4,17 @@ import {defineAllAudioElements as defineAudioAnalyze} from '@webmusic/audio/anal
 import type {MountContext} from '../model';
 import {arabesqueAudioUrl, arabesqueUrl, reportErrors, setMarkup, stopPlayers} from './shared';
 
-/** A, the docs' modular composition: one Session over Score, Audio, a Rack part and shared inserts. */
+/** A1, A2, A4: the docs' modular composition — one Session over Score, Audio, a Rack part and shared inserts. */
 export function mountComposedDesk(context: MountContext): () => void {
+  return mountDesk(context, false);
+}
+
+/** A3: the same desk with a second panel on the one shared reverb. */
+export function mountSharedEffectDesk(context: MountContext): () => void {
+  return mountDesk(context, true);
+}
+
+function mountDesk(context: MountContext, sharedPanels: boolean): () => void {
   defineAllElements();
   defineAudioPlay();
   defineAudioAnalyze();
@@ -21,10 +30,10 @@ export function mountComposedDesk(context: MountContext): () => void {
         <audio-effect id="mt-filter" type="filter" frequency="6000" q="0.7"></audio-effect>
       </score-rack-control>
     </score-player>
-    <div class="mt-pair">
+    ${sharedPanels ? `<div class="mt-pair">
       <score-synth-panel target="#mt-room" sections="effects" aria-label="Room parameters"></score-synth-panel>
       <score-synth-panel target="#mt-room" sections="effects" aria-label="The same room parameters"></score-synth-panel>
-    </div>
+    </div>` : '<score-synth-panel target="#mt-room" sections="effects" aria-label="Room parameters"></score-synth-panel>'}
     <audio-spectrum-analyzer input="#mt-desk" port="master" aria-label="Mixed output spectrum"></audio-spectrum-analyzer>`);
   const stopErrors = reportErrors(context);
   return () => { stopErrors(); stopPlayers(context.canvas); };

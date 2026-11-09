@@ -578,7 +578,9 @@ export class AudioPlayerElement extends WebMusicElement {
    */
   private get sessionDriven(): boolean {
     const session = this.moduleContext?.session;
-    const transport = this._player?.transport;
+    // An attached document's sequence engine is this player's own source, a
+    // Session participant like a clip, not a borrowed group (MOD-14).
+    const transport = this._player?.documentSource ? undefined : this._player?.transport;
     if (!session || (transport && !(transport.onTrackChange && this.participant?.active))) return false;
     // A nested player always commands the shared Session it borrows.
     return !this.ownedSession || !!this.participant?.active || this.aggregate;

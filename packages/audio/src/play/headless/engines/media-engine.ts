@@ -97,7 +97,12 @@ export class MediaEngine implements PlaybackEngine {
       : 0;
   }
 
-  async play(offsetSeconds?: number, _when?: number): Promise<void> {
+  /**
+   * Start the stream. A media element cannot be scheduled on the audio clock,
+   * so a future `when` (a Session's shared start instant) is waited out on a
+   * timer before the element starts; a past or omitted one starts now.
+   */
+  async play(offsetSeconds?: number, when?: number): Promise<void> {
     if (this.disposed) return;
     const adapter = this.ensureAdapter();
     // Per the PlaybackEngine contract, play() on a running engine is a no-op:
@@ -109,6 +114,12 @@ export class MediaEngine implements PlaybackEngine {
     const generation = ++this.playbackGeneration;
     this.wantsPlayback = true;
     if (offsetSeconds !== undefined) adapter.currentTime = this.sourceTime(offsetSeconds);
+    const wait = when === undefined ? 0 : (when - this.context.currentTime) * 1000;
+    if (wait > 1) {
+      await new Promise<void>((resolve) => setTimeout(resolve, wait));
+      // A pause, stop or newer play during the wait owns the outcome.
+      if (generation !== this.playbackGeneration || this.disposed || !this.wantsPlayback) return;
+    }
     try {
       await adapter.play();
     } catch (error) {

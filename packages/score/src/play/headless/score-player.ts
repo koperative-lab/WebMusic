@@ -501,19 +501,32 @@ export class ScorePlayer {
     if (this.activeGraphBuild !== undefined) throw new Error('The synth cannot change during graph construction.');
     const current = this.synth ?? this.options.synth;
     const attacks = (value: HeadlessSynth | undefined) => value ? scoreSchedulingCapabilities(value).attacks : 'audio-clock';
-    if (attacks(synth) !== attacks(current)) return false;
     if (synth === this.options.synth && (synth !== undefined || this.synthOwnership === 'owned')) return true;
-    this.options.synth = synth;
-    this.options.synthOwnership = synth ? ownership : undefined;
-    this.preloadPromise = undefined;
     const output = this.output;
     const context = this._context;
-    if (!output || !context || !this.synth) return true;
+    if (!output || !context || !this.synth) {
+      if (attacks(synth) !== attacks(current)) return false;
+      this.options.synth = synth;
+      this.options.synthOwnership = synth ? ownership : undefined;
+      this.preloadPromise = undefined;
+      return true;
+    }
     const previous = this.synth;
     const previousCleanup = this.synthRouteCleanup;
     const previousOwnership = this.synthOwnership;
+    // A Sound reports its backend's capabilities only once connected, so the
+    // mounted engine compares the connected candidate, not its bare promise.
     const next = synth ?? new OscillatorSynth(context);
     const route = next.connect?.(output);
+    if (attacks(next) !== attacks(previous)) {
+      if (typeof route === 'function') this.tryCleanup('synth route cleanup', route);
+      else if (!synth && next.dispose) this.tryCleanup('synth.dispose', () => next.dispose!());
+      else if (next.disconnect) this.tryCleanup('synth.disconnect', () => next.disconnect!());
+      return false;
+    }
+    this.options.synth = synth;
+    this.options.synthOwnership = synth ? ownership : undefined;
+    this.preloadPromise = undefined;
     this.synth = next;
     this.synthRouteCleanup = typeof route === 'function' ? route : undefined;
     this.synthOwnership = synth ? ownership : 'owned';

@@ -122,6 +122,14 @@ describe('AudioPlaylist queue', () => {
     expect(queue.playing).toBe(true);
   });
 
+  it('starts the selected entry at a scheduled time, as a Session arms its members', async () => {
+    const {context, sources} = fakeContext();
+    const queue = createAudioPlaylist({audioContext: context, entries: [{id: 'a', clip: clip()}]});
+    await queue.play(0.06);
+    expect(sources.at(-1)!.start).toHaveBeenCalledWith(0.06, 0);
+    queue.dispose();
+  });
+
   it('advances to the next entry when one ends', async () => {
     const {context, sources} = fakeContext();
     const queue = createAudioPlaylist({
