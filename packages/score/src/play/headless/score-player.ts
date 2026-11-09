@@ -447,6 +447,22 @@ export class ScorePlayer {
   private replacementSerial = 0;
 
   /**
+   * Quiesce before adopting a new score. A Session-followed engine never takes
+   * a direct transport command: its Session (stopped by the module first) has
+   * already paused the scheduler, so only this player's own state resets.
+   */
+  private stopForReplacement(): void {
+    if (!this.scheduler.followsSession) {
+      this.stop();
+      return;
+    }
+    if (this.scheduler.isPlaying) throw new Error('Stop the Session before replacing the score of a Session-followed ScorePlayer.');
+    this.documents.recordPositionIntent(0);
+    this.playbackState = 'stopped';
+    this.playbackPublisher.notify();
+  }
+
+  /**
    * Play another score in place (DEC-068): the engine keeps its AudioContext,
    * synth, output, inserts and any Session scheduling attachment. Playback
    * stops and the new timeline starts at its origin; a synth that preloads
@@ -457,11 +473,11 @@ export class ScorePlayer {
     if (this.disposed) throw new Error('ScorePlayer has been disposed.');
     if (this.documents.getSource()) throw new Error('A bound document owns this player\u2019s score; detach it before replacing the score.');
     const serial = ++this.replacementSerial;
-    this.stop();
+    this.stopForReplacement();
     const candidate = await this.prepareDocument(score);
     if (this.disposed || serial !== this.replacementSerial) return;
     // A play request during preparation is stopped: adoption needs a paused timeline.
-    if (this.scheduler.isPlaying || this.playbackState !== 'stopped') this.stop();
+    if (this.scheduler.isPlaying || this.playbackState !== 'stopped') this.stopForReplacement();
     this.scheduler.adoptTimeline(candidate.score, candidate.timeline, 0);
     this.score = candidate.score;
     this.preloadPromise = candidate.preload;

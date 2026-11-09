@@ -2977,6 +2977,15 @@ are commanded. An `AudioPlayer` document-sequence scheduler takes its lookahead
 ticks from the module environment's `createTickSource`, so offline renders
 include edited Audio documents.
 
+**Round 18 choices (2026-11-08):** manual device acceptance runs in a separate
+`apps/test` workspace rather than on documentation pages, so checks can mount
+compositions the reference pages do not show and keep a per-environment record
+without adding test chrome to the site; its catalog is the single list of
+manual checks and it reads Arabesque from the site's public folder without
+copying it. A `ScorePlayer` that follows a Session never takes a direct
+transport command, including while it replaces its score; the module stops the
+Session first.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

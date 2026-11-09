@@ -404,6 +404,31 @@ describe('Score modular scope and source lifecycle', () => {
     expect(other.dispose).not.toHaveBeenCalled();
   });
 
+  it('replaces .score while the Session is playing, without a direct engine command', async () => {
+    const f = fixture(); f.session.dispose();
+    const player = document.createElement('score-player') as ScorePlayerElement;
+    player.audioContext = f.context; player.sound = f.synth; player.score = score(2);
+    document.body.append(player); await settle();
+    const errors: unknown[] = [];
+    player.addEventListener('webscore:error', (event) => errors.push((event as CustomEvent).detail));
+    const session = player.sessionTransport!;
+    await session.play(); await settle();
+    expect(session.snapshot.paused).toBe(false);
+
+    const next = score(6);
+    player.score = next; await settle();
+    expect(errors).toEqual([]);
+    expect(player.playback.snapshot().score).toBe(next);
+    expect(session.snapshot.durationSeconds).toBe(6);
+    expect(session.snapshot.position).toBe(0);
+    expect(session.participantCount).toBe(1);
+    // The Session still commands the same engine afterwards.
+    await session.play(); await settle();
+    expect(session.snapshot.paused).toBe(false);
+    await session.stop();
+    player.remove(); await settle();
+  });
+
   it('rebuilds when a new sound changes the engine timing class', async () => {
     const f = fixture(); f.session.dispose();
     const player = document.createElement('score-player') as ScorePlayerElement;

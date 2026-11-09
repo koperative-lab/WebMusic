@@ -1,0 +1,24 @@
+{
+  "name": "webmusic-test",
+  "private": true,
+  "type": "module",
+  "description": "Manual acceptance runner for WebMusic: live compositions and a check-by-check result record",
+  "scripts": {
+    "dev": "vite --port 4331 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 4331 --strictPort",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@webmusic/audio": "^0.3.0",
+    "@webmusic/bridge": "^0.3.0",
+    "@webmusic/kernel": "^0.3.0",
+    "@webmusic/score": "^0.3.0",
+    "@webmusic/ui": "^0.3.0",
+    "jsdom": "^30.1.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.3",
+    "vitest": "^5.1.0"
+  }
+}

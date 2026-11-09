@@ -1,7 +1,7 @@
 # apps/
 
-This directory contains the WebMusic documentation application and its shared
-assets. The site demonstrates the music interaction component packages through
+This directory contains the WebMusic documentation application, its shared
+assets, and the manual acceptance runner. The site demonstrates the music interaction component packages through
 Web Components, Headless objects, and API + UI composition. It is a consumer of
 the workspace packages, not the implementation of the component library or a
 complete online DAW.
@@ -14,6 +14,7 @@ authoring entry points live in [dev/README.md](../dev/README.md); the repository
 |---|---|---|
 | `doc/webmusic` | `webmusic-doc` | Astro Starlight documentation, examples, and API reference for the WebMusic packages. |
 | `doc/shared` | — | Shared documentation catalogs and UI assets; not a workspace. |
+| `test` | `webmusic-test` | [Manual acceptance runner](test/README.md): live compositions and a check-by-check result record for device acceptance; not part of the documentation site. |
 
 ## Start locally
 

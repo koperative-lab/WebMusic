@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Every documentation demo and copyable example plays Arabesque No. 1 from the
-// owner-maintained apps/doc/webmusic/public/ folder. This gate only reads that
-// folder; it never writes, regenerates or re-encodes media (see AGENTS.md).
+// Every documentation demo, copyable example and manual acceptance check plays
+// Arabesque No. 1 from the owner-maintained apps/doc/webmusic/public/ folder.
+// This gate only reads that folder; it never writes, regenerates or re-encodes media (see AGENTS.md).
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
@@ -16,7 +16,7 @@ export const PUBLIC_PIN = 'apps/doc/webmusic/public.sha256';
 const IGNORED = new Set(['.DS_Store', 'Thumbs.db']);
 /** Folder → file extension of each Arabesque format. */
 export const FORMATS = {midi: 'mid', mxl: 'mxl', wav: 'wav', mp3: 'mp3'};
-const SCANNED = ['apps/doc/webmusic/src', 'apps/doc/shared'];
+const SCANNED = ['apps/doc/webmusic/src', 'apps/doc/shared', 'apps/test/src'];
 const MEDIA = /\b(midi|mxl|wav|mp3)\/([^\s'"`)\]<>,;{}]+?)\.(midi?|mxl|wav|mp3)\b/g;
 
 /** Return one message per media reference that is not an Arabesque No. 1 file. */

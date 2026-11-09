@@ -1,16 +1,18 @@
 # MOD-15 device acceptance (2026-11-07)
 
-This record is the owner's procedure for the device half of VERIFY-01 for the
-DEC-068 single composition model (MOD-15, rounds 1–17 on `modular-redesign`).
-Its first section records what automated and scripted browser checks already
-established. The checklist then covers what only a person with ears, real
-devices and assistive technology can accept. Fill in the result columns; leave
-a failed row's notes concrete enough to reproduce. [STATUS](../STATUS.md) owns
-the remaining gap; this file keeps the dated evidence.
+This record holds the device half of VERIFY-01 for the DEC-068 single
+composition model (MOD-15, rounds 1–18 on `modular-redesign`). Its first section
+records what automated and scripted browser checks already established. The
+manual checks cover what only a person with ears, real devices and assistive
+technology can accept. They run in the
+[manual acceptance runner](../../apps/test/README.md), outside the documentation
+site; its catalog (`apps/test/src/checks.ts`) is the single list of checks.
+[STATUS](../STATUS.md) owns the remaining gap; this file keeps the dated evidence.
 
 ## Already verified without a person
 
-Baseline: `modular-redesign` after round 17. `npm run check` and
+Baseline: `modular-redesign` after round 17; round 18 adds the runner and the
+in-place score fix found with it. `npm run check` and
 `npm run docs:build` pass. Scripted checks ran in the desktop app's built-in
 Chromium against the built site (`astro preview`), with Arabesque No. 1 from the
 site's own `public/` folder:
@@ -24,121 +26,41 @@ site's own `public/` folder:
 | Playlist demo | Session position follows the entry (20.94 s against 21.0 s after a seek), re-anchors at 0 on the next entry, one participant |
 | Mixer demo | `channel:track A` and `channel:track B` taps listed; a tap carries signal |
 | Quick Start | `.score` assignment keeps the output port and Session membership |
+| Runner D4 (round 18) | Assigning `.score` during Session playback failed with “ScorePlayer transport is owned by its Session”; fixed, it now stops at 0 with the new duration (8.0 s for the 16-beat opening) and plays again, while `.sound` keeps the position (2.3 s → 3.3 s) |
+| Runner H1–H3 (round 18) | Offline graph 12 s in 71 ms, every window sounding; edited document matches 1.000 before and after the cut, control −0.001; code-built Score + Audio Session plays and pauses with 2 participants |
 
 None of these establish audible timing, latency, device output, background-tab
-behavior, touch or screen-reader use. That is what the checklist below is for.
+behavior, touch or screen-reader use. That is what the manual checks are for.
 
-## Before you start
+## Running the manual checks
 
-1. Start the site from a clean build:
+```bash
+npm run test:manual
+```
 
-   ```bash
-   npm run dev:restart
-   ```
+Open <http://localhost:4331>, fill in **0 · Before you start**, then work through
+the 25 checks in eight groups. Each one mounts its own composition:
 
-   Open the printed localhost URL in a desktop browser. For a phone or tablet,
-   start it on the network instead (`npm run docs:dev -- --host`) and open the
-   printed network URL. Plain-HTTP network origins are not secure contexts:
-   microphone checks need the desktop `localhost` URL (or an HTTPS
-   deployment).
-2. Use wired headphones or a known speaker, system volume at a comfortable
-   level, and no other audio app playing.
-3. Fill in one environment row per device/browser you test.
+| Group | Checks | Covers |
+| --- | --- | --- |
+| A Composed desk | A1–A4 | One Session over Score, Audio and a Rack part; faders, mute, solo; one shared reverb in two panels; seek, pause and resume |
+| B Rack parts and channels | B1–B2 | Three parts under one desk; a recorder's own channel inside a desk |
+| C Note input and recording | C1–C2 | Monitoring without stuck notes; take playback and MIDI/MusicXML export |
+| D Score playback and companions | D1–D4 | Staff and keyboard following; seek; background tab; in-place `.sound` and `.score` |
+| E Audio player, playlist and mixer | E1–E4 | Play, seek and rate; queue entries and loop; mixer channels; an edited document |
+| F Microphone and analysis | F1–F3 | Microphone capture; a meter following its player; analysers behind a playlist |
+| H Offline rendering and Score + Audio | H1–H3 | Listen to offline renders of a graph and an edited document; a code-built Session |
+| G Accessibility and input | G1–G3 | Keyboard only, screen reader, narrow width and touch, on the earlier compositions |
 
-| # | Device and OS | Browser and version | Output (speaker, headphones, interface) | Microphone | Date |
-| --- | --- | --- | --- | --- | --- |
-| E1 | | | | | |
-| E2 | | | | | |
-| E3 | | | | | |
-
-Suggested minimum: E1 desktop Chrome, E2 desktop Safari or Firefox, E3 an iPhone
-or Android phone.
-
-## Checklist
-
-Routes are site paths; prefix them with the site's base when it has one.
-"Pass" means every expected point holds.
-
-### A. One transport for a composed desk — `/bridge/modular-composition/`
-
-1. Press the outer **Play**. Expected: the piano score, the recorded Arabesque
-   and the triangle pad start together, with no flam or audible offset between
-   the Score and Audio members, and the spectrum moves.
-2. Move each member fader and the master fader. Expected: only that member (or
-   the whole mix) changes level; nothing restarts or clicks.
-3. Change a room parameter in one panel. Expected: the other panel follows and
-   the reverb changes audibly once.
-4. Seek to the middle, pause, resume. Expected: every member jumps together and
-   resumes from the same place.
-
-### B. Rack parts and channels — `/score/element/play/score-rack-control/`
-
-1. Play, then mute and solo parts. Expected: muting silences only that part;
-   solo leaves only that part; levels persist when you pause and resume.
-2. Move each part's fader while playing, then pause and seek. Expected: the
-   three parts (lead, bass, pad) stay together and keep their levels.
-
-### C. Recorder and note input — `/score/element/play/score-recorder/` and `/score/element/play/score-note-input/`
-
-1. Press record, play eight notes on the on-screen keys (mouse, then the
-   computer keyboard, then touch on the phone), press stop.
-   Expected: each key sounds immediately while recording, with no stuck note;
-   the take count is eight.
-2. Play the take. Expected: the take's rhythm matches what you played; nothing
-   else in the page starts.
-3. Export MIDI and MusicXML. Expected: both download and open in another
-   notation program with the same notes.
-
-### D. Score player and companions — `/quick-start/`
-
-1. Play the Arabesque. Expected: the staff cursor and the highlighted keyboard
-   keys stay on the sounding notes for the whole passage; no drift by the end.
-2. Seek several times while playing and while paused. Expected: the cursor and
-   keyboard follow immediately and the sound resumes from the new place.
-3. Switch the tab to the background for 30 s while playing, then come back.
-   Expected: playback continued without long gaps; record any gap you heard.
-
-### E. Audio player, playlist and mixer — `/audio/element/play/audio-player/`, `/audio/element/play/audio-playlist/`, `/audio/element/play/audio-mixer/`
-
-1. Audio player: play, seek, change rate if offered. Expected: no clicks on
-   seek; the time readout matches what you hear.
-2. Playlist: play, seek inside an entry, press next and previous, let the last
-   entry finish with loop on. Expected: the readout restarts at 0 for each
-   entry, the right entry sounds, the queue wraps once, and the player's
-   controls never disagree with what is playing.
-3. Mixer: play, then move each channel's controls. Expected: each changes only
-   its own track, and both tracks stay in time with each other.
-
-### F. Microphone and analysis — `/audio/element/play/audio-recorder/`, `/audio/element/analyze/audio-meter/`
-
-1. Recorder: allow the microphone, record 5 s, stop, play back. Expected: the
-   take sounds like your input with no added echo; denying permission shows
-   the error state instead of hanging.
-2. Meter: play the linked source. Expected: the meter moves with the music,
-   falls to rest on pause, and resets after a seek.
-
-### G. Accessibility and input on the same pages
-
-1. Keyboard only (Tab, Shift+Tab, Space, Enter, arrow keys): operate Play,
-   seek, faders and the recorder. Expected: visible focus on every control and
-   every action reachable.
-2. Screen reader (VoiceOver on macOS or iOS, TalkBack on Android): Expected:
-   each control announces its name and state (playing, muted, recording).
-3. Phone at 320–480 px width: Expected: no clipped controls, no horizontal
-   scrollbar, touch targets usable.
+Suggested minimum environments: desktop Chrome, desktop Safari or Firefox, and
+an iPhone or Android phone. Run F1 on the desktop `localhost` URL, because phones
+block the microphone on plain-HTTP network addresses.
 
 ## Results
 
-| Check | E1 | E2 | E3 | Notes (what you heard or saw when it failed) |
-| --- | --- | --- | --- | --- |
-| A1–A4 composed desk | | | | |
-| B1–B2 Rack parts | | | | |
-| C1–C3 recorder and note input | | | | |
-| D1–D3 Score player and companions | | | | |
-| E1–E3 Audio player, playlist, mixer | | | | |
-| F1–F2 microphone and analysis | | | | |
-| G1–G3 accessibility and input | | | | |
+Paste the runner's **Copy Markdown** output here, one block per testing date.
+No device results have been recorded yet.
 
-When every row passes on the minimum environments, VERIFY-01 for MOD-15 can be
+When every check passes on the minimum environments, VERIFY-01 for MOD-15 can be
 closed in STATUS and the release work moves to RELEASE-01 (remote CI for the
 final commit, registry checks and publication in dependency order).
