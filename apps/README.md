@@ -14,7 +14,7 @@ authoring entry points live in [dev/README.md](../dev/README.md); the repository
 |---|---|---|
 | `doc/webmusic` | `webmusic-doc` | Astro Starlight documentation, examples, and API reference for the WebMusic packages. |
 | `doc/shared` | — | Shared documentation catalogs and UI assets; not a workspace. |
-| `library` | `webmusic-library` | [Component library](library/README.md): every Web Component by function, searchable, with a live Arabesque canvas per element and an app composer that nests chosen elements into one page to copy; not part of the documentation site. |
+| `library` | `webmusic-library` | [Component library](library/README.md): every Web Component as a still Arabesque card on a packed, topologically ordered vertical reel, searchable and filtered by family and category tag, with a live demo per element and an app composer that nests chosen elements into one page to copy; not part of the documentation site. |
 | `test` | `webmusic-test` | [Manual acceptance runner](test/README.md): a live canvas of package components per check, keyed to the build's version and commit, with a Markdown report kept outside Git; not part of the documentation site. |
 
 ## Start locally

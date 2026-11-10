@@ -14,7 +14,24 @@ export interface ComposeOptions {
   /** Prefix for the Arabesque files: `import.meta.env.BASE_URL` live, `/` in copied code. */
   readonly mediaBase: string;
   readonly overrides?: Overrides;
+  /**
+   * For a card preview, a picture rather than a demo: players that only lend
+   * their data, state and time to the chosen elements hide their transport,
+   * so the chosen element is what shows. A player the selection names keeps
+   * its controls. Players still preload: desks and effect panels draw their
+   * channels and parameters only once their Session has prepared them.
+   */
+  readonly bareHosts?: boolean;
+  /**
+   * Prefix for every id and `#` reference, so several compositions can share
+   * one document: an `input` or `target` selector must match one element.
+   * Rack part and mixer member ids are their channel labels and keep their names.
+   */
+  readonly idPrefix?: string;
 }
+
+/** Ids that are also channel labels on a desk or mixer. */
+const LABEL_IDS = new Set(['lead', 'pad', 'piano', 'double']);
 
 /** A document editor the page loads and lends to a player and its editing views. */
 export interface EditorStep {
@@ -127,38 +144,44 @@ export function composeApp(selection: readonly string[], options: ComposeOptions
 
   // Score: one player owns the transport. Companions nest in it, or in the
   // lead part of a Rack desk when the app has one.
-  const scoreCompanions = bySlot('score-companion');
+  const linked = bySlot('score-companion').filter((tag) => recipeFor(tag).link === 'input');
+  const scoreCompanions = bySlot('score-companion').filter((tag) => !linked.includes(tag));
   const scoreFree = bySlot('score-free');
   const desk = has('score-rack-control') || has('score-rack-part');
-  const scoreHost = desk || has('score-player') || scoreCompanions.length > 0;
+  const scoreHost = desk || has('score-player') || scoreCompanions.length > 0 || linked.length > 0;
   const scoreSource = media(tags.some((tag) => recipeFor(tag).notation) ? 'mxl' : 'midi');
   const editors: EditorStep[] = [];
   const editing = (domain: 'score' | 'audio', list: readonly string[]) => list.filter((tag) => recipeFor(tag).editor === domain);
   // A desk plays its parts' own files; editing views there stay read-only.
   const scoreEditing = desk ? [] : editing('score', scoreCompanions);
   if (scoreEditing.length) editors.push({kind: 'score', url: scoreSource, targets: ['#score', ...scoreEditing]});
-  const companionNodes = (list: readonly string[]): Node[] => list.flatMap((tag) => {
-    const node = scoreEditing.includes(tag) ? element(tag, {editable: ''}) : element(tag);
-    // A panel for the declared insert, next to the sound panel.
-    if (tag === 'score-effect' && has('score-synth-panel')) {
-      return [node, {tag: 'score-synth-panel', attributes: {target: '#room', sections: 'effects'}}];
-    }
-    return [node];
-  });
+  /** An insert renders nothing; a panel on its parameters makes it visible and adjustable. */
+  const withPanel = (node: Node): Node[] => {
+    const id = node.attributes.id;
+    if ((node.tag !== 'score-effect' && node.tag !== 'audio-effect') || !id) return [node];
+    return [node, {tag: 'score-synth-panel', attributes: {target: `#${id}`, sections: 'effects'}}];
+  };
+  /** A player the selection does not name hides its transport in a card preview. */
+  const host = (node: Node): Node => options.bareHosts && !has(node.tag)
+    ? {...node, attributes: {...node.attributes, controls: 'hide'}} : node;
+  const companionNodes = (list: readonly string[]): Node[] => list.flatMap((tag) =>
+    withPanel(scoreEditing.includes(tag) ? element(tag, {editable: ''}) : element(tag)));
   if (!scoreHost) {
     nodes.push(...scoreFree.map((tag) => element(tag)));
   } else if (desk) {
     const panel = scoreFree.filter((tag) => tag === 'score-synth-panel');
     const inputs = scoreFree.filter((tag) => tag !== 'score-synth-panel');
-    nodes.push(element('score-player', {id: 'score'}, [
+    nodes.push(host(element('score-player', {id: 'score'}, [
       element('score-rack-control', {id: 'desk'}, [
         {...element('score-rack-part', {id: 'lead', src: scoreSource, sound: 'triangle'}), children: companionNodes([...scoreCompanions, ...panel])},
         {tag: 'score-rack-part', attributes: {id: 'pad', src: media('midi'), sound: 'sine'}},
         ...inputs.map((tag) => element(tag)),
       ]),
-    ]));
+    ])));
+    nodes.push(...linked.map((tag) => element(tag, {input: '#lead'})));
   } else {
-    nodes.push(element('score-player', scoreEditing.length ? {id: 'score'} : {id: 'score', src: scoreSource}, companionNodes([...scoreCompanions, ...scoreFree])));
+    nodes.push(host(element('score-player', scoreEditing.length ? {id: 'score'} : {id: 'score', src: scoreSource}, companionNodes([...scoreCompanions, ...scoreFree]))));
+    nodes.push(...linked.map((tag) => element(tag, {input: '#score'})));
   }
 
   // Audio: a mixer owns its member players; meters tap its master bus. Every
@@ -180,18 +203,29 @@ export function composeApp(selection: readonly string[], options: ComposeOptions
   const audioEditing = editing('audio', hosted);
   const ownEditPlayer = queue && audioEditing.length > 0;
   const mainHosted = ownEditPlayer ? hosted.filter((tag) => !audioEditing.includes(tag)) : hosted;
-  const audioChild = (tag: string) => tag === 'audio-playlist' ? element(tag, {src: `${media('wav')}, ${media('mp3')}`})
-    : audioEditing.includes(tag) ? element(tag, {editable: ''}) : element(tag);
+  const audioChild = (tag: string): Node[] => tag === 'audio-playlist' ? [element(tag, {src: `${media('wav')}, ${media('mp3')}`})]
+    : withPanel(audioEditing.includes(tag) ? element(tag, {editable: ''}) : element(tag));
   if (has('audio-player') || mainHosted.length > 0) {
     const edited = !ownEditPlayer && audioEditing.length > 0;
-    nodes.push(element('audio-player', queue || edited ? {id: 'audio'} : {id: 'audio', src: media('wav')}, mainHosted.map(audioChild)));
+    nodes.push(host(element('audio-player', queue || edited ? {id: 'audio'} : {id: 'audio', src: media('wav')}, mainHosted.flatMap(audioChild))));
     if (edited) editors.push({kind: 'audio', url: media('wav'), targets: ['#audio', ...audioEditing]});
   }
   if (ownEditPlayer) {
-    nodes.push({tag: 'audio-player', attributes: {id: 'clip', controls: ''}, children: audioEditing.map(audioChild)});
+    nodes.push({tag: 'audio-player', attributes: {id: 'clip', controls: ''}, children: audioEditing.flatMap(audioChild)});
     editors.push({kind: 'audio', url: media('wav'), targets: ['#clip', ...audioEditing]});
   }
 
+  const prefix = options.idPrefix;
+  const scoped = (id: string) => prefix && !LABEL_IDS.has(id) ? `${prefix}${id}` : id;
+  const reference = (value: string) => value.startsWith('#') ? `#${scoped(value.slice(1))}` : value;
+  const scope = (node: Node): Node => !prefix ? node : {
+    ...node,
+    attributes: Object.fromEntries(Object.entries(node.attributes).map(([name, value]) =>
+      [name, name === 'id' ? scoped(value) : name === 'input' || name === 'target' ? reference(value) : value])),
+    children: node.children?.map(scope),
+  };
+  nodes.splice(0, nodes.length, ...nodes.map(scope));
+  editors.splice(0, editors.length, ...editors.map((step) => ({...step, targets: step.targets.map(reference)})));
   const markup = nodes.map((node) => render(node, 0)).join('\n');
   const present = new Set<string>();
   const collect = (node: Node) => { present.add(node.tag); node.children?.forEach(collect); };

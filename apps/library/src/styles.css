@@ -1,18 +1,19 @@
 /* Library chrome in the WebMusic visual language (dev/design/VISUAL-DESIGN.md):
-   neutral tokens with light and dark fallbacks, square one-height controls,
-   hairlines instead of shadows, mono captions. Colour marks only an error.
-   One spacing token, --lb-gap, separates panels and canvas components;
-   --lb-pad is the inset inside a panel. */
+   light only, neutral tokens, square one-height controls, hairlines instead of
+   shadows, mono captions. Colour marks only an error. The page is the
+   components: chrome is one bar and the hairline frames around each card.
+   --lb-gap separates cards and panels; --lb-pad is the inset inside one. */
 :root {
-  color-scheme: light dark;
-  --lb-ink: var(--wm-foreground, light-dark(#111, #eee));
-  --lb-muted: var(--wm-foreground-muted, light-dark(#6b6b6b, #aaa));
-  --lb-line: var(--wm-border, light-dark(#d8d8d8, #333));
-  --lb-surface: var(--wm-surface, light-dark(#fff, #111));
-  --lb-raised: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
-  --lb-on-ink: var(--wm-accent-foreground, light-dark(#fff, #111));
-  --lb-error: light-dark(#c62828, #ef5350);
-  --lb-gap: 1rem;
+  /* Every package component inherits this scheme, so its light-dark() tokens resolve to light. */
+  color-scheme: light;
+  --lb-ink: #111;
+  --lb-muted: #777;
+  --lb-line: #d8d8d8;
+  --lb-surface: #fff;
+  --lb-raised: #f3f3f3;
+  --lb-on-ink: #fff;
+  --lb-error: #c62828;
+  --lb-gap: 12px;
   --lb-pad: .75rem;
   --lb-side: 22rem;
   --lb-size: var(--wm-control-size, 2rem);
@@ -26,19 +27,17 @@
 html, body { margin: 0; background: var(--lb-surface); color: var(--lb-ink); font: 15px/1.5 var(--lb-font); }
 body { overflow-x: hidden; }
 :focus-visible { outline: var(--lb-focus); outline-offset: -2px; }
-h1 { font-size: 1.25rem; line-height: 1.3; margin: 0; font-weight: 600; }
-h2 { margin: 0; font-size: inherit; }
+h1, h2, p { margin: 0; }
+h2 { font-size: inherit; }
 a { color: inherit; }
-p { margin: 0; }
 
 .lb-caption { font: 600 .7rem/1.4 var(--lb-mono); text-transform: uppercase; letter-spacing: .12em; color: var(--lb-muted); }
 .lb-value { font: .75rem var(--lb-mono); }
 .lb-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .lb-spacer { flex: 1; }
-.lb-lede { max-width: 46rem; color: var(--lb-muted); }
-.lb-empty { padding: var(--lb-gap) 0; color: var(--lb-muted); font-family: var(--lb-mono); }
+.lb-empty { padding: var(--lb-gap); color: var(--lb-muted); font-family: var(--lb-mono); }
 
-/* ------------------------------------------------------------ icon buttons */
+/* ------------------------------------------------------------ icon buttons and tags */
 .lb-icon {
   display: inline-flex; align-items: center; justify-content: center; gap: .35rem; flex: none;
   min-width: var(--lb-size); height: var(--lb-size); padding: 0 .5rem; border: 0; border-radius: var(--lb-radius);
@@ -46,81 +45,92 @@ p { margin: 0; }
 }
 .lb-icon:hover { color: var(--lb-ink); background: var(--lb-raised); }
 .lb-icon[aria-pressed="true"], .lb-icon[aria-current="page"] { background: var(--lb-ink); color: var(--lb-on-ink); }
-.lb-icon:disabled { opacity: .3; cursor: default; }
 .lb-icon-space { width: var(--lb-size); }
+
+/* A tag: small mono caption in a hairline box; the active filter is inverted. */
+.lb-chip {
+  display: inline-flex; align-items: center; gap: .3rem; flex: none; height: 1.25rem; padding: 0 .4rem;
+  border: 1px solid var(--lb-line); border-radius: var(--lb-radius); background: var(--lb-surface); color: var(--lb-muted);
+  font: 600 .6rem/1 var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap;
+}
+button.lb-chip { cursor: pointer; }
+button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
+.lb-chip[aria-pressed="true"], .lb-chip--active { background: var(--lb-ink); border-color: var(--lb-ink); color: var(--lb-on-ink); }
+.lb-chip svg { width: 10px; height: 10px; }
 
 /* ------------------------------------------------------------ top bar */
 /* One control height, one row, sideways scroll without a scrollbar. */
 .lb-bar {
-  position: sticky; top: 0; z-index: 2; display: flex; align-items: stretch;
-  height: var(--lb-size); border-bottom: 1px solid var(--lb-line); background: var(--lb-surface);
+  position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: var(--lb-pad);
+  height: var(--lb-size); padding-right: 0; border-bottom: 1px solid var(--lb-line); background: var(--lb-surface);
   overflow-x: auto; scrollbar-width: none; white-space: nowrap;
 }
 .lb-bar::-webkit-scrollbar { display: none; }
-.lb-bar > .lb-icon { border-left: 1px solid var(--lb-line); }
+.lb-bar > .lb-icon { border-left: 1px solid var(--lb-line); align-self: stretch; height: auto; }
 .lb-brand {
-  display: inline-flex; align-items: center; padding-inline: var(--lb-pad); border-right: 1px solid var(--lb-line);
+  align-self: stretch; display: inline-flex; align-items: center; padding-inline: var(--lb-pad); border-right: 1px solid var(--lb-line);
   font: 600 .75rem var(--lb-mono); text-transform: uppercase; letter-spacing: .12em; text-decoration: none;
 }
-.lb-search { display: flex; align-items: center; gap: .5rem; padding-left: var(--lb-pad); color: var(--lb-muted); flex: 0 1 26rem; min-width: 12rem; }
+/* Score / Audio: a square segmented choice, the current one inverted. */
+.lb-segment { display: flex; align-self: stretch; }
+.lb-segment > button {
+  min-width: 4.5rem; padding: 0 var(--lb-pad); border: 0; border-right: 1px solid var(--lb-line); background: transparent; color: var(--lb-muted);
+  font: 600 .7rem var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; cursor: pointer;
+}
+.lb-segment > button:hover { color: var(--lb-ink); background: var(--lb-raised); }
+.lb-segment > button[aria-pressed="true"] { background: var(--lb-ink); color: var(--lb-on-ink); }
+.lb-search { display: flex; align-items: center; gap: .5rem; align-self: stretch; color: var(--lb-muted); flex: 0 1 16rem; min-width: 8rem; padding-left: .25rem; }
 .lb-search__field {
   flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--lb-ink);
-  font: .85rem var(--lb-mono); appearance: none;
+  font: .8rem var(--lb-mono); appearance: none;
 }
 .lb-search__field:focus-visible { outline: none; }
-.lb-search:focus-within { box-shadow: inset 0 0 0 2px var(--lb-ink); }
+.lb-search:focus-within { box-shadow: inset 0 -2px 0 var(--lb-ink); }
 .lb-search__field::-webkit-search-cancel-button { display: none; }
 
-/* ------------------------------------------------------------ layout */
-.lb-body { display: grid; grid-template-columns: 16rem minmax(0, 1fr); min-height: calc(100vh - var(--lb-size)); }
-.lb-nav {
-  border-right: 1px solid var(--lb-line); position: sticky; top: var(--lb-size);
-  height: calc(100vh - var(--lb-size)); overflow-y: auto; scrollbar-width: none;
-}
-.lb-nav::-webkit-scrollbar { display: none; }
-.lb-nav__section { padding: var(--lb-pad); border-bottom: 1px solid var(--lb-line); }
-.lb-categories { list-style: none; margin: 0; padding: 0; }
-.lb-category {
-  display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%;
-  min-height: var(--lb-size); padding: .3rem var(--lb-pad); border: 0; background: transparent; color: inherit;
-  font: .85rem/1.35 var(--lb-font); text-align: left; cursor: pointer;
-}
-.lb-category:hover { background: var(--lb-raised); }
-.lb-category[aria-pressed="true"] { background: var(--lb-ink); color: var(--lb-on-ink); }
-.lb-category > .lb-value { color: inherit; opacity: .7; }
-
-.lb-main { padding: var(--lb-gap) calc(var(--lb-gap) * 1.5) calc(var(--lb-gap) * 3); min-width: 0; max-width: 100rem; container-type: inline-size; }
+/* ------------------------------------------------------------ reel */
+/* A vertical mosaic in the page's own scroll; cards keep a readable size. */
+.lb-main { min-width: 0; }
 .lb-main:focus { outline: none; }
-.lb-head { display: grid; gap: .4rem; margin-bottom: calc(var(--lb-gap) * 1.5); }
-.lb-back { display: inline-flex; align-items: center; gap: .4rem; justify-self: start; text-decoration: none; color: var(--lb-muted); font: .75rem var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; }
-.lb-back:hover { color: var(--lb-ink); }
-.lb-tag-title { font-family: var(--lb-mono); font-size: 1.35rem; }
+.lb-main--reel { background: var(--lb-surface) radial-gradient(var(--lb-line) 1px, transparent 1px) 0 0 / 16px 16px; min-height: calc(100vh - var(--lb-size)); }
+.lb-reel { position: relative; width: 100%; max-width: 120rem; margin: 0 auto; }
 
-/* ------------------------------------------------------------ catalog */
-.lb-group { margin-bottom: calc(var(--lb-gap) * 2); }
-.lb-group__title {
-  display: flex; align-items: baseline; gap: .75rem; padding-bottom: .4rem; margin-bottom: 0;
-  font: 600 .75rem var(--lb-mono); text-transform: uppercase; letter-spacing: .12em;
+/* A card: one hairline frame, a one-height head with the name and its tag,
+   and a still picture of the element filling the rest. The whole card opens
+   the element's page; only the tag is a control of its own. */
+.lb-card {
+  position: absolute; display: flex; flex-direction: column; min-width: 0;
+  border: 1px solid var(--lb-line); background: var(--lb-surface); cursor: pointer;
+  transition: opacity .15s, border-color .15s;
 }
-.lb-group__title > .lb-value { color: var(--lb-muted); }
-/* A hairline grid of square cards: cells share their lines. */
-.lb-cards {
-  list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  border-top: 1px solid var(--lb-line); border-left: 1px solid var(--lb-line);
-}
-.lb-card { display: grid; grid-template-rows: auto 1fr auto; gap: .5rem; padding: 0 0 var(--lb-pad); border-right: 1px solid var(--lb-line); border-bottom: 1px solid var(--lb-line); min-width: 0; }
-.lb-card:hover { background: var(--lb-raised); }
-.lb-card__head { display: flex; align-items: center; justify-content: space-between; min-height: var(--lb-size); border-bottom: 1px solid var(--lb-line); }
-.lb-card__summary, .lb-card > .lb-caption { padding-inline: var(--lb-pad); }
-.lb-card__summary { font-size: .85rem; line-height: 1.45; }
-.lb-tag { padding-inline: var(--lb-pad); font: 600 .85rem var(--lb-mono); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-tag:hover { text-decoration: underline; text-underline-offset: 3px; }
-.lb-card .lb-tag::after { content: ""; position: absolute; inset: 0; }
-.lb-card { position: relative; }
-.lb-card .lb-icon { position: relative; z-index: 1; }
+.lb-card:hover, .lb-card:focus-within { border-color: var(--lb-ink); }
+.lb-card__head { display: flex; align-items: center; gap: .5rem; height: var(--lb-size); padding-inline: var(--lb-pad); border-bottom: 1px solid var(--lb-line); flex: none; }
+.lb-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 .8rem var(--lb-mono); text-decoration: none; }
+.lb-card__name::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.lb-card__name:focus-visible { outline: none; }
+.lb-card:has(.lb-card__name:focus-visible) { outline: var(--lb-focus); outline-offset: -2px; }
+.lb-card__head > .lb-chip { position: relative; z-index: 2; }
+.lb-card__chosen { margin-left: auto; display: inline-flex; color: var(--lb-ink); }
+.lb-card__frame { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.lb-card__stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: grid; gap: var(--lb-gap); padding: var(--lb-gap); }
+.lb-card--failed .lb-card__frame { background: repeating-linear-gradient(45deg, transparent 0 8px, var(--lb-raised) 8px 9px); }
+.lb-card--failed .lb-card__stage { visibility: hidden; }
 
-/* ------------------------------------------------------------ choice grid and fields */
-/* Hairline grid of square cells; the current choice is inverted. */
+/* Hovering a card shows its topology: what it attaches to and what attaches to it. */
+.lb-reel--focus .lb-card:not(.lb-card--near) { opacity: .3; }
+.lb-reel--focus .lb-card--near { border-color: var(--lb-ink); }
+.lb-links { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; overflow: visible; }
+.lb-links path { fill: none; stroke: var(--lb-ink); stroke-width: 1; stroke-dasharray: 3 3; }
+
+/* Package elements default to inline; give each one a block of its own and
+   space the members a player or desk composes by the same gap. */
+:where(.lb-card__stage, .lb-canvas) > :where(:not([hidden], style, script, template)) { display: block; min-width: 0; max-width: 100%; }
+:where(.lb-card__stage, .lb-canvas) :where(score-player, audio-player, audio-mixer, score-rack-control, score-rack-part) > :where(:not([hidden], style, script, template, score-effect, audio-effect)) { display: block; margin-top: var(--lb-gap); }
+:where(.lb-card__stage, .lb-canvas) score-rack-control::part(rack-control-root) { margin-top: var(--lb-gap); }
+/* A hidden transport leaves no gap above the element it serves. */
+:where(.lb-card__stage) :where(score-player, audio-player)[controls="hide"] > :where(:first-child) { margin-top: 0; }
+
+/* ------------------------------------------------------------ fields and actions */
 .lb-choice { display: flex; flex-wrap: wrap; }
 .lb-choice > button {
   display: inline-flex; align-items: center; justify-content: center; flex: 1 0 auto; min-height: var(--lb-size); padding: 0 var(--lb-pad);
@@ -138,20 +148,19 @@ select.lb-field {
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 1.75rem;
 }
-
-/* ------------------------------------------------------------ actions */
-.lb-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
 .lb-action {
   display: inline-flex; align-items: center; justify-content: center; min-height: var(--lb-size); padding: 0 var(--lb-pad);
   border: 1px solid var(--lb-ink); border-radius: var(--lb-radius); background: var(--lb-surface); color: var(--lb-ink);
   font: 600 .7rem var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; text-decoration: none; cursor: pointer; white-space: nowrap;
 }
 .lb-action--primary { background: var(--lb-ink); color: var(--lb-on-ink); }
-.lb-action:disabled { opacity: .3; cursor: default; }
-.lb-entry { color: var(--lb-muted); padding-left: .25rem; overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------------ element and app pages */
-/* Narrow: one column. Wide: the canvas and code on the left, Parameters and members beside them. */
+.lb-main:not(.lb-main--reel) { padding: var(--lb-gap) calc(var(--lb-gap) * 1.5) calc(var(--lb-gap) * 3); max-width: 100rem; container-type: inline-size; }
+.lb-head { display: flex; align-items: center; gap: .6rem; margin-bottom: var(--lb-gap); min-height: var(--lb-size); }
+.lb-back { margin-left: -.5rem; }
+.lb-title { font: 600 1.1rem var(--lb-mono); }
+
 .lb-layout { display: flex; flex-direction: column; gap: var(--lb-gap); }
 .lb-stage, .lb-side { display: flex; flex-direction: column; gap: var(--lb-gap); min-width: 0; }
 @container (min-width: 56rem) {
@@ -163,7 +172,6 @@ select.lb-field {
   .lb-side::-webkit-scrollbar { display: none; }
 }
 
-/* One frame per panel; a caption header one control tall. */
 .lb-panel { border: 1px solid var(--lb-line); min-width: 0; background: var(--lb-surface); }
 .lb-panel__head {
   display: flex; align-items: center; gap: var(--lb-pad); min-height: var(--lb-size);
@@ -173,45 +181,34 @@ select.lb-field {
 
 .lb-canvas {
   display: grid; align-content: start; gap: var(--lb-gap); padding: var(--lb-gap); min-width: 0; min-height: 8rem;
-  background: var(--lb-surface) radial-gradient(var(--lb-line) 1px, transparent 1px) 0 0 / var(--lb-gap) var(--lb-gap);
+  background: var(--lb-surface) radial-gradient(var(--lb-line) 1px, transparent 1px) 0 0 / 16px 16px;
 }
-/* Package elements default to inline; give each one a block of its own and
-   space the members a player or desk composes by the same gap. */
-:where(.lb-canvas) > :where(:not([hidden], style, script, template)) { display: block; min-width: 0; max-width: 100%; }
-:where(.lb-canvas) :where(score-player, audio-player, audio-mixer, score-rack-control, score-rack-part) > :where(:not([hidden], style, script, template, score-effect, audio-effect)) { display: block; margin-top: var(--lb-gap); }
-.lb-canvas score-rack-control::part(rack-control-root) { margin-top: var(--lb-gap); }
-
 .lb-error { padding: .5rem var(--lb-pad); color: var(--lb-error); font: .85rem var(--lb-mono); border-top: 1px solid var(--lb-line); }
 .lb-error[hidden] { display: none; }
 
 .lb-code {
-  margin: 0; padding: var(--lb-pad); max-height: 28rem; overflow: auto; scrollbar-width: none;
+  margin: 0; padding: var(--lb-pad); max-height: 24rem; overflow: auto; scrollbar-width: none;
   font: .78rem/1.55 var(--lb-mono); white-space: pre; tab-size: 2;
 }
 .lb-code::-webkit-scrollbar { display: none; }
 
 .lb-parameters { display: grid; gap: var(--lb-pad); padding: var(--lb-pad); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
-.lb-parameters > .lb-caption { grid-column: 1 / -1; }
 .lb-param { display: grid; gap: .25rem; min-width: 0; }
 .lb-param:has(.lb-choice) { grid-column: 1 / -1; }
 
-.lb-members { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .4rem var(--lb-gap); margin: 0; padding: var(--lb-pad); font-size: .8rem; }
-.lb-members dt { font-family: var(--lb-mono); font-weight: 600; overflow-wrap: anywhere; max-width: 10rem; }
-.lb-members dd { margin: 0; color: var(--lb-muted); overflow-wrap: anywhere; }
-
 .lb-chosen { list-style: none; margin: 0; padding: 0; }
-.lb-chosen__item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .5rem; min-height: var(--lb-size); border-bottom: 1px solid var(--lb-line); }
+.lb-chosen__item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .5rem; min-height: var(--lb-size); padding-left: var(--lb-pad); border-bottom: 1px solid var(--lb-line); }
 .lb-chosen__item:last-child { border-bottom: 0; }
-.lb-chosen__item > .lb-caption { white-space: nowrap; }
+.lb-empty-app {
+  display: grid; place-items: center; height: 40vh; border: 1px dashed var(--lb-line); color: var(--lb-muted);
+}
+.lb-empty-app:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
+.lb-empty-app svg { width: 32px; height: 32px; }
 
 @media (max-width: 720px) {
-  .lb-body { grid-template-columns: minmax(0, 1fr); }
-  .lb-nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--lb-line); }
-  .lb-categories { display: flex; overflow-x: auto; scrollbar-width: none; }
-  .lb-categories::-webkit-scrollbar { display: none; }
-  .lb-category { white-space: nowrap; border-right: 1px solid var(--lb-line); }
-  .lb-main { padding: var(--lb-gap) var(--lb-gap) calc(var(--lb-gap) * 3); }
-  .lb-brand { font-size: .7rem; }
-  .lb-search { min-width: 9rem; }
+  .lb-brand { display: none; }
+  .lb-segment > button { min-width: 0; }
+  .lb-search { min-width: 6rem; }
+  .lb-main:not(.lb-main--reel) { padding: var(--lb-gap) var(--lb-gap) calc(var(--lb-gap) * 3); }
   .lb-parameters { grid-template-columns: minmax(0, 1fr); }
 }

@@ -12,6 +12,8 @@ const PATHS = {
   reload: '<path d="M19 12a7 7 0 1 1-2.05-4.95M19 4v4h-4"/>',
   link: '<path d="M10 14l4-4M8.5 11.5l-2 2a3 3 0 0 0 4.24 4.24l2-2M15.5 12.5l2-2a3 3 0 0 0-4.24-4.24l-2 2"/>',
   trash: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+  play: '<path d="M7 5l12 7-12 7z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

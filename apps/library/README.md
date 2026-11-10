@@ -27,27 +27,39 @@ development and at the published site in a production build; set
 
 ## Use
 
-- **Browse by function.** Elements are grouped into Playback, Mixing and
-  effects, Note input and recording, Sound design, Notation and piano roll,
-  Waveform and spectrum, Music theory analysis, and Metering and signal
-  analysis. The side list filters by group; Score and Audio narrow by family.
-- **Search.** Press `/` to focus the search field. Every term must match the
-  tag, its group or synonyms, its family and entry, its purpose, or one of its
-  attributes, properties or events (`microphone`, `fft`, `waveform editor`,
-  `webscore:chordchange`). Escape clears it.
-- **Try one.** An element page mounts it on Arabesque No. 1 together with the
-  player it follows, shows the code for exactly that canvas, and binds its
-  observed attributes in Parameters, so the code changes as you adjust them.
-  Its properties, methods and events come from the documentation catalog.
-- **Compose an app.** The plus button adds an element to **Your app**. The app
-  page nests every companion into the player that lends it data, state and
-  time — one Score player and one Audio player at most — adds what a choice
-  needs (a recorder gets a note input, a Rack part gets its desk), and shows the
+- **The reel.** The home page is a white mosaic of cards that scrolls
+  vertically. A card shows the element's name, its category tag and a still
+  picture of the element on Arabesque No. 1 — no controls, playback or
+  interaction; click it to open the element's page, where the demo is. Each
+  card's footprint follows how much room its element draws in, at a readable
+  size; the number of columns follows the window's width.
+- **Topology.** Score and Audio are separate segments, Score first. In each,
+  cards follow the composition tree depth-first: each player is followed by
+  what attaches to it (a desk and its part, a note input and its recorder,
+  views, analysis, meters). Packing lets a card a few places later take a
+  hole, then grows cards into empty cells — sideways freely, down the page by
+  one row at most — so the reel closes into a mosaic. Hovering a card dims the
+  rest and draws dashed links to what it attaches to and what attaches to it.
+- **Filter.** All, Score or Audio at the top; press `/` to search. Every term
+  must match the tag, its category or synonyms, its family and entry, its
+  purpose, or one of its attributes, properties or events (`microphone`, `fft`,
+  `waveform editor`, `webscore:chordchange`). A card's tag filters by that
+  category; the filter shows in the bar until cleared.
+- **An element's page** is the demo: the element with its player's transport,
+  the code for exactly that canvas, its observed attributes in Parameters (the
+  code changes as you adjust them), and the plus button that adds it to
+  **Your app**. A card in your app carries a check mark.
+- **Compose an app.** The app page nests every companion into the player that
+  lends it data, state and time — one Score player and one Audio player at
+  most — adds what a choice needs (a recorder gets a note input, a Rack part
+  gets its desk, an insert gets a panel on its parameters), and shows the
   result live beside the complete page to copy. Editing views
   (`<score-grid-view>`, `<score-sheet-view>`, `<audio-clip-view>`) borrow one
   editor per family that the page loads and lends to the player, as their
-  reference pages show; inside a Rack desk the score views stay read-only. The selection stays in this
-  browser; **Copy link** shares it as `#/app/<tag>,<tag>`.
+  reference pages show; inside a Rack desk the score views stay read-only.
+  Score analysis links to its player with `input` (see STATUS LIB-01). The
+  selection stays in this browser; the link icon shares it as
+  `#/app/<tag>,<tag>`.
 
 The copied page imports the packages by their public entries
 (`@webmusic/score/play/element` and so on), so serve it through a bundler such
@@ -60,7 +72,7 @@ as Vite, and replace the Arabesque URLs with your own files.
 | Tags, families, capabilities, behaviour and presenters | [`apps/doc/shared/ui-catalog.ts`](../doc/shared/ui-catalog.ts) |
 | Entries, attributes, properties and events | [Parameter catalog](../doc/webmusic/src/lib/params/index.ts) |
 | One-line purpose | The first sentence of each owning documentation page, read at build time by [`summaries.ts`](summaries.ts) |
-| Functional group, search synonyms, define function and composition slot | [`src/recipes.ts`](src/recipes.ts), the library's only own inventory |
+| Functional group and card tag, card footprint, search synonyms, define function and composition slot | [`src/recipes.ts`](src/recipes.ts), the library's only own inventory |
 | Composition rules | [`src/compose.ts`](src/compose.ts); the live canvas and the copied code both come from it |
 
 A new public element fails the library tests until it has a recipe. Tests also
@@ -71,13 +83,14 @@ recipes write only observed attributes.
 
 | Path | Contents |
 |---|---|
-| `src/main.ts` | Routing, catalog, element page with Parameters, and the app composer |
+| `src/main.ts` | Routing, the vertical reel of still cards, element page with Parameters, and the app composer |
+| `src/layout.ts` | Topological order, look-ahead packing, hole closing, the mosaic search and its vertical form |
 | `src/catalog.ts` | Library entries joined from the catalogs above |
 | `src/compose.ts` | Selection → nested markup, define imports and a complete page |
 | `src/elements.ts` | Loads the element entries and mounts a composition in a live canvas |
 | `src/search.ts` | Weighted all-terms search |
 | `src/styles.css` | Library chrome in the [visual design](../../dev/design/VISUAL-DESIGN.md) |
-| `test/` | Catalog, composition and search tests (`npm test -w webmusic-library`) |
+| `test/` | Catalog, composition, layout and search tests (`npm test -w webmusic-library`) |
 
 ## Checks
 
@@ -88,5 +101,5 @@ npm run check:library
 ```
 
 `npm run check:library` builds the page into the ignored `dist/` and is part of
-`npm run check:source`. Live playback, audio devices and keyboard use are
-browser checks; the static checks do not establish them.
+`npm run check:source`. Live playback, audio devices, keyboard use and how the
+reel looks are browser checks; the static checks do not establish them.

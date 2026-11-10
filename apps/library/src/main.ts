@@ -1,12 +1,15 @@
-// The WebMusic component library: every Web Component by function, a search
-// over names, purposes and members, a live Arabesque canvas per element with
-// its attributes in Parameters, and an app composer that nests the chosen
-// elements into one working page to copy.
+// The WebMusic component library: every Web Component as a card on a vertical
+// reel. Cards have the footprint their element draws in and are packed in
+// topological order, so each player is followed by what attaches to it. A card
+// shows the element's name, its category tag and how the element looks — a
+// still picture, not a demo. Its page plays it with Parameters and code, and
+// chosen elements compose into one working page to copy.
 import './styles.css';
-import {LIBRARY, byTag, inCategory, type LibraryEntry} from './catalog.ts';
+import {LIBRARY, byTag, type LibraryEntry} from './catalog.ts';
 import {composeApp, page, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
+import {packColumns, parentOf, reelRows, topologicalOrder} from './layout.ts';
 import {CATEGORIES, type CategoryId} from './recipes.ts';
 import {search, type Family} from './search.ts';
 import type {ParamSpec} from '../../doc/webmusic/src/lib/params/index.ts';
@@ -20,7 +23,7 @@ const storage = (() => { try { return window.localStorage; } catch { return unde
 
 let query = '';
 let family: Family = 'all';
-let category: CategoryId | 'all' = 'all';
+let category: CategoryId | undefined;
 let selection: string[] = loadSelection();
 
 function loadSelection(): string[] {
@@ -55,8 +58,14 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, attributes: Record<str
 
 function iconButton(name: IconName, label: string, onClick: (button: HTMLButtonElement) => void, attributes: Record<string, string | undefined> = {}): HTMLButtonElement {
   const button = h('button', {type: 'button', class: 'lb-icon', 'aria-label': label, title: label, ...attributes}, icon(name));
-  button.addEventListener('click', () => onClick(button));
+  button.addEventListener('click', (event) => { event.stopPropagation(); onClick(button); });
   return button;
+}
+
+function setIcon(button: HTMLButtonElement, name: IconName, label: string): void {
+  button.replaceChildren(icon(name));
+  button.setAttribute('aria-label', label);
+  button.title = label;
 }
 
 function action(label: string, onClick: () => unknown, primary = false): HTMLButtonElement {
@@ -120,26 +129,22 @@ function importSharedApp(): void {
 }
 
 const go = (hash: string) => { if (location.hash !== hash) location.hash = hash; else render(); };
+/** Filters live on the reel: change them there, or go back to it. */
+const refilter = () => { if (currentRoute().kind === 'catalog') { renderBar(); renderReel(); } else go('#/'); };
 
-// ---------------------------------------------------------------- chrome
+// ---------------------------------------------------------------- top bar
 
 const app = document.querySelector<HTMLElement>('#app')!;
 const bar = h('header', {class: 'lb-bar'});
-const nav = h('nav', {class: 'lb-nav', 'aria-label': 'Categories'});
 const main = h('main', {class: 'lb-main', tabindex: '-1'});
-const searchField = h('input', {type: 'search', class: 'lb-search__field', placeholder: 'Search components', 'aria-label': 'Search components', autocomplete: 'off', spellcheck: 'false'});
+const searchField = h('input', {type: 'search', class: 'lb-search__field', placeholder: 'Search', 'aria-label': 'Search components', autocomplete: 'off', spellcheck: 'false'});
 
-searchField.addEventListener('input', () => {
-  query = searchField.value;
-  if (currentRoute().kind !== 'catalog') go('#/');
-  else { renderNav(); renderCatalog(); }
-});
+searchField.addEventListener('input', () => { query = searchField.value; refilter(); });
 searchField.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && searchField.value) {
     event.preventDefault();
     searchField.value = query = '';
-    renderNav();
-    renderCatalog();
+    refilter();
   }
 });
 document.addEventListener('keydown', (event) => {
@@ -154,116 +159,249 @@ document.addEventListener('keydown', (event) => {
 
 function renderBar(): void {
   const route = currentRoute();
-  const appLink = h('a', {href: '#/app', class: 'lb-icon lb-app-link', 'aria-label': `Your app, ${selection.length} components`, title: 'Your app', 'aria-current': route.kind === 'app' ? 'page' : undefined},
-    icon('app'), h('span', {class: 'lb-value'}, String(selection.length)));
+  const families = h('div', {class: 'lb-segment', role: 'group', 'aria-label': 'Family'},
+    ...(['all', 'Score', 'Audio'] as const).map((id) => {
+      const button = h('button', {type: 'button', 'aria-pressed': String(family === id)}, id === 'all' ? 'All' : id);
+      button.addEventListener('click', () => { family = id; refilter(); });
+      return button;
+    }));
+  const filter = category && h('button', {type: 'button', class: 'lb-chip lb-chip--active', 'aria-label': `Clear ${CATEGORIES.find((c) => c.id === category)!.short} filter`},
+    CATEGORIES.find((c) => c.id === category)!.short, icon('close'));
+  filter?.addEventListener('click', () => { category = undefined; refilter(); });
   bar.replaceChildren(
-    h('a', {class: 'lb-brand', href: '#/'}, 'WebMusic library'),
+    h('a', {class: 'lb-brand', href: '#/', 'aria-label': 'WebMusic library'}, 'WebMusic'),
+    families,
     h('label', {class: 'lb-search'}, icon('search'), searchField),
+    ...(filter ? [filter] : []),
     h('span', {class: 'lb-spacer'}),
     h('a', {class: 'lb-icon', href: DOCS_ORIGIN, 'aria-label': 'Documentation', title: 'Documentation'}, icon('docs')),
-    appLink,
+    h('a', {href: '#/app', class: 'lb-icon lb-app-link', 'aria-label': `Your app, ${selection.length} components`, title: 'Your app', 'aria-current': route.kind === 'app' ? 'page' : undefined},
+      icon('app'), selection.length ? h('span', {class: 'lb-value'}, String(selection.length)) : null),
   );
 }
 
-function matches(): LibraryEntry[] {
-  return search(LIBRARY, query, family);
+// ---------------------------------------------------------------- live previews
+
+/** Something mounted on screen that must be stopped before it goes away. */
+const live = new Set<() => void>();
+
+function stopAll(): void {
+  for (const stop of [...live]) stop();
+  live.clear();
 }
 
-function renderNav(): void {
-  const hits = matches();
-  const families = h('div', {class: 'lb-choice', role: 'group', 'aria-label': 'Family'},
-    ...(['all', 'Score', 'Audio'] as const).map((id) => {
-      const button = h('button', {type: 'button', 'aria-pressed': String(family === id)}, id === 'all' ? 'All' : id);
-      button.addEventListener('click', () => { family = id; if (currentRoute().kind !== 'catalog') go('#/'); else { renderNav(); renderCatalog(); } });
-      return button;
-    }));
-  const list = h('ul', {class: 'lb-categories'});
-  const item = (id: CategoryId | 'all', label: string, count: number) => {
-    const button = h('button', {type: 'button', class: 'lb-category', 'aria-pressed': String(category === id)},
-      h('span', {}, label), h('span', {class: 'lb-value'}, String(count)));
-    button.addEventListener('click', () => {
-      category = category === id && id !== 'all' ? 'all' : id;
-      if (currentRoute().kind !== 'catalog') go('#/');
-      else { renderNav(); renderCatalog(); }
-    });
-    return h('li', {}, button);
+/**
+ * Mount a composition into `stage` and keep `onError` informed. Returns the
+ * cleanup, which aborts a mount still loading.
+ */
+function mountLive(stage: HTMLElement, tags: readonly string[], overrides: Overrides, onError: (reason: unknown) => void, card?: number): () => void {
+  const controller = new AbortController();
+  let teardown: (() => void) | undefined;
+  // Cards share the document, so each card's ids get a prefix of their own.
+  const composition = card !== undefined
+    ? composeApp(tags, {mediaBase: import.meta.env.BASE_URL, overrides, bareHosts: true, idPrefix: `c${card}-`})
+    : liveComposition(tags, overrides);
+  mountComposition(stage, composition, onError, controller.signal)
+    .then((cleanup) => { if (controller.signal.aborted) cleanup(); else teardown = cleanup; })
+    .catch((reason: unknown) => { if (!controller.signal.aborted) onError(reason); });
+  const stop = () => {
+    controller.abort();
+    teardown?.();
+    teardown = undefined;
+    live.delete(stop);
   };
-  list.append(item('all', 'All components', hits.length));
-  for (const group of CATEGORIES) list.append(item(group.id, group.label, inCategory(group.id, hits).length));
-  nav.replaceChildren(h('div', {class: 'lb-nav__section'}, families), list);
+  live.add(stop);
+  return stop;
 }
 
-// ---------------------------------------------------------------- live canvas
+// ---------------------------------------------------------------- reel
 
-let teardown: (() => void) | undefined;
-let controller: AbortController | undefined;
-
-function stopCanvas(): void {
-  controller?.abort();
-  controller = undefined;
-  teardown?.();
-  teardown = undefined;
+interface Card {
+  readonly entry: LibraryEntry;
+  readonly element: HTMLElement;
+  readonly frame: HTMLElement;
+  readonly stage: HTMLElement;
+  stop?: () => void;
 }
 
-/** A framed live canvas with one error line; returns the canvas for Parameters. */
-function liveCanvas(caption: string, tags: () => readonly string[], overrides: () => Overrides): {element: HTMLElement; canvas: HTMLElement; ready: Promise<void>; reload: () => Promise<void>} {
+const GAP = 16;
+const PAD = 16;
+/** Column width the reel aims for, and the fixed height of one row. */
+const TARGET_COLUMN = 168;
+const ROW = 150;
+let cards: Card[] = [];
+let reelObserver: IntersectionObserver | undefined;
+let resizeObserver: ResizeObserver | undefined;
+
+/** Scale the element down to fit its card, keeping its own width large enough to lay out. */
+function fit(card: Card): void {
+  const {frame, stage} = card;
+  const width = frame.clientWidth;
+  const height = frame.clientHeight;
+  if (!width || !height) return;
+  const design = Math.max(width, 480);
+  stage.style.width = `${design}px`;
+  const content = Math.max(1, stage.scrollHeight);
+  const scale = Math.min(width / design, height / content, 1);
+  stage.style.transform = `scale(${scale})`;
+  stage.style.left = `${Math.max(0, (width - design * scale) / 2)}px`;
+  stage.style.top = `${Math.max(0, (height - content * scale) / 2)}px`;
+}
+
+/** A card shows how its element looks: mounted, then made inert. */
+function mountCard(card: Card): void {
+  if (card.stop) return;
+  card.element.classList.remove('lb-card--failed');
+  const stop = mountLive(card.stage, [card.entry.tag], {}, () => card.element.classList.add('lb-card--failed'), cards.indexOf(card));
+  const sizer = new ResizeObserver(() => fit(card));
+  sizer.observe(card.stage);
+  card.stop = () => { sizer.disconnect(); stop(); card.stop = undefined; };
+}
+
+function cardFor(entry: LibraryEntry): Card {
+  // The preview is a picture of the element: no focus, pointer or keyboard reaches it.
+  const frame = h('div', {class: 'lb-card__frame', inert: ''});
+  const stage = h('div', {class: 'lb-card__stage'});
+  frame.append(stage);
+  const tag = h('button', {type: 'button', class: 'lb-chip', 'aria-pressed': String(category === entry.category.id), title: entry.category.label}, entry.category.short);
+  tag.addEventListener('click', () => { category = category === entry.category.id ? undefined : entry.category.id; refilter(); });
+  const element = h('article', {class: 'lb-card', 'data-tag': entry.tag, title: entry.summary});
+  const card: Card = {entry, element, frame, stage};
+  element.append(
+    h('header', {class: 'lb-card__head'},
+      h('a', {class: 'lb-card__name', href: `#/c/${entry.tag}`}, entry.tag),
+      tag,
+      selection.includes(entry.tag) ? h('span', {class: 'lb-card__chosen', 'aria-label': 'In your app', title: 'In your app'}, icon('check')) : null),
+    frame);
+  element.addEventListener('pointerenter', () => highlight(entry.tag));
+  element.addEventListener('pointerleave', () => highlight(undefined));
+  element.addEventListener('focusin', () => highlight(entry.tag));
+  element.addEventListener('focusout', () => highlight(undefined));
+  return card;
+}
+
+const links = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+links.classList.add('lb-links');
+links.setAttribute('aria-hidden', 'true');
+
+/** The cards an element attaches to, and those attached to it. */
+function related(tag: string): Set<string> {
+  const near = new Set<string>([tag]);
+  const parent = parentOf(byTag(tag)!.recipe);
+  if (parent) near.add(parent);
+  for (const card of cards) if (parentOf(card.entry.recipe) === tag) near.add(card.entry.tag);
+  return near;
+}
+
+/** Hairlines from a card to the cards it attaches to and that attach to it. */
+function highlight(tag: string | undefined): void {
+  links.replaceChildren();
+  const reel = links.parentElement;
+  reel?.classList.toggle('lb-reel--focus', !!tag);
+  if (!tag) { for (const card of cards) card.element.classList.remove('lb-card--near'); return; }
+  const near = related(tag);
+  for (const card of cards) card.element.classList.toggle('lb-card--near', near.has(card.entry.tag));
+  const center = (card: Card) => ({x: card.element.offsetLeft + card.element.offsetWidth / 2, y: card.element.offsetTop + card.element.offsetHeight / 2});
+  const from = cards.find((card) => card.entry.tag === tag);
+  if (!from) return;
+  for (const card of cards) {
+    if (card === from || !near.has(card.entry.tag)) continue;
+    const a = center(from);
+    const b = center(card);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    // An elbow through the gap row between the two cards.
+    const midY = (a.y + b.y) / 2;
+    line.setAttribute('d', `M${a.x} ${a.y}V${midY}H${b.x}V${b.y}`);
+    links.append(line);
+  }
+}
+
+function layoutReel(reel: HTMLElement): void {
+  const width = reel.clientWidth;
+  const columns = Math.max(1, Math.floor((width - PAD * 2 + GAP) / (TARGET_COLUMN + GAP)));
+  const column = (width - PAD * 2 - GAP * (columns - 1)) / columns;
+  // Each family is a segment of its own, so packing never pulls a card across.
+  let rows = 0;
+  for (const family of ['Score', 'Audio'] as const) {
+    const segment = cards.filter((card) => card.entry.family === family);
+    if (!segment.length) continue;
+    const placements = packColumns(segment.map((card) => card.entry.recipe.size), columns);
+    segment.forEach((card, index) => {
+      const placement = placements[index]!;
+      Object.assign(card.element.style, {
+        left: `${PAD + placement.x * (column + GAP)}px`,
+        top: `${PAD + (rows + placement.y) * (ROW + GAP)}px`,
+        width: `${placement.w * column + (placement.w - 1) * GAP}px`,
+        height: `${placement.h * ROW + (placement.h - 1) * GAP}px`,
+      });
+    });
+    rows += reelRows(placements);
+  }
+  const height = PAD * 2 + rows * ROW + Math.max(0, rows - 1) * GAP;
+  reel.style.height = `${height}px`;
+  links.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  links.setAttribute('width', String(width));
+  links.setAttribute('height', String(height));
+  for (const card of cards) fit(card);
+}
+
+function renderReel(): void {
+  stopAll();
+  reelObserver?.disconnect();
+  resizeObserver?.disconnect();
+  const entries = topologicalOrder(search(LIBRARY, query, family).filter((entry) => !category || entry.category.id === category));
+  cards = entries.map(cardFor);
+  links.replaceChildren();
+  if (!cards.length) {
+    main.replaceChildren(h('p', {class: 'lb-empty'}, '—'));
+    return;
+  }
+  const reel = h('div', {class: 'lb-reel', role: 'list', 'aria-label': `${cards.length} components`}, links, ...cards.map((card) => card.element));
+  for (const card of cards) card.element.setAttribute('role', 'listitem');
+  main.replaceChildren(reel);
+  main.classList.add('lb-main--reel');
+  layoutReel(reel);
+  let lastWidth = reel.clientWidth;
+  resizeObserver = new ResizeObserver(() => {
+    if (reel.clientWidth === lastWidth) return;
+    lastWidth = reel.clientWidth;
+    layoutReel(reel);
+  });
+  resizeObserver.observe(reel);
+  // Mount what is on screen or close to it; release what scrolls far away.
+  const byElement = new Map(cards.map((card) => [card.element as Element, card]));
+  reelObserver = new IntersectionObserver((records) => {
+    for (const record of records) {
+      const card = byElement.get(record.target);
+      if (!card) continue;
+      if (record.isIntersecting) mountCard(card);
+      else card.stop?.();
+    }
+  }, {rootMargin: '600px 0px'});
+  for (const card of cards) reelObserver.observe(card.element);
+  announce(`${cards.length} component${cards.length === 1 ? '' : 's'}`);
+}
+
+// ---------------------------------------------------------------- live canvas (element and app pages)
+
+/** A framed live canvas with one error line. */
+function liveCanvas(caption: string, tags: () => readonly string[], overrides: () => Overrides): {element: HTMLElement; canvas: HTMLElement} {
   const canvas = h('div', {class: 'lb-canvas'});
   const error = h('p', {class: 'lb-error', role: 'alert', hidden: ''});
+  let stop: (() => void) | undefined;
   const fail = (reason: unknown) => {
     if (!error.hidden) return;
     error.textContent = reason instanceof Error ? reason.message : String(reason ?? 'The component failed to load.');
     error.hidden = false;
   };
-  const reload = async () => {
-    stopCanvas();
+  const reload = () => {
+    stop?.();
     error.hidden = true;
-    const signal = (controller = new AbortController()).signal;
-    try {
-      const cleanup = await mountComposition(canvas, liveComposition(tags(), overrides()), fail, signal);
-      if (signal.aborted) cleanup();
-      else teardown = cleanup;
-    } catch (reason) {
-      if (!signal.aborted) fail(reason);
-    }
+    stop = mountLive(canvas, tags(), overrides(), fail);
   };
-  const element = panel(caption, h('div', {}, canvas, error), iconButton('reload', 'Reload canvas', () => { void reload(); }));
-  return {element, canvas, ready: reload(), reload};
-}
-
-// ---------------------------------------------------------------- catalog
-
-function card(entry: LibraryEntry): HTMLElement {
-  const chosen = selection.includes(entry.tag);
-  const add = iconButton(chosen ? 'check' : 'plus', chosen ? `Remove ${tagName(entry.tag)} from your app` : `Add ${tagName(entry.tag)} to your app`, () => {
-    toggleSelected(entry.tag);
-    renderCatalog();
-    announce(selection.includes(entry.tag) ? `${tagName(entry.tag)} added to your app` : `${tagName(entry.tag)} removed from your app`);
-  }, {'aria-pressed': String(chosen)});
-  return h('li', {class: 'lb-card'},
-    h('div', {class: 'lb-card__head'},
-      h('a', {class: 'lb-tag', href: `#/c/${entry.tag}`}, tagName(entry.tag)),
-      add),
-    h('p', {class: 'lb-card__summary'}, entry.summary),
-    h('p', {class: 'lb-caption'}, `${entry.family} · ${entry.capability}${entry.nonvisual ? ' · nonvisual' : ''}`));
-}
-
-function renderCatalog(): void {
-  const hits = matches();
-  const groups = CATEGORIES.filter((group) => category === 'all' || group.id === category)
-    .map((group) => ({group, entries: inCategory(group.id, hits)}))
-    .filter(({entries}) => entries.length > 0);
-  const sections = groups.map(({group, entries}) => h('section', {class: 'lb-group', 'aria-labelledby': `lb-group-${group.id}`},
-    h('h2', {class: 'lb-group__title', id: `lb-group-${group.id}`},
-      h('span', {}, group.label), h('span', {class: 'lb-value'}, String(entries.length))),
-    h('ul', {class: 'lb-cards'}, ...entries.map(card))));
-  const total = groups.reduce((sum, {entries}) => sum + entries.length, 0);
-  main.replaceChildren(
-    h('div', {class: 'lb-head'},
-      h('h1', {}, 'Components'),
-      h('p', {class: 'lb-lede'}, 'Every WebMusic Web Component, grouped by what it does. Open one to try it on Arabesque No. 1, or add components to your app and copy the composed page.')),
-    ...(sections.length ? sections : [h('p', {class: 'lb-empty'}, `No component matches “${query}”.`)]),
-  );
-  announce(`${total} component${total === 1 ? '' : 's'}`);
+  reload();
+  const element = panel(caption, h('div', {}, canvas, error), iconButton('reload', 'Reload canvas', reload));
+  return {element, canvas};
 }
 
 // ---------------------------------------------------------------- element page
@@ -326,57 +464,49 @@ function visible(entry: LibraryEntry, param: ParamSpec, overrides: Overrides): b
   return param.when.values.includes(value || param.when.fallback);
 }
 
-function memberTable(caption: string, rows: readonly {name: string; detail: string}[]): HTMLElement | null {
-  if (!rows.length) return null;
-  return panel(caption, h('dl', {class: 'lb-members'}, ...rows.flatMap((row) => [h('dt', {}, row.name), h('dd', {}, row.detail)])));
+function pageHead(title: string, ...rest: Child[]): HTMLElement {
+  return h('div', {class: 'lb-head'},
+    h('a', {class: 'lb-icon lb-back', href: '#/', 'aria-label': 'All components', title: 'All components'}, icon('back')),
+    h('h1', {class: 'lb-title'}, title),
+    ...rest);
 }
 
 function renderElement(entry: LibraryEntry): void {
   let overrides: Overrides = {};
   const composed = () => composeApp([entry.tag], {mediaBase: '/', overrides});
   const code = codePanel('Code', () => snippet(composed()), 'code');
-  const live = liveCanvas('Live', () => [entry.tag], () => overrides);
+  const canvas = liveCanvas('Live', () => [entry.tag], () => overrides);
 
   const parameters = h('div', {class: 'lb-parameters'});
   const renderParameters = () => {
     const params = entry.spec.params.filter((param) => !FIXED_ATTRIBUTES.has(param.name) && visible(entry, param, overrides));
     parameters.replaceChildren(...params.map((param) => parameterControl(entry, param, overrides, (name, value) => {
       overrides = {...overrides, [entry.tag]: {...overrides[entry.tag], [name]: value}};
-      const target = live.canvas.querySelector(entry.tag);
+      const target = canvas.canvas.querySelector(entry.tag);
       if (value === null) target?.removeAttribute(name);
       else target?.setAttribute(name, value);
       code.update();
       if (entry.spec.params.some((other) => other.when?.attribute === name)) renderParameters();
     })));
-    if (!params.length) parameters.append(h('p', {class: 'lb-caption'}, 'No markup parameters'));
   };
   renderParameters();
 
   const chosen = selection.includes(entry.tag);
-  const added = composed().added;
+  const add = iconButton(chosen ? 'check' : 'plus', chosen ? 'Remove from your app' : 'Add to your app', (button) => {
+    toggleSelected(entry.tag);
+    const now = selection.includes(entry.tag);
+    setIcon(button, now ? 'check' : 'plus', now ? 'Remove from your app' : 'Add to your app');
+    button.setAttribute('aria-pressed', String(now));
+  }, {'aria-pressed': String(chosen)});
   main.replaceChildren(
-    h('div', {class: 'lb-head'},
-      h('a', {class: 'lb-back', href: '#/'}, icon('back'), h('span', {}, 'Components')),
-      h('h1', {class: 'lb-tag-title'}, tagName(entry.tag)),
-      h('p', {class: 'lb-caption'}, `${entry.category.label} · ${entry.family} · ${entry.capability}${entry.nonvisual ? ' · nonvisual' : ''}`),
-      h('p', {class: 'lb-lede'}, entry.summary),
-      h('div', {class: 'lb-actions'},
-        action(chosen ? 'Remove from app' : 'Add to app', () => { toggleSelected(entry.tag); renderElement(entry); }, !chosen),
-        h('a', {class: 'lb-action', href: docsUrl(entry)}, 'Reference'),
-        h('code', {class: 'lb-value lb-entry'}, entry.entry)),
-    ),
+    pageHead(entry.tag,
+      h('span', {class: 'lb-chip', title: entry.category.label}, entry.category.short),
+      h('span', {class: 'lb-spacer'}),
+      h('a', {class: 'lb-icon', href: docsUrl(entry), 'aria-label': 'Reference', title: 'Reference'}, icon('docs')),
+      add),
     h('div', {class: 'lb-layout'},
-      h('div', {class: 'lb-stage'},
-        live.element,
-        code.element,
-        added.length ? h('p', {class: 'lb-caption'}, `Composed with ${added.map(tagName).join(', ')}`) : null),
-      h('div', {class: 'lb-side'},
-        panel('Parameters', parameters),
-        memberTable('Properties and methods', (entry.spec.properties ?? []).map((member) => ({name: member.name, detail: member.note}))),
-        memberTable('Events', (entry.spec.events ?? []).map((member) => ({name: member.name, detail: member.note}))),
-        panel('Composition', h('dl', {class: 'lb-members'},
-          h('dt', {}, 'Behaviour'), h('dd', {}, entry.headless),
-          h('dt', {}, 'Presenters'), h('dd', {}, entry.ui))))),
+      h('div', {class: 'lb-stage'}, canvas.element, code.element),
+      h('div', {class: 'lb-side'}, parameters.childElementCount ? panel('Parameters', parameters) : null)),
   );
 }
 
@@ -386,33 +516,27 @@ function renderApp(): void {
   const composed = () => composeApp(selection, {mediaBase: '/'});
   const {tags, added} = composed();
   if (!tags.length) {
-    main.replaceChildren(
-      h('div', {class: 'lb-head'}, h('h1', {}, 'Your app'),
-        h('p', {class: 'lb-lede'}, 'Add components from the library with the plus button. They are nested into one working page: views, analysis and inserts follow the player that owns their transport.')),
-      h('div', {class: 'lb-actions'}, h('a', {class: 'lb-action lb-action--primary', href: '#/'}, 'Browse components')));
+    main.replaceChildren(pageHead('Your app'), h('a', {class: 'lb-empty-app', href: '#/', 'aria-label': 'Add components'}, icon('plus')));
     return;
   }
   const code = codePanel('Page', () => page(composed()), 'page');
-  const live = liveCanvas('Live', () => selection, () => ({}));
+  const canvas = liveCanvas('Live', () => selection, () => ({}));
   const list = h('ul', {class: 'lb-chosen'}, ...tags.map((tag) => {
     const auto = added.includes(tag);
     return h('li', {class: 'lb-chosen__item'},
-      h('a', {class: 'lb-tag', href: `#/c/${tag}`}, tagName(tag)),
-      h('span', {class: 'lb-caption'}, auto ? 'added' : byTag(tag)!.category.label),
+      h('a', {class: 'lb-card__name', href: `#/c/${tag}`}, tag),
+      h('span', {class: 'lb-chip'}, auto ? 'Added' : byTag(tag)!.category.short),
       auto ? h('span', {class: 'lb-icon-space'}) : iconButton('close', `Remove ${tagName(tag)}`, () => { toggleSelected(tag); renderApp(); }));
   }));
   const share = () => copy(`${location.origin}${location.pathname}#/app/${selection.join(',')}`, 'Link');
   main.replaceChildren(
-    h('div', {class: 'lb-head'},
-      h('h1', {}, 'Your app'),
-      h('p', {class: 'lb-caption'}, `${tags.length} component${tags.length === 1 ? '' : 's'}`),
-      h('div', {class: 'lb-actions'},
-        action('Copy page', () => copy(page(composed()), 'Page'), true),
-        action('Copy link', share),
-        action('Clear', () => { saveSelection([]); renderApp(); }),
-        h('a', {class: 'lb-action', href: '#/'}, 'Add more'))),
+    pageHead('Your app',
+      h('span', {class: 'lb-spacer'}),
+      iconButton('link', 'Copy link', () => { void share(); }),
+      iconButton('trash', 'Clear', () => { saveSelection([]); renderApp(); }),
+      action('Copy page', () => copy(page(composed()), 'Page'), true)),
     h('div', {class: 'lb-layout'},
-      h('div', {class: 'lb-stage'}, live.element, code.element),
+      h('div', {class: 'lb-stage'}, canvas.element, code.element),
       h('div', {class: 'lb-side'}, panel('Components', list))),
   );
 }
@@ -420,19 +544,21 @@ function renderApp(): void {
 // ---------------------------------------------------------------- render
 
 function render(): void {
-  stopCanvas();
+  stopAll();
+  reelObserver?.disconnect();
+  resizeObserver?.disconnect();
   importSharedApp();
   const route = currentRoute();
   renderBar();
-  renderNav();
+  main.classList.remove('lb-main--reel');
   if (route.kind === 'element') renderElement(route.entry);
   else if (route.kind === 'app') renderApp();
-  else renderCatalog();
+  else renderReel();
   document.title = route.kind === 'element' ? `${tagName(route.entry.tag)} · WebMusic library`
     : route.kind === 'app' ? 'Your app · WebMusic library' : 'WebMusic library';
   if (route.kind !== 'catalog') { window.scrollTo(0, 0); main.focus({preventScroll: true}); }
 }
 
-app.replaceChildren(bar, h('div', {class: 'lb-body'}, nav, main), announcer);
+app.replaceChildren(bar, main, announcer);
 window.addEventListener('hashchange', render);
 render();

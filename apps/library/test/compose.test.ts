@@ -112,3 +112,37 @@ describe('editing views', () => {
     expect(queued.editors[0]?.targets).toEqual(['#clip', 'audio-clip-view']);
   });
 });
+
+describe('linked analysis', () => {
+  it('links Score analysis to its player by input, as a sibling', () => {
+    const {markup} = compose(['score-view', 'score-interval-analysis']);
+    expect(markup).toMatch(/<\/score-player>\n<score-interval-analysis input="#score" window="1"><\/score-interval-analysis>$/);
+    expect(markup).not.toMatch(/<score-player[^]*<score-interval-analysis[^]*<\/score-player>/);
+  });
+
+  it('links to the lead part inside a desk', () => {
+    expect(compose(['score-rack-control', 'score-chord-analysis']).markup).toContain('<score-chord-analysis input="#lead" window="1">');
+  });
+
+  it('shows an insert through a panel on its parameters', () => {
+    expect(compose(['score-effect']).markup).toContain('<score-synth-panel target="#room" sections="effects">');
+    expect(compose(['audio-effect']).markup).toContain('<score-synth-panel target="#filter" sections="effects">');
+  });
+
+  it('hides only the transports of players the selection does not name', () => {
+    const bare = (tags: string[]) => composeApp(tags, {mediaBase: '/', bareHosts: true}).markup;
+    expect(bare(['score-view'])).toContain('<score-player id="score" src="/mxl/Arabesque%20No.1.mxl" time-control="full" controls="hide">');
+    expect(bare(['score-player'])).not.toContain('controls="hide"');
+    expect(bare(['audio-meter'])).toContain('<audio-player id="audio" src="/wav/Arabesque%20No.1.wav" controls="hide">');
+  });
+});
+
+describe('shared documents', () => {
+  it('prefixes ids and references but keeps channel labels', () => {
+    const composition = composeApp(['score-rack-control', 'score-recorder', 'score-effect', 'score-chord-analysis', 'audio-clip-view'], {mediaBase: '/', idPrefix: 'c7-'});
+    const ids = [...composition.markup.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]);
+    expect(ids).toEqual(expect.arrayContaining(['c7-score', 'c7-desk', 'lead', 'pad', 'c7-keys', 'c7-room', 'c7-audio']));
+    for (const match of composition.markup.matchAll(/ (?:input|target)="#([^"]+)"/g)) expect(ids, match[1]).toContain(match[1]);
+    expect(composition.editors.flatMap((step) => step.targets).filter((target) => target.startsWith('#'))).toEqual(['#c7-audio']);
+  });
+});
