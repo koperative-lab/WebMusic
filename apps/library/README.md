@@ -29,21 +29,32 @@ development and at the published site in a production build; set
 
 - **The reel.** The home page is a white wall of cards that scrolls
   vertically. A card shows the element's name, its category tag and a still
-  picture of the element on Arabesque No. 1 — no controls, playback or
-  interaction; click it to open the element's page, where the demo is. Hovering
-  a card only outlines it.
-- **Cards fit their elements.** Every card is exactly as tall as its element.
+  picture of the element alone — not the player, input or desk that feeds it in
+  a composition — with no controls, playback or interaction; click it to open
+  the element's page, where the live demo is. Hovering a card only outlines it.
+- **Pictures, not live elements.** The home page mounts no element. A hidden
+  background frame ([`render.html`](render.html), [`src/render.ts`](src/render.ts))
+  mounts one element at a time with the packages' own code on Arabesque No. 1,
+  waits for it to settle and turns it into a self-contained SVG
+  ([`src/snapshot.ts`](src/snapshot.ts)): its composed tree with shadow roots
+  flattened, every computed style inline, canvases as images and scroll offsets
+  kept. Cards near the screen are drawn first. Pictures are kept in IndexedDB
+  per build ([`src/pictures.ts`](src/pictures.ts)); the key changes when a
+  package is rebuilt or the drawing code changes (restart the dev server after
+  either), so later visits show every card at once without drawing. An insert
+  is pictured by the panel on its parameters, and a Rack part by its desk.
+- **Cards fit their pictures.** Every card is exactly as tall as its picture.
   An element with a width of its own (faders, knobs, keys, a scope, a meter)
   gets a card exactly that wide; an element that stretches (a transport, a
-  staff, a lane, a waveform) starts at a preferred width and widens into the
-  free space beside it. Only an element wider than the window is scaled down.
-  Sizes are measured once an element has drawn and kept in the browser, so
-  later visits lay out at the right sizes straight away.
+  staff, a lane, a waveform) has a least width, takes the free span where it
+  lands and is pictured at that width. Only a picture wider than the window is
+  scaled down.
 - **Order.** Score and Audio are separate segments, Score first. In each,
   cards follow the composition tree depth-first: each player is followed by
   what attaches to it (a desk and its part, a note input and its recorder,
-  views, analysis, meters). A skyline packs the cards at their exact sizes, a
-  gap apart, each into the highest free spot where it fits.
+  views, analysis, meters). A skyline packs the cards a gap apart, each into
+  the highest free spot where it fits; a stretching card then fills the row
+  beside it, so cards of different sizes close up.
 - **Filter.** All, Score or Audio at the top; press `/` to search. Every term
   must match the tag, its category or synonyms, its family and entry, its
   purpose, or one of its attributes, properties or events (`microphone`, `fft`,
@@ -88,13 +99,16 @@ recipes write only observed attributes.
 | Path | Contents |
 |---|---|
 | `src/main.ts` | Routing, the vertical reel of still cards, element page with Parameters, and the app composer |
+| `render.html`, `src/render.ts` | The background frame that draws one element at a time for its picture |
+| `src/snapshot.ts` | An element as a self-contained SVG picture |
+| `src/pictures.ts` | The drawing queue and the per-build IndexedDB store of pictures |
 | `src/layout.ts` | Topological order, skyline packing at exact card sizes, widening stretch cards, and how a card fits its picture |
 | `src/catalog.ts` | Library entries joined from the catalogs above |
 | `src/compose.ts` | Selection → nested markup, define imports and a complete page |
 | `src/elements.ts` | Loads the element entries and mounts a composition in a live canvas |
 | `src/search.ts` | Weighted all-terms search |
 | `src/styles.css` | Library chrome in the [visual design](../../dev/design/VISUAL-DESIGN.md) |
-| `test/` | Catalog, composition, layout and search tests (`npm test -w webmusic-library`) |
+| `test/` | Catalog, composition, layout, picture and search tests (`npm test -w webmusic-library`) |
 
 ## Checks
 

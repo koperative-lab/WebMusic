@@ -50,10 +50,10 @@ export type Slot =
 /**
  * How a card sizes to its element. `content`: the element has its own width
  * (faders, knobs, keys, a scope), so the card takes that width. `fill`: the
- * element stretches to whatever width it gets (a transport, a staff, a lane),
- * so the card starts at `width` and grows into free space beside it. Either way
- * the card is as tall as the element. `width` and `height` are the element's
- * size in pixels before it has been measured, used for the first layout only.
+ * element stretches to whatever width it gets (a transport, a staff, a lane);
+ * `width` is the least it needs and packing gives it the free span where it
+ * lands. Either way the card is as tall as the element's picture. `height`,
+ * and a content element's `width`, are used until its picture is drawn.
  */
 export interface CardPreview {
   readonly fit: 'content' | 'fill';
@@ -83,6 +83,12 @@ export interface Recipe {
    * Score analysis waits for a score when nested (STATUS LIB-01), so it links.
    */
   readonly link?: 'input';
+  /**
+   * What the home page pictures, when the element draws nothing itself: a
+   * selector inside its composition (an insert shows the panel on its
+   * parameters, a Rack part the desk it adds a channel to).
+   */
+  readonly picture?: string;
   /** Other elements a composed app adds so this one has something to work with. */
   readonly requires?: readonly string[];
   /** Search synonyms beyond the tag, summary and members. */
@@ -91,41 +97,41 @@ export interface Recipe {
 
 export const RECIPES: readonly Recipe[] = [
   // Playback
-  {tag: 'score-player', preview: {fit: 'fill', width: 640, height: 78}, category: 'playback', define: 'defineScorePlayerElement', slot: 'score-host', attributes: {'time-control': 'full'}, keywords: ['transport', 'play', 'pause', 'seek', 'midi', 'musicxml', 'synth']},
-  {tag: 'audio-player', preview: {fit: 'fill', width: 640, height: 66}, category: 'playback', define: 'defineAudioPlayerElement', slot: 'audio-host', attributes: {controls: ''}, keywords: ['transport', 'play', 'pause', 'seek', 'wav', 'mp3', 'recording']},
+  {tag: 'score-player', preview: {fit: 'fill', width: 360, height: 78}, category: 'playback', define: 'defineScorePlayerElement', slot: 'score-host', attributes: {'time-control': 'full'}, keywords: ['transport', 'play', 'pause', 'seek', 'midi', 'musicxml', 'synth']},
+  {tag: 'audio-player', preview: {fit: 'fill', width: 360, height: 66}, category: 'playback', define: 'defineAudioPlayerElement', slot: 'audio-host', attributes: {controls: ''}, keywords: ['transport', 'play', 'pause', 'seek', 'wav', 'mp3', 'recording']},
   {tag: 'audio-playlist', preview: {fit: 'content', width: 240, height: 72}, category: 'playback', define: 'defineAudioPlaylistElement', slot: 'audio-companion', attributes: {loop: ''}, keywords: ['queue', 'tracks', 'next', 'previous', 'album']},
 
   // Mixing and effects
   {tag: 'score-rack-control', preview: {fit: 'content', width: 260, height: 209}, category: 'mixing', define: 'defineRackControlElement', slot: 'score-desk', attributes: {master: '', mute: '', solo: ''}, keywords: ['desk', 'rack', 'fader', 'channels', 'mute', 'solo', 'multitrack']},
-  {tag: 'score-rack-part', preview: {fit: 'content', width: 260, height: 209}, category: 'mixing', define: 'defineRackPartElement', slot: 'score-desk-part', requires: ['score-rack-control'], keywords: ['desk', 'rack', 'channel', 'track', 'member', 'layer']},
-  {tag: 'score-effect', preview: {fit: 'content', width: 190, height: 141}, category: 'mixing', define: 'defineScoreEffectElement', slot: 'score-companion', attributes: {id: 'room', type: 'reverb', seconds: '2', wet: '0.25'}, keywords: ['insert', 'reverb', 'delay', 'filter', 'compressor', 'fx']},
+  {tag: 'score-rack-part', preview: {fit: 'content', width: 260, height: 209}, category: 'mixing', define: 'defineRackPartElement', slot: 'score-desk-part', picture: 'score-rack-control', requires: ['score-rack-control'], keywords: ['desk', 'rack', 'channel', 'track', 'member', 'layer']},
+  {tag: 'score-effect', preview: {fit: 'content', width: 190, height: 141}, category: 'mixing', define: 'defineScoreEffectElement', slot: 'score-companion', picture: 'score-synth-panel', attributes: {id: 'room', type: 'reverb', seconds: '2', wet: '0.25'}, keywords: ['insert', 'reverb', 'delay', 'filter', 'compressor', 'fx']},
   {tag: 'audio-mixer', preview: {fit: 'content', width: 260, height: 240}, category: 'mixing', define: 'defineAudioMixerElement', slot: 'audio-mix', attributes: {id: 'mix'}, keywords: ['desk', 'fader', 'channels', 'mute', 'solo', 'multitrack', 'stems']},
-  {tag: 'audio-effect', preview: {fit: 'content', width: 270, height: 141}, category: 'mixing', define: 'defineAudioEffectElement', slot: 'audio-companion', attributes: {id: 'filter', type: 'filter', frequency: '1200'}, keywords: ['insert', 'filter', 'eq', 'reverb', 'delay', 'fx']},
+  {tag: 'audio-effect', preview: {fit: 'content', width: 270, height: 141}, category: 'mixing', define: 'defineAudioEffectElement', slot: 'audio-companion', picture: 'score-synth-panel', attributes: {id: 'filter', type: 'filter', frequency: '1200'}, keywords: ['insert', 'filter', 'eq', 'reverb', 'delay', 'fx']},
 
   // Note input and recording
   {tag: 'score-note-input', preview: {fit: 'content', width: 370, height: 187}, category: 'input', define: 'defineNoteInputElement', slot: 'score-free', attributes: {id: 'keys', layout: 'piano', start: '48', end: '71', keyboard: ''}, keywords: ['keyboard', 'piano', 'pads', 'chords', 'qwerty', 'controller', 'instrument']},
   {tag: 'score-recorder', preview: {fit: 'content', width: 370, height: 231}, category: 'input', define: 'defineScoreRecorderElement', slot: 'score-free', attributes: {input: '#keys', quantize: '0.25'}, requires: ['score-note-input'], keywords: ['record', 'take', 'capture', 'export', 'midi', 'musicxml']},
-  {tag: 'audio-recorder', preview: {fit: 'fill', width: 360, height: 48}, category: 'input', define: 'defineAudioRecorderElement', slot: 'audio-companion', keywords: ['record', 'microphone', 'mic', 'capture', 'take', 'voice']},
+  {tag: 'audio-recorder', preview: {fit: 'fill', width: 240, height: 48}, category: 'input', define: 'defineAudioRecorderElement', slot: 'audio-companion', keywords: ['record', 'microphone', 'mic', 'capture', 'take', 'voice']},
 
   // Sound design
   {tag: 'score-synth-panel', preview: {fit: 'content', width: 260, height: 266}, category: 'sound', define: 'defineSynthPanelElement', slot: 'score-free', attributes: {sections: 'sound,envelope'}, keywords: ['synth', 'knobs', 'envelope', 'adsr', 'eq', 'lfo', 'macros', 'oscillator', 'patch']},
 
   // Notation and piano roll
-  {tag: 'score-view', preview: {fit: 'fill', width: 960, height: 277}, category: 'notation', define: 'defineScoreViewElement', slot: 'score-companion', attributes: {type: 'staff'}, notation: true, keywords: ['piano roll', 'staff', 'waterfall', 'visualizer', 'notes']},
-  {tag: 'score-sheet-view', preview: {fit: 'fill', width: 1200, height: 660}, category: 'notation', define: 'defineSheetViewElement', slot: 'score-companion', attributes: {layout: 'flow'}, notation: true, editor: 'score', keywords: ['sheet music', 'engraving', 'notation', 'editor', 'staff', 'pages']},
-  {tag: 'score-grid-view', preview: {fit: 'fill', width: 1200, height: 540}, category: 'notation', define: 'defineScoreGridViewElement', slot: 'score-companion', editor: 'score', keywords: ['piano roll', 'daw', 'grid', 'editor', 'velocity', 'midi']},
-  {tag: 'score-pitch-view', preview: {fit: 'fill', width: 720, height: 120}, category: 'notation', define: 'definePitchViewElement', slot: 'score-companion', attributes: {type: 'keyboard', low: '48', high: '84', 'fit-to-width': 'true'}, keywords: ['keyboard', 'fretboard', 'guitar', 'staff', 'active notes', 'piano']},
+  {tag: 'score-view', preview: {fit: 'fill', width: 480, height: 277}, category: 'notation', define: 'defineScoreViewElement', slot: 'score-companion', attributes: {type: 'staff'}, notation: true, keywords: ['piano roll', 'staff', 'waterfall', 'visualizer', 'notes']},
+  {tag: 'score-sheet-view', preview: {fit: 'fill', width: 640, height: 660}, category: 'notation', define: 'defineSheetViewElement', slot: 'score-companion', attributes: {layout: 'flow'}, notation: true, editor: 'score', keywords: ['sheet music', 'engraving', 'notation', 'editor', 'staff', 'pages']},
+  {tag: 'score-grid-view', preview: {fit: 'fill', width: 640, height: 540}, category: 'notation', define: 'defineScoreGridViewElement', slot: 'score-companion', editor: 'score', keywords: ['piano roll', 'daw', 'grid', 'editor', 'velocity', 'midi']},
+  {tag: 'score-pitch-view', preview: {fit: 'fill', width: 360, height: 120}, category: 'notation', define: 'definePitchViewElement', slot: 'score-companion', attributes: {type: 'keyboard', low: '48', high: '84', 'fit-to-width': 'true'}, keywords: ['keyboard', 'fretboard', 'guitar', 'staff', 'active notes', 'piano']},
 
   // Waveform and spectrum
-  {tag: 'audio-view', preview: {fit: 'fill', width: 960, height: 164}, category: 'audio-views', define: 'defineAudioViewElement', slot: 'audio-companion', attributes: {type: 'waveform', interactive: ''}, keywords: ['waveform', 'spectrogram', 'peaks', 'scrub', 'timeline']},
-  {tag: 'audio-clip-view', preview: {fit: 'fill', width: 1200, height: 252}, category: 'audio-views', define: 'defineAudioClipViewElement', slot: 'audio-companion', editor: 'audio', keywords: ['waveform', 'editor', 'fade', 'gain', 'markers', 'cut']},
-  {tag: 'audio-live-view', preview: {fit: 'fill', width: 720, height: 76}, category: 'audio-views', define: 'defineAudioLiveViewElement', slot: 'audio-companion', attributes: {type: 'spectrogram'}, keywords: ['live', 'scrolling', 'spectrogram', 'waveform', 'analyser']},
+  {tag: 'audio-view', preview: {fit: 'fill', width: 480, height: 164}, category: 'audio-views', define: 'defineAudioViewElement', slot: 'audio-companion', attributes: {type: 'waveform', interactive: ''}, keywords: ['waveform', 'spectrogram', 'peaks', 'scrub', 'timeline']},
+  {tag: 'audio-clip-view', preview: {fit: 'fill', width: 640, height: 252}, category: 'audio-views', define: 'defineAudioClipViewElement', slot: 'audio-companion', editor: 'audio', keywords: ['waveform', 'editor', 'fade', 'gain', 'markers', 'cut']},
+  {tag: 'audio-live-view', preview: {fit: 'fill', width: 360, height: 76}, category: 'audio-views', define: 'defineAudioLiveViewElement', slot: 'audio-companion', attributes: {type: 'spectrogram'}, keywords: ['live', 'scrolling', 'spectrogram', 'waveform', 'analyser']},
 
   // Music theory analysis
-  {tag: 'score-chord-analysis', preview: {fit: 'fill', width: 720, height: 165}, category: 'theory', define: 'defineChordAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['harmony', 'chords', 'roman numerals', 'key']},
-  {tag: 'score-interval-analysis', preview: {fit: 'fill', width: 720, height: 217}, category: 'theory', define: 'defineIntervalAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['intervals', 'melody', 'harmony', 'distance']},
-  {tag: 'score-scale-analysis', preview: {fit: 'fill', width: 720, height: 173}, category: 'theory', define: 'defineScaleAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1', tonic: 'E', scale: 'major'}, keywords: ['scale', 'degrees', 'key', 'tonic', 'mode']},
-  {tag: 'score-rhythm-analysis', preview: {fit: 'fill', width: 720, height: 173}, category: 'theory', define: 'defineRhythmAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['rhythm', 'meter', 'beats', 'attacks', 'groove']},
+  {tag: 'score-chord-analysis', preview: {fit: 'fill', width: 480, height: 165}, category: 'theory', define: 'defineChordAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['harmony', 'chords', 'roman numerals', 'key']},
+  {tag: 'score-interval-analysis', preview: {fit: 'fill', width: 480, height: 217}, category: 'theory', define: 'defineIntervalAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['intervals', 'melody', 'harmony', 'distance']},
+  {tag: 'score-scale-analysis', preview: {fit: 'fill', width: 480, height: 173}, category: 'theory', define: 'defineScaleAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1', tonic: 'E', scale: 'major'}, keywords: ['scale', 'degrees', 'key', 'tonic', 'mode']},
+  {tag: 'score-rhythm-analysis', preview: {fit: 'fill', width: 480, height: 173}, category: 'theory', define: 'defineRhythmAnalysisElement', slot: 'score-companion', link: 'input', attributes: {window: '1'}, keywords: ['rhythm', 'meter', 'beats', 'attacks', 'groove']},
 
   // Metering and signal analysis
   {tag: 'audio-meter', preview: {fit: 'content', width: 390, height: 160}, category: 'metering', define: 'defineAudioMeterElement', slot: 'audio-companion', keywords: ['vu', 'loudness', 'level', 'stereo', 'spectrum', 'oscilloscope']},

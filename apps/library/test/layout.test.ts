@@ -37,7 +37,8 @@ describe('skyline packing', () => {
       const placed = packSkyline(input, width, GAP);
       expect(placed).toHaveLength(input.length);
       placed.forEach((card, i) => {
-        expect(card.width).toBe(Math.min(input[i]!.width, width));
+        if (input[i]!.fill) expect(card.width).toBeGreaterThanOrEqual(Math.min(input[i]!.width, width));
+        else expect(card.width).toBe(Math.min(input[i]!.width, width));
         expect(card.height).toBe(input[i]!.height);
         expect(card.x).toBeGreaterThanOrEqual(0);
         expect(card.x + card.width).toBeLessThanOrEqual(width + 1e-6);
@@ -57,6 +58,30 @@ describe('skyline packing', () => {
   it('fills the lowest free edge first', () => {
     const placed = packSkyline([{width: 290, height: 200, fill: false}, {width: 290, height: 50, fill: false}, {width: 290, height: 50, fill: false}], 600, 10);
     expect(placed[2]).toMatchObject({x: 300, y: 60});
+  });
+});
+
+describe('fill spans', () => {
+  it('gives a fill card the free span where it lands, a gap before the next card', () => {
+    const placed = packSkyline([
+      {width: 200, height: 100, fill: false},
+      {width: 300, height: 40, fill: true},
+      {width: 150, height: 300, fill: false},
+    ], 1000, 10);
+    // The fill card lands beside the first card and takes the rest of the row.
+    expect(placed[1]).toEqual({x: 210, y: 0, width: 790, height: 40});
+    // A later card goes under it.
+    expect(placed[2]!.y).toBeGreaterThanOrEqual(50);
+  });
+
+  it('stops at a taller card in the way', () => {
+    const placed = packSkyline([
+      {width: 300, height: 50, fill: false},
+      {width: 300, height: 200, fill: false},
+      {width: 200, height: 40, fill: true},
+    ], 640, 10);
+    // No room at the top right: under the first card, up to the second one.
+    expect(placed[2]).toEqual({x: 0, y: 60, width: 300, height: 40});
   });
 });
 

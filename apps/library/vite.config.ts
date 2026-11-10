@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+import {existsSync, readFileSync, statSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import type {Plugin} from 'vite';
 import {defineConfig} from 'vitest/config';
@@ -43,11 +45,39 @@ const summaries: Plugin = {
   },
 };
 
+// The home page keeps pictures of each element per build. This key changes
+// when a package is rebuilt or the library's drawing code changes, so a
+// picture always shows the code that is running.
+function pictureVersion(): string {
+  const hash = createHash('sha256');
+  for (const pkg of ['platform/kernel', 'packages/ui', 'packages/score', 'packages/audio']) {
+    const manifest = `${repositoryRoot}${pkg}/package.json`;
+    hash.update(readFileSync(manifest));
+    const dist = `${repositoryRoot}${pkg}/dist`;
+    if (existsSync(dist)) hash.update(String(statSync(dist).mtimeMs));
+  }
+  for (const file of ['src/compose.ts', 'src/recipes.ts', 'src/render.ts', 'src/snapshot.ts', 'src/elements.ts']) {
+    hash.update(readFileSync(fileURLToPath(new URL(file, import.meta.url))));
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+
 export default defineConfig({
   publicDir,
+  define: {__LIBRARY_PICTURE_VERSION__: JSON.stringify(pictureVersion())},
   plugins: [stubOptionalPeers, summaries],
   server: {fs: {allow: [repositoryRoot]}},
-  build: {target: 'es2022', rollupOptions: {external: OPTIONAL_AUDIO_PEERS}},
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      external: OPTIONAL_AUDIO_PEERS,
+      // The library page and the background frame that draws its pictures.
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        render: fileURLToPath(new URL('render.html', import.meta.url)),
+      },
+    },
+  },
   worker: {format: 'es', rollupOptions: {external: OPTIONAL_AUDIO_PEERS}},
   test: {environment: 'jsdom', include: ['test/**/*.test.ts']},
 });

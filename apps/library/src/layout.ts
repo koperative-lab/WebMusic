@@ -39,11 +39,14 @@ export function topologicalOrder<T extends Ordered>(entries: readonly T[]): T[] 
   return order;
 }
 
-/** A card to place: its size in pixels, and whether it may grow sideways. */
+/**
+ * A card to place. A `fill` card's element stretches to any width without
+ * changing height: `width` is the least it needs, and packing gives it the
+ * whole free span where it lands.
+ */
 export interface Box {
   readonly width: number;
   readonly height: number;
-  /** The element stretches to any width without changing height. */
   readonly fill: boolean;
 }
 
@@ -55,10 +58,12 @@ export interface Placed {
 }
 
 /**
- * Pack cards of exact sizes into a column `containerWidth` wide, in order. A
- * skyline tracks the lowest free edge across the width; each card takes the
- * position where its top is highest (then leftmost) and its width fits. Cards
- * are `gap` apart and never wider than the container.
+ * Pack cards into a column `containerWidth` wide, in order. A skyline tracks
+ * the lowest free edge across the width; each card takes the position where
+ * its top is highest (then leftmost) and its width fits. A fill card then
+ * widens to the free span at that height — up to the next card that is in the
+ * way, a gap before it, or the container edge — so it closes the row its
+ * neighbours leave. Cards are `gap` apart and never wider than the container.
  */
 export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: number): Placed[] {
   const width = Math.max(1, containerWidth);
@@ -76,8 +81,19 @@ export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: 
       if (!best || y < best.y - 1e-6 || (Math.abs(y - best.y) <= 1e-6 && x < best.x)) best = {x, y};
     }
     const {x, y} = best ?? {x: 0, y: Math.max(...skyline.map((segment) => segment.y))};
+    let span = w;
+    if (box.fill) {
+      // Walk right while the skyline stays at or below this card's top.
+      let end = x;
+      for (const segment of skyline) {
+        if (segment.end <= end) continue;
+        if (segment.x > end + 1e-6 || segment.y > y + 1e-6) break;
+        end = segment.end;
+      }
+      span = Math.max(w, end >= width - 1e-6 ? width - x : end - x - gap);
+    }
     const bottom = y + box.height + gap;
-    const right = x + w + gap;
+    const right = x + span + gap;
     const next: typeof skyline = [];
     for (const segment of skyline) {
       if (segment.end <= x || segment.x >= right) { next.push(segment); continue; }
@@ -92,7 +108,7 @@ export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: 
         else merged.push({...segment});
         return merged;
       }, []);
-    return {x, y, width: w, height: box.height};
+    return {x, y, width: span, height: box.height};
   });
 }
 

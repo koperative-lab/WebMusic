@@ -9,7 +9,9 @@ import {LIBRARY, byTag, type LibraryEntry} from './catalog.ts';
 import {composeApp, page, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
-import {fitPreview, packSkyline, packedHeight, stretchFills, topologicalOrder, type Box, type PreviewFit, type Size} from './layout.ts';
+import {packSkyline, packedHeight, stretchFills, topologicalOrder, type Box, type Size} from './layout.ts';
+import {anyPicture, cancelPending, loadPictures, pictureFor, pictureUrl, prioritize, requestPicture} from './pictures.ts';
+import type {PictureJob} from './render.ts';
 import {CATEGORIES, type CategoryId} from './recipes.ts';
 import {search, type Family} from './search.ts';
 import type {ParamSpec} from '../../doc/webmusic/src/lib/params/index.ts';
@@ -194,14 +196,10 @@ function stopAll(): void {
  * Mount a composition into `stage` and keep `onError` informed. Returns the
  * cleanup, which aborts a mount still loading.
  */
-function mountLive(stage: HTMLElement, tags: readonly string[], overrides: Overrides, onError: (reason: unknown) => void, card?: number): () => void {
+function mountLive(stage: HTMLElement, tags: readonly string[], overrides: Overrides, onError: (reason: unknown) => void): () => void {
   const controller = new AbortController();
   let teardown: (() => void) | undefined;
-  // Cards share the document, so each card's ids get a prefix of their own.
-  const composition = card !== undefined
-    ? composeApp(tags, {mediaBase: import.meta.env.BASE_URL, overrides, bareHosts: true, idPrefix: `c${card}-`})
-    : liveComposition(tags, overrides);
-  mountComposition(stage, composition, onError, controller.signal)
+  mountComposition(stage, liveComposition(tags, overrides), onError, controller.signal)
     .then((cleanup) => { if (controller.signal.aborted) cleanup(); else teardown = cleanup; })
     .catch((reason: unknown) => { if (!controller.signal.aborted) onError(reason); });
   const stop = () => {
@@ -220,8 +218,9 @@ interface Card {
   readonly entry: LibraryEntry;
   readonly element: HTMLElement;
   readonly frame: HTMLElement;
-  readonly stage: HTMLElement;
-  stop?: () => void;
+  readonly image: HTMLImageElement;
+  /** The picture the card's current width asks for. */
+  job?: PictureJob;
 }
 
 const GAP = 16;
@@ -234,25 +233,13 @@ let resizeObserver: ResizeObserver | undefined;
 let scheduled = 0;
 let relayout: () => void = () => {};
 
-// Each element's own size, measured once it has drawn and kept for later
-// visits, so a card is as large as its element from the first layout on.
-const SIZES_KEY = 'webmusic-library:sizes:v1';
-const measured = new Map<string, Size>(Object.entries((() => {
-  try { return JSON.parse(storage?.getItem(SIZES_KEY) ?? '{}') as Record<string, Size>; } catch { return {}; }
-})()));
-let saveSizes = 0;
-
 const isFill = (card: Card) => card.entry.recipe.preview.fit === 'fill';
-const natural = (card: Card): Size => measured.get(card.entry.tag) ?? card.entry.recipe.preview;
 
-/** The card's frame width and height for its element at a given card width. */
-function frameFor(card: Card, cardWidth: number): {fit: PreviewFit; width: number; height: number; layout: number} {
-  const width = Math.max(1, cardWidth - 2);
-  const size = natural(card);
-  // A fill element lays out at the card's width; one with its own width keeps it.
-  const layout = isFill(card) ? Math.max(width, Math.min(size.width, width)) : size.width;
-  const fit = fitPreview({width, height: 0}, {width: layout, height: size.height});
-  return {fit, width, height: Math.ceil(size.height * fit.scale), layout};
+/** The element's size: from its picture once drawn, else the recipe's estimate. */
+function sizeOf(card: Card, frameWidth?: number): Size {
+  const picture = isFill(card) && frameWidth ? pictureFor({tag: card.entry.tag, width: frameWidth}) ?? anyPicture(card.entry.tag) : anyPicture(card.entry.tag);
+  if (picture && isFill(card) && frameWidth) return {width: frameWidth, height: Math.round(picture.height * Math.min(1, frameWidth / picture.width)) || picture.height};
+  return picture ?? card.entry.recipe.preview;
 }
 
 let chrome = 0;
@@ -262,87 +249,91 @@ function chromeHeight(card: Card): number {
   return chrome;
 }
 
-/** Size a card's frame to its element and scale the element only if the card is narrower. */
-function applyFit(card: Card): void {
-  const {fit, height, layout} = frameFor(card, card.element.offsetWidth);
-  card.stage.style.width = isFill(card) ? `${layout}px` : 'max-content';
-  card.stage.style.transform = fit.scale < 1 ? `scale(${fit.scale})` : '';
-  card.stage.style.left = `${fit.left}px`;
-  card.frame.style.height = `${height}px`;
-}
-
-/** Read the element's size once it has drawn; re-pack when it differs from what the layout used. */
-function measure(card: Card): void {
-  if (!card.stage.childElementCount) return;
-  const previous = natural(card);
-  const size = {
-    width: isFill(card) ? previous.width : card.stage.offsetWidth,
-    height: card.stage.scrollHeight,
-  };
-  if (Math.abs(size.width - previous.width) <= 1 && Math.abs(size.height - previous.height) <= 1) return;
-  measured.set(card.entry.tag, size);
-  clearTimeout(saveSizes);
-  saveSizes = window.setTimeout(() => {
-    try { storage?.setItem(SIZES_KEY, JSON.stringify(Object.fromEntries(measured))); } catch { /* Sizes are measured again next visit. */ }
-  }, 500);
-  cancelAnimationFrame(scheduled);
-  scheduled = requestAnimationFrame(() => relayout());
-}
-
-/** A card shows how its element looks: mounted, then made inert. */
-function mountCard(card: Card): void {
-  if (card.stop) return;
-  card.element.classList.remove('lb-card--failed');
-  const stop = mountLive(card.stage, [card.entry.tag], {}, () => card.element.classList.add('lb-card--failed'), cards.indexOf(card));
-  applyFit(card);
-  const sizer = new ResizeObserver(() => measure(card));
-  sizer.observe(card.stage);
-  card.stop = () => { sizer.disconnect(); stop(); card.stop = undefined; };
+/** Show the best picture there is for the card's width, and ask for the exact one. */
+function paint(card: Card, frameWidth: number, priority: number): void {
+  const job: PictureJob = isFill(card) ? {tag: card.entry.tag, width: Math.round(frameWidth)} : {tag: card.entry.tag};
+  card.job = job;
+  const exact = pictureFor(job);
+  const shown = exact ?? anyPicture(card.entry.tag);
+  if (shown) {
+    const url = pictureUrl(shown);
+    if (card.image.getAttribute('src') !== url) card.image.src = url;
+    card.image.hidden = false;
+  } else {
+    card.image.hidden = true;
+  }
+  card.element.classList.toggle('lb-card--drawing', !exact);
+  if (exact) return;
+  requestPicture(job, priority).then((picture) => {
+    if (card.job !== job) return;
+    card.element.classList.remove('lb-card--drawing', 'lb-card--failed');
+    card.image.src = pictureUrl(picture);
+    card.image.hidden = false;
+    // Its real size may differ from the estimate the layout used.
+    cancelAnimationFrame(scheduled);
+    scheduled = requestAnimationFrame(() => relayout());
+  }, (error: unknown) => {
+    if (card.job !== job || (error instanceof DOMException && error.name === 'AbortError')) return;
+    card.element.classList.remove('lb-card--drawing');
+    card.element.classList.add('lb-card--failed');
+  });
 }
 
 function cardFor(entry: LibraryEntry): Card {
-  // The preview is a picture of the element: no focus, pointer or keyboard reaches it.
-  const frame = h('div', {class: 'lb-card__frame', inert: ''});
-  const stage = h('div', {class: 'lb-card__stage'});
-  frame.append(stage);
+  // A still picture of the element: no element is mounted on this page.
+  const image = h('img', {class: 'lb-card__picture', alt: '', decoding: 'async', draggable: 'false', hidden: ''});
+  const frame = h('div', {class: 'lb-card__frame'}, image);
   const tag = h('button', {type: 'button', class: 'lb-chip', 'aria-pressed': String(category === entry.category.id), title: entry.category.label}, entry.category.short);
   tag.addEventListener('click', () => { category = category === entry.category.id ? undefined : entry.category.id; refilter(); });
   const element = h('article', {class: 'lb-card', 'data-tag': entry.tag, title: entry.summary});
-  const card: Card = {entry, element, frame, stage};
   element.append(
     h('header', {class: 'lb-card__head'},
       h('a', {class: 'lb-card__name', href: `#/c/${entry.tag}`}, entry.tag),
       tag,
       selection.includes(entry.tag) ? h('span', {class: 'lb-card__chosen', 'aria-label': 'In your app', title: 'In your app'}, icon('check')) : null),
     frame);
-  return card;
+  return {entry, element, frame, image};
 }
 
 function layoutReel(reel: HTMLElement): void {
   const width = Math.max(1, reel.clientWidth - PAD * 2);
   let top = PAD;
+  const viewportBottom = window.scrollY + window.innerHeight;
   // Each family is a segment of its own, so packing never pulls a card across.
   for (const family of ['Score', 'Audio'] as const) {
     const segment = cards.filter((card) => card.entry.family === family);
     if (!segment.length) continue;
     const boxes: Box[] = segment.map((card) => {
-      const size = natural(card);
-      const cardWidth = Math.min(width, Math.max(headWidth(card.entry.tag), isFill(card) ? card.entry.recipe.preview.width : size.width + 2));
-      return {width: cardWidth, height: chromeHeight(card) + frameFor(card, cardWidth).height, fill: isFill(card)};
+      const fill = isFill(card);
+      const own = sizeOf(card);
+      const cardWidth = Math.min(width, Math.max(headWidth(card.entry.tag), fill ? card.entry.recipe.preview.width : own.width + 2));
+      return {width: cardWidth, height: chromeHeight(card) + (fill ? own.height : sizeOf(card).height), fill};
     });
     const placed = stretchFills(packSkyline(boxes, width, GAP), boxes, width, GAP);
     segment.forEach((card, index) => {
       const spot = placed[index]!;
+      const frameWidth = Math.max(1, spot.width - 2);
       Object.assign(card.element.style, {left: `${PAD + spot.x}px`, top: `${top + spot.y}px`, width: `${spot.width}px`});
-      applyFit(card);
+      const size = sizeOf(card, frameWidth);
+      // A stretching element fills the card; one with its own width sits centred in it.
+      const scale = Math.min(1, frameWidth / Math.max(1, size.width));
+      card.frame.style.height = `${Math.round(size.height * (isFill(card) ? 1 : scale))}px`;
+      Object.assign(card.image.style, isFill(card)
+        ? {width: '100%', height: '100%', left: '0px'}
+        : {width: `${size.width * scale}px`, height: `${size.height * scale}px`, left: `${Math.max(0, (frameWidth - size.width * scale) / 2)}px`});
+      // On screen first, then down the page.
+      const y = top + spot.y;
+      paint(card, frameWidth, y < viewportBottom + 200 ? y : 100000 + y);
     });
     top += packedHeight(placed) + GAP * 2;
   }
   reel.style.height = `${top - GAP * 2 + PAD}px`;
+  // Pictures for widths no card has any more are not drawn.
+  const wanted = new Set(cards.map((card) => JSON.stringify(card.job)));
+  cancelPending((job) => wanted.has(JSON.stringify(job)));
 }
 
 function renderReel(): void {
-  stopAll();
   reelObserver?.disconnect();
   resizeObserver?.disconnect();
   const entries = topologicalOrder(search(LIBRARY, query, family).filter((entry) => !category || entry.category.id === category));
@@ -356,6 +347,8 @@ function renderReel(): void {
   main.replaceChildren(reel);
   main.classList.add('lb-main--reel');
   relayout = () => layoutReel(reel);
+  void picturesLoaded.then(() => { if (relayout === layoutRef) layoutReel(reel); });
+  const layoutRef = relayout;
   layoutReel(reel);
   let lastWidth = reel.clientWidth;
   resizeObserver = new ResizeObserver(() => {
@@ -364,16 +357,14 @@ function renderReel(): void {
     layoutReel(reel);
   });
   resizeObserver.observe(reel);
-  // Mount what is on screen or close to it; release what scrolls far away.
+  // A card scrolled into view moves to the front of the drawing queue.
   const byElement = new Map(cards.map((card) => [card.element as Element, card]));
   reelObserver = new IntersectionObserver((records) => {
     for (const record of records) {
       const card = byElement.get(record.target);
-      if (!card) continue;
-      if (record.isIntersecting) mountCard(card);
-      else card.stop?.();
+      if (card?.job && record.isIntersecting) prioritize(card.job, -1);
     }
-  }, {rootMargin: '800px 0px'});
+  }, {rootMargin: '400px 0px'});
   for (const card of cards) reelObserver.observe(card.element);
   announce(`${cards.length} component${cards.length === 1 ? '' : 's'}`);
 }
@@ -554,6 +545,9 @@ function render(): void {
     : route.kind === 'app' ? 'Your app · WebMusic library' : 'WebMusic library';
   if (route.kind !== 'catalog') { window.scrollTo(0, 0); main.focus({preventScroll: true}); }
 }
+
+/** This build's pictures, read from the browser before the first full layout. */
+const picturesLoaded = loadPictures();
 
 app.replaceChildren(bar, main, announcer);
 window.addEventListener('hashchange', render);

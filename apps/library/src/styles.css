@@ -112,17 +112,19 @@ button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
 .lb-card__head > .lb-chip { position: relative; z-index: 2; }
 .lb-card__chosen { margin-left: auto; display: inline-flex; color: var(--lb-ink); }
 .lb-card__frame { position: relative; flex: none; overflow: hidden; }
-.lb-card__stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: grid; gap: 12px; padding: 12px; }
+/* The element's still picture: drawn once in the background, shown as an image. */
+.lb-card__picture { position: absolute; top: 0; left: 0; display: block; max-width: none; user-select: none; -webkit-user-drag: none; }
+.lb-card__picture[hidden] { display: none; }
+/* Waiting for its picture: a quiet raised fill, no text. */
+.lb-card--drawing .lb-card__frame { background: var(--lb-raised); }
+.lb-card--drawing .lb-card__picture:not([hidden]) { opacity: .5; }
 .lb-card--failed .lb-card__frame { background: repeating-linear-gradient(45deg, transparent 0 8px, var(--lb-raised) 8px 9px); }
-.lb-card--failed .lb-card__stage { visibility: hidden; }
 
 /* Package elements default to inline; give each one a block of its own and
    space the members a player or desk composes by the same gap. */
-:where(.lb-card__stage, .lb-canvas) > :where(:not([hidden], style, script, template)) { display: block; min-width: 0; max-width: 100%; }
-:where(.lb-card__stage, .lb-canvas) :where(score-player, audio-player, audio-mixer, score-rack-control, score-rack-part) > :where(:not([hidden], style, script, template, score-effect, audio-effect)) { display: block; margin-top: var(--lb-gap); }
-:where(.lb-card__stage, .lb-canvas) score-rack-control::part(rack-control-root) { margin-top: var(--lb-gap); }
-/* A hidden transport leaves no gap above the element it serves. */
-:where(.lb-card__stage) :where(score-player, audio-player)[controls="hide"] > :where(:first-child) { margin-top: 0; }
+:where(.lb-canvas) > :where(:not([hidden], style, script, template)) { display: block; min-width: 0; max-width: 100%; }
+:where(.lb-canvas) :where(score-player, audio-player, audio-mixer, score-rack-control, score-rack-part) > :where(:not([hidden], style, script, template, score-effect, audio-effect)) { display: block; margin-top: var(--lb-gap); }
+:where(.lb-canvas) score-rack-control::part(rack-control-root) { margin-top: var(--lb-gap); }
 
 /* ------------------------------------------------------------ fields and actions */
 .lb-choice { display: flex; flex-wrap: wrap; }
