@@ -1,10 +1,9 @@
-// The reel: cards of different footprints packed into a fixed number of
-// columns down a vertical scroll (packColumns), using the row packer on its side. Order is topological — every element follows the
-// element it attaches to (a view its player, a part its desk, a recorder its
-// note input) — so related cards sit next to each other. Packing lets a card
-// a few places later take a hole the next card cannot fill, then grows cards
-// into whatever cells stay empty.
-import type {CardSize, Recipe} from './recipes.ts';
+// The reel: cards as large as the elements they show, packed down a vertical
+// page. Order is topological — every element follows the element it attaches
+// to (a view its player, a part its desk, a recorder its note input) — so
+// related cards sit near each other. A skyline packs the exact card sizes,
+// then cards whose element stretches widen into the free space beside them.
+import type {Recipe} from './recipes.ts';
 
 /** The element a recipe attaches to in a composition, if any. */
 export function parentOf(recipe: Recipe): string | undefined {
@@ -40,173 +39,102 @@ export function topologicalOrder<T extends Ordered>(entries: readonly T[]): T[] 
   return order;
 }
 
-export interface Placement {
-  /** Column and row of the top-left cell. */
+/** A card to place: its size in pixels, and whether it may grow sideways. */
+export interface Box {
+  readonly width: number;
+  readonly height: number;
+  /** The element stretches to any width without changing height. */
+  readonly fill: boolean;
+}
+
+export interface Placed {
   readonly x: number;
   readonly y: number;
-  readonly w: number;
-  readonly h: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 /**
- * Pack cards into `rows` rows, keeping their order as far as holes allow.
- * Each step looks for the earliest free cell at or after `lookback` columns
- * before the previous card. The first of the next `lookahead` cards that fits
- * there takes it; if none fits, the next card takes its own leftmost (then
- * topmost) free spot. Footprints are clamped to the rows and `maxColumns`.
- * Placements are returned in input order.
+ * Pack cards of exact sizes into a column `containerWidth` wide, in order. A
+ * skyline tracks the lowest free edge across the width; each card takes the
+ * position where its top is highest (then leftmost) and its width fits. Cards
+ * are `gap` apart and never wider than the container.
  */
-export function packReel(sizes: readonly CardSize[], rows: number, maxColumns = Infinity, lookback = 3, lookahead = 4): Placement[] {
-  const height = Math.max(1, Math.floor(rows));
-  const taken: boolean[][] = [];
-  const free = (x: number, y: number, w: number, h: number) => {
-    if (y + h > height) return false;
-    for (let column = x; column < x + w; column += 1) {
-      for (let row = y; row < y + h; row += 1) if (taken[column]?.[row]) return false;
+export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: number): Placed[] {
+  const width = Math.max(1, containerWidth);
+  // Segments of the skyline: [x, end) has its free edge at y.
+  let skyline = [{x: 0, end: width, y: 0}];
+  return boxes.map((box) => {
+    const w = Math.min(box.width, width);
+    let best: {x: number; y: number} | undefined;
+    for (const start of skyline) {
+      const x = start.x;
+      if (x + w > width + 1e-6) continue;
+      // The card and the gap after it must clear everything under them.
+      const reach = Math.min(x + w + gap, width);
+      const y = Math.max(...skyline.filter((segment) => segment.x < reach && segment.end > x).map((segment) => segment.y));
+      if (!best || y < best.y - 1e-6 || (Math.abs(y - best.y) <= 1e-6 && x < best.x)) best = {x, y};
     }
-    return true;
-  };
-  const clamp = (size: CardSize) => ({w: Math.max(1, Math.min(size.w, Math.floor(maxColumns))), h: Math.max(1, Math.min(size.h, height))});
-  const placements: Placement[] = new Array(sizes.length);
-  const remaining = sizes.map((_, index) => index);
-  let previous = 0;
-  while (remaining.length) {
-    const from = Math.max(0, previous - lookback);
-    let hole: [number, number] | undefined;
-    for (let x = from; !hole; x += 1) {
-      for (let y = 0; y < height; y += 1) if (!taken[x]?.[y]) { hole = [x, y]; break; }
+    const {x, y} = best ?? {x: 0, y: Math.max(...skyline.map((segment) => segment.y))};
+    const bottom = y + box.height + gap;
+    const right = x + w + gap;
+    const next: typeof skyline = [];
+    for (const segment of skyline) {
+      if (segment.end <= x || segment.x >= right) { next.push(segment); continue; }
+      if (segment.x < x) next.push({x: segment.x, end: x, y: segment.y});
+      if (segment.end > right) next.push({x: right, end: segment.end, y: segment.y});
     }
-    const [hx, hy] = hole;
-    let pick = remaining.slice(0, lookahead).find((index) => {
-      const {w, h} = clamp(sizes[index]!);
-      return free(hx, hy, w, h);
-    });
-    let spot: Placement | undefined;
-    if (pick !== undefined) {
-      spot = {x: hx, y: hy, ...clamp(sizes[pick]!)};
-    } else {
-      pick = remaining[0]!;
-      const {w, h} = clamp(sizes[pick]!);
-      for (let x = from; !spot; x += 1) {
-        for (let y = 0; y + h <= height; y += 1) if (free(x, y, w, h)) { spot = {x, y, w, h}; break; }
-      }
-    }
-    for (let column = spot.x; column < spot.x + spot.w; column += 1) {
-      taken[column] ??= [];
-      for (let row = spot.y; row < spot.y + spot.h; row += 1) taken[column]![row] = true;
-    }
-    placements[pick] = spot;
-    remaining.splice(remaining.indexOf(pick), 1);
-    previous = spot.x;
-  }
-  return placements;
+    next.push({x, end: Math.min(right, width), y: bottom});
+    skyline = next.sort((a, b) => a.x - b.x)
+      .reduce<typeof skyline>((merged, segment) => {
+        const last = merged.at(-1);
+        if (last && last.end >= segment.x - 1e-6 && Math.abs(last.y - segment.y) <= 1e-6) last.end = Math.max(last.end, segment.end);
+        else merged.push({...segment});
+        return merged;
+      }, []);
+    return {x, y, width: w, height: box.height};
+  });
 }
 
 /**
- * Grow cards into empty neighbouring cells until nothing moves, so the packed
- * reel closes up into a mosaic. A card grows one column or row at a time, to
- * the right, down, left or up, only across a strip that is entirely free and
- * inside the reel's rows and its first `columns` columns, never wider than
- * `maxColumns`, and at most `alongGrowth` columns wider than it was packed —
- * columns run along the scroll, so this keeps a card near its own length.
- * Cards never shrink, move or overlap.
+ * Widen every `fill` card into the free space beside it — up to the next
+ * card that overlaps its height, or the container edge — so rows close up.
+ * Heights do not change: a fill element keeps its height at any width.
  */
-export function fillHoles(placements: readonly Placement[], rows: number, columns = reelColumns(placements), maxColumns = Infinity, alongGrowth = Infinity): Placement[] {
-  const cards = placements.map((placement) => ({...placement}));
-  const limit = placements.map((placement) => Math.min(maxColumns, placement.w + alongGrowth));
-  const occupied = (x: number, y: number, skip: number) => x < 0 || y < 0 || x >= columns || y >= rows
-    || cards.some((card, index) => index !== skip && x >= card.x && x < card.x + card.w && y >= card.y && y < card.y + card.h);
-  const strip = (skip: number, cells: [number, number][]) => cells.every(([x, y]) => !occupied(x, y, skip));
-  const range = (start: number, length: number) => Array.from({length}, (_, offset) => start + offset);
-  for (let grew = true; grew;) {
-    grew = false;
-    cards.forEach((card, index) => {
-      const wider = card.w < limit[index]!;
-      if (wider && strip(index, range(card.y, card.h).map((y) => [card.x + card.w, y]))) { card.w += 1; grew = true; }
-      if (strip(index, range(card.x, card.w).map((x) => [x, card.y + card.h]))) { card.h += 1; grew = true; }
-      if (card.w < limit[index]! && strip(index, range(card.y, card.h).map((y) => [card.x - 1, y]))) { card.x -= 1; card.w += 1; grew = true; }
-      if (strip(index, range(card.x, card.w).map((x) => [x, card.y - 1]))) { card.y -= 1; card.h += 1; grew = true; }
-    });
-  }
-  return cards;
+export function stretchFills(placed: readonly Placed[], boxes: readonly Box[], containerWidth: number, gap: number): Placed[] {
+  const result = placed.map((card) => ({...card}));
+  result.forEach((card, index) => {
+    if (!boxes[index]?.fill) return;
+    const beside = result.filter((other, j) => j !== index && other.y < card.y + card.height && card.y < other.y + other.height);
+    const right = Math.min(containerWidth, ...beside.filter((other) => other.x >= card.x + card.width).map((other) => other.x - gap));
+    const left = Math.max(0, ...beside.filter((other) => other.x + other.width <= card.x).map((other) => other.x + other.width + gap));
+    card.x = left;
+    card.width = right - left;
+  });
+  return result;
 }
 
-/** Cells inside the reel's span that no card covers. */
-export function emptyCells(placements: readonly Placement[], rows: number): number {
-  return reelColumns(placements) * rows - placements.reduce((sum, placement) => sum + placement.w * placement.h, 0);
-}
-
-/**
- * The reel layout: pack with growing look-ahead and look-back, close holes,
- * and keep the result with the fewest empty cells. Ties keep the smallest
- * look-ahead, which bends topological order least.
- */
-export function packMosaic(sizes: readonly CardSize[], rows: number, maxColumns = Infinity, alongGrowth = Infinity): Placement[] {
-  let best: Placement[] | undefined;
-  let fewest = Infinity;
-  for (let lookahead = 1; lookahead <= 8 && fewest > 0; lookahead += 1) {
-    for (const lookback of [1, 3, 6]) {
-      const packed = packReel(sizes, rows, maxColumns, lookback, lookahead);
-      const filled = fillHoles(packed, rows, reelColumns(packed), maxColumns, alongGrowth);
-      const empty = emptyCells(filled, rows);
-      if (empty < fewest) { best = filled; fewest = empty; }
-      if (fewest === 0) break;
-    }
-  }
-  return best ?? [];
-}
-
-/**
- * The vertical reel: a fixed number of columns, growing downward. It is the
- * mosaic packed on its side — footprints and placements are transposed — so
- * cards fill each band left to right before the next one starts below.
- */
-export function packColumns(sizes: readonly CardSize[], columns: number): Placement[] {
-  const across = Math.max(1, Math.floor(columns));
-  // Down the page a card may grow by one row at most, so tall cards stay their size.
-  return packMosaic(sizes.map((size) => ({w: size.h, h: Math.min(size.w, across)})), across, Infinity, 1)
-    .map((placement) => ({x: placement.y, y: placement.x, w: placement.h, h: placement.w}));
-}
-
-/** Rows the vertical reel spans. */
-export function reelRows(placements: readonly Placement[]): number {
-  return placements.reduce((end, placement) => Math.max(end, placement.y + placement.h), 0);
-}
-
-/** Columns the packed reel spans. */
-export function reelColumns(placements: readonly Placement[]): number {
-  return placements.reduce((end, placement) => Math.max(end, placement.x + placement.w), 0);
+/** The height a packed column takes. */
+export function packedHeight(placed: readonly Placed[]): number {
+  return placed.reduce((end, card) => Math.max(end, card.y + card.height), 0);
 }
 
 export interface Size { readonly width: number; readonly height: number }
 
-/** How a card shows its element: the width it lays out at, the scale and the centred offset. */
+/** How a card shows its element: the scale and the centred offset. */
 export interface PreviewFit {
-  readonly design: number;
   readonly scale: number;
   readonly left: number;
   readonly top: number;
 }
 
 /**
- * Lay the element out at the card's width, but never narrower than
- * `minDesign` so it keeps its own proportions on small cards. Then scale it
- * down — never up — until its laid-out width and height both fit the frame,
- * and centre it. `content` is measured at the design width; an element wider
- * than that (a fixed-width surface) still fits.
+ * Scale an element down — never up — until its laid-out width fits the
+ * frame, and centre it across. The card's height follows the scaled element,
+ * so nothing is left above or below it.
  */
-export function fitPreview(frame: Size, content: Size, minDesign = 480): PreviewFit {
-  const design = Math.max(frame.width, minDesign);
-  const width = Math.max(design, content.width, 1);
-  const height = Math.max(content.height, 1);
-  const scale = Math.min(1, frame.width / width, frame.height / height);
-  return {
-    design,
-    scale,
-    left: Math.max(0, (frame.width - width * scale) / 2),
-    top: Math.max(0, (frame.height - height * scale) / 2),
-  };
+export function fitPreview(frame: Size, content: Size): PreviewFit {
+  const width = Math.max(content.width, 1);
+  const scale = Math.min(1, frame.width / width);
+  return {scale, left: Math.max(0, (frame.width - width * scale) / 2), top: 0};
 }
-
-/** The design width a card lays its element out at, before measuring it. */
-export const designWidth = (frame: Size, minDesign = 480): number => Math.max(frame.width, minDesign);

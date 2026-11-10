@@ -27,20 +27,23 @@ development and at the published site in a production build; set
 
 ## Use
 
-- **The reel.** The home page is a white mosaic of cards that scrolls
+- **The reel.** The home page is a white wall of cards that scrolls
   vertically. A card shows the element's name, its category tag and a still
   picture of the element on Arabesque No. 1 — no controls, playback or
-  interaction; click it to open the element's page, where the demo is. Each
-  card's footprint follows how much room its element draws in, at a readable
-  size; the number of columns follows the window's width, and each picture is
-  laid out at its card's width (480px at least) and scaled down — never up —
-  to fit inside the card. Hovering a card only outlines it.
+  interaction; click it to open the element's page, where the demo is. Hovering
+  a card only outlines it.
+- **Cards fit their elements.** Every card is exactly as tall as its element.
+  An element with a width of its own (faders, knobs, keys, a scope, a meter)
+  gets a card exactly that wide; an element that stretches (a transport, a
+  staff, a lane, a waveform) starts at a preferred width and widens into the
+  free space beside it. Only an element wider than the window is scaled down.
+  Sizes are measured once an element has drawn and kept in the browser, so
+  later visits lay out at the right sizes straight away.
 - **Order.** Score and Audio are separate segments, Score first. In each,
   cards follow the composition tree depth-first: each player is followed by
   what attaches to it (a desk and its part, a note input and its recorder,
-  views, analysis, meters). Packing lets a card a few places later take a
-  hole, then grows cards into empty cells — sideways freely, down the page by
-  one row at most — so the reel closes into a mosaic.
+  views, analysis, meters). A skyline packs the cards at their exact sizes, a
+  gap apart, each into the highest free spot where it fits.
 - **Filter.** All, Score or Audio at the top; press `/` to search. Every term
   must match the tag, its category or synonyms, its family and entry, its
   purpose, or one of its attributes, properties or events (`microphone`, `fft`,
@@ -73,7 +76,7 @@ as Vite, and replace the Arabesque URLs with your own files.
 | Tags, families, capabilities, behaviour and presenters | [`apps/doc/shared/ui-catalog.ts`](../doc/shared/ui-catalog.ts) |
 | Entries, attributes, properties and events | [Parameter catalog](../doc/webmusic/src/lib/params/index.ts) |
 | One-line purpose | The first sentence of each owning documentation page, read at build time by [`summaries.ts`](summaries.ts) |
-| Functional group and card tag, card footprint, search synonyms, define function and composition slot | [`src/recipes.ts`](src/recipes.ts), the library's only own inventory |
+| Functional group and card tag, card sizing (own width or stretch) with first-layout estimates, search synonyms, define function and composition slot | [`src/recipes.ts`](src/recipes.ts), the library's only own inventory |
 | Composition rules | [`src/compose.ts`](src/compose.ts); the live canvas and the copied code both come from it |
 
 A new public element fails the library tests until it has a recipe. Tests also
@@ -85,7 +88,7 @@ recipes write only observed attributes.
 | Path | Contents |
 |---|---|
 | `src/main.ts` | Routing, the vertical reel of still cards, element page with Parameters, and the app composer |
-| `src/layout.ts` | Topological order, look-ahead packing, hole closing, the mosaic search and its vertical form, and how a card fits its picture |
+| `src/layout.ts` | Topological order, skyline packing at exact card sizes, widening stretch cards, and how a card fits its picture |
 | `src/catalog.ts` | Library entries joined from the catalogs above |
 | `src/compose.ts` | Selection → nested markup, define imports and a complete page |
 | `src/elements.ts` | Loads the element entries and mounts a composition in a live canvas |

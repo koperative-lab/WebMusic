@@ -9,7 +9,7 @@ import {LIBRARY, byTag, type LibraryEntry} from './catalog.ts';
 import {composeApp, page, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
-import {designWidth, fitPreview, packColumns, reelRows, topologicalOrder} from './layout.ts';
+import {fitPreview, packSkyline, packedHeight, stretchFills, topologicalOrder, type Box, type PreviewFit, type Size} from './layout.ts';
 import {CATEGORIES, type CategoryId} from './recipes.ts';
 import {search, type Family} from './search.ts';
 import type {ParamSpec} from '../../doc/webmusic/src/lib/params/index.ts';
@@ -226,23 +226,67 @@ interface Card {
 
 const GAP = 16;
 const PAD = 16;
-/** Column width the reel aims for, and the fixed height of one row. */
-const TARGET_COLUMN = 168;
-const ROW = 150;
+/** Width a card needs for its name and tag. */
+const headWidth = (tag: string) => Math.ceil(tag.length * 7.5 + 112);
 let cards: Card[] = [];
 let reelObserver: IntersectionObserver | undefined;
 let resizeObserver: ResizeObserver | undefined;
+let scheduled = 0;
+let relayout: () => void = () => {};
 
-/** Lay the element out at the card's width (480px at least), then scale it down to fit and centre it. */
-function fit(card: Card): void {
-  const {frame, stage} = card;
-  const size = {width: frame.clientWidth, height: frame.clientHeight};
-  if (!size.width || !size.height) return;
-  stage.style.width = `${designWidth(size)}px`;
-  const placed = fitPreview(size, {width: stage.scrollWidth, height: stage.scrollHeight});
-  stage.style.transform = `scale(${placed.scale})`;
-  stage.style.left = `${placed.left}px`;
-  stage.style.top = `${placed.top}px`;
+// Each element's own size, measured once it has drawn and kept for later
+// visits, so a card is as large as its element from the first layout on.
+const SIZES_KEY = 'webmusic-library:sizes:v1';
+const measured = new Map<string, Size>(Object.entries((() => {
+  try { return JSON.parse(storage?.getItem(SIZES_KEY) ?? '{}') as Record<string, Size>; } catch { return {}; }
+})()));
+let saveSizes = 0;
+
+const isFill = (card: Card) => card.entry.recipe.preview.fit === 'fill';
+const natural = (card: Card): Size => measured.get(card.entry.tag) ?? card.entry.recipe.preview;
+
+/** The card's frame width and height for its element at a given card width. */
+function frameFor(card: Card, cardWidth: number): {fit: PreviewFit; width: number; height: number; layout: number} {
+  const width = Math.max(1, cardWidth - 2);
+  const size = natural(card);
+  // A fill element lays out at the card's width; one with its own width keeps it.
+  const layout = isFill(card) ? Math.max(width, Math.min(size.width, width)) : size.width;
+  const fit = fitPreview({width, height: 0}, {width: layout, height: size.height});
+  return {fit, width, height: Math.ceil(size.height * fit.scale), layout};
+}
+
+let chrome = 0;
+/** Header and borders around the frame, measured from a card on screen. */
+function chromeHeight(card: Card): number {
+  if (!chrome) chrome = (card.element.querySelector<HTMLElement>('.lb-card__head')?.offsetHeight ?? 31) + 2;
+  return chrome;
+}
+
+/** Size a card's frame to its element and scale the element only if the card is narrower. */
+function applyFit(card: Card): void {
+  const {fit, height, layout} = frameFor(card, card.element.offsetWidth);
+  card.stage.style.width = isFill(card) ? `${layout}px` : 'max-content';
+  card.stage.style.transform = fit.scale < 1 ? `scale(${fit.scale})` : '';
+  card.stage.style.left = `${fit.left}px`;
+  card.frame.style.height = `${height}px`;
+}
+
+/** Read the element's size once it has drawn; re-pack when it differs from what the layout used. */
+function measure(card: Card): void {
+  if (!card.stage.childElementCount) return;
+  const previous = natural(card);
+  const size = {
+    width: isFill(card) ? previous.width : card.stage.offsetWidth,
+    height: card.stage.scrollHeight,
+  };
+  if (Math.abs(size.width - previous.width) <= 1 && Math.abs(size.height - previous.height) <= 1) return;
+  measured.set(card.entry.tag, size);
+  clearTimeout(saveSizes);
+  saveSizes = window.setTimeout(() => {
+    try { storage?.setItem(SIZES_KEY, JSON.stringify(Object.fromEntries(measured))); } catch { /* Sizes are measured again next visit. */ }
+  }, 500);
+  cancelAnimationFrame(scheduled);
+  scheduled = requestAnimationFrame(() => relayout());
 }
 
 /** A card shows how its element looks: mounted, then made inert. */
@@ -250,7 +294,8 @@ function mountCard(card: Card): void {
   if (card.stop) return;
   card.element.classList.remove('lb-card--failed');
   const stop = mountLive(card.stage, [card.entry.tag], {}, () => card.element.classList.add('lb-card--failed'), cards.indexOf(card));
-  const sizer = new ResizeObserver(() => fit(card));
+  applyFit(card);
+  const sizer = new ResizeObserver(() => measure(card));
   sizer.observe(card.stage);
   card.stop = () => { sizer.disconnect(); stop(); card.stop = undefined; };
 }
@@ -274,29 +319,26 @@ function cardFor(entry: LibraryEntry): Card {
 }
 
 function layoutReel(reel: HTMLElement): void {
-  const width = reel.clientWidth;
-  const columns = Math.max(1, Math.floor((width - PAD * 2 + GAP) / (TARGET_COLUMN + GAP)));
-  const column = (width - PAD * 2 - GAP * (columns - 1)) / columns;
+  const width = Math.max(1, reel.clientWidth - PAD * 2);
+  let top = PAD;
   // Each family is a segment of its own, so packing never pulls a card across.
-  let rows = 0;
   for (const family of ['Score', 'Audio'] as const) {
     const segment = cards.filter((card) => card.entry.family === family);
     if (!segment.length) continue;
-    const placements = packColumns(segment.map((card) => card.entry.recipe.size), columns);
-    segment.forEach((card, index) => {
-      const placement = placements[index]!;
-      Object.assign(card.element.style, {
-        left: `${PAD + placement.x * (column + GAP)}px`,
-        top: `${PAD + (rows + placement.y) * (ROW + GAP)}px`,
-        width: `${placement.w * column + (placement.w - 1) * GAP}px`,
-        height: `${placement.h * ROW + (placement.h - 1) * GAP}px`,
-      });
+    const boxes: Box[] = segment.map((card) => {
+      const size = natural(card);
+      const cardWidth = Math.min(width, Math.max(headWidth(card.entry.tag), isFill(card) ? card.entry.recipe.preview.width : size.width + 2));
+      return {width: cardWidth, height: chromeHeight(card) + frameFor(card, cardWidth).height, fill: isFill(card)};
     });
-    rows += reelRows(placements);
+    const placed = stretchFills(packSkyline(boxes, width, GAP), boxes, width, GAP);
+    segment.forEach((card, index) => {
+      const spot = placed[index]!;
+      Object.assign(card.element.style, {left: `${PAD + spot.x}px`, top: `${top + spot.y}px`, width: `${spot.width}px`});
+      applyFit(card);
+    });
+    top += packedHeight(placed) + GAP * 2;
   }
-  const height = PAD * 2 + rows * ROW + Math.max(0, rows - 1) * GAP;
-  reel.style.height = `${height}px`;
-  for (const card of cards) fit(card);
+  reel.style.height = `${top - GAP * 2 + PAD}px`;
 }
 
 function renderReel(): void {
@@ -313,6 +355,7 @@ function renderReel(): void {
   for (const card of cards) card.element.setAttribute('role', 'listitem');
   main.replaceChildren(reel);
   main.classList.add('lb-main--reel');
+  relayout = () => layoutReel(reel);
   layoutReel(reel);
   let lastWidth = reel.clientWidth;
   resizeObserver = new ResizeObserver(() => {
@@ -330,7 +373,7 @@ function renderReel(): void {
       if (record.isIntersecting) mountCard(card);
       else card.stop?.();
     }
-  }, {rootMargin: '600px 0px'});
+  }, {rootMargin: '800px 0px'});
   for (const card of cards) reelObserver.observe(card.element);
   announce(`${cards.length} component${cards.length === 1 ? '' : 's'}`);
 }
