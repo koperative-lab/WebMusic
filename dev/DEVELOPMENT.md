@@ -138,7 +138,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
-| `npm run check:demo-music` | After package builds, verify that the owner-maintained `apps/doc/webmusic/public/` folder matches the owner's pin `apps/doc/webmusic/public.sha256` file for file and byte for byte, and that every media reference in the documentation and manual-test (`apps/test/src`) source is one of its four Arabesque No. 1 files. It only reads the folder. After changing the folder themselves, the owner reviews `node scripts/check-demo-music.mjs --print-pin` and commits its output as the new pin. Included in source checks and both site build commands. |
+| `npm run check:demo-music` | After package builds, verify that the owner-maintained `apps/doc/webmusic/public/` folder matches the owner's pin `apps/doc/webmusic/public.sha256` file for file and byte for byte, and that every media reference in the documentation, manual-test (`apps/test/src`) and library (`apps/library/src`) source is one of its four Arabesque No. 1 files. It only reads the folder. After changing the folder themselves, the owner reviews `node scripts/check-demo-music.mjs --print-pin` and commits its output as the new pin. Included in source checks and both site build commands. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |
@@ -148,6 +148,8 @@ helps select commands; it does not define another execution chain.
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
 | `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site and shows the version, commit and working tree under test. |
+| `npm run library:dev` | Build packages and serve the [component library](../apps/library/README.md) at <http://localhost:4341>: every Web Component by function, searchable, with live Arabesque canvases and an app composer. |
+| `npm run check:library` | Build the component library, so CI catches a recipe or composition that no longer compiles. Included in source checks. |
 | `npm run check:acceptance` | Build the manual acceptance runner, so CI catches a check whose canvas no longer compiles. Included in source checks. |
 | `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
