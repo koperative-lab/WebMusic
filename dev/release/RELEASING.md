@@ -52,8 +52,8 @@ registry provenance attestation.
 
 A release passes three gates in order on one clean commit, defined in
 [PUBLISHING.md](PUBLISHING.md#release-gates): CI on that exact commit, the local
-automated gate, then the owner's manual acceptance of that commit, verified with
-`npm run release:acceptance`. Nothing is published before all three pass. Every
+automated gate, then the owner's statement that manual acceptance of that
+commit is complete. Nothing is published before all three pass. Every
 version developed before a release carries its own unit tests, CI coverage and
 manual checks ([version workflow](../DEVELOPMENT.md#version-workflow)).
 

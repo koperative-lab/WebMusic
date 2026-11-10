@@ -17,7 +17,7 @@ const SETUP_STEPS: readonly string[] = [
   'Fill in the environment. Press “New environment” for each further device or browser.',
   'Work down the list: follow Steps in the live canvas, compare with Expected, then choose Pass, Fail or Skip. A failure or a skip needs a note.',
   'Phones block the microphone on plain-HTTP network addresses: run F1 on the desktop localhost URL.',
-  'When done, download the Markdown report and keep it outside Git (for example in the ignored acceptance-reports/ folder). The release verifier reads that report; results are never committed.',
+  'Send each failure, with its notes, to the agent; it fixes them in a new commit and you test that commit. When every check passes, tell the agent the build is accepted. Copy Markdown is an optional way to paste your findings; nothing needs to be saved.',
 ];
 
 const MARKS: Record<Status, string> = {untested: '', pass: '✓', fail: '✕', skip: '–'};
@@ -220,11 +220,10 @@ function renderSetup(): void {
       ['Committed', identity.committedAt || '—'],
       ...Object.entries(identity.packages).map(([name, version]) => [name, version] as [string, string]),
     ])),
-    panel('Report',
+    panel('Summary',
       definitionRows([
-        ['Verdict', assessment.accepted ? 'Accepted' : 'Not accepted'],
+        ['Summary', assessment.accepted ? 'Every check passed' : 'Open'],
         ...assessment.reasons.map((reason) => ['Open', reason] as [string, string]),
-        ['File', reportFileName(identity)],
       ])))),
   );
 }

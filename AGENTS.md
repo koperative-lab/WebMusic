@@ -276,12 +276,15 @@ rules apply to every version an agent develops:
   components. Mount the changed checks in a browser yourself before handing off.
 - **Hand off** the commit, the commands run and their results, and the manual
   checks the owner should run on that commit.
-- **Never commit manual results.** The runner exports a Markdown report keyed
-  to version and commit; the owner keeps it outside Git.
-- **Release only through the gates, in order:** CI green on the exact commit,
-  the local automated gate, then the owner's manual acceptance report for that
-  commit, verified with `npm run release:acceptance`. Never publish, tag or
-  deploy before all three pass or without the owner's explicit instruction.
+- **Manual acceptance is a conversation, not an artifact.** The owner tests in
+  the runner and sends back what fails; fix it as a new round and hand off the
+  new commit. Repeat until the owner says the build is accepted. Commit no
+  manual results and ask for no report file.
+- **Merge or release only through the gates, in order:** CI green on the exact
+  commit, the local automated gate on that commit, then the owner's statement
+  in the conversation that manual acceptance is complete. Merge into an
+  integration branch or publish, tag or deploy only after all three, and only
+  on the owner's explicit instruction.
 
 ## Keep current guidance separate from history
 

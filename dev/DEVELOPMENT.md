@@ -101,14 +101,16 @@ later:
    find; then tell the owner which checks to run.
 
 Hand-off reports the commit, the commands run with their results, and the
-manual checks the owner should run. Manual results are never committed: the
-runner exports a Markdown report that the owner keeps outside Git (the
-`acceptance-reports/` folder is ignored for this).
+manual checks the owner should run. Manual acceptance produces no artifact:
+the owner tests that commit in the runner and reports what fails in the
+conversation; the agent fixes it as a new round and hands off the new commit.
+The loop repeats until the owner says the build is accepted. Manual results
+are never committed, and no report file is required.
 
-A release is a version that has passed the three
-[release gates](release/PUBLISHING.md#release-gates) in order: CI on the exact
-commit, the local automated gate, then the owner's manual acceptance report for
-that commit, verified with `npm run release:acceptance`. Nothing is published,
+A merge into an integration branch such as `dev`, and a release, follow the
+three [gates](release/PUBLISHING.md#release-gates) in order: CI green on the
+exact commit, the local automated gate on that commit, then the owner's
+statement that manual acceptance is complete. Nothing is merged, published,
 tagged or deployed before all three pass, and only on the owner's explicit
 instruction.
 
@@ -146,8 +148,7 @@ helps select commands; it does not define another execution chain.
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
 | `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site and shows the version, commit and working tree under test. |
-| `npm run check:acceptance` | Test the release verifier and build the manual acceptance runner. Included in source checks. |
-| `npm run release:acceptance -- <report.md>` | Release gate 3: verify a manual acceptance report against this checkout's version and HEAD commit, a clean tree and the current check catalog. |
+| `npm run check:acceptance` | Build the manual acceptance runner, so CI catches a check whose canvas no longer compiles. Included in source checks. |
 | `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
 | `npm run audit:production` | Run the production dependency audit manually; it is outside `npm run check`. |

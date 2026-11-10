@@ -1,10 +1,9 @@
-// Results of a manual acceptance pass and the Markdown report made from them.
-// One record per tested environment (device + browser + output), one status
-// and note per check, kept in this browser's localStorage under the build it
-// was taken on. Nothing here is written to the repository: the person exports
-// a Markdown report, and the release verifier
-// (scripts/verify-acceptance-report.mjs) reads that report with parseReport()
-// and judges it with the same assess() rule the runner shows.
+// Results of a manual acceptance sitting. One record per tested environment
+// (device + browser + output), one status and note per check, kept in this
+// browser's localStorage under the build it was taken on. Nothing here is a
+// release artifact: the person reports problems to the agent, and says when
+// the build is accepted. The optional Markdown export only helps them paste
+// their findings.
 import type {BuildIdentity} from './build.ts';
 
 export type Status = 'untested' | 'pass' | 'fail' | 'skip';
@@ -162,9 +161,10 @@ export interface Assessment {
 }
 
 /**
- * The single acceptance rule, shared by the runner and the release verifier:
- * a committed build with a clean working tree; no check failed anywhere;
- * every check passed in at least one environment; every skip says why.
+ * The runner's summary of a sitting: a committed build with a clean working
+ * tree, no check failed anywhere, every check passed in at least one
+ * environment and every skip says why. It only guides the person testing;
+ * acceptance is their word to the agent, not a stored result.
  */
 export function assess(outcomes: Outcomes, checkIds: readonly string[], identity: Pick<BuildIdentity, 'commit' | 'changes'>): Assessment {
   const reasons: string[] = [];
@@ -191,18 +191,16 @@ export function storeOutcomes(store: ResultStore): Outcomes {
 
 // ---------------------------------------------------------------- Markdown
 
-export const REPORT_TITLE = '# WebMusic manual acceptance report';
+export const REPORT_TITLE = '# WebMusic manual test results';
 const STATUS_WORD: Record<Status, string> = {untested: 'Untested', pass: 'Pass', fail: 'Fail', skip: 'Skip'};
-const WORD_STATUS = new Map(Object.entries(STATUS_WORD).map(([status, word]) => [word, status as Status]));
 
 const cell = (text: string) => text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim();
-const uncell = (text: string) => text.trim().replace(/<br>/g, '\n').replace(/\\([\\|])/g, '$1');
 
 export function reportFileName(identity: BuildIdentity): string {
-  return `webmusic-${identity.version}-${identity.commit.slice(0, 7)}-acceptance.md`;
+  return `webmusic-${identity.version}-${identity.commit.slice(0, 7)}-results.md`;
 }
 
-/** The whole report: build identity, verdict, environments and every check. */
+/** Optional findings export: build identity, summary, environments and every check. */
 export function toMarkdown(store: ResultStore, checks: readonly ReportCheck[], identity: BuildIdentity, now = new Date()): string {
   const assessment = assess(storeOutcomes(store), checks.map((check) => check.id), identity);
   const lines: string[] = [REPORT_TITLE, ''];
@@ -214,7 +212,7 @@ export function toMarkdown(store: ResultStore, checks: readonly ReportCheck[], i
   lines.push(`| Committed | ${cell(identity.committedAt)} |`);
   lines.push(`| Packages | ${cell(Object.entries(identity.packages).map(([name, version]) => `${name} ${version}`).join(', '))} |`);
   lines.push(`| Exported | ${now.toISOString()} |`);
-  lines.push(`| Verdict | ${assessment.accepted ? 'Accepted' : cell(`Not accepted: ${assessment.reasons.join('; ')}`)} |`);
+  lines.push(`| Summary | ${assessment.accepted ? 'Every check passed' : cell(`Open: ${assessment.reasons.join('; ')}`)} |`);
   lines.push('', '## Environments', '');
   lines.push('| Environment | Device and OS | Browser and version | Output | Microphone | Started |', '| --- | --- | --- | --- | --- | --- |');
   store.environments.forEach((environment, index) => {
@@ -237,69 +235,3 @@ export function toMarkdown(store: ResultStore, checks: readonly ReportCheck[], i
   }
   return `${lines.join('\n')}\n`;
 }
-
-export interface ParsedReport {
-  readonly fields: Readonly<Record<string, string>>;
-  readonly environments: number;
-  readonly outcomes: Outcomes;
-  readonly checkIds: readonly string[];
-}
-
-function cells(line: string): string[] {
-  const parts = line.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/);
-  return parts.map((part) => uncell(part));
-}
-
-function section(lines: readonly string[], heading: string): string[] {
-  const start = lines.indexOf(heading);
-  if (start < 0) return [];
-  const rows: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (line.startsWith('## ')) break;
-    if (line.startsWith('|')) rows.push(line);
-  }
-  return rows;
-}
-
-/** Read a report this runner exported; throws on anything else. */
-export function parseReport(markdown: string): ParsedReport {
-  const lines = markdown.split(/\r?\n/);
-  if (lines[0]?.trim() !== REPORT_TITLE) throw new Error('Not a WebMusic manual acceptance report.');
-  const fields: Record<string, string> = {};
-  for (const line of lines.slice(1)) {
-    if (line.startsWith('## ')) break;
-    if (!line.startsWith('|')) continue;
-    const [name, value] = cells(line);
-    if (name && name !== 'Field' && !/^-+$/.test(name)) fields[name] = value ?? '';
-  }
-  const results = section(lines, '## Results');
-  const header = results[0] ? cells(results[0]) : [];
-  if (header[0] !== 'Check' || header[1] !== 'Title' || header.at(-1) !== 'Notes') throw new Error('The report has no results table.');
-  const environments = header.length - 3;
-  const outcomes: Record<string, {status: Status; notes: string}[]> = {};
-  const checkIds: string[] = [];
-  for (const row of results.slice(2)) {
-    const values = cells(row);
-    const id = values[0]!;
-    const notes = values.at(-1) ?? '';
-    const noteFor = (index: number) => notes.split('\n').find((line) => line.startsWith(`E${index + 1}: `))?.slice(`E${index + 1}: `.length) ?? '';
-    checkIds.push(id);
-    outcomes[id] = values.slice(2, 2 + environments).map((word, index) => {
-      const status = WORD_STATUS.get(word);
-      if (!status) throw new Error(`${id}: unknown status “${word}”.`);
-      return {status, notes: noteFor(index)};
-    });
-  }
-  return {fields, environments, outcomes, checkIds};
-}
-
-/** The identity a parsed report names, in the runner's own terms. */
-export function reportIdentity(report: ParsedReport): Pick<BuildIdentity, 'version' | 'commit' | 'changes'> {
-  const tree = report.fields['Working tree'] ?? '';
-  return {
-    version: report.fields.Version ?? 'unknown',
-    commit: report.fields.Commit ?? 'unknown',
-    changes: tree === 'clean' ? 0 : Number.parseInt(tree, 10) || 1,
-  };
-}
-

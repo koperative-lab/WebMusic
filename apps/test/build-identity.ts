@@ -1,6 +1,5 @@
 // Node side of the runner's build identity: read from Git and the manifests.
-// Shared by the Vite plugin below and the release verifier
-// (scripts/verify-acceptance-report.mjs), so both name a build the same way.
+// The Vite plugin serves it to the page and emits it into the build.
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';

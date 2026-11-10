@@ -59,12 +59,14 @@ block the microphone on plain-HTTP network addresses.
 
 ## Where results go
 
-Manual results are never committed. The runner keys them to the build under
-test (version, commit, working tree) and exports one Markdown report, which the
-person who accepted the build keeps outside Git (for example in the ignored
-`acceptance-reports/` folder). A release reads that report with
-`npm run release:acceptance -- <report>`, the third gate in
-[PUBLISHING](../release/PUBLISHING.md#gate-3-manual-acceptance-of-the-exact-commit).
+Manual results are never committed and no report file is kept. The runner
+keys them to the build under test (version, commit, working tree) in the
+browser only. The owner reports failures to the agent in the conversation,
+re-tests each fixing round, and says when the build is accepted; that
+statement is the third gate in
+[PUBLISHING](../release/PUBLISHING.md#gate-3-the-owners-manual-acceptance).
+(Round 20 briefly required an exported report verified by a script; round 22
+retired it at the owner's request.)
 
 ## Findings from the first manual sitting, fixed in round 19
 
@@ -81,6 +83,6 @@ without it and was checked in the built-in Chromium against the runner:
 | E2/F3: “4 consecutive drift corrections failed to converge (drift 0.06 s)” | The Session starts members at a shared instant 60 ms ahead; the playlist ignored that start time and its entry ran 60 ms early, so every drift re-join landed early again | `AudioPlaylist.play(when)` passes the instant to the entry; the streaming engine waits it out before starting its media element. Over WAV, WAV and the streamed MP3: no re-join, offset 0, 0 and −0.023 s, no error |
 | E4: no sound from the edited document | An `<audio-player>` treated its editor document's sequence engine as a borrowed group, so Play bypassed the Session and its output was never routed | A document is the player's own Session source; Play starts the Session and the output route is active (analyser peak 0.10 from the on-screen button) |
 
-VERIFY-01 for MOD-15 closes when an accepted report verifies against the
-release commit on the minimum environments above; the release then moves to
-RELEASE-01.
+The owner confirmed manual acceptance of `3d81ef3` (round 21) on 2026-11-09,
+which closes VERIFY-01 for MOD-15's delivered scope; publication remains
+RELEASE-01, on the owner's instruction.

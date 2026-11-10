@@ -56,33 +56,36 @@ commit itself.
    with **Expected**, then choose **Pass**, **Fail** or **Skip**. A failure or a skip
    needs a note. Settings and measurements a check needs are under
    **Parameters**; **Reload canvas** remounts the check's components.
-3. **Download Markdown** (or **Copy Markdown**) produces the report: the build
-   identity, the verdict, the environments and every check's result per
-   environment. Keep it outside Git, for example in the repository's ignored
-   `acceptance-reports/` folder.
+3. Send what fails, with its notes, to the agent. It fixes the problem as a
+   new round and hands off a new commit; reload and test that commit. When the
+   build is right, tell the agent that manual acceptance is complete — that
+   statement is the gate. Nothing has to be saved or exported.
+
+**Copy Markdown** and **Download Markdown** are optional: they put the build
+identity, a summary and every check's result per environment into text you
+can paste into the conversation.
 
 Results are stored in this browser's `localStorage` under the build they were
 taken on, so a new commit starts a fresh record and results never mix across
-builds. They are not shared between devices; export from each device. Nothing
-the runner records is committed.
+builds. They are not shared between devices. Nothing the runner records is
+committed.
 
-The verdict follows one rule, shown on the first page and in the report: the
-build is a commit with a clean tree, no check failed in any environment, every
-check passed in at least one environment, and every skip has a note.
-`npm run release:acceptance -- <report.md>` applies the same rule to a report
-and also requires it to name the checkout's version and HEAD commit.
+The **Summary** on the first page says whether a sitting is complete: the build
+is a commit with a clean tree, no check failed in any environment, every check
+passed in at least one environment, and every skip has a note. It guides the
+person testing; it is not stored or verified anywhere.
 
 ## Structure
 
 | Path | Role |
 | --- | --- |
-| `src/checks.ts` | The catalog: groups, check IDs, steps and expectations (pure data; the release verifier imports it) |
+| `src/checks.ts` | The catalog: groups, check IDs, steps and expectations (pure data; mounts load lazily) |
 | `src/checks/*.ts` | One mount function per live canvas; each returns its cleanup |
 | `src/build.ts` | The build identity the page shows and keys results to |
-| `src/report.ts` | Result store, acceptance rule, Markdown report and its parser |
+| `src/report.ts` | Result store, sitting summary and the optional Markdown export |
 | `src/main.ts` | Runner: list, check page, live canvas, result controls, environments, export |
-| `build-identity.ts` | Reads the identity from Git and the manifests (Vite plugin and release verifier) |
-| `test/` | Catalog, store, rule and report tests (`npm test -w webmusic-test`) |
+| `build-identity.ts` | Reads the identity from Git and the manifests (Vite plugin) |
+| `test/` | Catalog, store, summary and export tests (`npm test -w webmusic-test`) |
 
 Add a check by adding a catalog entry and, if it needs a new composition, a
 mount function. Every check has a live canvas of package components; use
@@ -102,7 +105,6 @@ npm test -w webmusic-test
 npm run check:acceptance
 ```
 
-`check:acceptance` (part of `npm run check`, so CI runs it) tests the release
-verifier and builds the runner into `apps/test/dist/`, which git ignores, with
-the read-only Arabesque files and a `build-info.json`. A green build does not
-stand in for the manual checks.
+`check:acceptance` (part of `npm run check`, so CI runs it) builds the runner
+into `apps/test/dist/`, which git ignores, with the read-only Arabesque files
+and a `build-info.json`. A green build does not stand in for the manual checks.

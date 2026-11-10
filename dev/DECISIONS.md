@@ -3009,6 +3009,17 @@ runner keys its stored results to version, commit and working tree for the
 same reason, is light and English only, and builds every check from the
 packages' own components.
 
+**Round 22 choices (2026-11-09):** manual acceptance is a conversation, not an
+artifact. The owner tests a handed-off commit in the runner and reports what
+fails; the agent fixes it as a new round and hands off the new commit; when the
+owner says acceptance is complete, that statement is gate 3, and a merge into
+`dev` or a release follows CI and the local gate on that exact commit and the
+owner's instruction. This supersedes round 20's exported report and
+`npm run release:acceptance`, which are removed: a stored report added a step
+without adding evidence the owner had not already given in the conversation.
+The runner keeps its per-build record and an optional Markdown export for
+pasting findings.
+
 ## DEC-069 — Elements preload on mount; readouts keep one length
 
 **Date / status:** 2026-11-09; accepted at the maintainer's request.

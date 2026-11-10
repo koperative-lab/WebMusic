@@ -1,8 +1,7 @@
 // The manual acceptance catalog. Every check names what to do and what must
 // hold, and mounts a live canvas of the packages' own components only while it
 // is open, so one check's audio never overlaps another's. All musical material
-// is Arabesque No. 1. This module is pure data: the release verifier imports it
-// under Node to know which checks a report must cover.
+// is Arabesque No. 1. This module is pure data; the mounts load lazily.
 import type {Check, Group} from './model';
 
 const desk = () => import('./checks/desk').then((module) => module.mountComposedDesk);

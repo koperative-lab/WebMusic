@@ -1,8 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {buildKey, type BuildIdentity} from '../src/build';
 import {
-  activeEnvironment, addEnvironment, assess, emptyStore, parseReport, parseStore, progress, removeEnvironment, reportIdentity,
-  saveStore, selectEnvironment, setEnvironmentFields, setResult, statusOf, storageKey, storeOutcomes, toMarkdown, type ResultStore,
+  activeEnvironment, addEnvironment, assess, emptyStore, parseStore, progress, removeEnvironment,
+  saveStore, selectEnvironment, setEnvironmentFields, setResult, statusOf, storageKey, storeOutcomes, toMarkdown,
 } from '../src/report';
 
 const now = new Date('2026-11-09T10:00:00Z');
@@ -14,13 +14,6 @@ const identity: BuildIdentity = {
 const build = buildKey(identity);
 const checks = [{id: 'A1', title: 'One'}, {id: 'A2', title: 'Two | pipe'}, {id: 'F1', title: 'Microphone'}];
 const ids = checks.map((check) => check.id);
-
-/** Every environment's outcome per check, untested included, as the report lists them. */
-function listedOutcomes(store: ResultStore) {
-  return Object.fromEntries(ids.map((id) => [id, store.environments.map((environment) => ({
-    status: statusOf(environment, id), notes: (environment.results[id]?.notes ?? '').replace(/\s*\n\s*/g, ' '),
-  }))]));
-}
 
 describe('result store', () => {
   it('records a status and a note on the active environment only', () => {
@@ -61,7 +54,7 @@ describe('result store', () => {
   });
 });
 
-describe('acceptance rule', () => {
+describe('sitting summary', () => {
   const passAll = () => {
     let store = emptyStore(build, now);
     for (const id of ids) store = setResult(store, id, {status: 'pass'}, now);
@@ -72,7 +65,7 @@ describe('acceptance rule', () => {
     expect(assess(storeOutcomes(passAll()), ids, identity)).toEqual({accepted: true, reasons: []});
   });
 
-  it('names every reason a pass cannot accept a release', () => {
+  it('names every reason a sitting is still open', () => {
     let store = passAll();
     store = setResult(store, 'A1', {status: 'fail'}, now);
     store = setResult(store, 'F1', {status: 'skip'}, now);
@@ -90,8 +83,8 @@ describe('acceptance rule', () => {
   });
 });
 
-describe('Markdown report', () => {
-  it('carries the build identity and verdict and reads back to the same outcomes', () => {
+describe('Markdown export', () => {
+  it('carries the build identity, a summary and every check per environment', () => {
     let store = setEnvironmentFields(emptyStore(build, now), {device: 'iPhone', browser: 'Safari'});
     store = setResult(store, 'A1', {status: 'fail', notes: 'a | b\nc'}, now);
     store = setResult(store, 'A2', {status: 'pass'}, now);
@@ -102,21 +95,12 @@ describe('Markdown report', () => {
     expect(markdown).toContain('| Version | 0.3.0 |');
     expect(markdown).toContain('| Working tree | clean |');
     expect(markdown).toContain('| Packages | @webmusic/kernel 0.3.0, @webmusic/score 0.3.0 |');
-    expect(markdown).toContain('| Verdict | Not accepted: failed: A1; not passed in any environment: A1, F1 |');
+    expect(markdown).toContain('| Summary | Open: failed: A1; not passed in any environment: A1, F1 |');
     expect(markdown).toContain('| E1 | iPhone | Safari |');
     expect(markdown).toContain('| A1 | One | Fail | Untested | E1: a \\| b c |');
     expect(markdown).toContain('| A2 | Two \\| pipe | Pass | Untested |  |');
     expect(markdown).toContain('| F1 | Microphone | Untested | Skip | E2: phone over HTTP |');
 
-    const parsed = parseReport(markdown);
-    expect(parsed.environments).toBe(2);
-    expect(parsed.checkIds).toEqual(ids);
-    expect(parsed.outcomes).toEqual(listedOutcomes(store));
-    expect(reportIdentity(parsed)).toEqual({version: '0.3.0', commit, changes: 0});
     expect(progress(store.environments[0]!, ids)).toEqual({done: 2, total: 3, failed: 1});
-  });
-
-  it('rejects text that is not a runner report', () => {
-    expect(() => parseReport('# Notes\n')).toThrow('Not a WebMusic manual acceptance report.');
   });
 });

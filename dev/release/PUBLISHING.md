@@ -81,7 +81,7 @@ npm run check:external-install
 ```
 
 `check` builds the packages and checks their source, tests, export maps,
-licenses, original demo assets, the manual acceptance runner and release
+licenses, original demo assets, the manual acceptance runner build and release
 metadata. `docs:build` verifies the
 public asset inventory and validates the documentation build. Review changed
 media against the [asset provenance and regeneration rules](../../apps/doc/webmusic/ASSETS.md);
@@ -105,25 +105,19 @@ faults hidden by workspace links;
 it is not a registry-publication or provenance check. It requires network
 access. Add `-- --keep` to retain its temporary project for diagnosis.
 
-### Gate 3: manual acceptance of the exact commit
+### Gate 3: the owner's manual acceptance
 
 The owner runs the [manual acceptance runner](../../apps/test/README.md) on the
-release commit (`npm run test:manual`), confirms on its first page that the
-build shows that version, commit and a clean working tree, works through every
-check on the minimum environments named in the current device acceptance
-record, and downloads the Markdown report. The report stays outside Git, for
-example in the ignored `acceptance-reports/` folder. Then:
+commit (`npm run test:manual`), confirms on its first page that the build shows
+that version, commit and a clean working tree, and works through the checks on
+the minimum environments named in the current device acceptance record. What
+fails goes back to the agent in the conversation and is fixed as a new round —
+a new commit, which starts again at gate 1 — and the owner re-tests it.
 
-```sh
-npm run release:acceptance -- acceptance-reports/webmusic-x.y.z-abcdef0-acceptance.md
-```
-
-It passes only when the report names this checkout's version and HEAD commit,
-was taken on a clean tree, this checkout is clean, and under the current check
-catalog no check failed, every check passed in at least one environment and
-every skip has a note. A failure is fixed in a new commit, which starts again
-at gate 1; the owner then re-runs the affected checks on that commit and
-exports a new report.
+The gate passes when the owner says, in the conversation, that manual
+acceptance of that commit is complete. It produces no artifact: no report file
+is stored or verified, and no manual result is committed. A merge or a release
+then follows only on the owner's explicit instruction.
 
 Do not modify source, manifests or build outputs between the gates and
 publication; if they change, the release returns to gate 1.
