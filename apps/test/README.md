@@ -50,8 +50,10 @@ commit itself.
 1. **0 · Before you start**: confirm the build, then fill in the environment
    (device, browser, output, microphone). Add a new environment for each
    further device or browser.
-2. Work down the list. Follow **Steps** in the live canvas, compare with
-   **Expected**, then choose **Pass**, **Fail** or **Skip**. A failure or a skip
+2. Work down the list. On a wide window the live canvas sits on the left and
+   Steps, Expected, Parameters and the result stay beside it; on a narrow one
+   they stack, instructions first. Follow **Steps** in the live canvas, compare
+   with **Expected**, then choose **Pass**, **Fail** or **Skip**. A failure or a skip
    needs a note. Settings and measurements a check needs are under
    **Parameters**; **Reload canvas** remounts the check's components.
 3. **Download Markdown** (or **Copy Markdown**) produces the report: the build
@@ -88,7 +90,9 @@ Arabesque through the shared loaders in
 `apps/doc/webmusic/src/components/headless/`. `npm run check:demo-music` scans
 this app's source too. A check's canvas follows the
 [visual design](../../dev/design/VISUAL-DESIGN.md): the real controls only, with
-settings and readouts in Parameters.
+settings and readouts in Parameters. The runner separates every component in a
+canvas by one gap (`--mt-gap`), including the members a desk composes, so a
+mount function adds no spacing of its own.
 
 ## Verify
 

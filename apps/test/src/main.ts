@@ -20,7 +20,7 @@ const SETUP_STEPS: readonly string[] = [
   'When done, download the Markdown report and keep it outside Git (for example in the ignored acceptance-reports/ folder). The release verifier reads that report; results are never committed.',
 ];
 
-const MARKS: Record<Status, string> = {untested: '·', pass: '✓', fail: '✕', skip: '–'};
+const MARKS: Record<Status, string> = {untested: '', pass: '✓', fail: '✕', skip: '–'};
 const STATUS_TEXT: Record<Status, string> = {untested: 'untested', pass: 'Pass', fail: 'Fail', skip: 'Skip'};
 const CHECK_IDS = CHECKS.map((check) => check.id);
 
@@ -90,7 +90,7 @@ function renderChrome(): void {
 
   const route = currentRoute();
   const list = element('ol', {class: 'mt-list'});
-  const setupLink = element('a', {href: '#/', class: 'mt-item'}, element('span', {class: 'mt-mark', 'aria-hidden': 'true'}, '○'), element('span', {class: 'mt-id'}, '0'), element('span', {}, 'Before you start'));
+  const setupLink = element('a', {href: '#/', class: 'mt-item'}, element('span', {'aria-hidden': 'true'}), element('span', {class: 'mt-id'}, '0'), element('span', {}, 'Before you start'));
   if (route.kind === 'setup') setupLink.setAttribute('aria-current', 'page');
   list.append(element('li', {}, setupLink));
   for (const group of GROUPS) {
@@ -152,7 +152,16 @@ function renderMain(): void {
 
 function panel(label: string, ...children: (Node | string)[]): HTMLElement {
   return element('section', {class: 'mt-panel', 'aria-label': label},
-    element('div', {class: 'mt-panel__head mt-caption'}, label), ...children);
+    element('h2', {class: 'mt-panel__head mt-caption'}, label), ...children);
+}
+
+function pageHead(caption: string, ...title: (Node | string)[]): HTMLElement {
+  return element('header', {class: 'mt-head'}, element('p', {class: 'mt-caption'}, caption), element('h1', {}, ...title));
+}
+
+function withClass<T extends HTMLElement>(node: T, name: string): T {
+  node.classList.add(name);
+  return node;
 }
 
 function definitionRows(rows: readonly [string, string][]): HTMLElement {
@@ -161,8 +170,8 @@ function definitionRows(rows: readonly [string, string][]): HTMLElement {
 
 function renderSetup(): void {
   const environment = activeEnvironment(store);
-  const field = (key: keyof EnvironmentFields, label: string) => {
-    const input = element('input', {class: 'mt-field', type: 'text', value: environment[key]});
+  const field = (key: keyof EnvironmentFields, label: string, placeholder = '') => {
+    const input = element('input', {class: 'mt-field', type: 'text', value: environment[key], placeholder});
     input.addEventListener('change', () => commit(setEnvironmentFields(store, {[key]: input.value.trim()})));
     return element('label', {class: 'mt-param'}, element('span', {class: 'mt-caption'}, label), input);
   };
@@ -190,10 +199,19 @@ function renderSetup(): void {
   if (identity.changes > 0) warnings.push(`This build has ${identity.changes} uncommitted change${identity.changes === 1 ? '' : 's'}: use it for debugging, then commit and accept the commit itself.`);
 
   main.replaceChildren(
-    element('h1', {}, 'Before you start'),
-    element('ol', {class: 'mt-steps'}, ...SETUP_STEPS.map((step) => element('li', {}, step))),
-    ...warnings.map((warning) => element('p', {class: 'mt-error mt-error--block', role: 'alert'}, warning)),
-    ...(storageWorks ? [] : [element('p', {class: 'mt-error mt-error--block', role: 'alert'}, 'Browser storage is unavailable: results live only in this page; download the report before closing it.')]),
+    pageHead('0 · Setup', 'Before you start'),
+    element('div', {class: 'mt-layout'},
+      element('div', {class: 'mt-stage'},
+        ...warnings.map((warning) => element('p', {class: 'mt-error mt-error--block', role: 'alert'}, warning)),
+        ...(storageWorks ? [] : [element('p', {class: 'mt-error mt-error--block', role: 'alert'}, 'Browser storage is unavailable: results live only in this page; download the report before closing it.')]),
+        panel('Checklist', element('ol', {class: 'mt-steps'}, ...SETUP_STEPS.map((step) => element('li', {}, step)))),
+        panel('Environment',
+          element('div', {class: 'mt-form'},
+            element('label', {class: 'mt-param'}, element('span', {class: 'mt-caption'}, 'Environment'), select),
+            field('device', 'Device and OS'), field('browser', 'Browser and version'),
+            field('output', 'Output device', 'Speaker, headphones or interface'), field('microphone', 'Microphone')),
+          element('div', {class: 'mt-actions'}, add, remove, element('span', {class: 'mt-spacer'}), start))),
+      element('div', {class: 'mt-side'},
     panel('Build under test', definitionRows([
       ['Version', identity.version],
       ['Commit', identity.commit],
@@ -202,18 +220,12 @@ function renderSetup(): void {
       ['Committed', identity.committedAt || '—'],
       ...Object.entries(identity.packages).map(([name, version]) => [name, version] as [string, string]),
     ])),
-    panel('Environment',
-      element('div', {class: 'mt-form'},
-        element('label', {class: 'mt-param'}, element('span', {class: 'mt-caption'}, 'Environment'), select),
-        field('device', 'Device and OS'), field('browser', 'Browser and version'),
-        field('output', 'Output (speaker, headphones, interface)'), field('microphone', 'Microphone')),
-      element('div', {class: 'mt-actions'}, add, remove, start)),
     panel('Report',
       definitionRows([
         ['Verdict', assessment.accepted ? 'Accepted' : 'Not accepted'],
         ...assessment.reasons.map((reason) => ['Open', reason] as [string, string]),
         ['File', reportFileName(identity)],
-      ])),
+      ])))),
   );
 }
 
@@ -236,7 +248,7 @@ function renderCheck(check: Check, index: number): void {
   const inventory = element('span', {class: 'mt-inventory'});
   const reload = element('button', {type: 'button', class: 'mt-action mt-action--quiet'}, 'Reload canvas');
   reload.addEventListener('click', () => renderMain());
-  const parameterPanel = panel('Parameters', parameters);
+  const parameterPanel = withClass(panel('Parameters', parameters), 'mt-slot-parameters');
   parameterPanel.hidden = true;
 
   const statusButtons = (['pass', 'fail', 'skip'] as const).map((status) => {
@@ -259,20 +271,21 @@ function renderCheck(check: Check, index: number): void {
   const nextLink = element('a', {class: 'mt-action mt-action--primary', href: next ? `#/${next.id}` : '#/'}, next ? `Next · ${next.id} →` : 'Report →');
 
   main.replaceChildren(
-    element('p', {class: 'mt-caption'}, `${check.group} · ${group?.title ?? ''}`),
-    element('h1', {}, element('span', {class: 'mt-id'}, check.id), ' ', check.title),
-    element('div', {class: 'mt-columns'},
-      element('section', {}, element('h2', {class: 'mt-caption'}, 'Steps'), element('ol', {class: 'mt-steps'}, ...check.steps.map((step) => element('li', {}, step)))),
-      element('section', {}, element('h2', {class: 'mt-caption'}, 'Expected'), element('ul', {class: 'mt-steps'}, ...check.expected.map((item) => element('li', {}, item))))),
-    element('section', {class: 'mt-panel mt-live', 'aria-label': 'Live canvas'},
-      element('div', {class: 'mt-panel__head'}, element('span', {class: 'mt-caption'}, 'Live canvas'), inventory, element('span', {class: 'mt-spacer'}), reload),
-      canvas, error),
-    parameterPanel,
-    element('section', {class: 'mt-panel mt-result', 'aria-label': 'Result'},
-      element('div', {class: 'mt-panel__head mt-caption'}, `Result · ${environmentLabel(environment, store.environments.indexOf(environment))}`),
-      element('div', {class: 'mt-choice mt-choice--status', role: 'group', 'aria-label': 'Result'}, ...statusButtons),
-      notes),
-    element('div', {class: 'mt-actions mt-pager'}, previous, nextLink),
+    pageHead(`${check.group} · ${group?.title ?? ''}`, element('span', {class: 'mt-id'}, check.id), ' ', check.title),
+    element('div', {class: 'mt-layout mt-layout--check'},
+      element('div', {class: 'mt-stage'},
+        element('section', {class: 'mt-panel mt-live', 'aria-label': 'Live canvas'},
+          element('div', {class: 'mt-panel__head'}, element('h2', {class: 'mt-caption'}, 'Live canvas'), inventory, reload),
+          canvas, error)),
+      element('div', {class: 'mt-side'},
+        withClass(panel('Steps', element('ol', {class: 'mt-steps'}, ...check.steps.map((step) => element('li', {}, step)))), 'mt-slot-steps'),
+        withClass(panel('Expected', element('ul', {class: 'mt-steps'}, ...check.expected.map((item) => element('li', {}, item)))), 'mt-slot-expected'),
+        parameterPanel,
+        element('section', {class: 'mt-panel mt-slot-result', 'aria-label': 'Result'},
+          element('h2', {class: 'mt-panel__head mt-caption'}, `Result · ${environmentLabel(environment, store.environments.indexOf(environment))}`),
+          element('div', {class: 'mt-choice mt-choice--status', role: 'group', 'aria-label': 'Result'}, ...statusButtons),
+          notes),
+        element('nav', {class: 'mt-pager mt-slot-pager', 'aria-label': 'Previous and next check'}, previous, nextLink))),
   );
 
   const controller = new AbortController();
@@ -291,6 +304,7 @@ function renderCheck(check: Check, index: number): void {
   const observer = new MutationObserver(() => {
     parameterPanel.hidden = parameters.childElementCount === 0;
     inventory.textContent = mountedElements(canvas);
+    inventory.title = inventory.textContent;
   });
   observer.observe(parameters, {childList: true});
   observer.observe(canvas, {childList: true, subtree: true});
