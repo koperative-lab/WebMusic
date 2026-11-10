@@ -177,3 +177,36 @@ export function reelRows(placements: readonly Placement[]): number {
 export function reelColumns(placements: readonly Placement[]): number {
   return placements.reduce((end, placement) => Math.max(end, placement.x + placement.w), 0);
 }
+
+export interface Size { readonly width: number; readonly height: number }
+
+/** How a card shows its element: the width it lays out at, the scale and the centred offset. */
+export interface PreviewFit {
+  readonly design: number;
+  readonly scale: number;
+  readonly left: number;
+  readonly top: number;
+}
+
+/**
+ * Lay the element out at the card's width, but never narrower than
+ * `minDesign` so it keeps its own proportions on small cards. Then scale it
+ * down — never up — until its laid-out width and height both fit the frame,
+ * and centre it. `content` is measured at the design width; an element wider
+ * than that (a fixed-width surface) still fits.
+ */
+export function fitPreview(frame: Size, content: Size, minDesign = 480): PreviewFit {
+  const design = Math.max(frame.width, minDesign);
+  const width = Math.max(design, content.width, 1);
+  const height = Math.max(content.height, 1);
+  const scale = Math.min(1, frame.width / width, frame.height / height);
+  return {
+    design,
+    scale,
+    left: Math.max(0, (frame.width - width * scale) / 2),
+    top: Math.max(0, (frame.height - height * scale) / 2),
+  };
+}
+
+/** The design width a card lays its element out at, before measuring it. */
+export const designWidth = (frame: Size, minDesign = 480): number => Math.max(frame.width, minDesign);

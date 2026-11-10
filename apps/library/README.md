@@ -32,23 +32,24 @@ development and at the published site in a production build; set
   picture of the element on Arabesque No. 1 — no controls, playback or
   interaction; click it to open the element's page, where the demo is. Each
   card's footprint follows how much room its element draws in, at a readable
-  size; the number of columns follows the window's width.
-- **Topology.** Score and Audio are separate segments, Score first. In each,
+  size; the number of columns follows the window's width, and each picture is
+  laid out at its card's width (480px at least) and scaled down — never up —
+  to fit inside the card. Hovering a card only outlines it.
+- **Order.** Score and Audio are separate segments, Score first. In each,
   cards follow the composition tree depth-first: each player is followed by
   what attaches to it (a desk and its part, a note input and its recorder,
   views, analysis, meters). Packing lets a card a few places later take a
   hole, then grows cards into empty cells — sideways freely, down the page by
-  one row at most — so the reel closes into a mosaic. Hovering a card dims the
-  rest and draws dashed links to what it attaches to and what attaches to it.
+  one row at most — so the reel closes into a mosaic.
 - **Filter.** All, Score or Audio at the top; press `/` to search. Every term
   must match the tag, its category or synonyms, its family and entry, its
   purpose, or one of its attributes, properties or events (`microphone`, `fft`,
   `waveform editor`, `webscore:chordchange`). A card's tag filters by that
   category; the filter shows in the bar until cleared.
-- **An element's page** is the demo: the element with its player's transport,
-  the code for exactly that canvas, its observed attributes in Parameters (the
-  code changes as you adjust them), and the plus button that adds it to
-  **Your app**. A card in your app carries a check mark.
+- **An element's page** is the demo and nothing else: the element with its
+  player's transport, the code for exactly that canvas, its observed
+  attributes in Parameters (the code changes as you adjust them), and the plus
+  button that adds it to **Your app**. A card in your app carries a check mark.
 - **Compose an app.** The app page nests every companion into the player that
   lends it data, state and time — one Score player and one Audio player at
   most — adds what a choice needs (a recorder gets a note input, a Rack part
@@ -84,7 +85,7 @@ recipes write only observed attributes.
 | Path | Contents |
 |---|---|
 | `src/main.ts` | Routing, the vertical reel of still cards, element page with Parameters, and the app composer |
-| `src/layout.ts` | Topological order, look-ahead packing, hole closing, the mosaic search and its vertical form |
+| `src/layout.ts` | Topological order, look-ahead packing, hole closing, the mosaic search and its vertical form, and how a card fits its picture |
 | `src/catalog.ts` | Library entries joined from the catalogs above |
 | `src/compose.ts` | Selection → nested markup, define imports and a complete page |
 | `src/elements.ts` | Loads the element entries and mounts a composition in a live canvas |

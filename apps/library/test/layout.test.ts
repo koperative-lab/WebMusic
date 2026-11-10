@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {LIBRARY} from '../src/catalog.ts';
-import {emptyCells, fillHoles, packColumns, packMosaic, packReel, reelRows, parentOf, reelColumns, topologicalOrder, type Placement} from '../src/layout.ts';
+import {emptyCells, fillHoles, fitPreview, packColumns, packMosaic, packReel, reelRows, parentOf, reelColumns, topologicalOrder, type Placement} from '../src/layout.ts';
 
 const overlaps = (a: Placement, b: Placement) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -153,6 +153,34 @@ describe('vertical growth', () => {
       packColumns(sizes, columns).forEach((placement, i) => {
         expect(placement.h, `${columns} columns`).toBeLessThanOrEqual(sizes[i]!.h + 1);
       });
+    }
+  });
+});
+
+describe('preview fit', () => {
+  it('lays out at least at the minimum width and scales down to fit, never up', () => {
+    // A small element in a large card stays at its own size, centred.
+    expect(fitPreview({width: 600, height: 300}, {width: 600, height: 100})).toEqual({design: 600, scale: 1, left: 0, top: 100});
+    // A narrow card lays out at 480 and scales to its width.
+    const narrow = fitPreview({width: 240, height: 400}, {width: 480, height: 200});
+    expect(narrow.design).toBe(480);
+    expect(narrow.scale).toBeCloseTo(0.5);
+    // A tall element scales to the card's height and is centred across it.
+    const tall = fitPreview({width: 800, height: 300}, {width: 800, height: 600});
+    expect(tall.scale).toBeCloseTo(0.5);
+    expect(tall.left).toBeCloseTo(200);
+    // A fixed-width element wider than its layout width still fits.
+    expect(fitPreview({width: 500, height: 500}, {width: 1000, height: 100}).scale).toBeCloseTo(0.5);
+  });
+
+  it('keeps every element inside its card at any card size', () => {
+    for (const frame of [{width: 120, height: 90}, {width: 343, height: 600}, {width: 1200, height: 150}]) {
+      for (const content of [{width: 480, height: 50}, {width: 900, height: 700}, {width: 300, height: 2000}]) {
+        const placed = fitPreview(frame, content);
+        const width = Math.max(placed.design, content.width) * placed.scale;
+        expect(placed.left + width).toBeLessThanOrEqual(frame.width + 1e-6);
+        expect(placed.top + content.height * placed.scale).toBeLessThanOrEqual(frame.height + 1e-6);
+      }
     }
   });
 });

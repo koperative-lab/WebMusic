@@ -9,7 +9,7 @@ import {LIBRARY, byTag, type LibraryEntry} from './catalog.ts';
 import {composeApp, page, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
-import {packColumns, parentOf, reelRows, topologicalOrder} from './layout.ts';
+import {designWidth, fitPreview, packColumns, reelRows, topologicalOrder} from './layout.ts';
 import {CATEGORIES, type CategoryId} from './recipes.ts';
 import {search, type Family} from './search.ts';
 import type {ParamSpec} from '../../doc/webmusic/src/lib/params/index.ts';
@@ -233,19 +233,16 @@ let cards: Card[] = [];
 let reelObserver: IntersectionObserver | undefined;
 let resizeObserver: ResizeObserver | undefined;
 
-/** Scale the element down to fit its card, keeping its own width large enough to lay out. */
+/** Lay the element out at the card's width (480px at least), then scale it down to fit and centre it. */
 function fit(card: Card): void {
   const {frame, stage} = card;
-  const width = frame.clientWidth;
-  const height = frame.clientHeight;
-  if (!width || !height) return;
-  const design = Math.max(width, 480);
-  stage.style.width = `${design}px`;
-  const content = Math.max(1, stage.scrollHeight);
-  const scale = Math.min(width / design, height / content, 1);
-  stage.style.transform = `scale(${scale})`;
-  stage.style.left = `${Math.max(0, (width - design * scale) / 2)}px`;
-  stage.style.top = `${Math.max(0, (height - content * scale) / 2)}px`;
+  const size = {width: frame.clientWidth, height: frame.clientHeight};
+  if (!size.width || !size.height) return;
+  stage.style.width = `${designWidth(size)}px`;
+  const placed = fitPreview(size, {width: stage.scrollWidth, height: stage.scrollHeight});
+  stage.style.transform = `scale(${placed.scale})`;
+  stage.style.left = `${placed.left}px`;
+  stage.style.top = `${placed.top}px`;
 }
 
 /** A card shows how its element looks: mounted, then made inert. */
@@ -273,47 +270,7 @@ function cardFor(entry: LibraryEntry): Card {
       tag,
       selection.includes(entry.tag) ? h('span', {class: 'lb-card__chosen', 'aria-label': 'In your app', title: 'In your app'}, icon('check')) : null),
     frame);
-  element.addEventListener('pointerenter', () => highlight(entry.tag));
-  element.addEventListener('pointerleave', () => highlight(undefined));
-  element.addEventListener('focusin', () => highlight(entry.tag));
-  element.addEventListener('focusout', () => highlight(undefined));
   return card;
-}
-
-const links = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-links.classList.add('lb-links');
-links.setAttribute('aria-hidden', 'true');
-
-/** The cards an element attaches to, and those attached to it. */
-function related(tag: string): Set<string> {
-  const near = new Set<string>([tag]);
-  const parent = parentOf(byTag(tag)!.recipe);
-  if (parent) near.add(parent);
-  for (const card of cards) if (parentOf(card.entry.recipe) === tag) near.add(card.entry.tag);
-  return near;
-}
-
-/** Hairlines from a card to the cards it attaches to and that attach to it. */
-function highlight(tag: string | undefined): void {
-  links.replaceChildren();
-  const reel = links.parentElement;
-  reel?.classList.toggle('lb-reel--focus', !!tag);
-  if (!tag) { for (const card of cards) card.element.classList.remove('lb-card--near'); return; }
-  const near = related(tag);
-  for (const card of cards) card.element.classList.toggle('lb-card--near', near.has(card.entry.tag));
-  const center = (card: Card) => ({x: card.element.offsetLeft + card.element.offsetWidth / 2, y: card.element.offsetTop + card.element.offsetHeight / 2});
-  const from = cards.find((card) => card.entry.tag === tag);
-  if (!from) return;
-  for (const card of cards) {
-    if (card === from || !near.has(card.entry.tag)) continue;
-    const a = center(from);
-    const b = center(card);
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    // An elbow through the gap row between the two cards.
-    const midY = (a.y + b.y) / 2;
-    line.setAttribute('d', `M${a.x} ${a.y}V${midY}H${b.x}V${b.y}`);
-    links.append(line);
-  }
 }
 
 function layoutReel(reel: HTMLElement): void {
@@ -339,9 +296,6 @@ function layoutReel(reel: HTMLElement): void {
   }
   const height = PAD * 2 + rows * ROW + Math.max(0, rows - 1) * GAP;
   reel.style.height = `${height}px`;
-  links.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  links.setAttribute('width', String(width));
-  links.setAttribute('height', String(height));
   for (const card of cards) fit(card);
 }
 
@@ -351,12 +305,11 @@ function renderReel(): void {
   resizeObserver?.disconnect();
   const entries = topologicalOrder(search(LIBRARY, query, family).filter((entry) => !category || entry.category.id === category));
   cards = entries.map(cardFor);
-  links.replaceChildren();
   if (!cards.length) {
     main.replaceChildren(h('p', {class: 'lb-empty'}, '—'));
     return;
   }
-  const reel = h('div', {class: 'lb-reel', role: 'list', 'aria-label': `${cards.length} components`}, links, ...cards.map((card) => card.element));
+  const reel = h('div', {class: 'lb-reel', role: 'list', 'aria-label': `${cards.length} components`}, ...cards.map((card) => card.element));
   for (const card of cards) card.element.setAttribute('role', 'listitem');
   main.replaceChildren(reel);
   main.classList.add('lb-main--reel');

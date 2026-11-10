@@ -101,7 +101,7 @@ button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
 .lb-card {
   position: absolute; display: flex; flex-direction: column; min-width: 0;
   border: 1px solid var(--lb-line); background: var(--lb-surface); cursor: pointer;
-  transition: opacity .15s, border-color .15s;
+  transition: border-color .15s;
 }
 .lb-card:hover, .lb-card:focus-within { border-color: var(--lb-ink); }
 .lb-card__head { display: flex; align-items: center; gap: .5rem; height: var(--lb-size); padding-inline: var(--lb-pad); border-bottom: 1px solid var(--lb-line); flex: none; }
@@ -115,12 +115,6 @@ button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
 .lb-card__stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: grid; gap: var(--lb-gap); padding: var(--lb-gap); }
 .lb-card--failed .lb-card__frame { background: repeating-linear-gradient(45deg, transparent 0 8px, var(--lb-raised) 8px 9px); }
 .lb-card--failed .lb-card__stage { visibility: hidden; }
-
-/* Hovering a card shows its topology: what it attaches to and what attaches to it. */
-.lb-reel--focus .lb-card:not(.lb-card--near) { opacity: .3; }
-.lb-reel--focus .lb-card--near { border-color: var(--lb-ink); }
-.lb-links { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; overflow: visible; }
-.lb-links path { fill: none; stroke: var(--lb-ink); stroke-width: 1; stroke-dasharray: 3 3; }
 
 /* Package elements default to inline; give each one a block of its own and
    space the members a player or desk composes by the same gap. */
