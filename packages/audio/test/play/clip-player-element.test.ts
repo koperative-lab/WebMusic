@@ -507,6 +507,32 @@ describe('<audio-player>', () => {
     expect(transportOf(element)).toBe(transport);
   });
 
+  it('preloads by default once the connecting script has run, and stays lazy with preload="none"', async () => {
+    const eager = mount();
+    eager.clip = clip(4);
+    // Synchronous assignments after connecting still apply before preparation.
+    expect(eager.clock).toBeUndefined();
+    await flush();
+    expect(eager.clock).toBeDefined();
+    expect(eager.playing).toBe(false);
+    const lazy = mount({preload: 'none'});
+    lazy.clip = clip(4);
+    await flush();
+    expect(lazy.clock).toBeUndefined();
+  });
+
+  it('prepares a context assigned after connecting without minting a second one', async () => {
+    const shared = new StubAudioContext() as unknown as AudioContext;
+    const before = contexts.length;
+    const element = mount();
+    element.audioContext = shared;
+    element.clip = clip();
+    await flush();
+    await element.preload();
+    expect(element.audioContext).toBe(shared);
+    expect(contexts).toHaveLength(before);
+  });
+
   it('uses a supplied context instead of minting its own', async () => {
     const shared = new StubAudioContext() as unknown as AudioContext;
     const before = contexts.length;

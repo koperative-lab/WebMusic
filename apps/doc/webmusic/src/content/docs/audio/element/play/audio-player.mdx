@@ -230,7 +230,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `volume` | attribute | Master volume (linear, `0`–`4`, default `1`); applies live. |
 | `rate` | attribute | Playback rate (`0.25`–`4`, default `1`); applies live. |
 | `pan` | attribute | Stereo position, `-1`–`1`; applies live. |
-| `preload` | attribute | Warm the context, graph and decoded buffer on mount so the first play does not hitch; with an editor, after its first applied revision. `preload="none"` opts out. |
+| `preload` | attribute | On by default: warm the context (created suspended; the first play resumes it), graph and decoded buffer on mount, so the first play does not hitch and a linked meter or analyser binds before it; with an editor, after its first applied revision. The default preload runs after the connecting script, so a `.audioContext`, `.clip` or `.player` assigned in that script is the one it prepares. `preload="none"` opts out. |
 | `.editor` | property | Assign an editor from `loadAudioClipEditor`/`createAudioClipEditor` (any `AudioDocumentSource`); borrowed, never disposed. `undefined` detaches it. Conflicts with independent sources. There is no `editor` attribute. |
 | `.source` | readonly property | Discriminated applied `empty`, `clip` or `sequence` snapshot; sequence includes `sequence`, `assets`, `documentId`, `documentRevision`, and publication `revision`. |
 | `.documentBinding` | readonly property | Requested/applied identities, `empty`/`preparing`/`ready`/`error` status, attempt, mapping policy, coordinate availability and error. |

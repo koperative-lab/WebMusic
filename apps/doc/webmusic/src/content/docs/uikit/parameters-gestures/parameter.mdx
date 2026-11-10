@@ -88,7 +88,7 @@ indices `0…options.length - 1` and forces `step: 1`.
 |---|---|---|---|
 | `layout` | `'flat' \| 'grouped'` | `'flat'` | Chooses one row of items or captioned groups divided by hairlines. |
 | `emptyLabel` | `string` | `'No parameters'` | Placeholder text when `parameters` is empty. |
-| `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. |
+| `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. The built-in formatter shows a choice's label, or the number with one fixed count of decimals per parameter — what its `step` reaches, capped at 0 for ranges reaching 100, 1 for ranges reaching 10 and 2 otherwise — so `1.00` and `0.15` share a length. It appends physical units such as `Hz`, `dB` or `s`, and omits units that only name a multiplier or a position (`linear-gain`, `gain`, `ratio`, `pan`, `native`, `normalized`, `multiplier`, `x`, `×`). |
 | `classNames` | `ParameterRackClassNames` | `{}` | Adds compatibility classes for presenter node kinds, including `modulation`. |
 | `parts` | `ParameterRackParts` | `{}` | Adds part tokens for presenter node kinds, including `modulation`. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, duplicate-id, formatter, command, subscription, stabilization and cleanup failures. |
@@ -148,7 +148,8 @@ Supply the exported stylesheet or your own CSS from the host when opting out.
 | `--wm-parameter-item-border` | `--wm-parameter-border` → `--wm-control-border` → `--wm-border` | `light-dark(#d8d8d8, #333)` | Hairline between adjacent groups. |
 | `--wm-parameter-heading` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Group caption text. |
 | `--wm-parameter-item-gap` | literal | `.5rem` | Gap between items inside a group. |
-| `--wm-parameter-label-width` | literal | `5rem` | Maximum wrapping width of labels and values, bounded by the container. |
+| `--wm-parameter-item-width` | literal | `5rem` | Fixed width of every item, so a readout that changes length never moves its dial or its neighbours. Values that do not fit end in an ellipsis. |
+| `--wm-parameter-label-width` | literal | `5rem` | Maximum wrapping width of labels, bounded by the item. |
 | `--wm-parameter-label` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Item label and empty-state text. |
 | `--wm-parameter-size` | `calc(1.5 × --wm-control-size)` | `3rem` | Knob control width and height. |
 | `--wm-parameter-track` | `--wm-surface-muted` | `light-dark(#dcdcdc, #333)` | Knob background arc. |

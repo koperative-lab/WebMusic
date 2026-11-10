@@ -3,6 +3,7 @@ import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
 import {neutralColor} from './internal/palette';
+import { displayUnit } from "./internal/display-unit";
 // ============================================================================
 // Domain-neutral parameter-rack presenter.
 //
@@ -193,10 +194,14 @@ ${componentSurfaceCss('parameter', {
   align-items: flex-start;
   gap: var(--wm-parameter-item-gap, .5rem);
 }
+/* Every item is one fixed width, so a readout changing length never moves
+   its dial or the dials beside it. */
 .wui-parameter-rack__item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  flex: none;
+  width: var(--wm-parameter-item-width, 5rem);
   gap: .25rem;
   min-width: 0;
   max-width: 100%;
@@ -269,8 +274,10 @@ ${componentSurfaceCss('parameter', {
 .wui-parameter-rack__input:disabled { cursor: default; }
 :where(.wui-parameter-rack__item.is-disabled) { opacity: .3; }
 :where(.wui-parameter-rack__value) {
-  max-width: min(100%, var(--wm-parameter-label-width, 5rem));
-  overflow-wrap: anywhere;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--wm-parameter-value, var(--wm-parameter-foreground, var(--wm-foreground, ${neutralColor('foreground')})));
   font: 500 .6875rem/1.2 ${monoFont};
   font-variant-numeric: tabular-nums;
@@ -328,16 +335,39 @@ function normalize(parameter: ParameterRackItem): NormalizedParameter {
   };
 }
 
-function formatNumber(value: number): string {
-  if (Number.isInteger(value)) return String(value);
-  if (Math.abs(value) >= 100) return value.toFixed(1).replace(/\.0$/, "");
-  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+/** Decimal places a step can reach: 0.01 → 2, 0.5 → 1, 1 → 0. */
+function stepDecimals(step: number | undefined): number {
+  if (step === undefined || !Number.isFinite(step) || step <= 0) return 2;
+  const text = String(step);
+  const exponent = /e-(\d+)$/.exec(text);
+  if (exponent) return Math.min(6, Number(exponent[1]));
+  const dot = text.indexOf(".");
+  return dot < 0 ? 0 : Math.min(6, text.length - dot - 1);
+}
+
+/** Decimals worth showing at a range's magnitude: 0–1 → 2, 0–20 → 1, 20–12000 → 0. */
+function rangeDecimals(min: number | undefined, max: number | undefined): number {
+  const magnitude = Math.max(Math.abs(finite(min)), Math.abs(finite(max)));
+  return magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2;
+}
+
+/**
+ * One fixed number of decimals per parameter — what its step can reach,
+ * capped by its range's magnitude — so the readout keeps one length while the
+ * value moves (1.00 and 0.15, not 1 and 0.15; 440 Hz, not 440.00 Hz).
+ */
+function formatNumber(value: number, parameter: ParameterRackItem): string {
+  const decimals = Math.min(stepDecimals(parameter.step), rangeDecimals(parameter.min, parameter.max));
+  const text = value.toFixed(decimals);
+  // Never show a negative zero.
+  return Number(text) === 0 ? (0).toFixed(decimals) : text;
 }
 
 function defaultFormat(parameter: ParameterRackItem, value: number): string {
   const option = parameter.options?.[Math.round(value)];
   if (option !== undefined) return option;
-  return `${formatNumber(value)}${parameter.unit ? ` ${parameter.unit}` : ""}`;
+  const unit = displayUnit(parameter.unit);
+  return `${formatNumber(value, parameter)}${unit ? ` ${unit}` : ""}`;
 }
 
 function structureSignature(

@@ -13,6 +13,7 @@ import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
 import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
+import {audioAvailable, keepSessionPreloaded, preloadEnabled} from './internal/session-preload';
 import {ScoreRackModule} from '../headless/score-rack-module';
 import {ScorePlayerModule} from '../headless/score-module';
 
@@ -67,7 +68,7 @@ export interface RackControlErrorDetail { operation: "rack-control"; error: unkn
  */
 export class RackControlElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ["master", "mute", "solo"];
+    return ["master", "mute", "solo", "preload"];
   }
 
   private root?: ShadowRoot;
@@ -93,6 +94,7 @@ export class RackControlElement extends WebMusicElement {
   private fallbackAudio?: ModuleAudioEnvironment;
   /** The Session an outermost desk owns for its parts (DEC-068 MC-23). */
   private ownedSession?: SessionTransport;
+  private sessionPreloadRelease?: () => void;
   private unsubscribeModule?: () => void;
   private readonly moduleParts = new Map<RackPartElementLike, {declaration: RackPartDeclaration; module: ScorePlayerModule}>();
 
@@ -436,7 +438,11 @@ export class RackControlElement extends WebMusicElement {
     this.dispatchEvent(new CustomEvent<RackControlErrorDetail>("webscore:error", {detail: {operation: "rack-control", error}, bubbles: true, composed: true}));
   }
 
-  attributeChangedCallback(): void {
+  attributeChangedCallback(name?: string): void {
+    if (name === 'preload') {
+      if (this.isConnected) this.syncSessionPreload();
+      return;
+    }
     // Each of these decides whether a control EXISTS, which the presenter
     // settles at mount — so the surface is rebuilt rather than repainted.
     if (this.isConnected) this.mountUI();
@@ -489,6 +495,7 @@ export class RackControlElement extends WebMusicElement {
         notifyModuleChange(this);
       });
       this.reconcileModuleParts();
+      this.syncSessionPreload();
     }
     notifyModuleContext(this);
     notifyModuleChange(this);
@@ -539,7 +546,24 @@ export class RackControlElement extends WebMusicElement {
     return this.ownedSession;
   }
 
+  /**
+   * An outermost desk owns its Session and preloads every part as it joins
+   * (DEC-069): channels, faders and the inserts on them exist before the
+   * first play. A desk inside a player borrows that player's preload.
+   */
+  private syncSessionPreload(): void {
+    this.sessionPreloadRelease?.();
+    this.sessionPreloadRelease = undefined;
+    const session = this.ownedSession;
+    const audio = this.modularContext?.audio;
+    if (!session || !audio || !preloadEnabled(this)) return;
+    this.sessionPreloadRelease = keepSessionPreloaded(session, () => !audio.disposed && audioAvailable(() => audio.peek()),
+      (error) => this.reportError(error));
+  }
+
   private releaseModuleRack(): void {
+    this.sessionPreloadRelease?.();
+    this.sessionPreloadRelease = undefined;
     this.unsubscribeModule?.();
     this.unsubscribeModule = undefined;
     const parts = [...this.moduleParts.values()];

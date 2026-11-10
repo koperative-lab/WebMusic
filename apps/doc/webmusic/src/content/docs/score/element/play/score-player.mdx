@@ -297,6 +297,7 @@ or the reverse) and clearing `.sound` rebuild the engine instead.
 | `.sessionTransport` | read-only property | `undefined` | Current borrowed/owned modular Session; undefined outside module mode, while its provider is pending, or after teardown. |
 | `.module` | read-only property | `undefined` until scoped | This player's `ModuleHandle`: its ports, inserts, parameters and note-input capability. See [Ports and composition](#ports-and-composition). |
 | `session` | attribute | borrow | `local` starts an independent Session boundary instead of borrowing the nearest one. |
+| `preload` | attribute | on | A player that owns its Session prepares every member as it joins — the AudioContext (created suspended; the first play resumes it from its gesture), engines, samples, desk channels and inserts — so nested desks, effect panels and analysers show their real surface before the first play. Nothing plays. `preload="none"` defers preparation to the first play. A page without Web Audio skips it. |
 | `controls` | attribute | `auto` | `auto` hides the transport of an inherited leaf, `show` displays it, `hide` suppresses local chrome. |
 | `.rack` | property | — | A borrowed [`Rack`](/score/headless/play/rack/) whose members share these transport commands. Overrides the nested desk, `.score` and `src`. |
 | `.controller` | property | — | A borrowed [`PlayerController`](/score/headless/play/player-controller/). Overrides every other source; see [Four ways to drive it](#four-ways-to-drive-it). |

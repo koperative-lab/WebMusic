@@ -3009,6 +3009,52 @@ runner keys its stored results to version, commit and working tree for the
 same reason, is light and English only, and builds every check from the
 packages' own components.
 
+## DEC-069 — Elements preload on mount; readouts keep one length
+
+**Date / status:** 2026-11-09; accepted at the maintainer's request.
+
+**Problem:** before the first play a composed desk showed a waiting mixer, an
+effect panel reported "Module target unavailable" and a meter waited for its
+player, because every module was prepared only by the first play. A parameter
+readout changed length with its value (`1` → `0.15`) and printed descriptor
+units such as `linear-gain`, so dials shifted sideways while they were turned.
+
+**Decision:** a Session's owner preloads it on mount — `<score-player>` and an
+outermost `<score-rack-control>` call `Session.preload()` as members join, and
+`<audio-player>` preloads its first-play path by default. Preparation creates
+the AudioContext in its suspended state, builds engines, loads samples, admits
+desk channels and realizes their inserts, and never plays or resumes; the first
+play resumes the context from its gesture. `preload="none"` restores the lazy
+path, and a page without Web Audio skips the default. The default
+`<audio-player>` preload waits for the connecting script, so an `.audioContext`,
+`.clip` or `.player` assigned there is the one it prepares, and a late
+`.audioContext` rebuilds a Session root's own environment around it. The
+parameter rack gives every item one fixed width, shows one fixed count of
+decimals per parameter (from its step, capped by its range's magnitude), and
+shows physical units only; descriptors keep their machine units.
+
+**Alternatives considered:** exposing channel and parameter structure without
+audio resources, which would duplicate the Kernel Rack's admission and insert
+model as a second, pre-audio state; preloading only in the acceptance runner,
+which would leave every application with the same empty first frame.
+
+**Consequences:** MODULAR-COMPOSITION's rule that discovery allocates nothing
+still holds — preparation is an owner's mount action, not discovery. Pages
+mounting several independent Session roots create one suspended context each
+at mount instead of at first play. Score's lazy-inspection tests opt out with
+`preload="none"`; new tests cover the default and the opt-out. Status feedback
+(DEC-052) remains for genuinely missing input, such as a take player before
+its first recording.
+
+**Owner:** [Modular composition](design/MODULAR-COMPOSITION.md), the
+`<score-player>`, `<score-rack-control>`, `<audio-player>` and parameter rack
+references.
+
+**Verification:** `packages/score/test/play/element-preload.test.ts`,
+`packages/audio/test/play/clip-player-element.test.ts` and
+`packages/ui/test/parameter.test.ts`; every acceptance-runner canvas shows its
+desk channels, effect knobs and meters before play.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

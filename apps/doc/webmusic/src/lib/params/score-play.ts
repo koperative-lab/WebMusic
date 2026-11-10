@@ -87,6 +87,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         note: 'Add a volume control to the chrome, as a horizontal fader or a rotary knob. Moves the same knob the volume attribute sets; needs the element to own its engine, so it is inert in .rack and .controller mode.',
       },
       {name: 'session', kind: 'enum', options: ['local'], fallback: 'inherit', note: 'Create an independent Session boundary instead of borrowing the nearest module Session.'},
+      {name: 'preload', kind: 'bool', fallback: 'on — members prepare on mount', note: 'A player that owns its Session prepares every member as it joins (a suspended AudioContext, engines, desk channels and inserts), so nested desks and effect panels are live before the first play. `preload="none"` defers it to the first play.'},
       {name: 'controls', kind: 'enum', options: ['auto', 'show', 'hide'], fallback: 'auto', note: 'In module mode, auto hides inherited transport controls; show sends commands to the same Session, hide suppresses the local surface.'},
     ],
     properties: [
@@ -197,6 +198,12 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         kind: 'bool',
         fallback: 'on — an S button per channel',
         note: 'Show the per-channel solo. Exclusive: soloing one channel clears the rest.',
+      },
+      {
+        name: 'preload',
+        kind: 'bool',
+        fallback: 'on — parts prepare on mount',
+        note: 'An outermost desk owns its Session and prepares every part as it joins, so its faders and the effects on them are live before the first play. `preload="none"` defers it to the first play; a desk inside a player follows that player.',
       },
     ],
     properties: [

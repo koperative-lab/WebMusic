@@ -262,7 +262,7 @@ export const CHECKS: readonly Check[] = [
     id: 'H1', group: 'H', mount: offlineScore,
     title: 'Offline render of a whole module graph',
     steps: [
-      'In Parameters press “Render 12 s”, then play the result with the player in the live canvas.',
+      'The graph renders when the check opens. Play the result with the player in the live canvas; “Render 12 s” in Parameters renders it again.',
     ],
     expected: [
       'Rendering takes far less than 12 seconds.',
@@ -273,7 +273,7 @@ export const CHECKS: readonly Check[] = [
     id: 'H2', group: 'H', mount: offlineDocument,
     title: 'Offline render of an edited audio document',
     steps: [
-      'In Parameters press “Render edited document”, then play the result with the player in the live canvas.',
+      'The edited document renders when the check opens. Play the result with the player in the live canvas; “Render edited document” in Parameters renders it again.',
     ],
     expected: [
       'At second 1 it jumps to the recording’s second 2 (one second cut), and keeps sounding.',

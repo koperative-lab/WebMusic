@@ -185,6 +185,7 @@ declare members, and `.rack` can supply an existing Rack. Transport remains on
 | `master` | attribute | Show the master strip. Absent means shown; `master="false"` leaves the channel strips alone. |
 | `mute` | attribute | Show per-channel mute, enabled by default; `mute="false"` removes the command from the mixer. |
 | `solo` | attribute | Show per-channel solo, enabled by default. Soloing one channel clears the rest; `solo="false"` removes the command. |
+| `preload` | attribute | An outermost desk, which owns its Session, prepares every part as it joins: the AudioContext (created suspended; the first play resumes it), each part's engine, its channel and the inserts on it, so faders and effect panels are live before the first play. On by default; `preload="none"` defers all of it to the first play. A desk inside a player follows that player's `preload`. |
 | child `<score-rack-part>` | markup | Each declares one rack member. Labelled by its `id`, or by position when it has none. |
 | `.rack` | property | The `Rack` to mix. Assigning one adopts it — it is never disposed here. Left unset, the element creates its own and disposes it on disconnect. |
 | `.sessionTransport` | property | Read-only `ModuleSession` the parts play in: the desk's own when it is outermost, otherwise the enclosing provider's; `undefined` while disconnected or when a Headless `.rack` is assigned. |

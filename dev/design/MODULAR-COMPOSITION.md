@@ -116,6 +116,9 @@ Binding rules:
    binding generation, not an identity transfer.
 6. Discovery creates/resumes no AudioContext, requests no device, and grants no
    close/dispose permission. Consumers own their binding subscriptions.
+   Preparation is separate from discovery: a Session's owning Element preloads
+   on mount (DEC-069), creating a suspended context that only a play resumes,
+   unless it declares `preload="none"`.
 
 ## Audio routing and default connections
 

@@ -18,8 +18,8 @@
 //                   engine, whose playbackRate transposes by construction —
 //                   this package ships no time-stretcher.
 //   pan             -1..1, applied live.
-//   preload         warm the first-play path on mount (`preload="none"` opts
-//                   out, as on <audio>).
+//   preload         warm the first-play path on mount; on by default, and
+//                   `preload="none"` opts out, as on <audio>.
 // Properties: .clip .player .effect .clock .analyser .currentTime .seconds
 //             .duration .playing
 // Methods: play(when?) pause() stop() seek(s) seekFraction(f) scrub(ds)
@@ -123,6 +123,7 @@ export class AudioPlayerElement extends WebMusicElement {
   private loadedSrc?: string;
   private offFns: Array<() => void> = [];
   private rafScheduled = false;
+  private defaultPreloadQueued = false;
   private renderRafId: number | null = null;
   /** Latest-wins generation for async loads (see score-source.ts precedent). */
   private loadToken = 0;
@@ -1111,6 +1112,16 @@ export class AudioPlayerElement extends WebMusicElement {
     if (context === this.suppliedContext) return;
     this.suppliedContext = context;
     if (context) this.closeOwnedContext();
+    // A Session root's own audio environment was made with the context the
+    // element had when it connected: remount so the scope uses the supplied
+    // one, as a borrowed player's context does. Otherwise preparation would
+    // mint a second context the player's output cannot join.
+    if (this.isConnected && context && !this.parentModuleContext && this.moduleEnvironment &&
+      this.moduleEnvironment.peek() !== context) {
+      super.disconnectedCallback();
+      super.connectedCallback();
+      return;
+    }
     if (this.isConnected && this.ownsPlayer) this.rebuildPlayer(true);
   }
 
@@ -1395,14 +1406,37 @@ export class AudioPlayerElement extends WebMusicElement {
   }
 
   /**
-   * `preload` warms the whole first-play path — context, graph and the decoded
-   * buffer or the media element — so the first play does not hitch. It follows
-   * <audio>: `preload="none"` (like the other false spellings) opts out.
+   * Preload warms the whole first-play path — context (created suspended; the
+   * first play resumes it), graph and the decoded buffer or the media element
+   * — on mount, so the first play does not hitch and companions such as a
+   * meter or an analyser bind before it (DEC-069). It is on by default;
+   * `preload="none"` (like the other false spellings) opts out, as on <audio>.
+   * A page without Web Audio skips the default preload.
    */
   private applyPreload(): void {
     const raw = this.getAttribute('preload');
-    if (raw === null || raw.trim().toLowerCase() === 'none') return;
-    if (!boolAttr(this, 'preload')) return;
+    if (raw !== null && (raw.trim().toLowerCase() === 'none' || !boolAttr(this, 'preload'))) return;
+    if (raw === null) { this.scheduleDefaultPreload(); return; }
+    this.runPreload();
+  }
+
+  /**
+   * The default preload waits one microtask, so a context, clip or player
+   * assigned in the same script that connected the element is the one it
+   * prepares — it never mints a context of its own first.
+   */
+  private scheduleDefaultPreload(): void {
+    if (this.defaultPreloadQueued) return;
+    this.defaultPreloadQueued = true;
+    queueMicrotask(() => {
+      this.defaultPreloadQueued = false;
+      if (!this.isConnected || this.getAttribute('preload') !== null) return;
+      if (!this.suppliedContext && !getAudioContextConstructor()) return;
+      this.runPreload();
+    });
+  }
+
+  private runPreload(): void {
     // A blocked editor binding preloads after its first applied revision instead.
     if (this.documentError) return;
     void this.preload().catch((error: unknown) => this.onPlayerError(error));

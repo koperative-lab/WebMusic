@@ -109,6 +109,8 @@ describe('Score module graph and Session integration', () => {
     let sequence = 0;
     Object.assign(synth, {supportsNoteOccurrences: true, noteOn: vi.fn(() => ++sequence), noteOffById: vi.fn()});
     const root = document.createElement('score-player') as ScorePlayerElement;
+    // Lazy path: this test asserts nothing is prepared before play (DEC-069 opt-out).
+    root.setAttribute('preload', 'none');
 
     root.audioContext = context;
     const child = document.createElement('score-player') as ScorePlayerElement;
@@ -226,6 +228,8 @@ describe('Score module graph and Session integration', () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
+    // Lazy path: this test asserts nothing is prepared before play (DEC-069 opt-out).
+    root.setAttribute('preload', 'none');
 
     root.audioContext = context;
     const desk = document.createElement('score-rack-control') as RackControlElement;
@@ -277,6 +281,8 @@ describe('Score module graph and Session integration', () => {
     const {context, synth, session: unusedSession} = fixture();
     unusedSession.dispose();
     const root = document.createElement('score-player') as ScorePlayerElement;
+    // Lazy path: this test asserts nothing is prepared before play (DEC-069 opt-out).
+    root.setAttribute('preload', 'none');
 
     root.audioContext = context;
     const desk = document.createElement('module-custom-desk') as RackControlElement;

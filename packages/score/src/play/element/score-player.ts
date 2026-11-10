@@ -31,6 +31,7 @@ import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
 import {observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport, type ModuleSession} from '@webmusic/kernel/session';
+import {audioAvailable, keepSessionPreloaded, preloadEnabled} from './internal/session-preload';
 import {ScorePlayerModule} from '../headless/score-module';
 import {ScorePlayer} from '../headless/score-player';
 import {mountModuleTransport, setModuleTransportVisibility} from './internal/module-transport';
@@ -134,6 +135,7 @@ export class ScorePlayerElement extends WebMusicElement {
       'time-control',
       'volume-control',
       'session',
+      'preload',
       'controls',
     ];
   }
@@ -199,6 +201,7 @@ export class ScorePlayerElement extends WebMusicElement {
   private moduleSource?: ScorePlayerModule;
   private moduleAudio?: ModuleAudioEnvironment;
   private ownedSession?: SessionTransport;
+  private sessionPreloadRelease?: () => void;
   private moduleUnsubscribe?: () => void;
   private moduleSessionUnsubscribe?: () => void;
   private modulePendingSource?: ReturnType<SessionTransport['holdPendingSource']>;
@@ -331,6 +334,10 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     if (name === 'controls') {
       if (this.handle?.element) setModuleTransportVisibility(this.handle.element, this.moduleControlsVisible);
+      return;
+    }
+    if (name === 'preload') {
+      this.syncSessionPreload();
       return;
     }
     if (name === 'loading') {
@@ -1602,8 +1609,24 @@ export class ScorePlayerElement extends WebMusicElement {
         !this.explicitScore && !this.getAttribute('src') && !this.hasEditorSource() && this.isAggregateRoot(this.moduleContext)) this.requestRender();
     });
     if (this.ownedSession) this.applyRate(false);
+    this.syncSessionPreload();
     notifyModuleContext(this);
     this.requestRender();
+  }
+
+  /**
+   * A player that owns its Session preloads every member as it joins
+   * (DEC-069), so the transport, a nested desk's channels and the inserts on
+   * them are real before the first play. `preload="none"` opts out.
+   */
+  private syncSessionPreload(): void {
+    this.sessionPreloadRelease?.();
+    this.sessionPreloadRelease = undefined;
+    const session = this.ownedSession;
+    const audio = this.moduleContext?.audio;
+    if (!session || !audio || !preloadEnabled(this)) return;
+    this.sessionPreloadRelease = keepSessionPreloaded(session, () => !audio.disposed && audioAvailable(() => audio.peek()),
+      (error) => this.reportPlaybackError(error));
   }
 
   /** Re-derive this scope for a new upstream destination and re-route this player's output. */
@@ -1642,6 +1665,8 @@ export class ScorePlayerElement extends WebMusicElement {
 
   private releaseModularComposition(): void {
     this.renderRequest += 1;
+    this.sessionPreloadRelease?.();
+    this.sessionPreloadRelease = undefined;
     this.moduleSessionUnsubscribe?.();
     this.moduleSessionUnsubscribe = undefined;
     this.cancelLoad();

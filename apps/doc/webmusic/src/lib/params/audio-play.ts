@@ -89,8 +89,8 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       {
         name: 'preload',
         kind: 'bool',
-        fallback: 'off — no warm-up until the first play',
-        note: 'Warms context, graph and decoded buffer on mount; an editor binding warms after its first applied revision. `preload="none"` opts out, as on <audio>.',
+        fallback: 'on — warms after the connecting script',
+        note: 'Warms a suspended context, the graph and the decoded buffer on mount, so linked meters and analysers bind before the first play; an editor binding warms after its first applied revision. `preload="none"` opts out, as on <audio>.',
       },
       {name: 'session', kind: 'enum', options: ['local'], fallback: 'inherit', note: 'Create an independent Session boundary instead of borrowing the nearest module Session.'},
     ],

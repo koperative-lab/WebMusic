@@ -89,6 +89,37 @@ describe("mountParameterRack", () => {
     expect(rule(".wui-parameter-rack__control")).toContain("var(--wm-parameter-size, calc(1.5 * var(--wm-control-size, 2rem)))");
   });
 
+  it("keeps each readout one length and shows only physical units", () => {
+    const host = document.createElement("div");
+    let wet = 1;
+    const binding: ParameterRackBinding = {
+      snapshot: () => ({
+        parameters: [
+          { id: "wet", label: "Wet", value: wet, min: 0, max: 1, step: 0.01, unit: "linear-gain" },
+          { id: "q", label: "Q", value: 0.7, min: 0.1, max: 20, step: 0.1, unit: "ratio" },
+          { id: "cutoff", label: "Cutoff", value: 6000, min: 20, max: 12000, unit: "Hz" },
+          { id: "time", label: "Time", value: 0.5, min: 0, max: 1, step: 0.01, unit: "s" },
+          { id: "pan", label: "Pan", value: -0, min: -1, max: 1, step: 0.01, unit: "pan" },
+        ],
+      }),
+      setValue: () => {},
+    };
+    const handle = mountParameterRack(host, binding);
+    const readouts = (): string[] => [...host.querySelectorAll(".wui-parameter-rack__value")].map((node) => node.textContent ?? "");
+    // Multipliers and positions read as the number; decimals follow the step,
+    // capped by the range, so 1 reads 1.00 beside 0.15 and Hz stays whole.
+    expect(readouts()).toEqual(["1.00", "0.7", "6000 Hz", "0.50 s", "0.00"]);
+    wet = 0.15;
+    handle.update();
+    expect(readouts()[0]).toBe("0.15");
+    expect(readouts()[0]!.length).toBe("1.00".length);
+    // Every item is one fixed width, so a changing readout never moves its dial.
+    const item = parameterRackStyle.match(/\.wui-parameter-rack__item \{([^}]*)\}/)?.[1] ?? "";
+    expect(item).toContain("width: var(--wm-parameter-item-width, 5rem)");
+    expect(item).toContain("flex: none");
+    handle.destroy();
+  });
+
   it("renders an accessible flat rack and applies live values", () => {
     const host = document.createElement("div");
     const binding = new FakeParameters();
@@ -108,7 +139,7 @@ describe("mountParameterRack", () => {
     expect(handle.element.getAttribute("part")).toContain("panel");
     expect(host.querySelectorAll(".param")).toHaveLength(2);
     expect(inputs[0]?.getAttribute("aria-label")).toBe("Rate");
-    expect(inputs[0]?.getAttribute("aria-valuetext")).toBe("1 ×");
+    expect(inputs[0]?.getAttribute("aria-valuetext")).toBe("1.0");
     expect(inputs[0]?.getAttribute("value")).toBe("1");
     expect(inputs[1]?.getAttribute("aria-valuetext")).toBe("Clean");
     expect(inputs[1]?.getAttribute("part")).toContain("native-control");
@@ -127,8 +158,8 @@ describe("mountParameterRack", () => {
     inputs[0]!.dispatchEvent(new Event("input", { bubbles: true }));
 
     expect(binding.values).toEqual([["rate", 1.5]]);
-    expect(host.querySelectorAll(".val")[0]?.textContent).toBe("1.5 ×");
-    expect(inputs[0]?.getAttribute("aria-valuetext")).toBe("1.5 ×");
+    expect(host.querySelectorAll(".val")[0]?.textContent).toBe("1.5");
+    expect(inputs[0]?.getAttribute("aria-valuetext")).toBe("1.5");
   });
 
   it("shows declared modulation range without replacing base value or claiming measured output", () => {
@@ -635,7 +666,7 @@ describe("mountParameterRack", () => {
     await Promise.resolve();
 
     expect(input.value).toBe("1.8");
-    expect(input.getAttribute("aria-valuetext")).toBe("1.8 ×");
+    expect(input.getAttribute("aria-valuetext")).toBe("1.8");
   });
 
   it("ignores command settlements from a destroyed mount", async () => {
@@ -718,7 +749,7 @@ describe("mountParameterRack", () => {
 
     expect(onError).toHaveBeenCalledWith(failure);
     expect(host.querySelector("input")?.getAttribute("aria-valuetext")).toBe(
-      "1 ×",
+      "1.0",
     );
   });
 

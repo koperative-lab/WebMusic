@@ -51,6 +51,7 @@ export function mountOfflineScore(context: MountContext): void {
   const show = resultCanvas(context, 'Rendered module graph');
   const time = addReadout(context, 'Render time');
   const level = addReadout(context, 'Peak per second');
+  // Rendered once on open, so the result player has its clip before any press.
   addAction(context, 'Render 12 s', async () => {
     const score = await loadArabesqueScore('midi');
     const started = performance.now();
@@ -65,7 +66,7 @@ export function mountOfflineScore(context: MountContext): void {
     time(`${Math.round(performance.now() - started)} ms`);
     level(windows(buffer, [0, 3, 6, 9, 11]));
     show(buffer);
-  }, true);
+  }, true).click();
 }
 
 /** Correlation and level of rendered[a…] against source[b…]. */
@@ -85,6 +86,7 @@ export function mountOfflineDocument(context: MountContext): void {
   const before = addReadout(context, 'Before-cut match');
   const after = addReadout(context, 'After-cut match');
   const control = addReadout(context, 'Control (should not match)');
+  // Rendered once on open, so the result player has its clip before any press.
   addAction(context, 'Render edited document', async () => {
     const editor = await loadAudioClipEditor(arabesqueAudioUrl(), {signal: context.signal});
     try {
@@ -129,7 +131,7 @@ export function mountOfflineDocument(context: MountContext): void {
     } finally {
       editor.dispose();
     }
-  }, true);
+  }, true).click();
 }
 
 /** H3: one Session over a Score engine and an Audio clip, commanded from code. */

@@ -5,6 +5,7 @@ import {componentSurfaceCss} from "./internal/surface";
 import {mountParameterRack, type ParameterRackHandle} from "./parameter";
 import {neutralColor} from "./internal/palette";
 import {visuallyHiddenCss} from "./internal/icons";
+import {displayUnit} from './internal/display-unit';
 
 export interface MacroTargetState { label: string; value: number; unit?: string; }
 export interface MacroState { label: string; value: number; targets: readonly MacroTargetState[]; disabled?: boolean; }
@@ -74,7 +75,7 @@ display:flex; flex-direction:column; gap:var(--wm-macro-rack-gap,.55rem); min-wi
 
 function format(value: number, unit?: string): string {
   const text = Math.abs(value) >= 100 ? String(Math.round(value)) : value.toFixed(Math.abs(value) >= 10 ? 1 : 2);
-  return `${text}${unit ?? ""}`;
+  return `${text}${displayUnit(unit) ?? ""}`;
 }
 
 export function mountMacro(host: MacroHost, binding: MacroBinding, options: MacroOptions = {}): MacroHandle {
