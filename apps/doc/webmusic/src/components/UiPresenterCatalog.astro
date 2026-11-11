@@ -65,7 +65,7 @@ import {
     align-items: end;
     justify-content: space-between;
     gap: 1rem;
-    border-bottom: 1px solid var(--sl-color-gray-5);
+    border-bottom: 1px solid var(--ws-line-strong);
     padding-bottom: 0.65rem;
   }
   .presenter-catalog__class h2 {
@@ -75,12 +75,12 @@ import {
   .presenter-catalog__class p {
     max-width: 70ch;
     margin: 0.3rem 0 0;
-    color: var(--sl-color-gray-3);
+    color: var(--ws-text-muted);
     font-size: 0.8rem;
     line-height: 1.55;
   }
   .presenter-catalog__class > header > strong {
-    color: var(--sl-color-gray-3);
+    color: var(--ws-text-muted);
     font: 800 1.5rem/1 var(--wui-font-mono);
   }
   .presenter-catalog__grid {
@@ -91,21 +91,21 @@ import {
   .presenter-catalog__card {
     display: grid;
     gap: 0.35rem;
-    border: 1px solid var(--sl-color-gray-5);
-    background: var(--sl-color-bg-nav);
+    border: 1px solid var(--ws-line-strong);
+    background: var(--ws-bg);
     padding: 0.85rem;
-    color: var(--sl-color-text);
+    color: var(--ws-text);
     text-decoration: none;
   }
   .presenter-catalog__card:hover {
-    border-color: var(--sl-color-text-accent);
+    border-color: var(--ws-fg);
   }
   .presenter-catalog__card:focus-visible {
-    outline: 2px solid var(--sl-color-text-accent);
+    outline: 2px solid var(--ws-fg);
     outline-offset: 2px;
   }
   .presenter-catalog__entry {
-    color: var(--sl-color-text-accent);
+    color: var(--ws-fg);
     font: 700 0.78rem/1.4 var(--wui-font-mono);
     overflow-wrap: anywhere;
   }
@@ -113,13 +113,13 @@ import {
     font-size: 0.9rem;
   }
   .presenter-catalog__card > span:not(.presenter-catalog__entry) {
-    color: var(--sl-color-gray-3);
+    color: var(--ws-text-muted);
     font-size: 0.73rem;
     line-height: 1.55;
   }
   .presenter-catalog__card > small {
     margin-top: 0.3rem;
-    color: var(--sl-color-gray-3);
+    color: var(--ws-text-muted);
     font: 600 0.65rem/1.4 var(--wui-font-mono);
   }
   @media (max-width: 720px) {

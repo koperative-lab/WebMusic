@@ -217,21 +217,8 @@ export function createSiteNoticeCollector({root = repository, appDirectory = pat
     }
     if (!modules.size) throw new Error('No client module inventory was captured for site notices.');
     if (includeGenerated) {
-      // These producers emit HTML and inline scripts outside chunk.modules.
-      for (const producer of ['astro', '@astrojs/starlight/components']) await addOwner(await sitePackageOwner(require.resolve(producer)));
-      if ([...outputNames].some((filename) => /(?:^|\/)ec\.[^/]+\.(?:js|css)$/.test(filename))) {
-        // Expressive Code emits JavaScript/CSS assets from string templates,
-        // outside chunk.modules. Follow the installed renderer's actual package
-        // resolution chain to its template owners, including nested versions.
-        const integration = require.resolve('astro-expressive-code');
-        const rehype = createRequire(integration).resolve('rehype-expressive-code');
-        const renderer = createRequire(rehype).resolve('expressive-code');
-        for (const entry of [integration, rehype, renderer]) await addOwner(await sitePackageOwner(entry));
-        const rendererRequire = createRequire(renderer);
-        for (const name of ['@expressive-code/core', '@expressive-code/plugin-frames', '@expressive-code/plugin-text-markers', '@expressive-code/plugin-shiki']) {
-          await addOwner(await sitePackageOwner(rendererRequire.resolve(name)));
-        }
-      }
+      // Astro emits HTML and inline scripts outside chunk.modules.
+      await addOwner(await sitePackageOwner(require.resolve('astro')));
     }
     const projectLicense = await readFile(path.join(root, 'LICENSE'), 'utf8');
     records.set('WebMusic website', {key: 'WebMusic website', license: 'MIT', text: `WebMusic website\n\n${projectLicense.trim()}`});

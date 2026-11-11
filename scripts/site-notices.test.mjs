@@ -185,9 +185,8 @@ import('lazy-runtime').then(({value}) => { document.body.dataset.lazyRuntime = v
   // Astro intentionally places prerender output within cwd. A child process
   // keeps all of its caches and generated files inside the temporary fixture.
   const script = `import {build} from ${JSON.stringify(pathToFileURL(appRequire.resolve('astro')).href)};
-import expressiveCode from ${JSON.stringify(pathToFileURL(appRequire.resolve('astro-expressive-code')).href)};
 import notices from ${JSON.stringify(new URL('./site-notices.mjs', import.meta.url).href)};
-await build({...${JSON.stringify(config)}, integrations: [expressiveCode(), notices(${JSON.stringify({root: directory, appDirectory: path.join(root, 'apps/doc/webmusic')})})]});`;
+await build({...${JSON.stringify(config)}, integrations: [notices(${JSON.stringify({root: directory, appDirectory: path.join(root, 'apps/doc/webmusic')})})]});`;
   await writeFile(path.join(directory, 'build.mjs'), script);
   await promisify(execFile)(process.execPath, ['build.mjs'], {cwd: directory});
   const dist = path.join(directory, 'dist');
@@ -196,11 +195,9 @@ await build({...${JSON.stringify(config)}, integrations: [expressiveCode(), noti
   assert.match(notices, /Copyright browser-runtime/);
   assert.match(notices, /Copyright lazy-runtime/);
   assert.match(notices, /Copyright page-styles/);
-  assert.match(notices, /Copyright \(c\) 2023 Tibor Schiemann/);
   assert.doesNotMatch(notices, /server-only@/);
   assert.ok(inventory.artifacts.some((filename) => filename.endsWith('.css')));
   assert.ok(inventory.artifacts.some((filename) => filename.endsWith('.js')));
-  assert.ok(inventory.artifacts.some((filename) => /\/ec\.[^.]+\.js$/.test(filename)));
   assert.ok(inventory.modules.some((id) => id === 'page-styles@1.0.0/style.css'));
   assert.match(await readFile(path.join(dist, 'index.html'), 'utf8'), /browser-runtime/);
   assert.match(await readFile(path.join(dist, 'old/index.html'), 'utf8'), /<link rel="license" href="\.\.\/licenses\/THIRD_PARTY_NOTICES.txt">/);

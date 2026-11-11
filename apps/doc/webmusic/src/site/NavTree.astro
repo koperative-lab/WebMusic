@@ -1,0 +1,23 @@
+---
+import Icon from './Icon.astro';
+import {holds, isCurrent, type NavEntry} from './navigation';
+
+interface Props { entries: readonly NavEntry[]; path: string; depth?: number }
+const {entries, path, depth = 0} = Astro.props;
+const href = (route: string): string => `${import.meta.env.BASE_URL.replace(/\/$/, '')}${route}`;
+---
+
+<ul class="doc-nav__list" style={depth ? `--depth: ${depth}` : undefined}>
+  {entries.map((entry) => entry.type === 'link' ? (
+    <li>
+      <a class="doc-nav__item" href={href(entry.href)} aria-current={isCurrent(entry.href, path) ? 'page' : undefined}>{entry.label}</a>
+    </li>
+  ) : (
+    <li>
+      <details class="doc-nav__group" open={!entry.collapsed || holds(entry, path)}>
+        <summary class="doc-nav__head"><Icon name="chevron" /><span>{entry.label}</span></summary>
+        <Astro.self entries={entry.entries} path={path} depth={depth + 1} />
+      </details>
+    </li>
+  ))}
+</ul>

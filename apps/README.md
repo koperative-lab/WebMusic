@@ -12,7 +12,7 @@ authoring entry points live in [dev/README.md](../dev/README.md); the repository
 
 | Path | Workspace | Purpose |
 |---|---|---|
-| `doc/webmusic` | `webmusic-doc` | Astro Starlight documentation, examples, and API reference for the WebMusic packages. |
+| `doc/webmusic` | `webmusic-doc` | Documentation, examples, and API reference for the WebMusic packages: Astro pages in the site's own shell (DEC-070). |
 | `doc/shared` | — | Shared documentation catalogs and UI assets; not a workspace. |
 | `test` | `webmusic-test` | [Manual acceptance runner](test/README.md): a live canvas of package components per check, keyed to the build's version and commit, with a Markdown report kept outside Git; not part of the documentation site. |
 

@@ -14,7 +14,7 @@ export function searchDocument(html, relative, base = '/') {
     if ([...document.querySelectorAll('meta[name="robots"]')].some((meta) => /\bnoindex\b/i.test(meta.content))
       || document.querySelector('meta[http-equiv="refresh" i]')) return undefined;
     const title = compact(document.querySelector('main h1')?.textContent ?? '');
-    const article = document.querySelector('main .sl-markdown-content');
+    const article = document.querySelector('main .doc-content');
     if (!title || !article) return undefined;
     article.querySelectorAll('script,style,template,noscript,button,input,select,textarea,[hidden],[aria-hidden="true"],[data-search-ignore],[data-pagefind-ignore]').forEach((element) => element.remove());
     article.querySelectorAll('p,div,section,article,h1,h2,h3,h4,h5,h6,li,pre,tr,td,th,br').forEach((element) => element.append(' '));

@@ -8,7 +8,7 @@ const directories = [];
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, {recursive: true, force: true})));
 });
-const article = '<main><h1>Score &amp; MIDI</h1><div class="sl-markdown-content"><h2>Playback</h2><p>Use <code>ScorePlayer</code> to play.</p><p>Next paragraph.</p></div></main>';
+const article = '<main><h1>Score &amp; MIDI</h1><div class="doc-content"><h2>Playback</h2><p>Use <code>ScorePlayer</code> to play.</p><p>Next paragraph.</p></div></main>';
 
 describe('public documentation search index', () => {
   it('extracts rendered article text without controls, navigation, or executable content', () => {

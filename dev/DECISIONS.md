@@ -3066,6 +3066,47 @@ references.
 `packages/ui/test/parameter.test.ts`; every acceptance-runner canvas shows its
 desk channels, effect knobs and meters before play.
 
+## DEC-070 — The documentation site owns its page shell
+
+**Date / status:** 2026-11-11; accepted by the repository owner.
+
+**Problem:** the documentation site wore the Starlight theme: its header,
+sidebar, table of contents, search slot, asides and Expressive Code frames,
+re-skinned through about seventy `--sl-*` overrides and a second dark palette.
+The acceptance runner and the component library already follow
+[Visual design](design/VISUAL-DESIGN.md) directly, so the documentation was the
+one surface that looked like a theme rather than like the components.
+
+**Decision:** the site drops Starlight and keeps Astro only as the compiler from
+MDX and `.astro` demos to static HTML. `apps/doc/webmusic/src/site/` owns the
+page: a one-height top bar with a tab per section, search and the repository
+link; the section's pages in a left column (opened from a menu button on narrow
+screens); the article with breadcrumbs; the page contents beside it on wide
+screens; previous and next pages. The navigation tree is
+`src/site/navigation.ts`, with directory groups listed by `sidebar.order`, and
+the UI Kit groups read from `UI_PRESENTER_CLASSES`. The site is light only, in
+the same tokens and geometry as the runner. Code blocks use a monochrome Shiki
+theme in a hairline frame with a copy icon; `:::note` and `:::caution` stay,
+through the Sätteri processor's directives. Content, URLs, redirects, frontmatter
+keys, live demos, local search, llms files and site notices are unchanged.
+
+**Alternatives considered:** a self-written Vite and MDX generator without
+Astro, which would rewrite about seventy `.astro` demos and every Astro-based
+gate for no reader-visible gain; keeping Starlight and overriding more of it,
+which keeps the theme's structure and a second palette.
+
+**Consequences:** the black site mode is gone; demos already rendered on light
+canvases. Expressive Code and its `postcss-nested` override leave the tree.
+Heading ids still come from Astro, so inbound fragments are unchanged. The
+navigation, search dialog and page chrome are site code, covered by
+`test/navigation.test.ts` and the existing search and breadcrumb tests.
+
+**Owner:** [Documentation site plan](docs/DOCS-SITE-PLAN.md) §"Site shell".
+
+**Verification:** `npm run check:docs`, the documentation workspace tests and
+`npm run docs:build`; every built anchor link resolves; the shell is checked in
+a browser at wide and phone widths with keyboard focus.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

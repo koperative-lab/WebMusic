@@ -1,0 +1,131 @@
+---
+/**
+ * The documentation page shell: one-height top bar with section tabs, the
+ * section's navigation on the left, the article, its contents on the right on
+ * wide screens, and the previous and next pages. Light only, in the visual
+ * design shared with the acceptance runner and the component library.
+ */
+import type {MarkdownHeading} from 'astro';
+import {getCollection} from 'astro:content';
+import '../../../shared/ui.css';
+import '../styles/site.css';
+import '../styles/component-section.css';
+import '../styles/audio.css';
+import '../styles/playground.css';
+import Breadcrumbs from './Breadcrumbs.astro';
+import Icon from './Icon.astro';
+import NavTree from './NavTree.astro';
+import Search from './Search.astro';
+import {navigationSections, navigationTree, pager, sectionFor} from './navigation';
+
+interface Props {
+  title: string;
+  description?: string;
+  headings?: readonly MarkdownHeading[];
+  /** Keep the page out of search engines and the site search (aliases, 404). */
+  noindex?: boolean;
+  /** The route the navigation marks as current, when it differs from the URL. */
+  route?: string;
+}
+
+const {title, description, headings = [], noindex = false} = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const href = (target: string): string => `${base}${target}`;
+const urlPath = Astro.url.pathname.startsWith(`${base}/`) || Astro.url.pathname === base
+  ? Astro.url.pathname.slice(base.length) || '/'
+  : Astro.url.pathname;
+const path = Astro.props.route ?? urlPath;
+
+const pages = (await getCollection('docs')).map((entry) => ({id: entry.id, title: entry.data.title, sidebar: entry.data.sidebar}));
+const tree = navigationTree(pages);
+const sections = navigationSections(tree);
+const section = sectionFor(sections, path);
+const {prev, next} = pager(tree, path);
+const contents = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const pageTitle = title === 'Introduction' && path === '/' ? 'WebMusic' : `${title} | WebMusic`;
+---
+
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>{pageTitle}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex, follow" />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="sitemap" href={href('/sitemap-index.xml')} />
+    <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:type" content="article" />
+    {canonical && <meta property="og:url" content={canonical} />}
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:site_name" content="WebMusic" />
+  </head>
+  <body>
+    <a class="doc-skip" href="#doc-main">Skip to content</a>
+    <header class="doc-bar">
+      <button type="button" class="doc-icon doc-bar__menu" data-nav-toggle aria-controls="doc-nav" aria-expanded="false" aria-label="Navigation" title="Navigation"><Icon name="menu" /></button>
+      <a class="doc-brand" href={href('/')}>WebMusic</a>
+      <nav class="doc-tabs" aria-label="Sections">
+        {sections.map((entry) => (
+          <a class="doc-tab" href={href(entry.href)} aria-current={entry === section ? 'true' : undefined}>{entry.label}</a>
+        ))}
+      </nav>
+      <span class="doc-spacer"></span>
+      <Search />
+      <a class="doc-icon" href="https://github.com/koperative-lab/WebMusic" aria-label="GitHub" title="GitHub"><Icon name="github" /></a>
+    </header>
+    <div class="doc-body">
+      <nav id="doc-nav" class="doc-nav" aria-label={`${section.label} pages`} data-search-ignore>
+        <NavTree entries={section.entries} path={path} />
+      </nav>
+      <div class="doc-page">
+        <main id="doc-main" class="doc-main" tabindex="-1">
+          <header class="doc-head">
+            <Breadcrumbs title={title} sidebar={tree} />
+            <h1 id="_top">{title}</h1>
+          </header>
+          <div class="doc-content">
+            <slot />
+          </div>
+          {(prev || next) && (
+            <nav class="doc-pager" aria-label="Previous and next pages" data-search-ignore>
+              {prev ? (
+                <a class="doc-pager__link" href={href(prev.href)} rel="prev">
+                  <span class="doc-caption"><Icon name="prev" />Previous</span>
+                  <span>{prev.label}</span>
+                </a>
+              ) : <span></span>}
+              {next && (
+                <a class="doc-pager__link doc-pager__link--next" href={href(next.href)} rel="next">
+                  <span class="doc-caption">Next<Icon name="next" /></span>
+                  <span>{next.label}</span>
+                </a>
+              )}
+            </nav>
+          )}
+        </main>
+        {contents.length > 1 && (
+          <aside class="doc-toc" aria-labelledby="doc-toc-title" data-search-ignore>
+            <h2 id="doc-toc-title" class="doc-caption">On this page</h2>
+            <ul>
+              {contents.map((heading) => (
+                <li class={heading.depth === 3 ? 'doc-toc__sub' : undefined}><a href={`#${heading.slug}`}>{heading.text}</a></li>
+              ))}
+            </ul>
+          </aside>
+        )}
+      </div>
+    </div>
+    <script>
+      // The UI Kit runtime renders on every page: sliders paint their fill only
+      // where its module has run, whichever demo the page carries.
+      import '../../../shared/ui';
+      import {mountSite} from './site-client';
+      mountSite(document);
+    </script>
+  </body>
+</html>

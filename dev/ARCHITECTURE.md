@@ -42,7 +42,7 @@ boundary is not necessarily a separate npm package.
 | `packages/score` | `@webmusic/score`: immutable Score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views and React composition. |
 | `packages/audio` | `@webmusic/audio`: AudioClip, decoding, playback, recording, analysis, views and React composition; format support depends on the selected decoder. |
 | `bridges/score-audio` | `@webmusic/bridge`: Score/Audio synchronization, rendering and model conversion. |
-| `apps/doc/webmusic` | Astro Starlight documentation app; content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
+| `apps/doc/webmusic` | Astro documentation app with its own page shell (`src/site/`, DEC-070); content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
 | `apps/doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
 | `scripts/` | Package, source, component, documentation and release-manifest checks; `release-pipeline/` preserves historical release machinery. |
 

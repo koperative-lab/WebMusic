@@ -12,8 +12,12 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@astrojs/starlight": "^0.42.6",
+    "@astrojs/markdown-satteri": "^0.4.2",
+    "@astrojs/mdx": "^8.0.3",
+    "@astrojs/sitemap": "^3.7.4",
     "@codesandbox/sandpack-react": "^2.20.0",
+    "@webmusic/audio": "^0.3.0",
+    "@webmusic/bridge": "^0.3.0",
     "@webmusic/score": "^0.3.0",
     "@webmusic/ui": "^0.3.0",
     "astro": "^7.3.3",
@@ -28,9 +32,7 @@
     "spessasynth_lib": "^4.3.6",
     "tone": "^15.0.4",
     "typescript": "^5.9.3",
-    "vitest": "^5.1.0",
-    "@webmusic/audio": "^0.3.0",
-    "@webmusic/bridge": "^0.3.0"
+    "vitest": "^5.1.0"
   },
   "description": "Documentation site for WebMusic Score, Audio, Bridge, UI and Kernel"
 }

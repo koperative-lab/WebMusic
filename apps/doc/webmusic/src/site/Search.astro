@@ -1,0 +1,37 @@
+---
+import Icon from './Icon.astro';
+
+const indexUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/search-index.json`;
+---
+
+<webmusic-doc-search data-index-url={indexUrl} data-dev={import.meta.env.DEV ? 'true' : undefined}>
+  <button type="button" class="doc-icon" data-search-open disabled aria-label="Search documentation" title="Search documentation (/)" aria-keyshortcuts="/ Control+K Meta+K">
+    <Icon name="search" />
+  </button>
+  <dialog aria-labelledby="webmusic-search-heading">
+    <div class="doc-search">
+      <header class="doc-search__head">
+        <h2 id="webmusic-search-heading" class="doc-caption">Search</h2>
+        <button type="button" class="doc-icon" data-search-close aria-label="Close search" title="Close search"><Icon name="close" /></button>
+      </header>
+      <div class="doc-search__query">
+        <label for="webmusic-search-input" class="doc-hidden">Title, API, or topic</label>
+        <input id="webmusic-search-input" class="doc-field" type="search" autocomplete="off" spellcheck="false" placeholder="ScorePlayer, transport, MIDI" aria-controls="webmusic-search-results" aria-describedby="webmusic-search-status" />
+        <p id="webmusic-search-status" class="doc-search__status" role="status" aria-live="polite">Enter a title, API, or topic.</p>
+        <button type="button" class="doc-action" data-search-retry hidden>Retry</button>
+      </div>
+      <ol id="webmusic-search-results" class="doc-search__results" data-search-results></ol>
+    </div>
+  </dialog>
+</webmusic-doc-search>
+
+<script>
+  import {mountDocumentationSearch} from './search-client';
+
+  class DocumentationSearch extends HTMLElement {
+    private detach?: () => void;
+    connectedCallback() { this.detach ??= mountDocumentationSearch(this); }
+    disconnectedCallback() { this.detach?.(); this.detach = undefined; }
+  }
+  if (!customElements.get('webmusic-doc-search')) customElements.define('webmusic-doc-search', DocumentationSearch);
+</script>

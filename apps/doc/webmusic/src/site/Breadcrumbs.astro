@@ -1,0 +1,23 @@
+---
+import {getBreadcrumbs, type BreadcrumbSidebarEntry} from './breadcrumbs';
+
+interface Props { title: string; sidebar: readonly BreadcrumbSidebarEntry[] }
+const crumbs = getBreadcrumbs({
+  pathname: Astro.url.pathname,
+  base: import.meta.env.BASE_URL,
+  title: Astro.props.title,
+  sidebar: Astro.props.sidebar,
+});
+---
+
+{crumbs.length > 1 && (
+  <nav class="doc-crumbs" aria-label="Breadcrumb" data-search-ignore>
+    <ol>
+      {crumbs.map((crumb) => (
+        <li>
+          {crumb.href ? <a href={crumb.href}>{crumb.label}</a> : <span aria-current="page">{crumb.label}</span>}
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}

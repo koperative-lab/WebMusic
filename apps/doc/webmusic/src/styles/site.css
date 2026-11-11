@@ -1,0 +1,343 @@
+/* ============================================================================
+   WebMusic documentation — site chrome and prose in the visual language
+   (dev/design/VISUAL-DESIGN.md) shared with the acceptance runner and the
+   component library: white and light only, neutral ink, square one-height
+   controls, hairlines, mono captions, no shadows and no visible scrollbars.
+
+   The --ws-* tokens are the site's own; demos and catalog components read
+   them too, so every documentation surface follows one palette.
+   ============================================================================ */
+
+:root {
+  color-scheme: light;
+
+  --ws-bg: #ffffff;
+  --ws-bg-nav: #ffffff;
+  --ws-fg: #111111;
+  --ws-on-accent: #ffffff;
+  --ws-text: #111111;
+  --ws-text-content: #161616;
+  --ws-text-soft: #333333;
+  --ws-text-muted: #6b6b6b;
+  --ws-link-underline: rgba(0, 0, 0, 0.3);
+  --ws-panel: #ffffff;
+  --ws-subtle: #f4f4f4;
+  --ws-inline-code-bg: #f4f4f4;
+  --ws-line: #ececec;
+  --ws-line-mid: #e2e2e2;
+  --ws-line-strong: #d8d8d8;
+  --ws-line-code: #d8d8d8;
+  --ws-shadow: rgba(0, 0, 0, 0.1);
+  --ws-shadow-2: rgba(0, 0, 0, 0.12);
+  --ws-shadow-block: #ececec;
+  --ws-shadow-block-2: #d8d8d8;
+  --ws-scroll-track: #ececec;
+  --ws-scroll-thumb: #bdbdbd;
+  --ws-scroll-thumb-hover: #8f8f8f;
+  --ws-code-text: #111111;
+
+  --ws-font: var(--wm-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
+  --ws-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  --ws-size: var(--wm-control-size, 2rem);
+  --ws-gap: 1rem;
+  --ws-pad: 0.75rem;
+  --ws-nav: 16rem;
+  --ws-toc: 13rem;
+  --ws-measure: 48rem;
+  --ws-scrim: rgba(0, 0, 0, 0.45);
+  --ws-focus: var(--wm-focus-ring, 2px solid var(--ws-fg));
+}
+
+* { box-sizing: border-box; }
+html {
+  background: var(--ws-bg);
+  accent-color: var(--ws-fg);
+  scroll-padding-top: calc(var(--ws-size) + var(--ws-gap));
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  font: 15px/1.6 var(--ws-font);
+  overflow-x: hidden;
+}
+::selection { background: var(--ws-fg); color: var(--ws-on-accent); }
+:where(a, button, input, select, textarea, summary, pre):focus-visible { outline: var(--ws-focus); outline-offset: -2px; }
+img, svg, video, canvas { max-width: 100%; }
+button { font: inherit; color: inherit; border-radius: 0; }
+
+.doc-caption {
+  margin: 0;
+  font: 600 0.7rem/1.4 var(--ws-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ws-text-muted);
+}
+.doc-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.doc-spacer { flex: 1; }
+.doc-svg { display: block; flex: none; }
+
+.doc-skip {
+  position: absolute; left: var(--ws-pad); top: 0; z-index: 30; transform: translateY(-120%);
+  padding: 0 var(--ws-pad); line-height: var(--ws-size); background: var(--ws-fg); color: var(--ws-on-accent);
+  font: 600 0.7rem/var(--ws-size) var(--ws-mono); text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none;
+}
+.doc-skip:focus { transform: none; }
+
+/* -------------------------------------------------------------- controls */
+/* Icon button: muted icon, no fill; hover ink on the raised fill; pressed inverts. */
+.doc-icon {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--ws-size); height: var(--ws-size); padding: 0;
+  border: 0; background: none; color: var(--ws-text-muted); cursor: pointer; text-decoration: none;
+}
+.doc-icon:hover { color: var(--ws-fg); background: var(--ws-subtle); }
+.doc-icon[aria-expanded='true'], .doc-icon[aria-pressed='true'] { background: var(--ws-fg); color: var(--ws-on-accent); }
+.doc-icon:disabled { opacity: 0.3; cursor: default; }
+
+/* Secondary action: 1px ink outline, mono uppercase caption. */
+.doc-action {
+  display: inline-flex; align-items: center; justify-content: center; min-height: var(--ws-size); padding: 0 var(--ws-pad);
+  border: 1px solid var(--ws-fg); background: var(--ws-bg); color: var(--ws-fg); cursor: pointer;
+  font: 600 0.7rem var(--ws-mono); text-transform: uppercase; letter-spacing: 0.1em; text-decoration: none;
+}
+.doc-action[hidden] { display: none; }
+
+.doc-field {
+  width: 100%; min-height: var(--ws-size); padding: 0.25rem 0.5rem;
+  border: 1px solid var(--ws-line-strong); border-radius: 0; background: var(--ws-bg); color: var(--ws-fg);
+  font: 0.85rem var(--ws-mono); appearance: none;
+}
+.doc-field::placeholder { color: var(--ws-text-muted); opacity: 1; }
+.doc-field::-webkit-search-cancel-button { display: none; }
+
+/* -------------------------------------------------------------- top bar */
+/* One control height, one row; on narrow screens it scrolls sideways. */
+.doc-bar {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: stretch;
+  height: var(--ws-size); border-bottom: 1px solid var(--ws-line-strong); background: var(--ws-bg); white-space: nowrap;
+}
+.doc-bar__menu { display: none; border-right: 1px solid var(--ws-line-strong); }
+.doc-brand {
+  display: inline-flex; align-items: center; padding-inline: var(--ws-pad); flex: none;
+  width: var(--ws-nav); border-right: 1px solid var(--ws-line-strong);
+  font: 600 0.75rem var(--ws-mono); text-transform: uppercase; letter-spacing: 0.14em; color: var(--ws-fg); text-decoration: none;
+}
+/* Only the tabs scroll sideways, so search and the repository link stay put. */
+.doc-tabs { display: flex; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.doc-tabs::-webkit-scrollbar { display: none; }
+.doc-tab {
+  display: inline-flex; flex: none; align-items: center; padding-inline: var(--ws-pad); border-right: 1px solid var(--ws-line-strong);
+  font: 600 0.7rem var(--ws-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ws-text-muted); text-decoration: none;
+}
+.doc-tab:hover { color: var(--ws-fg); background: var(--ws-subtle); }
+.doc-tab[aria-current='true'] { background: var(--ws-fg); color: var(--ws-on-accent); }
+.doc-bar > webmusic-doc-search, .doc-bar > .doc-icon { border-left: 1px solid var(--ws-line-strong); }
+webmusic-doc-search { display: flex; }
+
+/* -------------------------------------------------------------- layout */
+.doc-body { display: grid; grid-template-columns: var(--ws-nav) minmax(0, 1fr); min-height: calc(100dvh - var(--ws-size)); }
+
+.doc-nav {
+  position: sticky; top: var(--ws-size); height: calc(100dvh - var(--ws-size));
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  border-right: 1px solid var(--ws-line-strong); background: var(--ws-bg); padding-bottom: calc(var(--ws-gap) * 2);
+}
+.doc-nav::-webkit-scrollbar { display: none; }
+.doc-nav__list { list-style: none; margin: 0; padding: 0; }
+.doc-nav__item, .doc-nav__head {
+  display: flex; align-items: center; gap: 0.4rem; min-height: var(--ws-size);
+  padding: 0.3rem var(--ws-pad) 0.3rem calc(var(--ws-pad) + var(--depth, 0) * var(--ws-pad));
+}
+.doc-nav__item { font-size: 0.85rem; line-height: 1.35; color: var(--ws-text); text-decoration: none; overflow-wrap: anywhere; }
+.doc-nav__item:hover { background: var(--ws-subtle); }
+.doc-nav__item[aria-current='page'] { background: var(--ws-fg); color: var(--ws-on-accent); }
+.doc-nav__head {
+  cursor: pointer; list-style: none; user-select: none;
+  font: 600 0.7rem/1.4 var(--ws-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--ws-text-muted);
+}
+.doc-nav__head::-webkit-details-marker { display: none; }
+.doc-nav__head:hover { color: var(--ws-fg); }
+.doc-nav__head .doc-svg { width: 12px; height: 12px; transition: transform 0.12s; }
+.doc-nav__group[open] > .doc-nav__head .doc-svg { transform: rotate(90deg); }
+/* Top-level groups of a section are separated by a hairline. */
+.doc-nav > .doc-nav__list > li:has(> .doc-nav__group) { border-top: 1px solid var(--ws-line-strong); }
+.doc-nav > .doc-nav__list > li:has(> .doc-nav__group) + li:not(:has(> .doc-nav__group)) { border-top: 1px solid var(--ws-line-strong); }
+
+.doc-page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; min-width: 0; }
+.doc-main {
+  min-width: 0; width: 100%; max-width: calc(var(--ws-measure) + var(--ws-gap) * 4);
+  padding: calc(var(--ws-gap) * 1.5) calc(var(--ws-gap) * 2) calc(var(--ws-gap) * 4);
+}
+.doc-main:focus { outline: none; }
+.doc-head { margin-bottom: calc(var(--ws-gap) * 1.5); }
+.doc-head h1 { margin: 0; font-size: 1.6rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; color: var(--ws-fg); overflow-wrap: anywhere; }
+.doc-crumbs ol { display: flex; flex-wrap: wrap; gap: 0.15rem 0; margin: 0 0 0.5rem; padding: 0; list-style: none; font: 0.72rem/1.5 var(--ws-mono); color: var(--ws-text-muted); }
+.doc-crumbs li + li::before { content: '/'; padding-inline: 0.45rem; color: var(--ws-line-strong); }
+.doc-crumbs a { color: inherit; text-decoration: none; }
+.doc-crumbs a:hover { color: var(--ws-fg); text-decoration: underline; text-underline-offset: 0.2em; }
+.doc-crumbs [aria-current='page'] { color: var(--ws-fg); }
+
+/* Contents of this page, beside the article on wide screens. */
+.doc-toc { display: none; }
+@media (min-width: 78rem) {
+  .doc-page { grid-template-columns: minmax(0, calc(var(--ws-measure) + var(--ws-gap) * 4)) var(--ws-toc); gap: var(--ws-gap); }
+  .doc-toc {
+    display: block; position: sticky; top: calc(var(--ws-size) + var(--ws-gap) * 1.5);
+    max-height: calc(100dvh - var(--ws-size) - var(--ws-gap) * 3); overflow-y: auto; scrollbar-width: none;
+    margin-top: calc(var(--ws-gap) * 1.5); padding-right: var(--ws-gap);
+  }
+  .doc-toc::-webkit-scrollbar { display: none; }
+}
+.doc-toc ul { list-style: none; margin: 0.5rem 0 0; padding: 0; border-left: 1px solid var(--ws-line-strong); }
+.doc-toc a {
+  display: block; margin-left: -1px; padding: 0.2rem 0 0.2rem var(--ws-pad); border-left: 2px solid transparent;
+  font-size: 0.78rem; line-height: 1.4; color: var(--ws-text-muted); text-decoration: none; overflow-wrap: anywhere;
+}
+.doc-toc__sub a { padding-left: calc(var(--ws-pad) * 2); }
+.doc-toc a:hover { color: var(--ws-fg); }
+.doc-toc a[aria-current='true'] { color: var(--ws-fg); border-left-color: var(--ws-fg); }
+
+.doc-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: calc(var(--ws-gap) * 3); }
+.doc-pager__link {
+  display: grid; gap: 0.2rem; padding: 0.6rem var(--ws-pad); border: 1px solid var(--ws-line-strong);
+  color: var(--ws-fg); text-decoration: none; overflow-wrap: anywhere; min-width: 0;
+}
+.doc-pager__link:hover { border-color: var(--ws-fg); }
+.doc-pager__link .doc-caption { display: flex; align-items: center; gap: 0.25rem; }
+.doc-pager__link .doc-svg { width: 12px; height: 12px; }
+.doc-pager__link--next { text-align: right; }
+.doc-pager__link--next .doc-caption { justify-content: flex-end; }
+
+/* -------------------------------------------------------------- prose */
+/* Sibling flow inside the article. Demos and other `.not-content` blocks keep
+   their own spacing, and nothing inside them is touched. */
+.doc-content { color: var(--ws-text-content); overflow-wrap: break-word; }
+.doc-content :not(a, strong, em, del, span, input, code, br, :where(.not-content, .not-content *))
+  + :not(a, strong, em, del, span, input, code, br, :where(.not-content, .not-content *)) { margin-top: 1rem; }
+.doc-content :where(p, ul, ol, dl, table, blockquote, figure, pre):not(:where(.not-content *)) { margin-bottom: 0; }
+.doc-content > :first-child { margin-top: 0; }
+
+.doc-content :where(h2, h3, h4, h5):not(:where(.not-content *)) { color: var(--ws-fg); font-weight: 600; margin-bottom: 0; overflow-wrap: anywhere; }
+.doc-content h2:not(:where(.not-content *)) {
+  margin-top: 2.5rem; padding-top: var(--ws-gap); border-top: 1px solid var(--ws-line-strong);
+  font-size: 1.2rem; line-height: 1.3;
+}
+.doc-content h3:not(:where(.not-content *)) { margin-top: 2rem; font-size: 1rem; line-height: 1.4; }
+.doc-content :where(h4, h5):not(:where(.not-content *)) {
+  margin-top: 1.5rem; font: 600 0.72rem/1.4 var(--ws-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--ws-text-muted);
+}
+.doc-content a:not(:where(.not-content *)) {
+  color: var(--ws-fg); text-decoration: underline; text-decoration-thickness: 1px;
+  text-decoration-color: var(--ws-link-underline); text-underline-offset: 0.2em;
+}
+.doc-content a:not(:where(.not-content *)):hover { text-decoration-color: var(--ws-fg); }
+.doc-content :where(ul, ol):not(:where(.not-content *)) { padding-left: 1.25rem; }
+.doc-content li:not(:where(.not-content *)) + li { margin-top: 0.3rem; }
+.doc-content li:not(:where(.not-content *))::marker { color: var(--ws-text-muted); }
+.doc-content :where(ol):not(:where(.not-content *)) > li::marker { font: 0.8rem var(--ws-mono); }
+.doc-content hr { border: 0; border-top: 1px solid var(--ws-line-strong); margin-block: 2rem; }
+.doc-content blockquote:not(:where(.not-content *)) {
+  margin-inline: 0; padding-left: var(--ws-pad); border-left: 2px solid var(--ws-fg); color: var(--ws-text-soft);
+}
+.doc-content :not(pre) > code:not(:where(.not-content *)) {
+  padding: 0.08em 0.3em; background: var(--ws-inline-code-bg); color: var(--ws-fg);
+  font: 0.86em var(--ws-mono); overflow-wrap: anywhere;
+}
+.doc-content :where(img, video):not(:where(.not-content *)) { height: auto; }
+
+/* Tables scroll sideways inside the article, without a visible scrollbar. */
+.doc-content table:not(:where(.not-content *)) {
+  display: block; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+  border-collapse: collapse; font-size: 0.85rem; line-height: 1.45;
+}
+.doc-content table:not(:where(.not-content *))::-webkit-scrollbar { display: none; }
+.doc-content :where(th, td):not(:where(.not-content *)) { padding: 0.45rem var(--ws-pad) 0.45rem 0; border-bottom: 1px solid var(--ws-line-strong); text-align: left; vertical-align: top; }
+.doc-content :where(th, td):not(:where(.not-content *)) + :where(th, td) { padding-left: var(--ws-pad); }
+.doc-content th:not(:where(.not-content *)) {
+  border-bottom-color: var(--ws-fg); white-space: nowrap;
+  font: 600 0.7rem/1.4 var(--ws-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ws-text-muted);
+}
+.doc-content td:not(:where(.not-content *)) code { white-space: nowrap; }
+
+/* Note and caution: one hairline frame, an ink edge and a caption. */
+.doc-aside { padding: var(--ws-pad); border: 1px solid var(--ws-line-strong); border-left: 2px solid var(--ws-fg); }
+.doc-aside > * + * { margin-top: 0.5rem !important; }
+.doc-aside > .doc-aside__title { color: var(--ws-fg); }
+
+/* Code: a hairline frame with a one-height header for the language and copy. */
+.doc-code { border: 1px solid var(--ws-line-strong); min-width: 0; }
+.doc-content .doc-code { margin-top: 1rem; }
+.doc-code__head {
+  display: flex; align-items: center; justify-content: space-between; height: var(--ws-size);
+  padding-left: var(--ws-pad); border-bottom: 1px solid var(--ws-line-strong);
+}
+.doc-code__head .doc-icon[data-copied='true'] { background: var(--ws-fg); color: var(--ws-on-accent); }
+.doc-code pre {
+  margin: 0; padding: var(--ws-pad); overflow-x: auto; scrollbar-width: none;
+  font: 0.8rem/1.65 var(--ws-mono); tab-size: 2;
+}
+.doc-code pre::-webkit-scrollbar { display: none; }
+.doc-code code { font: inherit; background: none; padding: 0; }
+
+/* Collapsible blocks written straight into prose. */
+.doc-content details:not(.component-section, :where(.not-content *)) { border: 1px solid var(--ws-line-strong); }
+.doc-content details:not(.component-section, :where(.not-content *)) > summary {
+  min-height: var(--ws-size); padding: 0.4rem var(--ws-pad); cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.doc-content details:not(.component-section, :where(.not-content *))[open] > summary { border-bottom: 1px solid var(--ws-line-strong); }
+.doc-content details:not(.component-section, :where(.not-content *)) > :not(summary) { margin-inline: var(--ws-pad); }
+.doc-content details:not(.component-section, :where(.not-content *)) > :last-child { margin-bottom: var(--ws-pad); }
+
+/* -------------------------------------------------------------- search */
+/* A modal card over a scrim: one-height header with caption and close. */
+webmusic-doc-search dialog {
+  width: min(36rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); margin: 4rem auto; padding: 0;
+  border: 1px solid var(--ws-line-strong); border-radius: 0; background: var(--ws-bg); color: var(--ws-text);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18); overflow: hidden; white-space: normal;
+}
+webmusic-doc-search dialog[open] { display: flex; }
+webmusic-doc-search dialog::backdrop { background: var(--ws-scrim); }
+.doc-search { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.doc-search__head {
+  display: flex; align-items: center; justify-content: space-between; height: var(--ws-size); flex: none;
+  padding-left: var(--ws-pad); border-bottom: 1px solid var(--ws-line-strong);
+}
+.doc-search__query { flex: none; padding: var(--ws-pad); }
+.doc-search__status { margin: 0.5rem 0 0; font: 0.72rem/1.4 var(--ws-mono); color: var(--ws-text-muted); }
+.doc-search__query .doc-action { margin-top: 0.5rem; }
+.doc-search__results { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; list-style: none; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.doc-search__results::-webkit-scrollbar { display: none; }
+.doc-search__results:not(:empty) { border-top: 1px solid var(--ws-line-strong); }
+.doc-search__results li + li { border-top: 1px solid var(--ws-line-strong); }
+.doc-search__results a { display: block; padding: 0.6rem var(--ws-pad); color: var(--ws-text); text-decoration: none; overflow-wrap: anywhere; }
+.doc-search__results a:hover, .doc-search__results a:focus-visible { background: var(--ws-subtle); }
+.doc-search__results strong { display: block; color: var(--ws-fg); font-size: 0.9rem; font-weight: 600; line-height: 1.4; }
+.doc-search__results p { margin: 0.25rem 0; font-size: 0.8rem; line-height: 1.5; color: var(--ws-text-soft); }
+.doc-search__results small { display: block; font: 0.7rem/1.4 var(--ws-mono); color: var(--ws-text-muted); }
+body[data-webmusic-search-open] { overflow: hidden; }
+
+/* -------------------------------------------------------------- narrow */
+/* Below two columns the navigation opens over the page from the menu button. */
+@media (max-width: 60rem) {
+  .doc-bar__menu { display: inline-grid; }
+  .doc-brand { width: auto; }
+  .doc-body { grid-template-columns: minmax(0, 1fr); }
+  .doc-nav {
+    display: none; position: fixed; top: var(--ws-size); left: 0; z-index: 15;
+    width: min(20rem, 100%); height: calc(100dvh - var(--ws-size));
+  }
+  body[data-nav-open] .doc-nav { display: block; }
+  body[data-nav-open]::after { content: ''; position: fixed; inset: var(--ws-size) 0 0; z-index: 14; background: var(--ws-scrim); }
+  body[data-nav-open] { overflow: hidden; }
+  .doc-main { padding: var(--ws-gap) var(--ws-gap) calc(var(--ws-gap) * 3); }
+}
+@media (max-width: 30rem) {
+  .doc-brand { display: none; }
+  .doc-head h1 { font-size: 1.35rem; }
+  .doc-pager { grid-template-columns: minmax(0, 1fr); }
+  webmusic-doc-search dialog { width: calc(100% - 1rem); margin: 0.5rem auto; max-height: calc(100dvh - 1rem); }
+}

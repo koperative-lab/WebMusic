@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {mountDocumentationSearch, readSearchIndex, searchDocuments, type SearchDocument} from '../src/starlight/search-client';
+import {mountDocumentationSearch, readSearchIndex, searchDocuments, type SearchDocument} from '../src/site/search-client';
 
 const entries: SearchDocument[] = [
   {url: '/WebMusic/score/', title: 'Score', text: 'ScorePlayer controls playback and the transport.'},

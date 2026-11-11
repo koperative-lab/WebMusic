@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {getBreadcrumbs, type BreadcrumbSidebarEntry} from '../src/starlight/breadcrumbs';
+import {getBreadcrumbs, type BreadcrumbSidebarEntry} from '../src/site/breadcrumbs';
 
 const base = '/WebMusic/';
 const group = (label: string, entries: BreadcrumbSidebarEntry[]): BreadcrumbSidebarEntry => ({type: 'group', label, entries});

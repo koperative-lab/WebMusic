@@ -1,8 +1,8 @@
 /* ============================================================================
    WebMusic docs UI kit — one control vocabulary for the documentation site.
 
-   Loaded globally through Starlight `customCss` (see the site's
-   astro.config.mjs), so it also reaches markup that demos mount from
+   Loaded globally by the page shell (see the site's
+   src/site/DocPage.astro), so it also reaches markup that demos mount from
    JavaScript — Astro's scoped <style> does not, because the scope class is
    only stamped onto nodes present at build time.
 
@@ -19,7 +19,7 @@
      transport   32x32 button, #111 on #fff
      meter       well #1d1d1d, fill #fff, peak #777 on a #111 body
 
-   Controls use square geometry through piano.css and the public component
+   Controls use square geometry through site.css and the public component
    radius token below. Status labels retain their meaning in a neutral palette.
    ========================================================================= */
 
@@ -52,7 +52,7 @@
 
   /* -- type -------------------------------------------------------------- */
   --wui-font-ui: system-ui, sans-serif;
-  --wui-font-mono: var(--sl-font-mono, ui-monospace, monospace);
+  --wui-font-mono: var(--ws-mono, ui-monospace, monospace);
   --wui-size-label: 0.68rem;
   --wui-size-readout: 0.7rem;
   --wui-size-control: 0.8rem;
@@ -61,7 +61,7 @@
   --wui-row-h: 2rem;
   /* The kit's house geometry, fed from the docs' own row height. These pierce
      every shadow root, which the `border-radius: 0` rule in
-     piano.css cannot: it stops at the boundary. Every in-row control on the
+     site.css cannot: it stops at the boundary. Every in-row control on the
      site — kit presenter, custom element or docs chrome — resolves to this. */
   --wm-control-size: var(--wui-row-h);
   --wm-control-radius: 0;
@@ -214,7 +214,7 @@
 }
 
 /* A panel dropped straight into MDX prose. `not-content` (which every demo
-   root needs, see the note on .wui-row) also removes the margin Starlight
+   root needs, see the note on .wui-row) also removes the margin the article
    would otherwise give it, so a standalone demo has to ask for its own
    breathing room. Panels laid out by a parent grid must NOT use this. */
 .wui-panel--flow {

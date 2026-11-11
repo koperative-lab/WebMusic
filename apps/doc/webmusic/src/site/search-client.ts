@@ -158,6 +158,16 @@ export function mountDocumentationSearch(root: HTMLElement): () => void {
       dialog.close();
       return;
     }
+    // `/` opens search too, as in the library, unless the reader is typing.
+    const target = event.target instanceof Element ? event.target : undefined;
+    // Live demos own their keys (a note input may play `/`), so only the page itself opens search.
+    const busy = event.defaultPrevented || !!target?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .not-content')
+      || !!target?.tagName.includes('-');
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !busy && !dialog.open) {
+      event.preventDefault();
+      open();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k' && !event.repeat) {
       event.preventDefault();
       if (dialog.open) dialog.close();

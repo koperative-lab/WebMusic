@@ -1353,27 +1353,27 @@ async function checkElementComposition() {
   );
 
   const uikitDocsRoot = path.join(root, 'apps/doc/webmusic/src/content/docs/uikit');
-  const docsAstroConfig = await readFile(
-    path.join(root, 'apps/doc/webmusic/astro.config.mjs'),
+  const docsNavigation = await readFile(
+    path.join(root, 'apps/doc/webmusic/src/site/navigation.ts'),
     'utf8',
   );
-  const uiKitNavigationStart = docsAstroConfig.indexOf("label: 'UI Kit'");
-  const uiKitNavigationEnd = docsAstroConfig.indexOf("label: 'Kernel'", uiKitNavigationStart);
-  const uiKitNavigation = docsAstroConfig.slice(uiKitNavigationStart, uiKitNavigationEnd);
+  const uiKitNavigationStart = docsNavigation.indexOf("group('UI Kit'");
+  const uiKitNavigationEnd = docsNavigation.indexOf("group('Kernel'", uiKitNavigationStart);
+  const uiKitNavigation = docsNavigation.slice(uiKitNavigationStart, uiKitNavigationEnd);
   // DOCS-SITE-PLAN.md §"UI Kit": Overview at /uikit/, Catalog at
   // /uikit/catalog/, the six presenter classes, then the root API page
   // labelled by its entry. This assertion used to forbid the Overview item,
   // from when /uikit/ was the catalog and the overview lived at /ui/.
   if (uiKitNavigationStart < 0) {
-    errors.push('UI Kit navigation group is missing from the docs sidebar.');
+    errors.push('UI Kit navigation group is missing from the docs navigation.');
   } else {
     for (const [label, link] of [
-      ['Overview', "link: '/uikit/'"],
-      ['Catalog', "link: '/uikit/catalog/'"],
-      ['@webmusic/ui', "link: '/uikit/api/'"],
+      ['Overview', '/uikit/'],
+      ['Catalog', '/uikit/catalog/'],
+      ['@webmusic/ui', '/uikit/api/'],
     ]) {
-      if (!uiKitNavigation.includes(`label: '${label}'`) || !uiKitNavigation.includes(link)) {
-        errors.push(`UI Kit navigation must carry a '${label}' item linking ${link.slice(7, -1)}.`);
+      if (!uiKitNavigation.includes(`link('${label}', '${link}')`)) {
+        errors.push(`UI Kit navigation must carry a '${label}' item linking ${link}.`);
       }
     }
     if (uiKitNavigation.includes("'/ui/")) {

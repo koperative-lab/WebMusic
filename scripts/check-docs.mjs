@@ -355,19 +355,13 @@ function checkCapabilityGroups(files) {
   }
 }
 
-/** The UI Kit class labels have one source; the sidebar mirrors it by hand. */
+/** The UI Kit class labels have one source; the navigation lists its groups from it. */
 async function checkUiKitLabels() {
-  const {UI_PRESENTER_CLASSES} = await load('apps/doc/shared/ui-presenter-catalog.ts');
-  const config = read('apps/doc/webmusic/astro.config.mjs');
-  const sidebar = new Map(
-    [...config.matchAll(/uiKitCategory\('([a-z-]+)',\s*'([^']+)'\)/g)].map((m) => [m[1], m[2]]),
-  );
-  for (const entry of UI_PRESENTER_CLASSES) {
-    const label = sidebar.get(entry.slug);
-    if (label === undefined) fail('plan', `astro.config.mjs has no uiKitCategory('${entry.slug}', …)`);
-    else if (label !== entry.label) {
-      fail('plan', `class ${entry.slug}: sidebar says "${label}", the catalog says "${entry.label}"`);
-    }
+  const navigation = read('apps/doc/webmusic/src/site/navigation.ts');
+  const start = navigation.indexOf("group('UI Kit'");
+  const group = navigation.slice(start, navigation.indexOf("group('Kernel'", start));
+  if (start < 0 || !/UI_PRESENTER_CLASSES\.map\(\(entry\) => group\(entry\.label, \[directory\(`uikit\/\$\{entry\.slug\}`\)\]/.test(group)) {
+    fail('plan', 'src/site/navigation.ts must list the UI Kit groups from UI_PRESENTER_CLASSES (label and directory slug)');
   }
 }
 
@@ -552,7 +546,7 @@ function checkLiveDemoCanvases(files) {
 // 6. Internal links and anchors.
 // ---------------------------------------------------------------------------
 
-/** github-slugger's rule, which is what Starlight generates heading ids with. */
+/** github-slugger's rule, which is what Astro generates heading ids with. */
 function slug(heading) {
   return heading
     .replace(/`([^`]*)`/g, '$1')

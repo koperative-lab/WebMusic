@@ -3,13 +3,7 @@
 
 :root {
   --wa-edge: #b0b0b0; /* output-block borders and waveform scrollbars */
-  /* Captions sit on the intentionally light `.wui-panel` demo canvas in both
-     site themes, so this contrast value must stay dark. */
   --wa-muted: #666;
-}
-
-:root[data-theme='dark'] {
-  --wa-edge: #3b3f49;
 }
 
 /* WebAudio-specific multi-column demo layout. The outer card and its title use
@@ -27,7 +21,7 @@
 
 /* <audio-view> draws the waveform / spectrogram onto a canvas that is
    intentionally WIDER than its box (duration × pixels-per-second) and lives in a
-   horizontally scrollable wrapper. Starlight's content reset applies
+   horizontally scrollable wrapper. The article's content reset applies
    `canvas { max-width: 100% }`, which clamps that canvas back to the box —
    squashing a long clip into a few pixels and killing the scroll. Opt these
    canvases out so the wrapper can overflow and pan. */

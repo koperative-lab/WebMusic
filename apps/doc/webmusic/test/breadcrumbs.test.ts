@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {UI_PRESENTER_CLASSES} from '../../shared/ui-presenter-catalog';
-import {getBreadcrumbs, type BreadcrumbSidebarEntry} from '../src/starlight/breadcrumbs';
+import {getBreadcrumbs, type BreadcrumbSidebarEntry} from '../src/site/breadcrumbs';
 
 const group = (label: string, entries: BreadcrumbSidebarEntry[]): BreadcrumbSidebarEntry => ({type: 'group', label, entries});
 const link = (label: string, href: string): BreadcrumbSidebarEntry => ({type: 'link', label, href});
