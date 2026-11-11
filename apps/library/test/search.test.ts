@@ -29,3 +29,11 @@ describe('library search', () => {
     expect(tags('zzzz-nothing')).toEqual([]);
   });
 });
+
+describe('type search', () => {
+  it('finds an element by one of its types', () => {
+    expect(tags('bitcrusher')).toEqual(['score-effect']);
+    expect(tags('stereometer')).toEqual(['audio-meter']);
+    expect(tags('fretboard')).toContain('score-pitch-view');
+  });
+});

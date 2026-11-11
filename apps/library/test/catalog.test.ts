@@ -59,3 +59,13 @@ describe('documentation summaries', () => {
     expect(plainText('Use `<score-player>` and <Badge text="x" />.')).toBe('Use <score-player> and .');
   });
 });
+
+describe('types', () => {
+  it('lists every value of an element’s type attribute, and none for elements without one', () => {
+    expect(byTag('audio-meter')?.types).toEqual(['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer']);
+    expect(byTag('score-view')?.types).toEqual(['piano-roll', 'staff', 'waterfall']);
+    expect(byTag('score-player')?.types).toEqual([]);
+    const cards = LIBRARY.reduce((sum, entry) => sum + Math.max(1, entry.types.length), 0);
+    expect(cards).toBeGreaterThan(LIBRARY.length);
+  });
+});

@@ -47,6 +47,21 @@ export const EDITOR_LOADERS = {
   audio: {entry: '@webmusic/audio/view/headless', name: 'loadAudioClipEditor'},
 } as const;
 
+/**
+ * Data an element cannot load from its markup, which the page computes and
+ * assigns: an `<audio-view type="spectrogram">` draws only a precomputed
+ * `.spectrogram` (its reference page).
+ */
+export interface SpectrogramStep {
+  /** Arabesque URL the clip is decoded from. */
+  readonly url: string;
+  /** Selector of the view that receives it. */
+  readonly target: string;
+}
+
+/** STFT settings for the whole piece: coarse enough to compute in a moment. */
+export const SPECTROGRAM_OPTIONS = {fftSize: 2048, hopSize: 2048} as const;
+
 export interface Composition {
   /** Chosen and required tags, in catalog order. */
   readonly tags: readonly string[];
@@ -58,6 +73,8 @@ export interface Composition {
   readonly imports: ReadonlyMap<string, readonly string[]>;
   /** Editors to load and lend after the markup is in the document. */
   readonly editors: readonly EditorStep[];
+  /** Spectrograms to compute and assign after the markup is in the document. */
+  readonly spectrograms: readonly SpectrogramStep[];
   /** A `<script type="module">` that defines every tag in the markup and loads its editors. */
   readonly script: string;
 }
@@ -236,11 +253,26 @@ export function composeApp(selection: readonly string[], options: ComposeOptions
     const entry = entryFor(recipe.tag);
     imports.set(entry, [...(imports.get(entry) ?? []), recipe.define]);
   }
+  const spectrograms: SpectrogramStep[] = [];
+  const findSpectrograms = (node: Node) => {
+    if (node.tag === 'audio-view' && node.attributes.type === 'spectrogram') spectrograms.push({url: media('wav'), target: 'audio-view[type="spectrogram"]'});
+    node.children?.forEach(findSpectrograms);
+  };
+  nodes.forEach(findSpectrograms);
   const loaders = new Map<string, string[]>();
-  for (const step of editors) {
-    const {entry, name} = EDITOR_LOADERS[step.kind];
+  const need = (entry: string, name: string) => {
     if (!loaders.get(entry)?.includes(name)) loaders.set(entry, [...(loaders.get(entry) ?? []), name]);
+  };
+  for (const step of editors) need(EDITOR_LOADERS[step.kind].entry, EDITOR_LOADERS[step.kind].name);
+  if (spectrograms.length) {
+    need('@webmusic/audio/play', 'loadClipFromUrl');
+    need('@webmusic/audio/analyze', 'computeSpectrogram');
   }
+  const spectrogramLines = spectrograms.flatMap((step) => [
+    '  // A spectrogram is precomputed data the page assigns to the view.',
+    `  const clip = await loadClipFromUrl('${step.url}');`,
+    `  document.querySelector('${step.target.replace(/'/g, "\\'")}').spectrogram = computeSpectrogram(clip.channelData(0), clip.sampleRate, {fftSize: ${SPECTROGRAM_OPTIONS.fftSize}, hopSize: ${SPECTROGRAM_OPTIONS.hopSize}});`,
+  ]);
   const editorLines = editors.length === 0 ? [] : [
     '  // Your page owns each editor; dispose it after detaching the elements.',
     ...editors.flatMap((step) => [
@@ -253,9 +285,10 @@ export function composeApp(selection: readonly string[], options: ComposeOptions
     ...[...imports, ...loaders].map(([entry, names]) => `  import {${names.join(', ')}} from '${entry}';`),
     ...[...imports.values()].flat().map((name) => `  ${name}();`),
     ...editorLines,
+    ...spectrogramLines,
     '</script>',
   ].join('\n');
-  return {tags, added, markup, imports, editors, script};
+  return {tags, added, markup, imports, editors, spectrograms, script};
 }
 
 /** Script and markup, the way the documentation pages show an element. */

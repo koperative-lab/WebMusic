@@ -32,6 +32,11 @@ development and at the published site in a production build; set
   picture of the element alone — not the player, input or desk that feeds it in
   a composition — with no controls, playback or interaction; click it to open
   the element's page, where the live demo is. Hovering a card only outlines it.
+- **A card per type.** An element with a `type` attribute has a card for each
+  value the parameter catalog lists — seven meters, eleven Score inserts, four
+  Audio inserts, three Score views, three pitch views, three Audio views and
+  two live views — each marked with its type and opening the demo on it
+  (`#/c/<tag>/<type>`). Searching a type's name keeps just those cards.
 - **Pictures, not live elements.** The home page mounts no element. A hidden
   background frame ([`render.html`](render.html), [`src/render.ts`](src/render.ts))
   mounts one element at a time with the packages' own code on Arabesque No. 1,
@@ -71,7 +76,10 @@ development and at the published site in a production build; set
   the code changes as you adjust them. Editing views (`<score-grid-view>`,
   `<score-sheet-view>`, `<audio-clip-view>`) borrow an editor the page loads and
   lends to the player, as their reference pages show; Score analysis links to
-  its player with `input` (see STATUS LIB-01).
+  its player with `input` (see STATUS LIB-01). A spectrogram view draws only
+  data the page computes and assigns, so the demo decodes the clip and assigns
+  `computeSpectrogram`'s result (2048-sample frames and hops), and its code
+  shows the same lines. Changing `type` in Parameters remounts the demo.
 
 The code imports the packages by their public entries
 (`@webmusic/score/play/element` and so on), so use it through a bundler such

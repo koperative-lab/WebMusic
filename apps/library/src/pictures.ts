@@ -14,7 +14,9 @@ const STORE = 'pictures';
 /** A stretching element's picture is reused within this many pixels of the width asked for. */
 const WIDTH_TOLERANCE = 24;
 
-const keyOf = (job: PictureJob) => `${VERSION}|${job.tag}|${job.width === undefined ? 'own' : Math.round(job.width)}`;
+/** One element, or one type of it. */
+const idOf = (job: Pick<PictureJob, 'tag' | 'type'>) => job.type ? `${job.tag}@${job.type}` : job.tag;
+const keyOf = (job: PictureJob) => `${VERSION}|${idOf(job)}|${job.width === undefined ? 'own' : Math.round(job.width)}`;
 
 const pictures = new Map<string, Picture>();
 const urls = new Map<string, string>();
@@ -72,8 +74,8 @@ function store(key: string, picture: Picture): void {
   });
 }
 
-function candidates(tag: string): [number | 'own', Picture][] {
-  const prefix = `${VERSION}|${tag}|`;
+function candidates(id: string): [number | 'own', Picture][] {
+  const prefix = `${VERSION}|${id}|`;
   return [...pictures].filter(([key]) => key.startsWith(prefix))
     .map(([key, picture]) => [key.slice(prefix.length) === 'own' ? 'own' : Number(key.slice(prefix.length)), picture]);
 }
@@ -82,13 +84,13 @@ function candidates(tag: string): [number | 'own', Picture][] {
 export function pictureFor(job: PictureJob): Picture | undefined {
   const exact = pictures.get(keyOf(job));
   if (exact || job.width === undefined) return exact;
-  return candidates(job.tag).filter(([width]) => width !== 'own' && Math.abs(width - job.width!) <= WIDTH_TOLERANCE)
+  return candidates(idOf(job)).filter(([width]) => width !== 'own' && Math.abs(width - job.width!) <= WIDTH_TOLERANCE)
     .sort(([a], [b]) => Math.abs(Number(a) - job.width!) - Math.abs(Number(b) - job.width!))[0]?.[1];
 }
 
 /** Any picture of the element, to size and show its card while the right one is drawn. */
-export function anyPicture(tag: string): Picture | undefined {
-  return candidates(tag)[0]?.[1];
+export function anyPicture(job: Pick<PictureJob, 'tag' | 'type'>): Picture | undefined {
+  return candidates(idOf(job))[0]?.[1];
 }
 
 /** An object URL for a picture, made once. */

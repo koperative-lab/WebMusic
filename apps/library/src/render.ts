@@ -10,6 +10,8 @@ import {defaultStylesFrom, snapshot, type Picture} from './snapshot.ts';
 
 export interface PictureJob {
   readonly tag: string;
+  /** The element's `type` attribute, for an element drawn one card per type. */
+  readonly type?: string;
   /** Width to lay a stretching element out at; absent for an element with its own width. */
   readonly width?: number;
 }
@@ -94,7 +96,7 @@ async function draw(job: PictureJob): Promise<Picture> {
   stage.style.width = job.width ? `${job.width}px` : 'max-content';
   const controller = new AbortController();
   const errors: unknown[] = [];
-  const cleanup = await mountComposition(stage, composeApp([job.tag], {mediaBase: import.meta.env.BASE_URL, bareHosts: true}), (error) => errors.push(error), controller.signal);
+  const cleanup = await mountComposition(stage, composeApp([job.tag], {mediaBase: import.meta.env.BASE_URL, bareHosts: true, overrides: job.type ? {[job.tag]: {type: job.type}} : undefined}), (error) => errors.push(error), controller.signal);
   try {
     await settle(stage, controller.signal);
     const target = stage.querySelector(recipe.picture ?? job.tag);

@@ -147,3 +147,14 @@ describe('shared documents', () => {
     expect(composition.editors.flatMap((step) => step.targets).filter((target) => target.startsWith('#'))).toEqual(['#c7-audio']);
   });
 });
+
+describe('precomputed data', () => {
+  it('computes and assigns a spectrogram for an audio view of that type', () => {
+    const composition = compose(['audio-view'], {'audio-view': {type: 'spectrogram'}});
+    expect(composition.spectrograms).toEqual([{url: '/wav/Arabesque%20No.1.wav', target: 'audio-view[type="spectrogram"]'}]);
+    expect(composition.script).toContain("import {loadClipFromUrl} from '@webmusic/audio/play';");
+    expect(composition.script).toContain("import {computeSpectrogram} from '@webmusic/audio/analyze';");
+    expect(composition.script).toContain('.spectrogram = computeSpectrogram(clip.channelData(0), clip.sampleRate');
+    expect(compose(['audio-view']).spectrograms).toEqual([]);
+  });
+});

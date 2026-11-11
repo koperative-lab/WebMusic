@@ -1,7 +1,7 @@
 // Mount a composition in a live canvas with the packages' own Elements. The
 // entry list names each public element entry once; a recipe's define name is
 // looked up in it, so a renamed export fails here instead of drawing nothing.
-import {EDITOR_LOADERS, composeApp, type Composition, type EditorStep, type Overrides} from './compose.ts';
+import {EDITOR_LOADERS, SPECTROGRAM_OPTIONS, composeApp, type Composition, type EditorStep, type Overrides, type SpectrogramStep} from './compose.ts';
 
 type EntryModule = Record<string, unknown>;
 
@@ -36,6 +36,20 @@ async function lendEditor(root: HTMLElement, step: EditorStep, signal: AbortSign
     for (const host of hosts) host.editor = undefined;
     editor.dispose();
   };
+}
+
+type SpectrogramView = Element & {spectrogram?: unknown};
+
+/** Decode the clip, compute its spectrogram and give it to the view; returns the cleanup. */
+async function assignSpectrogram(root: HTMLElement, step: SpectrogramStep, signal: AbortSignal): Promise<() => void> {
+  const [{loadClipFromUrl}, {computeSpectrogram}] = await Promise.all([import('@webmusic/audio/play'), import('@webmusic/audio/analyze')]);
+  const clip = await loadClipFromUrl(step.url, {signal});
+  const channel = clip.channelData(0);
+  if (signal.aborted || !channel) return () => {};
+  const view = root.querySelector<SpectrogramView>(step.target);
+  if (!view) return () => {};
+  view.spectrogram = computeSpectrogram(channel, clip.sampleRate, SPECTROGRAM_OPTIONS);
+  return () => { view.spectrogram = undefined; };
 }
 
 /** Resolve every define function a composition needs, without calling them. */
@@ -90,7 +104,10 @@ export async function mountComposition(canvas: HTMLElement, composition: Composi
     canvas.replaceChildren();
   };
   try {
-    for (const release of await Promise.all(composition.editors.map((step) => lendEditor(canvas, step, signal)))) releases.push(release);
+    for (const release of await Promise.all([
+      ...composition.editors.map((step) => lendEditor(canvas, step, signal)),
+      ...composition.spectrograms.map((step) => assignSpectrogram(canvas, step, signal)),
+    ])) releases.push(release);
   } catch (error) {
     cleanup();
     throw error;

@@ -53,6 +53,8 @@ a { color: inherit; }
   font: 600 .6rem/1 var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap;
 }
 button.lb-chip { cursor: pointer; }
+/* The type a card shows: ink, so it reads before the category. */
+.lb-chip--type { color: var(--lb-ink); border-color: var(--lb-ink); text-transform: none; letter-spacing: .02em; }
 button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
 .lb-chip[aria-pressed="true"], .lb-chip--active { background: var(--lb-ink); border-color: var(--lb-ink); color: var(--lb-on-ink); }
 .lb-chip svg { width: 10px; height: 10px; }

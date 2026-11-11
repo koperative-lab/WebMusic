@@ -78,13 +78,15 @@ function codePanel(caption: string, code: () => string, label: string): {element
 
 // ---------------------------------------------------------------- routing
 
-type Route = {kind: 'catalog'} | {kind: 'element'; entry: LibraryEntry};
+type Route = {kind: 'catalog'} | {kind: 'element'; entry: LibraryEntry; type?: string};
 
+/** `#/c/<tag>` or, for one type of an element, `#/c/<tag>/<type>`. */
 function currentRoute(): Route {
   const path = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
   if (path.startsWith('c/')) {
-    const entry = byTag(path.slice(2));
-    if (entry) return {kind: 'element', entry};
+    const [tag = '', type] = path.slice(2).split('/');
+    const entry = byTag(tag);
+    if (entry) return {kind: 'element', entry, type: type && entry.types.includes(type) ? type : undefined};
   }
   return {kind: 'catalog'};
 }
@@ -172,6 +174,8 @@ function mountLive(stage: HTMLElement, tags: readonly string[], overrides: Overr
 
 interface Card {
   readonly entry: LibraryEntry;
+  /** The `type` this card shows, for an element with a card per type. */
+  readonly type?: string;
   readonly element: HTMLElement;
   readonly frame: HTMLElement;
   readonly image: HTMLImageElement;
@@ -182,7 +186,7 @@ interface Card {
 const GAP = 16;
 const PAD = 16;
 /** Width a card needs for its name and tag. */
-const headWidth = (tag: string) => Math.ceil(tag.length * 7.5 + 112);
+const headWidth = (card: Card) => Math.ceil(card.entry.tag.length * 7.5 + 112 + (card.type ? card.type.length * 7 + 28 : 0));
 let cards: Card[] = [];
 let reelObserver: IntersectionObserver | undefined;
 let resizeObserver: ResizeObserver | undefined;
@@ -193,7 +197,8 @@ const isFill = (card: Card) => card.entry.recipe.preview.fit === 'fill';
 
 /** The element's size: from its picture once drawn, else the recipe's estimate. */
 function sizeOf(card: Card, frameWidth?: number): Size {
-  const picture = isFill(card) && frameWidth ? pictureFor({tag: card.entry.tag, width: frameWidth}) ?? anyPicture(card.entry.tag) : anyPicture(card.entry.tag);
+  const id = {tag: card.entry.tag, type: card.type};
+  const picture = isFill(card) && frameWidth ? pictureFor({...id, width: frameWidth}) ?? anyPicture(id) : anyPicture(id);
   if (picture && isFill(card) && frameWidth) return {width: frameWidth, height: Math.round(picture.height * Math.min(1, frameWidth / picture.width)) || picture.height};
   return picture ?? card.entry.recipe.preview;
 }
@@ -207,10 +212,11 @@ function chromeHeight(card: Card): number {
 
 /** Show the best picture there is for the card's width, and ask for the exact one. */
 function paint(card: Card, frameWidth: number, priority: number): void {
-  const job: PictureJob = isFill(card) ? {tag: card.entry.tag, width: Math.round(frameWidth)} : {tag: card.entry.tag};
+  const id = {tag: card.entry.tag, type: card.type};
+  const job: PictureJob = isFill(card) ? {...id, width: Math.round(frameWidth)} : id;
   card.job = job;
   const exact = pictureFor(job);
-  const shown = exact ?? anyPicture(card.entry.tag);
+  const shown = exact ?? anyPicture(id);
   if (shown) {
     const url = pictureUrl(shown);
     if (card.image.getAttribute('src') !== url) card.image.src = url;
@@ -236,20 +242,21 @@ function paint(card: Card, frameWidth: number, priority: number): void {
   });
 }
 
-function cardFor(entry: LibraryEntry): Card {
+function cardFor(entry: LibraryEntry, type?: string): Card {
   // A still picture of the element: no element is mounted on this page.
   const image = h('img', {class: 'lb-card__picture', alt: '', decoding: 'async', draggable: 'false', hidden: ''});
   const frame = h('div', {class: 'lb-card__frame'}, image);
   const tag = h('button', {type: 'button', class: 'lb-chip', 'aria-pressed': String(category === entry.category.id), title: entry.category.label}, entry.category.short);
   tag.addEventListener('click', () => { category = category === entry.category.id ? undefined : entry.category.id; refilter(); });
-  const element = h('article', {class: 'lb-card', 'data-tag': entry.tag, title: entry.summary});
+  const element = h('article', {class: 'lb-card', 'data-tag': entry.tag, 'data-type': type, title: entry.summary});
   element.append(
     h('header', {class: 'lb-card__head'},
-      h('a', {class: 'lb-card__name', href: `#/c/${entry.tag}`}, entry.tag),
+      h('a', {class: 'lb-card__name', href: `#/c/${entry.tag}${type ? `/${type}` : ''}`, 'aria-label': type ? `${entry.tag}, ${type}` : undefined}, entry.tag),
+      type ? h('span', {class: 'lb-chip lb-chip--type', title: 'type'}, type) : null,
       tag,
     ),
     frame);
-  return {entry, element, frame, image};
+  return {entry, type, element, frame, image};
 }
 
 function layoutReel(reel: HTMLElement): void {
@@ -263,7 +270,7 @@ function layoutReel(reel: HTMLElement): void {
     const boxes: Box[] = segment.map((card) => {
       const fill = isFill(card);
       const own = sizeOf(card);
-      const cardWidth = Math.min(width, Math.max(headWidth(card.entry.tag), fill ? card.entry.recipe.preview.width : own.width + 2));
+      const cardWidth = Math.min(width, Math.max(headWidth(card), fill ? card.entry.recipe.preview.width : own.width + 2));
       // A stretching card takes half again its least width when the row has room for more beside it.
       return {width: cardWidth, height: chromeHeight(card) + (fill ? own.height : sizeOf(card).height), fill, preferred: fill ? Math.min(width, cardWidth * 1.5) : undefined};
     });
@@ -297,7 +304,14 @@ function renderReel(): void {
   reelObserver?.disconnect();
   resizeObserver?.disconnect();
   const entries = topologicalOrder(search(LIBRARY, query, family).filter((entry) => !category || entry.category.id === category));
-  cards = entries.map(cardFor);
+  // An element with a `type` attribute has a card per type. A search naming
+  // types keeps just those; otherwise every type shows.
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  cards = entries.flatMap((entry) => {
+    if (!entry.types.length) return [cardFor(entry)];
+    const named = entry.types.filter((type) => terms.some((term) => type.includes(term)));
+    return (named.length ? named : entry.types).map((type) => cardFor(entry, type));
+  });
   if (!cards.length) {
     main.replaceChildren(h('p', {class: 'lb-empty'}, '—'));
     return;
@@ -332,7 +346,7 @@ function renderReel(): void {
 // ---------------------------------------------------------------- live canvas (element and app pages)
 
 /** A framed live canvas with one error line. */
-function liveCanvas(caption: string, tags: () => readonly string[], overrides: () => Overrides): {element: HTMLElement; canvas: HTMLElement} {
+function liveCanvas(caption: string, tags: () => readonly string[], overrides: () => Overrides): {element: HTMLElement; canvas: HTMLElement; reload: () => void} {
   const canvas = h('div', {class: 'lb-canvas'});
   const error = h('p', {class: 'lb-error', role: 'alert', hidden: ''});
   let stop: (() => void) | undefined;
@@ -348,7 +362,7 @@ function liveCanvas(caption: string, tags: () => readonly string[], overrides: (
   };
   reload();
   const element = panel(caption, h('div', {}, canvas, error), iconButton('reload', 'Reload canvas', reload));
-  return {element, canvas};
+  return {element, canvas, reload};
 }
 
 // ---------------------------------------------------------------- element page
@@ -418,8 +432,9 @@ function pageHead(title: string, ...rest: Child[]): HTMLElement {
     ...rest);
 }
 
-function renderElement(entry: LibraryEntry): void {
-  let overrides: Overrides = {};
+function renderElement(entry: LibraryEntry, type?: string): void {
+  // Opened from a type's card: the demo starts on that type.
+  let overrides: Overrides = type ? {[entry.tag]: {type}} : {};
   const composed = () => composeApp([entry.tag], {mediaBase: '/', overrides});
   const code = codePanel('Code', () => snippet(composed()), 'code');
   const canvas = liveCanvas('Live', () => [entry.tag], () => overrides);
@@ -429,8 +444,11 @@ function renderElement(entry: LibraryEntry): void {
     const params = entry.spec.params.filter((param) => !FIXED_ATTRIBUTES.has(param.name) && visible(entry, param, overrides));
     parameters.replaceChildren(...params.map((param) => parameterControl(entry, param, overrides, (name, value) => {
       overrides = {...overrides, [entry.tag]: {...overrides[entry.tag], [name]: value}};
+      // A type can need data its markup does not bring (a spectrogram), so a
+      // type change remounts the demo; other attributes apply in place.
       const target = canvas.canvas.querySelector(entry.tag);
-      if (value === null) target?.removeAttribute(name);
+      if (name === 'type') canvas.reload();
+      else if (value === null) target?.removeAttribute(name);
       else target?.setAttribute(name, value);
       code.update();
       if (entry.spec.params.some((other) => other.when?.attribute === name)) renderParameters();
@@ -458,7 +476,7 @@ function render(): void {
   const route = currentRoute();
   renderBar();
   main.classList.remove('lb-main--reel');
-  if (route.kind === 'element') renderElement(route.entry);
+  if (route.kind === 'element') renderElement(route.entry, route.type);
   else renderReel();
   document.title = route.kind === 'element' ? `${tagName(route.entry.tag)} · WebMusic library` : 'WebMusic library';
   if (route.kind !== 'catalog') { window.scrollTo(0, 0); main.focus({preventScroll: true}); }

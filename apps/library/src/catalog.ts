@@ -25,6 +25,8 @@ export interface LibraryEntry {
   readonly href: string;
   readonly spec: ElementParamSpec;
   readonly recipe: Recipe;
+  /** Values of the element's `type` attribute, each a card of its own on the home page; empty when it has none. */
+  readonly types: readonly string[];
 }
 
 const CATEGORY = new Map(CATEGORIES.map((category) => [category.id, category]));
@@ -50,6 +52,7 @@ function entryFor(item: UiCompositionEntry): LibraryEntry {
     href: item.href,
     spec,
     recipe,
+    types: spec.params.find((param) => param.name === 'type' && param.kind === 'enum')?.options ?? [],
   };
 }
 

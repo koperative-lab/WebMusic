@@ -17,7 +17,7 @@ function fields(entry: LibraryEntry): Field[] {
   ];
   return [
     {text: entry.tag, weight: 8},
-    {text: `${entry.category.label} ${entry.recipe.keywords.join(' ')}`, weight: 4},
+    {text: `${entry.category.label} ${entry.recipe.keywords.join(' ')} ${entry.types.join(' ')}`, weight: 4},
     {text: `${entry.family} ${entry.capability} ${entry.entry}`, weight: 3},
     {text: entry.summary, weight: 2},
     {text: `${members.join(' ')} ${entry.headless} ${entry.ui}`, weight: 1},
