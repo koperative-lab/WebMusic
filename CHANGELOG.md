@@ -26,8 +26,19 @@ work and does not establish npm publication, a release tag or a deployment.
 - Guard initial automation attachment against reentrant pause/stop/seek and
   mixer preparation against a nested owner replacing its channel.
 - Replace unresolved public resources with original MIT-licensed study media,
-  with reproducibility and license checks in source and site builds. A scoped
-  Expressive Code PostCSS override removes the vulnerable selector-parser chain.
+  with reproducibility and license checks in source and site builds.
+- Render the documentation site in its own page shell instead of Starlight:
+  section tabs, a section navigation, a contents column, a search dialog and
+  monochrome code frames, light only (DEC-070). Content and URLs are unchanged;
+  Starlight, Expressive Code and their PostCSS override leave the tree.
+- Give `Effect.distortion` live `drive`, `wet` and `dry` parameters and
+  `Effect.bitcrusher` live `wet` and `dry` (`<score-effect drive>` included);
+  defaults keep the previous sound. A single `<score-effect>` or `<audio-effect>`
+  titles its panel by its type. `SectionPanelHandle.describe()` gives a section
+  a description for assistive technology only, which `<score-synth-panel>` now
+  uses instead of visible notes. The transport's surface seek draws the square
+  thumb, and `<score-player>`'s time readout uses the mono face of
+  `<audio-player>`.
 - Keep inherited Audio module leaves from rewriting their provider's Session
   rate and loop. A provider's new destination re-routes Audio leaves and desk
   masters in place, preserving engines, Session membership and channel mixes.

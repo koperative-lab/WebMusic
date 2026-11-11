@@ -7,11 +7,11 @@ and published archives missing their declared license text. Builds do not
 request license texts over the network.
 
 Astro's prerender environment emits public CSS, and its client build can inline
-small scripts into HTML. The collector retains those owners before inlining.
-Expressive Code emits `ec.*` assets from templates outside `chunk.modules`; their
-notices follow the installed renderer's resolution chain to the core, frames,
-text-markers and Shiki plugins. This is a specific generated-asset boundary,
-not a list of every server-side build dependency.
+small scripts into HTML. The collector retains those owners before inlining,
+and records Astro itself for the HTML and inline scripts it generates. Code
+highlighting runs at build time and ships only HTML, so it adds no client
+asset. This is a specific generated-asset boundary, not a list of every
+server-side build dependency.
 
 ## Font and prebundled-code records
 
@@ -60,6 +60,6 @@ Run `node --test scripts/site-notices.test.mjs`, build the site, and run
 `node scripts/site-notices.mjs --check`. The real-bundle regression covers React,
 Sandpack, VexFlow, SpessaSynth and the missing-license repairs above. A synthetic build
 exercises CSS, workers, unused imports and missing notices. A real Astro build
-covers client/prerender environments, inline and lazy scripts, extracted CSS,
-Expressive Code assets and compact redirect documents. Pagefind output is
+covers client/prerender environments, inline and lazy scripts, extracted CSS
+and compact redirect documents. Pagefind output is
 deliberately rejected; the site uses its own search client and generated index.

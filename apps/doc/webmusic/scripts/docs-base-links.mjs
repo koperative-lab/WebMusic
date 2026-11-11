@@ -47,7 +47,7 @@ export function docsBaseLinks(base = '/') {
   });
 }
 
-/** Extend Astro's configured native processor, retaining Starlight's plugins. */
+/** Extend Astro's configured Sätteri processor, keeping the plugins already on it. */
 export function docsBaseLinksIntegration() {
   return {
     name: 'webmusic-docs-base-links',

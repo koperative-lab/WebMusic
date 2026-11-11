@@ -219,7 +219,7 @@ export async function extractAgentMarkdown(source, {
         } else if (clause?.name) {
           if (!target.endsWith('.astro') || !target.startsWith('.')) throw new Error(`${location(node)}: unsupported MDX component import ${target}`);
           imports.set(clause.name.text, target);
-        } else if (['astro:components', '@astrojs/starlight/components'].includes(target) && clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        } else if (target === 'astro:components' && clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) {
           for (const entry of clause.namedBindings.elements) {
             if ((entry.propertyName?.text ?? entry.name.text) !== 'Code') throw new Error(`${location(node)}: unsupported Astro component`);
             imports.set(entry.name.text, 'Code');
