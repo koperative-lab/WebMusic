@@ -160,7 +160,6 @@ owning leaf page; do not copy a complete member table into another document.
 | Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
 | Any new or changed visible UI | The owning presenter, renderer or Element | [Visual design](dev/design/VISUAL-DESIGN.md) before coding, then the [frontend workflow](.agent/workflows/frontend-review.md) for rendered acceptance |
 | Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
-| Component library | [apps/library/src/](apps/library/src/) | [Library README](apps/library/README.md); it reads the documentation catalogs and owner pages, and a new public element needs a recipe in `src/recipes.ts` |
 | Manual device acceptance | [apps/test/src/](apps/test/src/) | [Runner README](apps/test/README.md), the current device acceptance audit and STATUS VERIFY-01; manual checks live here, not in the documentation site, and their results never enter Git |
 | A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
 

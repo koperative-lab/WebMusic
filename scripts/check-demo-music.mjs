@@ -16,7 +16,7 @@ export const PUBLIC_PIN = 'apps/doc/webmusic/public.sha256';
 const IGNORED = new Set(['.DS_Store', 'Thumbs.db']);
 /** Folder → file extension of each Arabesque format. */
 export const FORMATS = {midi: 'mid', mxl: 'mxl', wav: 'wav', mp3: 'mp3'};
-const SCANNED = ['apps/doc/webmusic/src', 'apps/doc/shared', 'apps/test/src', 'apps/library/src'];
+const SCANNED = ['apps/doc/webmusic/src', 'apps/doc/shared', 'apps/test/src'];
 const MEDIA = /\b(midi|mxl|wav|mp3)\/([^\s'"`)\]<>,;{}]+?)\.(midi?|mxl|wav|mp3)\b/g;
 
 /** Return one message per media reference that is not an Arabesque No. 1 file. */

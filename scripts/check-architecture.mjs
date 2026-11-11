@@ -56,13 +56,12 @@ compareExactSet('Root workspace', 'workspace directory', rootManifest.workspaces
   ...packageDirectories,
   'apps/doc/webmusic',
   'apps/test',
-  'apps/library',
 ]);
 compareExactSet('Package policy', 'published package', [...packages.keys()], Object.keys(expectedPublicEntries));
 if ([...packages.keys()].join() !== releasePackageNames.join()) {
   errors.push('Package order must match packageDirectories and package manifests.');
 }
-for (const directory of ['', ...packageDirectories, 'apps/doc/webmusic', 'apps/test', 'apps/library']) {
+for (const directory of ['', ...packageDirectories, 'apps/doc/webmusic', 'apps/test']) {
   const file = path.join(root, directory, 'package.json');
   const manifest = JSON.parse(await readFile(file, 'utf8'));
   errors.push(...manifestBoundaryProblems(manifest, packages.keys()).map((problem) => `${relativeToRoot(file)} ${problem}`));
