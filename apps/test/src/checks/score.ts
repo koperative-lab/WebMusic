@@ -4,7 +4,7 @@ import {definePitchViewElement, defineScoreViewElement} from '@webmusic/score/vi
 import type {Score} from '@webmusic/score';
 import type {MountContext} from '../model';
 import {
-  addChoice, addReadout, arabesqueExcerpt, every, loadArabesqueScore, reportErrors, setMarkup, stopPlayers,
+  addChoice, addReadout, arabesqueAudioUrl, arabesqueExcerpt, arabesqueUrl, every, loadArabesqueScore, reportErrors, setMarkup, stopPlayers,
 } from './shared';
 
 function mountPlayerWithViews(context: MountContext): ScorePlayerElement {
@@ -54,5 +54,17 @@ export async function mountInPlaceReplacement(context: MountContext): Promise<()
     const duration = timed.duration;
     state(`${typeof position === 'number' ? position.toFixed(1) : '—'} s / ${typeof duration === 'number' ? duration.toFixed(1) : '—'} s`);
   });
+  return () => { stopErrors(); stopPlayers(context.canvas); };
+}
+
+/** D5: a score player and an audio player side by side read as one control. */
+export async function mountPlayersAlike(context: MountContext): Promise<() => void> {
+  defineScorePlayerElement();
+  const {defineAudioPlayerElement} = await import('@webmusic/audio/play/element');
+  defineAudioPlayerElement();
+  setMarkup(context.canvas, `
+    <score-player src="${arabesqueUrl('midi')}" time-control="full" aria-label="Arabesque No. 1 score"></score-player>
+    <audio-player src="${arabesqueAudioUrl()}" controls aria-label="Arabesque No. 1 recording"></audio-player>`);
+  const stopErrors = reportErrors(context);
   return () => { stopErrors(); stopPlayers(context.canvas); };
 }

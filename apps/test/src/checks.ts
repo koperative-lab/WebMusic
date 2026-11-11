@@ -12,6 +12,7 @@ const recorderDesk = () => import('./checks/rack').then((module) => module.mount
 const notes = () => import('./checks/notes').then((module) => module.mountNoteRecorder);
 const scorePlayer = () => import('./checks/score').then((module) => module.mountScoreCompanions);
 const replacement = () => import('./checks/score').then((module) => module.mountInPlaceReplacement);
+const playersAlike = () => import('./checks/score').then((module) => module.mountPlayersAlike);
 const audioPlayer = () => import('./checks/audio').then((module) => module.mountAudioPlayer);
 const playlist = () => import('./checks/audio').then((module) => module.mountPlaylist);
 const mixer = () => import('./checks/audio').then((module) => module.mountMixer);
@@ -190,6 +191,17 @@ export const CHECKS: readonly Check[] = [
     expected: [
       'A sound change keeps the position and changes the timbre at once, without restarting.',
       'A score change stops at 0 with no error; the duration readout changes, the views show the new score, and Play plays it.',
+    ],
+  },
+  {
+    id: 'D5', group: 'D', mount: playersAlike,
+    title: 'A score player and an audio player look alike',
+    steps: [
+      'Compare the two transports at rest, then play each and drag its seek bar.',
+    ],
+    expected: [
+      'Both show the same play button, the same grey track with a square ink handle at the playhead, and the same small mono time readout.',
+      'The handle follows playback and dragging on both; nothing else differs but the duration.',
     ],
   },
   {

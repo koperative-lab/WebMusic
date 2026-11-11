@@ -40,6 +40,14 @@ class FakeTransport implements TransportBinding {
   }
 }
 
+describe('surface seek handle', () => {
+  it('draws the native thumb’s handle at the fill’s leading edge', () => {
+    // The same token-fed square as ::-webkit-slider-thumb, so a surface transport matches a native one.
+    expect(transportStateStyle).toMatch(/\.wui-transport__surface > \.wui-transport__fill::after \{[^}]*right: 0;[^}]*width: var\(--wui-transport-handle\);[^}]*background: var\(--wui-transport-thumb\);/);
+    expect(transportStateStyle).toMatch(/\.wui-transport__surface > \.wui-transport__fill \{[^}]*min-width: var\(--wui-transport-handle\);/);
+  });
+});
+
 describe('mountTransport', () => {
   it('shares state feedback with an inline transport and swapped volume controls', () => {
     const host = document.createElement('div');

@@ -53,7 +53,9 @@ so a scrub is one seek rather than one per pointer move, and `Shift` selects a c
 - `'native'` (the default) places a real `input[type="range"]` inside the track. Its DOM range is
   `0…1000`; the binding continues to receive a normalized `0…1` fraction.
 - `'surface'` turns the track into an ARIA slider, adds a presenter-owned fill, and supports
-  pointer capture plus keyboard seeking.
+  pointer capture plus keyboard seeking. The state stylesheet draws the native thumb's square
+  handle (`--wui-transport-handle`, `--wui-transport-thumb`) at the fill's leading edge, so both
+  forms look alike.
 - `false` leaves the track empty for caller-owned seeking UI. The presenter still paints its
   progress properties on the track.
 

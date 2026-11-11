@@ -238,8 +238,9 @@ function mountCompatibilityTransport(
         'var(--webscore-play-progress-fill, var(--wm-transport-fill, var(--wm-accent, #999)))',
       '--cp-text':
         'var(--webscore-play-time-color, var(--wm-transport-foreground, var(--wm-foreground-muted, var(--wm-foreground, #444))))',
+      // The transport's own time face, so a score and an audio player read alike.
       '--cp-time-font':
-        'var(--webscore-play-time-font, 0.85rem/1.2 var(--wm-font-family, system-ui, sans-serif))',
+        'var(--webscore-play-time-font, 0.72rem/1.2 var(--wm-font-mono, ui-monospace, monospace))',
       '--cp-volume-width': 'var(--webscore-play-volume-width, var(--wm-transport-volume-width, 4.5rem))',
       '--cp-volume-height': 'var(--webscore-play-volume-height, var(--cp-track-height))',
       '--cp-volume-size': 'var(--webscore-play-volume-size, var(--cp-track-height))',

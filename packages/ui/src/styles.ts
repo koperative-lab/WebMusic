@@ -254,6 +254,23 @@ export const transportStateStyle = [faderStyle, knobStyle, String.raw`
 }
 
 .wui-transport__track[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+
+/* The surface seek draws the same square handle as the native range thumb,
+   at the leading edge of its fill, so both seek forms look alike. */
+.wui-transport__surface > .wui-transport__fill {
+  position: relative;
+  min-width: var(--wui-transport-handle);
+}
+.wui-transport__surface > .wui-transport__fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--wui-transport-handle);
+  height: 100%;
+  border-radius: var(--wui-transport-thumb-radius);
+  background: var(--wui-transport-thumb);
+}
 `].join('\n\n');
 
 export const transportStyle = [
