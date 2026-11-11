@@ -148,7 +148,7 @@ helps select commands; it does not define another execution chain.
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
 | `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site and shows the version, commit and working tree under test. |
-| `npm run library:dev` | Build packages and serve the [component library](../apps/library/README.md) at <http://localhost:4341>: every Web Component by function, searchable, with live Arabesque canvases and an app composer. |
+| `npm run library:dev` | Build packages and serve the [component library](../apps/library/README.md) at <http://localhost:4341>: every Web Component as a still picture, searchable and filtered by family and category, each opening a live Arabesque demo with its code. |
 | `npm run check:library` | Build the component library, so CI catches a recipe or composition that no longer compiles. Included in source checks. |
 | `npm run check:acceptance` | Build the manual acceptance runner, so CI catches a check whose canvas no longer compiles. Included in source checks. |
 | `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |

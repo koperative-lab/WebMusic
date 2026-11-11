@@ -45,7 +45,6 @@ a { color: inherit; }
 }
 .lb-icon:hover { color: var(--lb-ink); background: var(--lb-raised); }
 .lb-icon[aria-pressed="true"], .lb-icon[aria-current="page"] { background: var(--lb-ink); color: var(--lb-on-ink); }
-.lb-icon-space { width: var(--lb-size); }
 
 /* A tag: small mono caption in a hairline box; the active filter is inverted. */
 .lb-chip {
@@ -110,7 +109,6 @@ button.lb-chip:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
 .lb-card__name:focus-visible { outline: none; }
 .lb-card:has(.lb-card__name:focus-visible) { outline: var(--lb-focus); outline-offset: -2px; }
 .lb-card__head > .lb-chip { position: relative; z-index: 2; }
-.lb-card__chosen { margin-left: auto; display: inline-flex; color: var(--lb-ink); }
 .lb-card__frame { position: relative; flex: none; overflow: hidden; }
 /* The element's still picture: drawn once in the background, shown as an image. */
 .lb-card__picture { position: absolute; top: 0; left: 0; display: block; max-width: none; user-select: none; -webkit-user-drag: none; }
@@ -144,14 +142,8 @@ select.lb-field {
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 1.75rem;
 }
-.lb-action {
-  display: inline-flex; align-items: center; justify-content: center; min-height: var(--lb-size); padding: 0 var(--lb-pad);
-  border: 1px solid var(--lb-ink); border-radius: var(--lb-radius); background: var(--lb-surface); color: var(--lb-ink);
-  font: 600 .7rem var(--lb-mono); text-transform: uppercase; letter-spacing: .1em; text-decoration: none; cursor: pointer; white-space: nowrap;
-}
-.lb-action--primary { background: var(--lb-ink); color: var(--lb-on-ink); }
 
-/* ------------------------------------------------------------ element and app pages */
+/* ------------------------------------------------------------ element page */
 .lb-main:not(.lb-main--reel) { padding: var(--lb-gap) calc(var(--lb-gap) * 1.5) calc(var(--lb-gap) * 3); max-width: 100rem; container-type: inline-size; }
 .lb-head { display: flex; align-items: center; gap: .6rem; margin-bottom: var(--lb-gap); min-height: var(--lb-size); }
 .lb-back { margin-left: -.5rem; }
@@ -192,14 +184,6 @@ select.lb-field {
 .lb-param { display: grid; gap: .25rem; min-width: 0; }
 .lb-param:has(.lb-choice) { grid-column: 1 / -1; }
 
-.lb-chosen { list-style: none; margin: 0; padding: 0; }
-.lb-chosen__item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .5rem; min-height: var(--lb-size); padding-left: var(--lb-pad); border-bottom: 1px solid var(--lb-line); }
-.lb-chosen__item:last-child { border-bottom: 0; }
-.lb-empty-app {
-  display: grid; place-items: center; height: 40vh; border: 1px dashed var(--lb-line); color: var(--lb-muted);
-}
-.lb-empty-app:hover { color: var(--lb-ink); border-color: var(--lb-ink); }
-.lb-empty-app svg { width: 32px; height: 32px; }
 
 @media (max-width: 720px) {
   .lb-brand { display: none; }

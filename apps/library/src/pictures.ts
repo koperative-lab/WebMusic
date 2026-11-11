@@ -12,7 +12,7 @@ const VERSION: string = __LIBRARY_PICTURE_VERSION__;
 const DB = 'webmusic-library';
 const STORE = 'pictures';
 /** A stretching element's picture is reused within this many pixels of the width asked for. */
-const WIDTH_TOLERANCE = 12;
+const WIDTH_TOLERANCE = 24;
 
 const keyOf = (job: PictureJob) => `${VERSION}|${job.tag}|${job.width === undefined ? 'own' : Math.round(job.width)}`;
 

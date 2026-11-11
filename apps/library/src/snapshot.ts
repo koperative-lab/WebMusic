@@ -103,6 +103,14 @@ interface Context {
   readonly defaults: DefaultStyles;
   /** Rules a picture carries for pseudo-elements inline styles cannot reach (range thumbs and tracks). */
   readonly rules: string[];
+  /** The picture's area on the page: anything wholly outside it is not seen. */
+  readonly visible: DOMRect;
+}
+
+/** Wholly outside the picture: a staff or lane drawn far beyond the visible box. */
+function outside(rect: DOMRect, visible: DOMRect): boolean {
+  if (!rect.width && !rect.height) return false;
+  return rect.right < visible.left || rect.left > visible.right || rect.bottom < visible.top || rect.top > visible.bottom;
 }
 
 const RANGE_PSEUDO = /^(.*?)(::-(?:webkit-slider-[a-z-]+|moz-range-[a-z-]+))\s*$/;
@@ -181,6 +189,11 @@ function copyNode(context: Context, node: Node, parent: CSSStyleDeclaration | un
     return image;
   }
 
+  // Out of sight: SVG content is dropped (it takes no part in layout); an HTML
+  // box keeps its size so its neighbours stay put, but not its contents.
+  const hidden = outside(element.getBoundingClientRect(), context.visible);
+  if (hidden && namespace === SVG_NS) return undefined;
+
   // Unknown custom elements keep their name: in the picture they are plain elements.
   const copy = out.createElementNS(namespace, name);
   for (const attribute of [...element.attributes]) {
@@ -191,6 +204,7 @@ function copyNode(context: Context, node: Node, parent: CSSStyleDeclaration | un
   copy.setAttribute('style', styleText(computed, parent, context.defaults(namespace, name)));
   if (name === 'input' && (element as HTMLInputElement).type === 'range') carryRangeRules(context, element, copy, computed);
 
+  if (hidden) return copy;
   const before = namespace === HTML_NS ? pseudo(context, element, '::before', computed) : undefined;
   if (before) copy.append(before);
   // A scrolled box shows where it was scrolled to; sticky children stay on the axis they stick to.
@@ -241,7 +255,7 @@ export function snapshot(target: Element, defaults: DefaultStyles): Picture {
   const inherited = parent ? [...INHERITED].map((name) => [name, parent.getPropertyValue(name)] as const)
     .filter(([name, value]) => value && !SKIPPED.test(name)).map(([name, value]) => `${name}:${value}`) : [];
   body.setAttribute('style', [...inherited, 'margin:0', 'color-scheme:light', `width:${width}px`, `height:${height}px`, 'overflow:hidden'].join(';'));
-  const context: Context = {view, out, defaults, rules: []};
+  const context: Context = {view, out, defaults, rules: [], visible: rect};
   const copy = copyNode(context, target, parent);
   if (context.rules.length) {
     const style = out.createElementNS(HTML_NS, 'style');

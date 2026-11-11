@@ -1,12 +1,11 @@
 // The WebMusic component library: every Web Component as a card on a vertical
-// reel. Cards have the footprint their element draws in and are packed in
+// reel. Cards are as large as their element's picture and are packed in
 // topological order, so each player is followed by what attaches to it. A card
 // shows the element's name, its category tag and how the element looks — a
-// still picture, not a demo. Its page plays it with Parameters and code, and
-// chosen elements compose into one working page to copy.
+// still picture, not a demo. Its page plays it with Parameters and code.
 import './styles.css';
 import {LIBRARY, byTag, type LibraryEntry} from './catalog.ts';
-import {composeApp, page, snippet, type Overrides} from './compose.ts';
+import {composeApp, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
 import {packSkyline, packedHeight, stretchFills, topologicalOrder, type Box, type Size} from './layout.ts';
@@ -18,30 +17,12 @@ import type {ParamSpec} from '../../doc/webmusic/src/lib/params/index.ts';
 
 const DOCS_ORIGIN: string = import.meta.env.VITE_WEBMUSIC_DOCS
   ?? (import.meta.env.DEV ? 'http://localhost:4321' : 'https://koperative-lab.github.io/WebMusic');
-const STORAGE_KEY = 'webmusic-library:app';
-const storage = (() => { try { return window.localStorage; } catch { return undefined; } })();
 
 // ---------------------------------------------------------------- state
 
 let query = '';
 let family: Family = 'all';
 let category: CategoryId | undefined;
-let selection: string[] = loadSelection();
-
-function loadSelection(): string[] {
-  try {
-    const stored: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? '[]');
-    return Array.isArray(stored) ? stored.filter((tag): tag is string => typeof tag === 'string' && !!byTag(tag)) : [];
-  } catch { return []; }
-}
-
-function saveSelection(next: readonly string[]): void {
-  selection = LIBRARY.map((entry) => entry.tag).filter((tag) => next.includes(tag));
-  try { storage?.setItem(STORAGE_KEY, JSON.stringify(selection)); } catch { /* Selection stays for this visit. */ }
-  renderBar();
-}
-
-const toggleSelected = (tag: string) => saveSelection(selection.includes(tag) ? selection.filter((other) => other !== tag) : [...selection, tag]);
 
 // ---------------------------------------------------------------- DOM helpers
 
@@ -61,18 +42,6 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, attributes: Record<str
 function iconButton(name: IconName, label: string, onClick: (button: HTMLButtonElement) => void, attributes: Record<string, string | undefined> = {}): HTMLButtonElement {
   const button = h('button', {type: 'button', class: 'lb-icon', 'aria-label': label, title: label, ...attributes}, icon(name));
   button.addEventListener('click', (event) => { event.stopPropagation(); onClick(button); });
-  return button;
-}
-
-function setIcon(button: HTMLButtonElement, name: IconName, label: string): void {
-  button.replaceChildren(icon(name));
-  button.setAttribute('aria-label', label);
-  button.title = label;
-}
-
-function action(label: string, onClick: () => unknown, primary = false): HTMLButtonElement {
-  const button = h('button', {type: 'button', class: primary ? 'lb-action lb-action--primary' : 'lb-action'}, label);
-  button.addEventListener('click', () => { void onClick(); });
   return button;
 }
 
@@ -109,7 +78,7 @@ function codePanel(caption: string, code: () => string, label: string): {element
 
 // ---------------------------------------------------------------- routing
 
-type Route = {kind: 'catalog'} | {kind: 'element'; entry: LibraryEntry} | {kind: 'app'};
+type Route = {kind: 'catalog'} | {kind: 'element'; entry: LibraryEntry};
 
 function currentRoute(): Route {
   const path = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
@@ -117,17 +86,7 @@ function currentRoute(): Route {
     const entry = byTag(path.slice(2));
     if (entry) return {kind: 'element', entry};
   }
-  if (path === 'app' || path.startsWith('app/')) return {kind: 'app'};
   return {kind: 'catalog'};
-}
-
-/** A shared link, `#/app/<tag>,<tag>`, replaces the selection once. */
-function importSharedApp(): void {
-  const path = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
-  if (!path.startsWith('app/')) return;
-  const shared = path.slice(4).split(',').filter((tag) => byTag(tag));
-  history.replaceState(null, '', '#/app');
-  if (shared.length) saveSelection(shared);
 }
 
 const go = (hash: string) => { if (location.hash !== hash) location.hash = hash; else render(); };
@@ -160,7 +119,6 @@ document.addEventListener('keydown', (event) => {
 });
 
 function renderBar(): void {
-  const route = currentRoute();
   const families = h('div', {class: 'lb-segment', role: 'group', 'aria-label': 'Family'},
     ...(['all', 'Score', 'Audio'] as const).map((id) => {
       const button = h('button', {type: 'button', 'aria-pressed': String(family === id)}, id === 'all' ? 'All' : id);
@@ -177,8 +135,6 @@ function renderBar(): void {
     ...(filter ? [filter] : []),
     h('span', {class: 'lb-spacer'}),
     h('a', {class: 'lb-icon', href: DOCS_ORIGIN, 'aria-label': 'Documentation', title: 'Documentation'}, icon('docs')),
-    h('a', {href: '#/app', class: 'lb-icon lb-app-link', 'aria-label': `Your app, ${selection.length} components`, title: 'Your app', 'aria-current': route.kind === 'app' ? 'page' : undefined},
-      icon('app'), selection.length ? h('span', {class: 'lb-value'}, String(selection.length)) : null),
   );
 }
 
@@ -276,6 +232,7 @@ function paint(card: Card, frameWidth: number, priority: number): void {
     if (card.job !== job || (error instanceof DOMException && error.name === 'AbortError')) return;
     card.element.classList.remove('lb-card--drawing');
     card.element.classList.add('lb-card--failed');
+    card.element.dataset.pictureError = error instanceof Error ? error.message : String(error);
   });
 }
 
@@ -290,7 +247,7 @@ function cardFor(entry: LibraryEntry): Card {
     h('header', {class: 'lb-card__head'},
       h('a', {class: 'lb-card__name', href: `#/c/${entry.tag}`}, entry.tag),
       tag,
-      selection.includes(entry.tag) ? h('span', {class: 'lb-card__chosen', 'aria-label': 'In your app', title: 'In your app'}, icon('check')) : null),
+    ),
     frame);
   return {entry, element, frame, image};
 }
@@ -307,7 +264,8 @@ function layoutReel(reel: HTMLElement): void {
       const fill = isFill(card);
       const own = sizeOf(card);
       const cardWidth = Math.min(width, Math.max(headWidth(card.entry.tag), fill ? card.entry.recipe.preview.width : own.width + 2));
-      return {width: cardWidth, height: chromeHeight(card) + (fill ? own.height : sizeOf(card).height), fill};
+      // A stretching card takes half again its least width when the row has room for more beside it.
+      return {width: cardWidth, height: chromeHeight(card) + (fill ? own.height : sizeOf(card).height), fill, preferred: fill ? Math.min(width, cardWidth * 1.5) : undefined};
     });
     const placed = stretchFills(packSkyline(boxes, width, GAP), boxes, width, GAP);
     segment.forEach((card, index) => {
@@ -321,9 +279,11 @@ function layoutReel(reel: HTMLElement): void {
       Object.assign(card.image.style, isFill(card)
         ? {width: '100%', height: '100%', left: '0px'}
         : {width: `${size.width * scale}px`, height: `${size.height * scale}px`, left: `${Math.max(0, (frameWidth - size.width * scale) / 2)}px`});
-      // On screen first, then down the page.
+      // On screen first. Within that, elements with their own width before
+      // stretching ones: their sizes settle the layout, so a stretching card is
+      // drawn once, at its final width.
       const y = top + spot.y;
-      paint(card, frameWidth, y < viewportBottom + 200 ? y : 100000 + y);
+      paint(card, frameWidth, (y < viewportBottom + 200 ? 0 : 1_000_000) + (isFill(card) ? 100_000 : 0) + y);
     });
     top += packedHeight(placed) + GAP * 2;
   }
@@ -478,53 +438,14 @@ function renderElement(entry: LibraryEntry): void {
   };
   renderParameters();
 
-  const chosen = selection.includes(entry.tag);
-  const add = iconButton(chosen ? 'check' : 'plus', chosen ? 'Remove from your app' : 'Add to your app', (button) => {
-    toggleSelected(entry.tag);
-    const now = selection.includes(entry.tag);
-    setIcon(button, now ? 'check' : 'plus', now ? 'Remove from your app' : 'Add to your app');
-    button.setAttribute('aria-pressed', String(now));
-  }, {'aria-pressed': String(chosen)});
   main.replaceChildren(
     pageHead(entry.tag,
       h('span', {class: 'lb-chip', title: entry.category.label}, entry.category.short),
       h('span', {class: 'lb-spacer'}),
-      h('a', {class: 'lb-icon', href: docsUrl(entry), 'aria-label': 'Reference', title: 'Reference'}, icon('docs')),
-      add),
+      h('a', {class: 'lb-icon', href: docsUrl(entry), 'aria-label': 'Reference', title: 'Reference'}, icon('docs'))),
     h('div', {class: 'lb-layout'},
       h('div', {class: 'lb-stage'}, canvas.element, code.element),
       h('div', {class: 'lb-side'}, parameters.childElementCount ? panel('Parameters', parameters) : null)),
-  );
-}
-
-// ---------------------------------------------------------------- app composer
-
-function renderApp(): void {
-  const composed = () => composeApp(selection, {mediaBase: '/'});
-  const {tags, added} = composed();
-  if (!tags.length) {
-    main.replaceChildren(pageHead('Your app'), h('a', {class: 'lb-empty-app', href: '#/', 'aria-label': 'Add components'}, icon('plus')));
-    return;
-  }
-  const code = codePanel('Page', () => page(composed()), 'page');
-  const canvas = liveCanvas('Live', () => selection, () => ({}));
-  const list = h('ul', {class: 'lb-chosen'}, ...tags.map((tag) => {
-    const auto = added.includes(tag);
-    return h('li', {class: 'lb-chosen__item'},
-      h('a', {class: 'lb-card__name', href: `#/c/${tag}`}, tag),
-      h('span', {class: 'lb-chip'}, auto ? 'Added' : byTag(tag)!.category.short),
-      auto ? h('span', {class: 'lb-icon-space'}) : iconButton('close', `Remove ${tagName(tag)}`, () => { toggleSelected(tag); renderApp(); }));
-  }));
-  const share = () => copy(`${location.origin}${location.pathname}#/app/${selection.join(',')}`, 'Link');
-  main.replaceChildren(
-    pageHead('Your app',
-      h('span', {class: 'lb-spacer'}),
-      iconButton('link', 'Copy link', () => { void share(); }),
-      iconButton('trash', 'Clear', () => { saveSelection([]); renderApp(); }),
-      action('Copy page', () => copy(page(composed()), 'Page'), true)),
-    h('div', {class: 'lb-layout'},
-      h('div', {class: 'lb-stage'}, canvas.element, code.element),
-      h('div', {class: 'lb-side'}, panel('Components', list))),
   );
 }
 
@@ -534,15 +455,12 @@ function render(): void {
   stopAll();
   reelObserver?.disconnect();
   resizeObserver?.disconnect();
-  importSharedApp();
   const route = currentRoute();
   renderBar();
   main.classList.remove('lb-main--reel');
   if (route.kind === 'element') renderElement(route.entry);
-  else if (route.kind === 'app') renderApp();
   else renderReel();
-  document.title = route.kind === 'element' ? `${tagName(route.entry.tag)} · WebMusic library`
-    : route.kind === 'app' ? 'Your app · WebMusic library' : 'WebMusic library';
+  document.title = route.kind === 'element' ? `${tagName(route.entry.tag)} · WebMusic library` : 'WebMusic library';
   if (route.kind !== 'catalog') { window.scrollTo(0, 0); main.focus({preventScroll: true}); }
 }
 

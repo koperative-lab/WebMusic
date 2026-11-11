@@ -114,7 +114,7 @@ export const RECIPES: readonly Recipe[] = [
   {tag: 'audio-recorder', preview: {fit: 'fill', width: 240, height: 48}, category: 'input', define: 'defineAudioRecorderElement', slot: 'audio-companion', keywords: ['record', 'microphone', 'mic', 'capture', 'take', 'voice']},
 
   // Sound design
-  {tag: 'score-synth-panel', preview: {fit: 'content', width: 260, height: 266}, category: 'sound', define: 'defineSynthPanelElement', slot: 'score-free', attributes: {sections: 'sound,envelope'}, keywords: ['synth', 'knobs', 'envelope', 'adsr', 'eq', 'lfo', 'macros', 'oscillator', 'patch']},
+  {tag: 'score-synth-panel', preview: {fit: 'content', width: 260, height: 266}, category: 'sound', define: 'defineSynthPanelElement', slot: 'score-companion', attributes: {sections: 'sound,envelope'}, keywords: ['synth', 'knobs', 'envelope', 'adsr', 'eq', 'lfo', 'macros', 'oscillator', 'patch']},
 
   // Notation and piano roll
   {tag: 'score-view', preview: {fit: 'fill', width: 480, height: 277}, category: 'notation', define: 'defineScoreViewElement', slot: 'score-companion', attributes: {type: 'staff'}, notation: true, keywords: ['piano roll', 'staff', 'waterfall', 'visualizer', 'notes']},

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {composeApp, page, resolveSelection, snippet} from '../src/compose.ts';
+import {composeApp, resolveSelection, snippet} from '../src/compose.ts';
 import {LIBRARY} from '../src/catalog.ts';
 
 const compose = (tags: readonly string[], overrides = {}) => composeApp(tags, {mediaBase: '/', overrides});
@@ -48,9 +48,11 @@ describe('app composition', () => {
   });
 
   it('leaves free elements standalone when nothing needs a player', () => {
-    const {markup} = compose(['score-note-input', 'score-synth-panel']);
+    const {markup} = compose(['score-note-input']);
     expect(markup).not.toContain('<score-player');
     expect(markup.startsWith('<score-note-input')).toBe(true);
+    // A synth panel edits a player's sound, so it always nests in one.
+    expect(compose(['score-synth-panel']).markup).toMatch(/^<score-player id="score"[^>]*>\n {2}<score-synth-panel/);
   });
 
   it('taps a mixer’s master bus with meters and queues a playlist without a player source', () => {
@@ -73,15 +75,14 @@ describe('app composition', () => {
     for (const match of all.markup.matchAll(/\/(midi|mxl|wav|mp3)\/([^"\s,]+)/g)) expect(match[2]).toMatch(/^Arabesque%20No\.1\./);
   });
 
-  it('writes a complete page and a docs-style snippet', () => {
+  it('writes a docs-style snippet: the define script, then the markup', () => {
     const composition = compose(['audio-player', 'audio-meter']);
-    const html = page(composition, 'Demo');
-    expect(html).toMatch(/^<!doctype html>/);
-    expect(html).toContain("    import {defineAudioPlayerElement} from '@webmusic/audio/play/element';");
-    expect(html).toContain("    import {defineAudioMeterElement} from '@webmusic/audio/analyze/element';");
-    expect(html).toContain('    <audio-player id="audio"');
-    expect(snippet(composition).startsWith('<script type="module">')).toBe(true);
-    expect(page(compose([]))).not.toContain('<script');
+    const text = snippet(composition);
+    expect(text.startsWith('<script type="module">')).toBe(true);
+    expect(text).toContain("  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';");
+    expect(text).toContain("  import {defineAudioMeterElement} from '@webmusic/audio/analyze/element';");
+    expect(text).toContain('<audio-player id="audio"');
+    expect(snippet(compose([]))).toBe('');
   });
 });
 

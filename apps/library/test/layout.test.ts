@@ -62,16 +62,25 @@ describe('skyline packing', () => {
 });
 
 describe('fill spans', () => {
-  it('gives a fill card the free span where it lands, a gap before the next card', () => {
+  it('takes its preferred width when the next card still fits beside it', () => {
     const placed = packSkyline([
       {width: 200, height: 100, fill: false},
-      {width: 300, height: 40, fill: true},
+      {width: 300, height: 40, fill: true, preferred: 400},
       {width: 150, height: 300, fill: false},
     ], 1000, 10);
-    // The fill card lands beside the first card and takes the rest of the row.
+    expect(placed[1]).toEqual({x: 210, y: 0, width: 400, height: 40});
+    // The next card goes beside it rather than under it.
+    expect(placed[2]).toMatchObject({x: 620, y: 0});
+  });
+
+  it('takes the whole span when what is left would be too narrow for the next card', () => {
+    const placed = packSkyline([
+      {width: 200, height: 100, fill: false},
+      {width: 300, height: 40, fill: true, preferred: 600},
+      {width: 250, height: 300, fill: false},
+    ], 1000, 10);
+    // 790 free: 600 would leave 190, too little for a 250-wide card.
     expect(placed[1]).toEqual({x: 210, y: 0, width: 790, height: 40});
-    // A later card goes under it.
-    expect(placed[2]!.y).toBeGreaterThanOrEqual(50);
   });
 
   it('stops at a taller card in the way', () => {
@@ -82,6 +91,31 @@ describe('fill spans', () => {
     ], 640, 10);
     // No room at the top right: under the first card, up to the second one.
     expect(placed[2]).toEqual({x: 0, y: 60, width: 300, height: 40});
+  });
+
+  it('lets a nearby later card take a higher spot first', () => {
+    const placed = packSkyline([
+      {width: 600, height: 100, fill: false},
+      {width: 500, height: 50, fill: false},
+      {width: 300, height: 50, fill: false},
+    ], 1000, 10);
+    // The 500-wide card cannot sit beside the first; the 300-wide one can, so it goes first.
+    expect(placed[2]).toMatchObject({x: 610, y: 0});
+    expect(placed[1]!.y).toBeGreaterThan(0);
+  });
+
+  it('gives the library’s stretching cards varied widths', () => {
+    const entries = topologicalOrder(LIBRARY);
+    const input = entries.map((entry) => ({
+      width: entry.recipe.preview.width, height: entry.recipe.preview.height,
+      fill: entry.recipe.preview.fit === 'fill', preferred: entry.recipe.preview.width * 1.5,
+    }));
+    const width = 1408;
+    const placed = stretchFills(packSkyline(input, width, GAP), input, width, GAP);
+    const fills = placed.filter((_, i) => input[i]!.fill);
+    const full = fills.filter((card) => card.width >= width - 1);
+    expect(full.length).toBeLessThan(fills.length / 2);
+    expect(new Set(fills.map((card) => Math.round(card.width))).size).toBeGreaterThan(3);
   });
 });
 

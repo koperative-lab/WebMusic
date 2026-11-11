@@ -35,6 +35,27 @@ const defaults = defaultStylesFrom(blank.contentDocument!);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const frame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
 
+/** Statuses that mean the element has not finished drawing what it shows. */
+const UNFINISHED = '.wui-status[data-kind="loading"], .wui-status[data-kind="waiting"], .wui-status[data-kind="error"], [aria-busy="true"]';
+
+/** Visible unfinished statuses anywhere in the element's composed tree, shadow roots included. */
+export function unfinished(root: Element): string[] {
+  const found: string[] = [];
+  const visit = (scope: Element | ShadowRoot) => {
+    for (const node of scope.querySelectorAll(UNFINISHED)) {
+      const box = node.getBoundingClientRect();
+      const style = getComputedStyle(node);
+      if (box.width && box.height && style.visibility !== 'hidden' && style.display !== 'none') {
+        found.push(node.textContent?.trim() || node.getAttribute('data-kind') || 'busy');
+      }
+    }
+    for (const element of scope.querySelectorAll('*')) if (element.shadowRoot) visit(element.shadowRoot);
+  };
+  visit(root);
+  if (root.shadowRoot) visit(root.shadowRoot);
+  return found;
+}
+
 /** Wait until the element has stopped changing: no DOM or size change for a while. */
 async function settle(root: HTMLElement, signal: AbortSignal): Promise<void> {
   await document.fonts.ready;
@@ -78,6 +99,10 @@ async function draw(job: PictureJob): Promise<Picture> {
     await settle(stage, controller.signal);
     const target = stage.querySelector(recipe.picture ?? job.tag);
     if (!target) throw new Error(`<${job.tag}> drew nothing to picture`);
+    // Never picture a half-drawn element: wait out loading and waiting states.
+    for (let waited = 0; unfinished(target).length && waited < 10000 && !errors.length; waited += 250) await sleep(250);
+    const pending = unfinished(target);
+    if (pending.length) throw new Error(`<${job.tag}> did not finish drawing: ${pending.join('; ')}`);
     if (errors.length) throw errors[0] instanceof Error ? errors[0] : new Error(String(errors[0]));
     return snapshot(target, defaults);
   } finally {

@@ -262,23 +262,3 @@ export function composeApp(selection: readonly string[], options: ComposeOptions
 export function snippet(composition: Composition): string {
   return [composition.script, composition.markup].filter(Boolean).join('\n\n');
 }
-
-/** A complete page; bare package specifiers resolve through the app's bundler. */
-export function page(composition: Composition, title = 'My WebMusic app'): string {
-  const indent = (text: string, depth: number) => text.split('\n').map((line) => line ? `${'  '.repeat(depth)}${line}` : line).join('\n');
-  return [
-    '<!doctype html>',
-    '<html lang="en">',
-    '  <head>',
-    '    <meta charset="utf-8" />',
-    '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
-    `    <title>${title.replace(/</g, '&lt;')}</title>`,
-    ...(composition.script ? [indent(composition.script, 2)] : []),
-    '  </head>',
-    '  <body>',
-    ...(composition.markup ? [indent(composition.markup, 2)] : []),
-    '  </body>',
-    '</html>',
-    '',
-  ].join('\n');
-}

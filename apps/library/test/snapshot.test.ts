@@ -58,3 +58,24 @@ describe('pictures', () => {
     expect(parsed.getElementsByTagName('parsererror')).toHaveLength(0);
   });
 });
+
+describe('culling', () => {
+  it('leaves out what lies wholly outside the picture', () => {
+    const host = document.createElement('div');
+    host.innerHTML = '<div class="near">seen</div><div class="far">unseen</div><svg><g class="far-svg"><path d="M0 0"/></g></svg>';
+    document.body.append(host);
+    // jsdom has no layout: give the boxes positions by hand.
+    const box = (left: number, top: number, width: number, height: number) => () => ({left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({})}) as DOMRect;
+    host.getBoundingClientRect = box(0, 0, 100, 50);
+    host.querySelector<HTMLElement>('.near')!.getBoundingClientRect = box(0, 0, 100, 20);
+    host.querySelector<HTMLElement>('.far')!.getBoundingClientRect = box(5000, 0, 100, 20);
+    host.querySelector('.far-svg')!.getBoundingClientRect = box(9000, 0, 10, 10);
+    const picture = snapshot(host, () => undefined);
+    host.remove();
+    expect(picture.svg).toContain('seen');
+    // The far box stays, so layout does not shift, but its text does not.
+    expect(picture.svg).toContain('class="far"');
+    expect(picture.svg).not.toContain('unseen');
+    expect(picture.svg).not.toContain('far-svg');
+  });
+});

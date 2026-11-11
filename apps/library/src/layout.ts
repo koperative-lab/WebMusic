@@ -41,13 +41,14 @@ export function topologicalOrder<T extends Ordered>(entries: readonly T[]): T[] 
 
 /**
  * A card to place. A `fill` card's element stretches to any width without
- * changing height: `width` is the least it needs, and packing gives it the
- * whole free span where it lands.
+ * changing height: `width` is the least it needs and `preferred` the width it
+ * takes when the row has room for more cards beside it.
  */
 export interface Box {
   readonly width: number;
   readonly height: number;
   readonly fill: boolean;
+  readonly preferred?: number;
 }
 
 export interface Placed {
@@ -57,59 +58,88 @@ export interface Placed {
   readonly height: number;
 }
 
+interface Segment { x: number; end: number; y: number }
+
+/** The highest (then leftmost) spot where a card `w` wide fits under the skyline. */
+function bestSpot(skyline: readonly Segment[], w: number, width: number, gap: number): {x: number; y: number} {
+  let best: {x: number; y: number} | undefined;
+  for (const start of skyline) {
+    const x = start.x;
+    if (x + w > width + 1e-6) continue;
+    // The card and the gap after it must clear everything under them.
+    const reach = Math.min(x + w + gap, width);
+    const y = Math.max(...skyline.filter((segment) => segment.x < reach && segment.end > x).map((segment) => segment.y));
+    if (!best || y < best.y - 1e-6 || (Math.abs(y - best.y) <= 1e-6 && x < best.x)) best = {x, y};
+  }
+  return best ?? {x: 0, y: Math.max(...skyline.map((segment) => segment.y))};
+}
+
+/** How far right a card starting at `x` on edge `y` can reach before something is in the way. */
+function freeEnd(skyline: readonly Segment[], x: number, y: number): number {
+  let end = x;
+  for (const segment of skyline) {
+    if (segment.end <= end) continue;
+    if (segment.x > end + 1e-6 || segment.y > y + 1e-6) break;
+    end = segment.end;
+  }
+  return end;
+}
+
 /**
- * Pack cards into a column `containerWidth` wide, in order. A skyline tracks
- * the lowest free edge across the width; each card takes the position where
- * its top is highest (then leftmost) and its width fits. A fill card then
- * widens to the free span at that height — up to the next card that is in the
- * way, a gap before it, or the container edge — so it closes the row its
- * neighbours leave. Cards are `gap` apart and never wider than the container.
+ * Pack cards into a column `containerWidth` wide. A skyline tracks the lowest
+ * free edge across the width. Each step looks at the next `lookahead` cards
+ * and places the one whose best spot is highest (the earliest on a tie), so a
+ * small card can take the hole beside a wide one while the order stays close
+ * to the topological one. A fill card takes its preferred width when the row
+ * still has room for the next card beside it, and the whole free span when
+ * the space left would be too narrow for any of them — rows close up without
+ * every stretching card running the full width. Cards are `gap` apart, never
+ * wider than the container, and returned in input order.
  */
-export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: number): Placed[] {
+export function packSkyline(boxes: readonly Box[], containerWidth: number, gap: number, lookahead = 3): Placed[] {
   const width = Math.max(1, containerWidth);
-  // Segments of the skyline: [x, end) has its free edge at y.
-  let skyline = [{x: 0, end: width, y: 0}];
-  return boxes.map((box) => {
-    const w = Math.min(box.width, width);
-    let best: {x: number; y: number} | undefined;
-    for (const start of skyline) {
-      const x = start.x;
-      if (x + w > width + 1e-6) continue;
-      // The card and the gap after it must clear everything under them.
-      const reach = Math.min(x + w + gap, width);
-      const y = Math.max(...skyline.filter((segment) => segment.x < reach && segment.end > x).map((segment) => segment.y));
-      if (!best || y < best.y - 1e-6 || (Math.abs(y - best.y) <= 1e-6 && x < best.x)) best = {x, y};
+  let skyline: Segment[] = [{x: 0, end: width, y: 0}];
+  const placed: Placed[] = new Array(boxes.length);
+  const remaining = boxes.map((_, index) => index);
+  const least = (box: Box) => Math.min(box.width, width);
+  while (remaining.length) {
+    let pick = remaining[0]!;
+    let spot = bestSpot(skyline, least(boxes[pick]!), width, gap);
+    for (const index of remaining.slice(1, lookahead)) {
+      const other = bestSpot(skyline, least(boxes[index]!), width, gap);
+      if (other.y < spot.y - 1e-6) { pick = index; spot = other; }
     }
-    const {x, y} = best ?? {x: 0, y: Math.max(...skyline.map((segment) => segment.y))};
-    let span = w;
+    const box = boxes[pick]!;
+    remaining.splice(remaining.indexOf(pick), 1);
+    const {x, y} = spot;
+    let span = least(box);
     if (box.fill) {
-      // Walk right while the skyline stays at or below this card's top.
-      let end = x;
-      for (const segment of skyline) {
-        if (segment.end <= end) continue;
-        if (segment.x > end + 1e-6 || segment.y > y + 1e-6) break;
-        end = segment.end;
-      }
-      span = Math.max(w, end >= width - 1e-6 ? width - x : end - x - gap);
+      const end = freeEnd(skyline, x, y);
+      const free = end >= width - 1e-6 ? width - x : end - x - gap;
+      const preferred = Math.max(span, Math.min(box.preferred ?? span, free));
+      // The narrowest card that might come next decides whether the rest of the row is usable.
+      const next = remaining.slice(0, lookahead).map((index) => least(boxes[index]!));
+      const smallest = next.length ? Math.min(...next) : Infinity;
+      span = Math.max(span, free - preferred >= smallest + gap ? preferred : free);
     }
     const bottom = y + box.height + gap;
     const right = x + span + gap;
-    const next: typeof skyline = [];
+    const next: Segment[] = [];
     for (const segment of skyline) {
       if (segment.end <= x || segment.x >= right) { next.push(segment); continue; }
       if (segment.x < x) next.push({x: segment.x, end: x, y: segment.y});
       if (segment.end > right) next.push({x: right, end: segment.end, y: segment.y});
     }
     next.push({x, end: Math.min(right, width), y: bottom});
-    skyline = next.sort((a, b) => a.x - b.x)
-      .reduce<typeof skyline>((merged, segment) => {
-        const last = merged.at(-1);
-        if (last && last.end >= segment.x - 1e-6 && Math.abs(last.y - segment.y) <= 1e-6) last.end = Math.max(last.end, segment.end);
-        else merged.push({...segment});
-        return merged;
-      }, []);
-    return {x, y, width: span, height: box.height};
-  });
+    skyline = next.sort((a, b) => a.x - b.x).reduce<Segment[]>((merged, segment) => {
+      const last = merged.at(-1);
+      if (last && last.end >= segment.x - 1e-6 && Math.abs(last.y - segment.y) <= 1e-6) last.end = Math.max(last.end, segment.end);
+      else merged.push({...segment});
+      return merged;
+    }, []);
+    placed[pick] = {x, y, width: span, height: box.height};
+  }
+  return placed;
 }
 
 /**

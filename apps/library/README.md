@@ -1,10 +1,10 @@
 # Component library
 
 `apps/library` (workspace `webmusic-library`) is a standalone page that lists
-every WebMusic Web Component by what it does, lets you search them, and
-composes the ones you pick into one working page. It is for people who want to
-assemble a music application from finished components instead of writing new
-ones. It is not part of the documentation site and owns no component contract:
+every WebMusic Web Component by what it looks like and what it does, lets you
+search them, and opens a live demo of each with the code to use it. It is for
+people who want to assemble a music application from finished components
+instead of writing new ones. It is not part of the documentation site and owns no component contract:
 each entry links to its owning reference page.
 
 All musical material is Arabesque No. 1, read from the documentation site's
@@ -45,39 +45,36 @@ development and at the published site in a production build; set
   is pictured by the panel on its parameters, and a Rack part by its desk.
 - **Cards fit their pictures.** Every card is exactly as tall as its picture.
   An element with a width of its own (faders, knobs, keys, a scope, a meter)
-  gets a card exactly that wide; an element that stretches (a transport, a
-  staff, a lane, a waveform) has a least width, takes the free span where it
-  lands and is pictured at that width. Only a picture wider than the window is
-  scaled down.
+  gets a card exactly that wide. An element that stretches (a transport, a
+  staff, a lane, a waveform) has a least width and a preferred one, half again
+  as wide, and is pictured at whatever width packing gives it. Only a picture
+  wider than the window is scaled down. A picture is never taken while the
+  element still shows a loading, waiting or error status: it waits, and a card
+  whose element never finishes shows a hatched frame instead.
 - **Order.** Score and Audio are separate segments, Score first. In each,
   cards follow the composition tree depth-first: each player is followed by
   what attaches to it (a desk and its part, a note input and its recorder,
-  views, analysis, meters). A skyline packs the cards a gap apart, each into
-  the highest free spot where it fits; a stretching card then fills the row
-  beside it, so cards of different sizes close up.
+  views, analysis, meters). A skyline packs the cards a gap apart. Each step
+  looks at the next three cards and places the one that sits highest, so a
+  small card takes the hole beside a wide one while the order stays close to
+  the tree. A stretching card takes its preferred width when the next card still
+  fits beside it, and the rest of the row only when what would be left is too
+  narrow — so rows close up without every stretching card running full width.
 - **Filter.** All, Score or Audio at the top; press `/` to search. Every term
   must match the tag, its category or synonyms, its family and entry, its
   purpose, or one of its attributes, properties or events (`microphone`, `fft`,
   `waveform editor`, `webscore:chordchange`). A card's tag filters by that
   category; the filter shows in the bar until cleared.
-- **An element's page** is the demo and nothing else: the element with its
-  player's transport, the code for exactly that canvas, its observed
-  attributes in Parameters (the code changes as you adjust them), and the plus
-  button that adds it to **Your app**. A card in your app carries a check mark.
-- **Compose an app.** The app page nests every companion into the player that
-  lends it data, state and time — one Score player and one Audio player at
-  most — adds what a choice needs (a recorder gets a note input, a Rack part
-  gets its desk, an insert gets a panel on its parameters), and shows the
-  result live beside the complete page to copy. Editing views
-  (`<score-grid-view>`, `<score-sheet-view>`, `<audio-clip-view>`) borrow one
-  editor per family that the page loads and lends to the player, as their
-  reference pages show; inside a Rack desk the score views stay read-only.
-  Score analysis links to its player with `input` (see STATUS LIB-01). The
-  selection stays in this browser; the link icon shares it as
-  `#/app/<tag>,<tag>`.
+- **An element's page** is the demo and nothing else: the element with the
+  player that lends it data, state and time (a recorder with its note input),
+  the code for exactly that canvas, and its observed attributes in Parameters —
+  the code changes as you adjust them. Editing views (`<score-grid-view>`,
+  `<score-sheet-view>`, `<audio-clip-view>`) borrow an editor the page loads and
+  lends to the player, as their reference pages show; Score analysis links to
+  its player with `input` (see STATUS LIB-01).
 
-The copied page imports the packages by their public entries
-(`@webmusic/score/play/element` and so on), so serve it through a bundler such
+The code imports the packages by their public entries
+(`@webmusic/score/play/element` and so on), so use it through a bundler such
 as Vite, and replace the Arabesque URLs with your own files.
 
 ## Sources
@@ -88,7 +85,7 @@ as Vite, and replace the Arabesque URLs with your own files.
 | Entries, attributes, properties and events | [Parameter catalog](../doc/webmusic/src/lib/params/index.ts) |
 | One-line purpose | The first sentence of each owning documentation page, read at build time by [`summaries.ts`](summaries.ts) |
 | Functional group and card tag, card sizing (own width or stretch) with first-layout estimates, search synonyms, define function and composition slot | [`src/recipes.ts`](src/recipes.ts), the library's only own inventory |
-| Composition rules | [`src/compose.ts`](src/compose.ts); the live canvas and the copied code both come from it |
+| Composition rules | [`src/compose.ts`](src/compose.ts); the live canvas, its code and each picture's composition come from it |
 
 A new public element fails the library tests until it has a recipe. Tests also
 check that every recipe's define function is exported by its entry and that
@@ -98,13 +95,13 @@ recipes write only observed attributes.
 
 | Path | Contents |
 |---|---|
-| `src/main.ts` | Routing, the vertical reel of still cards, element page with Parameters, and the app composer |
+| `src/main.ts` | Routing, the vertical reel of still cards and the element page with Parameters |
 | `render.html`, `src/render.ts` | The background frame that draws one element at a time for its picture |
 | `src/snapshot.ts` | An element as a self-contained SVG picture |
 | `src/pictures.ts` | The drawing queue and the per-build IndexedDB store of pictures |
 | `src/layout.ts` | Topological order, skyline packing at exact card sizes, widening stretch cards, and how a card fits its picture |
 | `src/catalog.ts` | Library entries joined from the catalogs above |
-| `src/compose.ts` | Selection → nested markup, define imports and a complete page |
+| `src/compose.ts` | Elements → nested markup, define imports and editors, and the code snippet |
 | `src/elements.ts` | Loads the element entries and mounts a composition in a live canvas |
 | `src/search.ts` | Weighted all-terms search |
 | `src/styles.css` | Library chrome in the [visual design](../../dev/design/VISUAL-DESIGN.md) |
