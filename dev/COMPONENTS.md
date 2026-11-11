@@ -53,7 +53,7 @@ A nonvisual declaration of one realized insert effect in a module chain.
 
 - Behavior/data collaboration: Effect recipe + InsertChain slot.
 - Reviewed UI composition: Nonvisual behavior/declaration; no presenter required.
-- Attribute controls: `type`, `gain`, `pan`, `frequency`, `q`, `filter-type`, `time`, `feedback`, `wet`, `dry`, `seconds`, `decay`, `threshold`, `ratio`, `knee`, `attack`, `release`, `depth`, `amount`, `bits`, `target`
+- Attribute controls: `type`, `gain`, `pan`, `frequency`, `q`, `filter-type`, `time`, `feedback`, `wet`, `dry`, `seconds`, `decay`, `threshold`, `ratio`, `knee`, `attack`, `release`, `depth`, `amount`, `bits`, `drive`, `target`
 - Properties and methods: `effect`, `moduleTarget`, `slotId`, `module`
 - Events: `webscore:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/play/score-effect.mdx>) · [Element source](<../packages/score/src/play/element/score-effect.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-play.ts>)

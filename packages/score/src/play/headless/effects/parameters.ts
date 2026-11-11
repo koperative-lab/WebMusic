@@ -14,12 +14,13 @@ export const PARAM_RANGE: Readonly<Record<string, [number, number, number]>> = {
   depth: [0, 1, 0.01],
   threshold: [-60, 0, 1],
   ratio: [1, 20, 0.5],
+  drive: [0, 4, 0.01],
 };
 
 export const PARAM_UNIT: Readonly<Record<string, string>> = {
   frequency: 'Hz', rate: 'Hz', threshold: 'dB', time: 's', pan: 'pan',
   Q: 'ratio', ratio: 'ratio', gain: 'linear-gain', wet: 'linear-gain',
-  dry: 'linear-gain', feedback: 'linear-gain', depth: 'linear-gain',
+  dry: 'linear-gain', feedback: 'linear-gain', depth: 'linear-gain', drive: 'linear-gain',
 };
 
 export function effectParameters(

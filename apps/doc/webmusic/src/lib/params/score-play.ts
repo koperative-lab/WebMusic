@@ -407,6 +407,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
       {"name": "depth", "kind": "number", "fallback": "recipe default", "note": "Finite depth setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "amount", "kind": "number", "fallback": "recipe default", "note": "Finite amount setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "bits", "kind": "number", "fallback": "recipe default", "note": "Finite bits setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
+      {"name": "drive", "kind": "number", "fallback": "recipe default", "note": "Finite drive setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "target", "kind": "text", "placeholder": "#desk", "fallback": "nearest module target", "note": "Unique module selector. Explicit missing targets remain pending; no ancestor fallback."},
     ],
     properties: [

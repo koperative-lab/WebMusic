@@ -1115,7 +1115,7 @@ export class SynthPanelElement extends WebMusicElement {
       const target = this.attachedTarget;
       const surfaces = target?.inserts
         ? target.inserts.instances.map((instance) => ({id: instance.id, label: instance.recipe.label ?? instance.slotId, params: instance.params}))
-        : target?.params && !hasInstrumentParameters(target) ? [{id: target.id, label: 'Effect', params: target.params}] : [];
+        : target?.params && !hasInstrumentParameters(target) ? [{id: target.id, label: (target as ModuleHandle & {label?: string}).label ?? 'Effect', params: target.params}] : [];
       this.effectHandle = mountParameterRack(host, parameterSurfaceBinding(surfaces), {
         layout: 'grouped', emptyLabel: target ? 'No effect parameters available' : 'Module target unavailable',
         onError: (error) => this.reportLfoError(error),
@@ -1142,8 +1142,8 @@ export class SynthPanelElement extends WebMusicElement {
       target?.params ? [{id: target.id, label: 'Instrument envelope', params: target.params}] : [],
       isEnvelopeParameter,
     ), {layout: 'grouped', emptyLabel: 'No instrument envelope parameters available', onError: (error) => this.reportEnvelopeError(error)});
-    const limitation = this.attachedEnvelopePanel.slot('availability');
-    if (limitation && target?.params?.handles.some(isEnvelopeParameter)) limitation.textContent = 'Envelope settings apply to new notes. Releasing a note early starts its release from the current envelope level.';
+    // An explanation, so assistive technology only (no visible prose in a component).
+    if (target?.params?.handles.some(isEnvelopeParameter)) this.attachedEnvelopePanel.describe('availability', 'Envelope settings apply to new notes. Releasing a note early starts its release from the current envelope level.');
   }
 
   private wireEnvelope(host: HTMLElement): boolean {
@@ -1417,10 +1417,9 @@ export class SynthPanelElement extends WebMusicElement {
     this.attachedLfoPanel = mountSectionPanel(host, ['control', 'amount', 'availability'], {label: 'Parameter LFO', stylesheet: false});
     const target = this.attachedLfoTarget();
     const controller = this.attachedLfo();
-    const availability = this.attachedLfoPanel.slot('availability');
-    if (availability) availability.textContent = target?.descriptor.modulation === 'audio-rate'
+    this.attachedLfoPanel.describe('availability', target?.descriptor.modulation === 'audio-rate'
       ? `Audio-rate modulation of ${target.descriptor.label ?? target.descriptor.id}. Depth scales Amount in ${target.descriptor.unit}.`
-      : 'The selected parameter does not support audio-rate modulation.';
+      : 'The selected parameter does not support audio-rate modulation.');
     const amount = this.attachedLfoPanel.slot('amount');
     if (amount && target) {
       const range = target.descriptor.displayRange ?? target.descriptor.range;

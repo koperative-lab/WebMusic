@@ -115,7 +115,10 @@ describe('attached synth panels and declarative effect identity', () => {
     expect(stages.map((entry) => entry.id.split('/').at(-1))).toEqual(['attackSeconds', 'decaySeconds', 'sustainLevel', 'releaseSeconds']);
     binding(envelope).setValue(stages[0].id, 0.25);
     expect(sound.params.get('attackSeconds')?.snapshot.baseValue).toBe(0.25);
-    expect(envelope.shadowRoot?.textContent).toContain('Envelope settings apply to new notes');
+    // The explanation is for assistive technology only: present, but not shown.
+    const note = envelope.shadowRoot?.querySelector<HTMLElement>('.wui-section-panel__description');
+    expect(note?.textContent).toContain('Envelope settings apply to new notes');
+    expect(note?.dataset.description).toBe('availability');
     binding(envelope).setValue(stages[1].id, 0.3);
     binding(envelope).setValue(stages[2].id, 0.45);
     expect(sound.params.get('decaySeconds')?.snapshot.baseValue).toBe(0.3);
@@ -155,6 +158,25 @@ describe('attached synth panels and declarative effect identity', () => {
     expect(instance.params.get('gain')?.snapshot.baseValue).toBe(0.7);
     expect(context.createGain).toHaveBeenCalledTimes(allocations);
     expect(context.close).not.toHaveBeenCalled();
+  });
+
+  it('titles a single effect by its type and lists distortion and bitcrusher parameters', async () => {
+    const {host, context} = fixture();
+    // The shaping effects need a WaveShaper as well as gains.
+    Object.assign(context, {createWaveShaper: () => ({curve: null, oversample: 'none', connect: (target: AudioNode) => target, disconnect: () => {}})});
+    for (const [type, expected] of [['distortion', ['drive', 'wet', 'dry']], ['bitcrusher', ['wet', 'dry']]] as const) {
+      const declaration = effect();
+      declaration.id = `fx-${type}`;
+      declaration.setAttribute('type', type);
+      const view = panel();
+      view.setAttribute('target', `#fx-${type}`);
+      host.append(declaration, view);
+      await settle();
+      expect((declaration.module as {label?: string} | undefined)?.label).toBe(type);
+      const parameters = binding(view).snapshot().parameters;
+      expect(parameters.map((entry) => entry.id.split('/').at(-1))).toEqual(expected);
+      expect(new Set(parameters.map((entry) => entry.group))).toEqual(new Set([type]));
+    }
   });
 
   it('preserves sound order for layout moves and removes only the declared slot', async () => {

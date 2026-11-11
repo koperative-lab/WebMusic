@@ -40,14 +40,21 @@ development and at the published site in a production build; set
 - **Pictures, not live elements.** The home page mounts no element. A hidden
   background frame ([`render.html`](render.html), [`src/render.ts`](src/render.ts))
   mounts one element at a time with the packages' own code on Arabesque No. 1,
-  waits for it to settle and turns it into a self-contained SVG
-  ([`src/snapshot.ts`](src/snapshot.ts)): its composed tree with shadow roots
-  flattened, every computed style inline, canvases as images and scroll offsets
-  kept. Cards near the screen are drawn first. Pictures are kept in IndexedDB
-  per build ([`src/pictures.ts`](src/pictures.ts)); the key changes when a
-  package is rebuilt or the drawing code changes (restart the dev server after
-  either), so later visits show every card at once without drawing. An insert
-  is pictured by the panel on its parameters, and a Rack part by its desk.
+  waits for it to settle, seeks its player to the middle of the piece and plays
+  it for about two seconds — into no output device (`sinkId: {type: 'none'}`),
+  so nothing is heard — and turns the element alone into a self-contained SVG
+  ([`src/snapshot.ts`](src/snapshot.ts)) while it plays: meters, scopes, spectra
+  and views show music rather than silence. The SVG holds the composed tree with
+  shadow roots flattened, every computed style inline, canvases as images,
+  scroll offsets kept and anything outside the element's box left out. Before the
+  user's first click or key press a browser may refuse to start audio; the
+  picture then shows the middle paused and is drawn again, playing, after that
+  first gesture. A browser without silent output keeps paused pictures. Cards
+  near the screen are drawn first. Pictures are kept in IndexedDB per build
+  ([`src/pictures.ts`](src/pictures.ts)); the key changes when a package is
+  rebuilt or the drawing code changes (restart the dev server after either), so
+  later visits show every card at once without drawing. An insert is pictured
+  by the panel on its parameters, titled by its type, and a Rack part by its desk.
 - **Cards fit their pictures.** Every card is exactly as tall as its picture.
   An element with a width of its own (faders, knobs, keys, a scope, a meter)
   gets a card exactly that wide. An element that stretches (a transport, a

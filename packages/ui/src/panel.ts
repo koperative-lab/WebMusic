@@ -2,6 +2,7 @@ import {claimHost} from './internal/lifecycle';
 import {installStyle} from "./internal/style";
 import {addClassNames, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
+import {visuallyHiddenCss} from './internal/icons';
 // ============================================================================
 // Domain-neutral compound panel presenter.
 //
@@ -56,6 +57,12 @@ export interface SectionPanelHandle {
   slot(id: string): HTMLElement | undefined;
   /** All slots in the same order as the normalized section list. */
   readonly slots: ReadonlyMap<string, HTMLElement>;
+  /**
+   * Give a section a description for assistive technology only: the text is
+   * read with the section but never shown, since a panel carries no visible
+   * explanatory prose. `undefined` or an empty string removes it.
+   */
+  describe(id: string, text: string | undefined): void;
   destroy(): void;
 }
 
@@ -83,6 +90,7 @@ ${componentSurfaceCss('panel', {
 }
 .wui-section-panel__section,
 .wui-section-panel__slot { display: block; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.wui-section-panel__description { ${visuallyHiddenCss} }
 `;
 
 function normalizeSections(
@@ -149,11 +157,26 @@ export function mountSectionPanel(
     slots.set(descriptor.id, slot);
   }
 
+  const descriptions = new Map<string, HTMLElement>();
   let destroyed = false;
   const handle: SectionPanelHandle = {
     element: root,
     slots,
     slot: (id) => slots.get(id),
+    describe(id, text) {
+      const slot = slots.get(id);
+      if (!slot || destroyed) return;
+      let note = descriptions.get(id);
+      if (!text) { note?.remove(); descriptions.delete(id); return; }
+      if (!note) {
+        note = document.createElement('span');
+        note.className = 'wui-section-panel__description';
+        note.dataset.description = id;
+        descriptions.set(id, note);
+      }
+      note.textContent = text;
+      if (note.parentElement !== slot) slot.append(note);
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;

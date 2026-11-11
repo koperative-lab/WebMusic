@@ -2,7 +2,7 @@ import {defineAllElements} from '@webmusic/score/play/element';
 import {defineAllAudioElements as defineAudioPlay} from '@webmusic/audio/play/element';
 import {defineAllAudioElements as defineAudioAnalyze} from '@webmusic/audio/analyze/element';
 import type {MountContext} from '../model';
-import {arabesqueAudioUrl, arabesqueUrl, reportErrors, setMarkup, stopPlayers} from './shared';
+import {addChoice, arabesqueAudioUrl, arabesqueUrl, reportErrors, setMarkup, stopPlayers} from './shared';
 
 /** A1, A2, A4: the docs' modular composition — one Session over Score, Audio, a Rack part and shared inserts. */
 export function mountComposedDesk(context: MountContext): () => void {
@@ -35,6 +35,28 @@ function mountDesk(context: MountContext, sharedPanels: boolean): () => void {
       <score-synth-panel target="#mt-room" sections="effects" aria-label="The same room parameters"></score-synth-panel>
     </div>` : '<score-synth-panel target="#mt-room" sections="effects" aria-label="Room parameters"></score-synth-panel>'}
     <audio-spectrum-analyzer input="#mt-desk" port="master" aria-label="Mixed output spectrum"></audio-spectrum-analyzer>`);
+  const stopErrors = reportErrors(context);
+  return () => { stopErrors(); stopPlayers(context.canvas); };
+}
+
+type InsertType = 'filter' | 'distortion' | 'bitcrusher' | 'reverb';
+
+/** A5: one insert switched between types; its panel is titled by the type and shows that type's controls. */
+export function mountInsertTypes(context: MountContext): () => void {
+  defineAllElements();
+  setMarkup(context.canvas, `
+    <score-player controls="show" time-control="full" src="${arabesqueUrl('midi')}" aria-label="Arabesque No. 1 with one insert">
+      <score-effect id="mt-insert" type="distortion"></score-effect>
+      <score-synth-panel target="#mt-insert" sections="effects" aria-label="Insert parameters"></score-synth-panel>
+      <score-synth-panel sections="sound,envelope" aria-label="Sound and envelope"></score-synth-panel>
+    </score-player>`);
+  const insert = context.canvas.querySelector('#mt-insert')!;
+  addChoice<InsertType>(context, 'Insert type', [
+    {id: 'distortion', label: 'Distortion'},
+    {id: 'bitcrusher', label: 'Bitcrusher'},
+    {id: 'filter', label: 'Filter'},
+    {id: 'reverb', label: 'Reverb'},
+  ], 'distortion', (type) => { insert.setAttribute('type', type); });
   const stopErrors = reportErrors(context);
   return () => { stopErrors(); stopPlayers(context.canvas); };
 }

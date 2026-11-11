@@ -30,6 +30,12 @@ export interface FilterOptions {
 export interface DistortionOptions {
   amount?: number;
   oversample?: OverSampleType;
+  /** Linear gain into the shaper (default 1): more drive saturates harder. */
+  drive?: number;
+  /** Linear level of the distorted signal (default 1). */
+  wet?: number;
+  /** Linear level of the untouched signal mixed back in (default 0). */
+  dry?: number;
 }
 
 export interface CompressorOptions {
@@ -55,6 +61,10 @@ export interface AnalyserOptions {
 export interface BitcrusherOptions {
   /** Bit depth (1–16). Lower values sound crunchier. */
   bits?: number;
+  /** Linear level of the crushed signal (default 1). */
+  wet?: number;
+  /** Linear level of the untouched signal mixed back in (default 0). */
+  dry?: number;
 }
 
 export interface TremoloOptions {

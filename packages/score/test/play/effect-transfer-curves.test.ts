@@ -15,8 +15,9 @@ describe('effect transfer functions on the Web Audio input axis', () => {
     ['bitcrusher', () => Effect.bitcrusher({bits: 6})],
     ['16-bit bitcrusher', () => Effect.bitcrusher({bits: 16})],
   ] as const)('%s preserves silence and symmetric positive/negative input', (_name, recipe) => {
-    const node = {curve: null as Float32Array | null};
-    const context = {createWaveShaper: () => node} as unknown as AudioContext;
+    const node = {curve: null as Float32Array | null, connect: (target: unknown) => target};
+    const gain = () => ({gain: {value: 1}, connect: (target: unknown) => target});
+    const context = {createWaveShaper: () => node, createGain: gain} as unknown as AudioContext;
     recipe().build(context);
     expect(node.curve).not.toBeNull();
     expect(transfer(node.curve!, 0)).toBeCloseTo(0, 8);

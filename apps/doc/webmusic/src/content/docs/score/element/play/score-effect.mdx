@@ -86,8 +86,8 @@ Changing a recipe attribute replaces that slot transactionally. Editing its live
 | `limiter` | `threshold`, `release` | dB threshold and release seconds. |
 | `tremolo` | `frequency`, `depth` | Modulation Hz and depth. |
 | `chorus` | `time`, `frequency`, `depth`, `wet` | Delay seconds, modulation Hz and mix. |
-| `distortion` | `amount` | Distortion amount. |
-| `bitcrusher` | `bits` | Quantization depth. |
+| `distortion` | `amount`, `drive`, `wet`, `dry` | Curve amount; live linear drive into the shaper (1) and wet (1) / dry (0) mix. |
+| `bitcrusher` | `bits`, `wet`, `dry` | Quantization depth; live wet (1) / dry (0) mix. |
 
 ### Events and ownership
 

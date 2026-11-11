@@ -20,7 +20,8 @@ export class AudioEffectElement extends WebMusicElement {
   private target?: ModuleHandle;
   private chain?: InsertChain;
   private instance?: EffectInstance;
-  private instanceModule?: ModuleHandle;
+  /** The realized insert, with the label a panel titles it by. */
+  private instanceModule?: ModuleHandle & {readonly label?: string};
   private resolutionRelease?: () => void;
   private targetRelease?: () => void;
   private chainRelease?: () => void;
@@ -158,6 +159,8 @@ export class AudioEffectElement extends WebMusicElement {
     this.instance = instance;
     this.instanceModule = instance ? {
       id: instance.id,
+      // What the insert is, for a panel that titles it (`filter`, `delay`, ...).
+      label: (instance.recipe as {label?: string}).label ?? this.getAttribute('type') ?? 'gain',
       params: instance.params,
       subscribe: (notify) => {
         this.listeners.add(notify);

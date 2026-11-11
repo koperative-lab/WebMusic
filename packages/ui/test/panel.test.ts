@@ -79,4 +79,23 @@ describe("mountSectionPanel", () => {
     expect(host.querySelectorAll(".wui-section-panel")).toHaveLength(1);
     expect(host.querySelectorAll('style[data-webmusic-ui="panel"]')).toHaveLength(1);
   });
+
+  it("describes a section for assistive technology only", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const handle = mountSectionPanel(host, ["envelope", "lfo"]);
+    handle.describe("envelope", "Envelope settings apply to new notes.");
+    handle.describe("missing", "Ignored.");
+    const note = handle.slot("envelope")!.querySelector<HTMLElement>(".wui-section-panel__description");
+    expect(note?.textContent).toBe("Envelope settings apply to new notes.");
+    expect(note?.dataset.description).toBe("envelope");
+    // Hidden by the panel's own stylesheet, not removed from the accessibility tree.
+    expect(sectionPanelStyle).toMatch(/\.wui-section-panel__description \{[^}]*clip-path: inset\(50%\)/);
+    handle.describe("envelope", "Changed.");
+    expect(handle.slot("envelope")!.querySelectorAll(".wui-section-panel__description")).toHaveLength(1);
+    expect(handle.slot("envelope")!.textContent).toBe("Changed.");
+    handle.describe("envelope", undefined);
+    expect(handle.slot("envelope")!.querySelector(".wui-section-panel__description")).toBeNull();
+    expect(host.textContent).not.toContain("Ignored.");
+  });
 });

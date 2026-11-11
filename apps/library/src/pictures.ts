@@ -2,7 +2,7 @@
 // (render.html), kept in IndexedDB for this build, and handed to the cards as
 // plain images. Cards near the screen are drawn first; the rest follow in the
 // background, one at a time.
-import type {PictureJob} from './render.ts';
+import type {DrawnPicture, PictureJob} from './render.ts';
 import type {Picture} from './snapshot.ts';
 
 export type {Picture} from './snapshot.ts';
@@ -18,7 +18,33 @@ const WIDTH_TOLERANCE = 24;
 const idOf = (job: Pick<PictureJob, 'tag' | 'type'>) => job.type ? `${job.tag}@${job.type}` : job.tag;
 const keyOf = (job: PictureJob) => `${VERSION}|${idOf(job)}|${job.width === undefined ? 'own' : Math.round(job.width)}`;
 
-const pictures = new Map<string, Picture>();
+const pictures = new Map<string, Picture | DrawnPicture>();
+
+// Browsers start audio only after the user has interacted with the page. A
+// picture drawn before that shows the middle of the piece paused; once the
+// user has clicked or pressed a key, it is drawn again, playing.
+let activated = typeof navigator !== 'undefined' && !!(navigator as Navigator & {userActivation?: {hasBeenActive: boolean}}).userActivation?.hasBeenActive;
+
+/** Paused pictures already drawn again this visit: never more than once. */
+const redrawn = new WeakSet<object>();
+
+/** A paused picture the page can now replace with a playing one. */
+export function needsRedraw(picture: Picture): boolean {
+  return activated && (picture as DrawnPicture).playing === false && !redrawn.has(picture);
+}
+
+/** Call `then` once, after the user's first click or key press on the page. */
+export function onActivation(then: () => void): void {
+  if (activated) return;
+  const done = () => {
+    window.removeEventListener('pointerdown', done, true);
+    window.removeEventListener('keydown', done, true);
+    activated = true;
+    then();
+  };
+  window.addEventListener('pointerdown', done, true);
+  window.addEventListener('keydown', done, true);
+}
 const urls = new Map<string, string>();
 
 function open(): Promise<IDBDatabase | undefined> {
@@ -67,7 +93,7 @@ function readAll(): Promise<void> {
   }));
 }
 
-function store(key: string, picture: Picture): void {
+function store(key: string, picture: Picture | DrawnPicture): void {
   pictures.set(key, picture);
   void database?.then((db) => {
     try { db?.transaction(STORE, 'readwrite').objectStore(STORE).put(picture, key); } catch { /* Drawn again next visit. */ }
@@ -114,16 +140,18 @@ interface Pending {
 const queue = new Map<string, Pending>();
 let busy = false;
 let frame: HTMLIFrameElement | undefined;
-let ready: Promise<(job: PictureJob) => Promise<Picture>> | undefined;
+let ready: Promise<(job: PictureJob) => Promise<DrawnPicture>> | undefined;
 let idle = 0;
 
-function drawer(): Promise<(job: PictureJob) => Promise<Picture>> {
+function drawer(): Promise<(job: PictureJob) => Promise<DrawnPicture>> {
   if (ready) return ready;
   window.clearTimeout(idle);
   frame = document.createElement('iframe');
   frame.title = 'Picture renderer';
   frame.setAttribute('aria-hidden', 'true');
   frame.tabIndex = -1;
+  // Pictures play the piece silently; the frame may start audio once the page may.
+  frame.allow = 'autoplay';
   // On screen but invisible, so the browser keeps drawing it at full rate.
   frame.style.cssText = 'position:fixed;left:0;top:0;width:2000px;height:1600px;border:0;opacity:0;pointer-events:none;z-index:-1';
   frame.src = `${import.meta.env.BASE_URL}render.html`;
@@ -162,13 +190,16 @@ async function pump(): Promise<void> {
         // Pictures kept from an earlier visit are never drawn again.
         await loadPictures();
         const kept = pictures.get(key);
-        if (kept) {
+        if (kept && !needsRedraw(kept)) {
           queue.delete(key);
           for (const waiting of next.waiting) waiting.resolve(kept);
           continue;
         }
+        // Drawn after the user's first gesture: whatever this draw gives is final for the visit.
+        const final = activated;
         const render = await drawer();
         const picture = await render(next.job);
+        if (final) redrawn.add(picture);
         store(key, picture);
         queue.delete(key);
         for (const waiting of next.waiting) waiting.resolve(picture);
@@ -187,7 +218,7 @@ async function pump(): Promise<void> {
 export function requestPicture(job: PictureJob, priority: number): Promise<Picture> {
   const key = keyOf(job);
   const known = pictures.get(key);
-  if (known) return Promise.resolve(known);
+  if (known && !needsRedraw(known)) return Promise.resolve(known);
   return new Promise((resolve, reject) => {
     const pending = queue.get(key);
     if (pending) {

@@ -113,7 +113,9 @@ export class Effect {
   }
 
   static bitcrusher(options: BitcrusherOptions = {}): Effect {
-    return new Effect((context) => buildBitcrusherEffect(context, options));
+    return new Effect((context) => buildBitcrusherEffect(context, options), effectParameters(['wet', 'dry'], {
+      wet: {defaultValue: options.wet ?? 1}, dry: {defaultValue: options.dry ?? 0},
+    }));
   }
 
   static tremolo(options: TremoloOptions = {}): Effect {
@@ -145,7 +147,9 @@ export class Effect {
   }
 
   static distortion(options: DistortionOptions = {}): Effect {
-    return new Effect((context) => buildDistortionEffect(context, options));
+    return new Effect((context) => buildDistortionEffect(context, options), effectParameters(['drive', 'wet', 'dry'], {
+      drive: {defaultValue: options.drive ?? 1}, wet: {defaultValue: options.wet ?? 1}, dry: {defaultValue: options.dry ?? 0},
+    }));
   }
 
   static compressor(options: CompressorOptions = {}): Effect {

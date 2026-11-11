@@ -21,7 +21,8 @@ export class ScoreEffectElement extends WebMusicElement {
   private target?: ModuleHandle;
   private chain?: InsertChain;
   private instance?: EffectInstance;
-  private instanceModule?: ModuleHandle;
+  /** The realized insert, with the label a panel titles it by. */
+  private instanceModule?: ModuleHandle & {readonly label?: string};
   private resolutionRelease?: () => void;
   private targetRelease?: () => void;
   private chainRelease?: () => void;
@@ -175,6 +176,8 @@ export class ScoreEffectElement extends WebMusicElement {
     this.instance = instance;
     this.instanceModule = instance ? {
       id: instance.id,
+      // What the insert is, for a panel that titles it (`filter`, `reverb`, ...).
+      label: (instance.recipe as {label?: string}).label ?? this.getAttribute('type') ?? 'gain',
       params: instance.params,
       subscribe: (notify) => {
         this.listeners.add(notify);
@@ -210,7 +213,7 @@ export class ScoreEffectElement extends WebMusicElement {
 const EFFECT_ATTRIBUTES = [
   'type', 'gain', 'pan', 'frequency', 'q', 'filter-type', 'time', 'feedback',
   'wet', 'dry', 'seconds', 'decay', 'threshold', 'ratio', 'knee', 'attack',
-  'release', 'depth', 'amount', 'bits',
+  'release', 'depth', 'amount', 'bits', 'drive',
 ] as const;
 
 function effectParameterDescriptors(host: Element): Readonly<Record<string, Partial<Omit<ParamDescriptor, 'id'>>>> {
@@ -241,7 +244,15 @@ function declaredEffect(host: Element): Effect {
     }
     return value;
   };
-  switch (host.getAttribute('type') ?? 'gain') {
+  const type = host.getAttribute('type') ?? 'gain';
+  const effect = recipeFor(type, host, number);
+  // Controls title the insert by what it is.
+  effect.label = type;
+  return effect;
+}
+
+function recipeFor(type: string, host: Element, number: (name: string) => number | undefined): Effect {
+  switch (type) {
     case 'gain': return Effect.gain(number('gain'));
     case 'panner': return Effect.panner(number('pan'));
     case 'filter': {
@@ -257,8 +268,8 @@ function declaredEffect(host: Element): Effect {
     case 'limiter': return Effect.limiter({threshold: number('threshold'), release: number('release')});
     case 'tremolo': return Effect.tremolo({frequency: number('frequency'), depth: number('depth')});
     case 'chorus': return Effect.chorus({delaySeconds: number('time'), frequency: number('frequency'), depth: number('depth'), wet: number('wet')});
-    case 'distortion': return Effect.distortion({amount: number('amount')});
-    case 'bitcrusher': return Effect.bitcrusher({bits: number('bits')});
+    case 'distortion': return Effect.distortion({amount: number('amount'), drive: number('drive'), wet: number('wet'), dry: number('dry')});
+    case 'bitcrusher': return Effect.bitcrusher({bits: number('bits'), wet: number('wet'), dry: number('dry')});
     default: throw new TypeError(`Unknown score-effect type: ${host.getAttribute('type')}`);
   }
 }

@@ -80,7 +80,7 @@ describe('Effect factories', () => {
   });
   it('build single-node effects with input === output', () => {
     const {ctx} = mockAudio();
-    for (const eff of [Effect.gain(0.5), Effect.filter({frequency: 800}), Effect.distortion(), Effect.compressor()]) {
+    for (const eff of [Effect.gain(0.5), Effect.filter({frequency: 800}), Effect.compressor()]) {
       const n = eff.build(ctx);
       expect(n.input).toBe(n.output);
     }
@@ -125,11 +125,34 @@ describe('Effect factories', () => {
     expect(n.input.ratio.value).toBe(20);
   });
 
-  it('bitcrusher builds a stepped waveshaper curve', () => {
-    const {ctx} = mockAudio();
-    const n: any = Effect.bitcrusher({ bits: 4 }).build(ctx);
-    expect(n.input).toBe(n.output);
-    expect(n.input.curve).toBeInstanceOf(Float32Array);
+  it('bitcrusher builds a stepped waveshaper curve with a live wet/dry mix', () => {
+    const {ctx, edges} = mockAudio();
+    const effect = Effect.bitcrusher({ bits: 4 });
+    const n: any = effect.build(ctx);
+    const shaper = edges.map(([, to]) => to).find((name) => name.startsWith('shaper'));
+    expect(shaper).toBeDefined();
+    expect(Object.keys(n.params)).toEqual(['wet', 'dry']);
+    // Defaults keep the previous sound: fully crushed, nothing of the dry signal.
+    expect(n.params.wet.value).toBe(1);
+    expect(n.params.dry.value).toBe(0);
+    expect(Object.keys(effect.parameterDescriptors ?? {})).toEqual(['wet', 'dry']);
+  });
+
+  it('distortion exposes drive into the shaper and a wet/dry mix', () => {
+    const {ctx, edges} = mockAudio();
+    const effect = Effect.distortion({amount: 0.6, drive: 2, dry: 0.25});
+    const n: any = effect.build(ctx);
+    expect(Object.keys(n.params)).toEqual(['drive', 'wet', 'dry']);
+    expect(n.params.drive.value).toBe(2);
+    expect(n.params.wet.value).toBe(1);
+    expect(n.params.dry.value).toBe(0.25);
+    // input → drive → shaper → wet → output, and input → dry → output.
+    const from = (name: string) => edges.filter(([source]) => source === name).map(([, target]) => target);
+    const input = n.input.name;
+    const shaper = edges.find(([, target]) => target.startsWith('shaper'))![1];
+    expect(from(input).some((name) => from(name).includes(shaper))).toBe(true);
+    expect(from(input).some((name) => from(name).includes(n.output.name))).toBe(true);
+    expect(Object.keys(effect.parameterDescriptors ?? {})).toEqual(['drive', 'wet', 'dry']);
   });
 
   it('tremolo and chorus build modulated graphs with a disposer', () => {

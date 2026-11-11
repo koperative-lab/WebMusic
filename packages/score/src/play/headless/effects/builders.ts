@@ -47,10 +47,33 @@ export function buildLimiterEffect(context: BaseAudioContext, options: LimiterOp
   };
 }
 
+/** A shaper with a wet/dry mix around it, so its level and blend are live parameters. */
+function shaperMix(context: BaseAudioContext, shaper: WaveShaperNode, options: {drive?: number; wet?: number; dry?: number}, drive: boolean): EffectNode {
+  const input = context.createGain();
+  const output = context.createGain();
+  const wet = context.createGain();
+  const dry = context.createGain();
+  wet.gain.value = options.wet ?? 1;
+  dry.gain.value = options.dry ?? 0;
+  // Signal order: drive, then the wet/dry mix.
+  let params: Record<string, AudioParam> = {wet: wet.gain, dry: dry.gain};
+  if (drive) {
+    const gain = context.createGain();
+    gain.gain.value = options.drive ?? 1;
+    input.connect(gain).connect(shaper);
+    params = {drive: gain.gain, ...params};
+  } else {
+    input.connect(shaper);
+  }
+  shaper.connect(wet).connect(output);
+  input.connect(dry).connect(output);
+  return {input, output, params};
+}
+
 export function buildBitcrusherEffect(context: BaseAudioContext, options: BitcrusherOptions): EffectNode {
   const shaper = context.createWaveShaper();
   shaper.curve = makeBitcrushCurve(options.bits ?? 6);
-  return {input: shaper, output: shaper};
+  return shaperMix(context, shaper, options, false);
 }
 
 export function buildTremoloEffect(context: BaseAudioContext, options: TremoloOptions): EffectNode {
@@ -128,7 +151,7 @@ export function buildDistortionEffect(context: BaseAudioContext, options: Distor
   const shaper = context.createWaveShaper();
   shaper.curve = makeDistortionCurve(options.amount ?? 0.4);
   shaper.oversample = options.oversample ?? '2x';
-  return {input: shaper, output: shaper};
+  return shaperMix(context, shaper, options, true);
 }
 
 export function buildCompressorEffect(context: BaseAudioContext, options: CompressorOptions): EffectNode {

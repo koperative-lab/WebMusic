@@ -8,6 +8,30 @@ import {composeApp, recipeFor} from './compose.ts';
 import {mountComposition} from './elements.ts';
 import {defaultStylesFrom, snapshot, type Picture} from './snapshot.ts';
 
+// Pictures are taken while the element plays the middle of Arabesque, so
+// meters, scopes and spectra show music rather than silence. The frame's audio
+// goes to no output device: the graph runs, nothing is heard. A browser that
+// cannot do that keeps its pictures paused instead.
+const NativeAudioContext = window.AudioContext;
+const silentOutput = !!NativeAudioContext && 'setSinkId' in NativeAudioContext.prototype;
+if (silentOutput) {
+  window.AudioContext = class SilentAudioContext extends NativeAudioContext {
+    constructor(options: AudioContextOptions = {}) {
+      super({...options, sinkId: {type: 'none'}} as AudioContextOptions);
+    }
+  } as typeof AudioContext;
+}
+
+/** What the picture frame returns: the picture, and whether it is final. */
+export interface DrawnPicture extends Picture {
+  /**
+   * False only when the element has a player and the browser would not start
+   * audio yet (no user gesture): the picture shows the middle, paused, and is
+   * worth drawing again once the page may play.
+   */
+  readonly playing: boolean;
+}
+
 export interface PictureJob {
   readonly tag: string;
   /** The element's `type` attribute, for an element drawn one card per type. */
@@ -84,14 +108,45 @@ async function settle(root: HTMLElement, signal: AbortSignal): Promise<void> {
 
 let running: Promise<unknown> = Promise.resolve();
 
+type Player = HTMLElement & {seek(seconds: number): void; play(): Promise<void>; readonly duration: number; readonly currentTime: number};
+
+/**
+ * Move the composition's players to the middle of the piece and play it.
+ * Resolves false only when there is a player the browser would not start
+ * (the players stay at the middle, paused); true otherwise — playing, or with
+ * nothing to play, or in a browser that cannot play silently.
+ */
+async function playMiddle(root: HTMLElement): Promise<boolean> {
+  const players = [...root.querySelectorAll<Player>(':scope > score-player, :scope > audio-player')]
+    .filter((player) => typeof player.seek === 'function' && typeof player.play === 'function');
+  if (!players.length) return true;
+  for (const player of players) {
+    const duration = player.duration;
+    if (Number.isFinite(duration) && duration > 0) {
+      try { player.seek(duration / 2); } catch { /* A player that cannot seek yet stays where it is. */ }
+    }
+  }
+  await sleep(300);
+  if (!silentOutput) return true;
+  const start = players[0]!.currentTime;
+  const started = await Promise.race([
+    Promise.all(players.map((player) => player.play())).then(() => true, () => false),
+    sleep(2500).then(() => false),
+  ]);
+  if (!started) return false;
+  // Long enough for scrolling views, meters and spectra to fill with music.
+  await sleep(1800);
+  return players[0]!.currentTime > start + 0.5;
+}
+
 /** Draw one element and return its picture. Calls run one after another. */
-export function renderPicture(job: PictureJob): Promise<Picture> {
+export function renderPicture(job: PictureJob): Promise<DrawnPicture> {
   const next = running.then(() => draw(job));
   running = next.catch(() => undefined);
   return next;
 }
 
-async function draw(job: PictureJob): Promise<Picture> {
+async function draw(job: PictureJob): Promise<DrawnPicture> {
   const recipe = recipeFor(job.tag);
   stage.style.width = job.width ? `${job.width}px` : 'max-content';
   const controller = new AbortController();
@@ -106,7 +161,8 @@ async function draw(job: PictureJob): Promise<Picture> {
     const pending = unfinished(target);
     if (pending.length) throw new Error(`<${job.tag}> did not finish drawing: ${pending.join('; ')}`);
     if (errors.length) throw errors[0] instanceof Error ? errors[0] : new Error(String(errors[0]));
-    return snapshot(target, defaults);
+    const playing = await playMiddle(stage);
+    return {...snapshot(target, defaults), playing};
   } finally {
     controller.abort();
     cleanup();

@@ -9,7 +9,7 @@ import {composeApp, snippet, type Overrides} from './compose.ts';
 import {liveComposition, mountComposition} from './elements.ts';
 import {icon, type IconName} from './icons.ts';
 import {packSkyline, packedHeight, stretchFills, topologicalOrder, type Box, type Size} from './layout.ts';
-import {anyPicture, cancelPending, loadPictures, pictureFor, pictureUrl, prioritize, requestPicture} from './pictures.ts';
+import {anyPicture, cancelPending, loadPictures, needsRedraw, onActivation, pictureFor, pictureUrl, prioritize, requestPicture} from './pictures.ts';
 import type {PictureJob} from './render.ts';
 import {CATEGORIES, type CategoryId} from './recipes.ts';
 import {search, type Family} from './search.ts';
@@ -225,7 +225,8 @@ function paint(card: Card, frameWidth: number, priority: number): void {
     card.image.hidden = true;
   }
   card.element.classList.toggle('lb-card--drawing', !exact);
-  if (exact) return;
+  // A paused picture stays on screen while its playing one is drawn.
+  if (exact && !needsRedraw(exact)) return;
   requestPicture(job, priority).then((picture) => {
     if (card.job !== job) return;
     card.element.classList.remove('lb-card--drawing', 'lb-card--failed');
@@ -321,6 +322,8 @@ function renderReel(): void {
   main.replaceChildren(reel);
   main.classList.add('lb-main--reel');
   relayout = () => layoutReel(reel);
+  // After the first click or key press the frame may play: redraw paused pictures.
+  onActivation(() => relayout());
   void picturesLoaded.then(() => { if (relayout === layoutRef) layoutReel(reel); });
   const layoutRef = relayout;
   layoutReel(reel);

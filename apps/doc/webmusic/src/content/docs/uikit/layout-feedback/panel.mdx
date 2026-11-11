@@ -89,6 +89,7 @@ not mutable state.
 | `element` | `HTMLElement` | Presenter-owned `.wui-section-panel` root. |
 | `slots` | `ReadonlyMap<string, HTMLElement>` | Stable map in normalized section order; cleared by `destroy()`. |
 | `slot(id)` | `(string) => HTMLElement \| undefined` | Looks up a current slot without exposing its wrapper structure. |
+| `describe(id, text)` | `(string, string \| undefined) => void` | Gives a section a visually hidden `.wui-section-panel__description` (`data-description` is the id) read by assistive technology; a panel shows no explanatory prose. An empty or `undefined` text removes it; unknown ids are ignored. |
 | `destroy()` | `() => void` | Idempotently clears the map and removes root and installed stylesheet; child resources remain caller-owned. |
 
 **Accessibility.** Labelled sections are semantic `<section>` elements with `aria-label`. An

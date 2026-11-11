@@ -137,12 +137,12 @@ optional. The option types are exported from the same Headless entry.
 | `Effect.panner(pan = 0)` | Stereo pan, clamped to −1…1. | `pan` |
 | `Effect.analyser(options?)` | `AnalyserOptions`: `fftSize` and `smoothing` use native node defaults when omitted; `onReady(node)` receives the live analyser during build. Caller polls it. | None |
 | `Effect.limiter(options?)` | `LimiterOptions`: `threshold: -3` dB, `release: 0.1` s. Fixed knee 0, ratio 20, attack 0.002 s. | `threshold`, `ratio` |
-| `Effect.bitcrusher(options?)` | `BitcrusherOptions.bits: 6`, clamped to 1–16; waveshaper amplitude quantization. | None |
+| `Effect.bitcrusher(options?)` | `BitcrusherOptions.bits: 6`, clamped to 1–16; waveshaper amplitude quantization. `wet: 1` and `dry: 0` linear gains mix the crushed and untouched signal. | `wet`, `dry` |
 | `Effect.tremolo(options?)` | `TremoloOptions.frequency: 5` Hz, `depth: 0.5` clamped to 0–1. Gain modulation begins at build. | `rate`, `depth` |
 | `Effect.chorus(options?)` | `ChorusOptions.delaySeconds: 0.025`, `depth: 0.005` s, `frequency: 0.8` Hz, `wet: 0.5`; direct dry route has unity gain. | `rate`, `depth`, `wet` |
 | `Effect.filter(options?)` | `FilterOptions.type: 'lowpass'`, `frequency: 1000` Hz, `Q: 1`; optional `gain` in dB otherwise retains the native default. | `frequency`, `Q` |
 | `Effect.delay(options?)` | `DelayOptions.delaySeconds: 0.25`, `feedback: 0.3`, `wet: 0.3`, `dry: 1`; feedback/wet/dry are linear gains. | `time`, `feedback`, `wet` |
-| `Effect.distortion(options?)` | `DistortionOptions.amount: 0.4`, `oversample: '2x'`; waveshaper curve strength and native oversampling mode. | None |
+| `Effect.distortion(options?)` | `DistortionOptions.amount: 0.4`, `oversample: '2x'`; waveshaper curve strength and native oversampling mode. `drive: 1` linear gain into the shaper, then `wet: 1` / `dry: 0` linear gains mix the distorted and untouched signal. | `drive`, `wet`, `dry` |
 | `Effect.compressor(options?)` | `CompressorOptions`: optional `threshold`, `knee` (dB), `ratio`, `attack`, `release` (s). Omitted values retain native compressor defaults. | `threshold`, `ratio` |
 | `Effect.reverb(options?)` | `ReverbOptions.seconds: 1.8`, `decay: 2.2`, `wet: 0.28`, `dry: 0.82`; seconds/decay have a minimum of 0.1. Generates a stereo noise impulse. | `wet`, `dry` |
 | `Effect.custom(implementation)` | Factory `(context: AudioContext) => EffectNode`, or a fixed `EffectNode`. | Supplied by caller |

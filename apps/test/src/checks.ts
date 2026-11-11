@@ -6,6 +6,7 @@ import type {Check, Group} from './model';
 
 const desk = () => import('./checks/desk').then((module) => module.mountComposedDesk);
 const sharedEffectDesk = () => import('./checks/desk').then((module) => module.mountSharedEffectDesk);
+const insertTypes = () => import('./checks/desk').then((module) => module.mountInsertTypes);
 const rackParts = () => import('./checks/rack').then((module) => module.mountRackParts);
 const recorderDesk = () => import('./checks/rack').then((module) => module.mountRecorderInDesk);
 const notes = () => import('./checks/notes').then((module) => module.mountNoteRecorder);
@@ -81,6 +82,20 @@ export const CHECKS: readonly Check[] = [
     expected: [
       'Every member jumps together and resumes from the same place.',
       'Pause is silent, with no hanging notes.',
+    ],
+  },
+  {
+    id: 'A5', group: 'A', mount: insertTypes,
+    title: 'An insert panel shows its type and that type’s controls, with no explanatory text',
+    steps: [
+      'Press Play. With Insert type Distortion, turn drive up, then move wet and dry.',
+      'Choose Bitcrusher and move wet and dry; then Filter and Reverb.',
+      'Look over both panels for any sentence of explanation.',
+    ],
+    expected: [
+      'The insert panel’s heading reads the chosen type (distortion, bitcrusher, filter, reverb), never just “Effect”.',
+      'Distortion shows drive, wet and dry; bitcrusher shows wet and dry; each change is heard at once, and with dry at 0 the defaults sound as before.',
+      'Neither panel shows explanatory sentences such as the envelope note; a screen reader still reads it in the envelope section.',
     ],
   },
   {
