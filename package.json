@@ -20,7 +20,7 @@
     "check:lockfile": "node scripts/check-lockfile.mjs",
     "check:licenses": "node scripts/license-gate.mjs",
     "check:architecture": "node --test scripts/release-surface.test.mjs scripts/architecture-identifiers.test.mjs scripts/element-composition-policy.test.mjs && node scripts/check-architecture.mjs",
-    "check:docs": "node --test scripts/headless-docs-policy.test.mjs && node --experimental-strip-types --no-warnings scripts/check-docs.mjs",
+    "check:docs": "node --test scripts/headless-docs-policy.test.mjs scripts/element-docs-policy.test.mjs && node --experimental-strip-types --no-warnings scripts/check-docs.mjs",
     "check:dev-docs": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --check",
     "docs:sync": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --write",
     "check:doc-snippets": "node --test scripts/check-doc-snippets.test.mjs && node scripts/check-doc-snippets.mjs",

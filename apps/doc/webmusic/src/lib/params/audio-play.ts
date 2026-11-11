@@ -322,7 +322,7 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     tag: 'audio-effect',
     entry: ENTRY,
     params: [
-      {"name": "type", "kind": "enum", "options": ["gain", "filter", "delay", "compressor"], "fallback": "gain", "note": "Lazy recipe type; only attributes used by this recipe affect the realized insert."},
+      {"name": "type", "kind": "enum", "switch": true, "options": ["gain", "filter", "delay", "compressor"], "fallback": "gain", "note": "Lazy recipe type; only attributes used by this recipe affect the realized insert."},
       {"name": "gain", "kind": "number", "fallback": "recipe default", "note": "Finite gain setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "frequency", "kind": "number", "fallback": "recipe default", "note": "Finite frequency setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "q", "kind": "number", "fallback": "recipe default", "note": "Finite q setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},

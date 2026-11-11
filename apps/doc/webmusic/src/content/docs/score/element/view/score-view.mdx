@@ -11,7 +11,7 @@ import ScoreEditingDemo from '../../../../../components/elements/ScoreEditingDem
 
 <ScoreViewDemo />
 
-`<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface; drawing attributes for another type are retained, and ignored, until that type is shown.
+`<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface; drawing attributes for another type are retained, and ignored, until that type is shown. Use the type switch above the demo to see each surface.
 
 The view is read-only. It can [follow an editor](#follow-an-editor) and draw its current content, but it never edits notes; use [`<score-grid-view>`](/score/element/view/score-grid-view/) to edit them.
 
@@ -455,4 +455,8 @@ score-view {
 
 ## Related
 
-[Edit notes in a grid](/score/element/view/score-grid-view/) · [Current sounding pitches](/score/element/view/score-pitch-view/) · [Engraved sheet music](/score/element/view/score-sheet-view/) · [View API and renderers](/score/api/view/) · [Headless ScoreView](/score/headless/view/score-view/)
+- [`<score-grid-view>`](/score/element/view/score-grid-view/) — edit notes in a grid.
+- [`<score-pitch-view>`](/score/element/view/score-pitch-view/) — the pitches sounding now.
+- [`<score-sheet-view>`](/score/element/view/score-sheet-view/) — engraved sheet music.
+- [View API and renderers](/score/api/view/) — the renderers behind each type.
+- [Headless ScoreView](/score/headless/view/score-view/) — the model behind this element.

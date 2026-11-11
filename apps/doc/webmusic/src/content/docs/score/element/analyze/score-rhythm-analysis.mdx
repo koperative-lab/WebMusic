@@ -9,7 +9,7 @@ import AnalysisFeaturePlayground from '../../../../../components/elements/Analys
 
 <AnalysisFeaturePlayground tag="score-rhythm-analysis" />
 
-Read a note attack’s measure, grouped beat and position within that beat. Written durations stay in quarter-note units. Compound meter uses musical pulses, so 6/8 has two dotted-quarter beats rather than six equal beats.
+`<score-rhythm-analysis>` reads a note attack’s measure, grouped beat and position within that beat. Written durations stay in quarter-note units. Compound meter uses musical pulses, so 6/8 has two dotted-quarter beats rather than six equal beats.
 
 ## Import
 
@@ -141,3 +141,9 @@ Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` a
 Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
 
 </details>
+
+## Related
+
+- [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) — harmony over the same beats.
+- [`<score-view>`](/score/element/view/score-view/) — the notes the rhythm lane reads.
+- [Analysis session](/score/headless/analyze/analysis-session/) — the Headless analysis behind these lanes.

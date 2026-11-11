@@ -9,7 +9,7 @@ import AnalysisFeaturePlayground from '../../../../../components/elements/Analys
 
 <AnalysisFeaturePlayground tag="score-interval-analysis" />
 
-Read interval number, quality, direction and semitone distance for authored score notes. Spelling distinguishes C–F♯ (augmented fourth) from C–G♭ (diminished fifth), although both span six semitones. Select a lane band or supply exact note IDs for an unambiguous pair.
+`<score-interval-analysis>` reads interval number, quality, direction and semitone distance for authored score notes. Spelling distinguishes C–F♯ (augmented fourth) from C–G♭ (diminished fifth), although both span six semitones. Select a lane band or supply exact note IDs for an unambiguous pair. The switch above the demo selects `melodic`, `harmonic` or `both` kinds of interval.
 
 ## Import
 
@@ -144,3 +144,9 @@ Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` a
 Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
 
 </details>
+
+## Related
+
+- [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) — whole chords rather than intervals.
+- [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) — scale degrees of the same notes.
+- [Analysis session](/score/headless/analyze/analysis-session/) — the Headless analysis behind these lanes.

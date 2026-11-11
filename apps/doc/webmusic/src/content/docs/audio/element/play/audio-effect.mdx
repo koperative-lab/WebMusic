@@ -5,13 +5,19 @@ sidebar:
   order: 5
 ---
 
-import ModularCompositionDemo from '../../../../../components/ModularCompositionDemo.astro';
+import EffectDemo from '../../../../../components/elements/EffectDemo.astro';
 
-<ModularCompositionDemo />
+<EffectDemo tag="audio-effect" />
 
 `<audio-effect>` declares one insert in the selected module's chain. The declaration
-renders nothing; use an attached panel to edit its realized parameters. The
-shared example above includes both Score and Audio declarations on one bus.
+renders nothing; an attached `<score-synth-panel sections="effects">` edits its
+realized parameters. In the demo the effect sits inside `<audio-player>`, so it joins
+that player's own chain, and starts as a `filter`; use the type switch above the
+demo to hear each recipe replace the slot in place.
+
+A Rack desk or mixer can host the same declaration on its master bus, as the
+[modular composition](/bridge/modular-composition/) example shows with Score and
+Audio inserts on one bus.
 
 ## Import
 
@@ -102,8 +108,7 @@ effect lifetime.
 
 ## Related
 
-- [Audio recipe defaults](/audio/headless/play/effects/)
-
-- [Modular composition](/bridge/modular-composition/)
-- [Attached parameter panel](/score/element/play/score-synth-panel/)
-- [InsertChain and ownership](/kernel/api/#effect--webmusickerneleffect)
+- [Audio recipe defaults](/audio/headless/play/effects/) — every recipe and its default values.
+- [`<score-synth-panel>`](/score/element/play/score-synth-panel/) — the attached parameter panel.
+- [Modular composition](/bridge/modular-composition/) — inserts on a shared Rack bus.
+- [InsertChain and ownership](/kernel/api/#effect--webmusickerneleffect) — the chain that owns realized effects.

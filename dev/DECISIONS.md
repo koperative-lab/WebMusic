@@ -3121,7 +3121,14 @@ documentation.
 **Decision:** a Web Component demo shows the component in its default
 composition with the real controls it needs, such as its transport, keys or
 toolbar. `ElementDemo` frames it with the entry and tag; there is no Parameters
-strip, markup readout, Copy or Reset, and no structured editors. The attribute,
+strip, markup readout, Copy or Reset, and no structured editors. The one
+exception is a type switch: an element with several drawings, surfaces or
+recipes marks that attribute `switch: true` in the catalog (`type`, or an
+equivalent such as `layout`), and `ElementDemo` shows one toggle per value, so
+a reader can see every variant without the reference tables. Every Web
+Component page has one shape: main demo, a short prose introduction, Import,
+Ports and composition, topics, API, Styling and Related, checked by
+`scripts/element-docs-policy.mjs`. The attribute,
 property and event tables document configuration, and code examples show it.
 Interactive adjustment and code generation belong to the separately maintained
 component library. The parameter catalog (`src/lib/params`) stays as data for
@@ -3138,14 +3145,17 @@ markup already shown in the page's code examples.
 **Consequences:** demos that a property editor used to configure set what they
 need from their own script; the synth panel demo nests the panel and a note
 input in a player, so it edits the player's instrument. Page prose no longer
-refers to Parameters, Copy or Reset on Element pages.
+refers to Parameters, Copy or Reset on Element pages. The two effect pages use
+their own demo, an effect inside a player with an attached panel, instead of
+the shared modular-composition example, so their recipe switch is audible.
 
 **Owner:** [Visual design](design/VISUAL-DESIGN.md) §"Documentation demos",
 [Component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the
 [site plan](docs/DOCS-SITE-PLAN.md).
 
-**Verification:** the documentation tests and build; every Element page renders
-its demo without a Parameters strip, and the changed demos are checked in a
+**Verification:** the documentation tests and build, including the page-shape
+policy and its unit tests; every Element page renders its demo without a
+Parameters strip, and the changed demos and type switches are checked in a
 browser.
 
 ## Recording the next decision

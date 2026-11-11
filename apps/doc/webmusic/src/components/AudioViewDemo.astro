@@ -24,7 +24,6 @@ const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
     drag-mode="scrub"
     data-view-demo
   ></audio-view>
-  <p class="wm-demo-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
   <p role="status" class="wm-demo-status" data-view-status></p>
   </div>
 </ElementDemo>
@@ -73,27 +72,8 @@ const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
         if (scope.active && current === generation) setLoading(false);
       }
     };
-    const help = root.querySelector<HTMLElement>('[data-drag-help]');
-    const updateHelp = (): void => {
-      if (!help) return;
-      help.hidden = view.type === 'meter';
-      const enabled = (name: string, fallback = false): boolean => view.hasAttribute(name)
-        ? !/^(false|0|no|off)$/i.test(view.getAttribute(name)?.trim() ?? '') : fallback;
-      if (enabled('annotate')) help.textContent = 'Drag to create a region. Annotation takes priority over the drag mode.';
-      else if (view.getAttribute('drag-mode') === 'pan') help.textContent = enabled('scrollable', true)
-        ? 'Drag left to see later audio, or right to see earlier audio. Arrow keys move the window. Playback is unchanged; following is suspended in pan mode.'
-        : 'Panning is disabled. Enable scrollable to move this viewport.';
-      else if (!enabled('interactive')) help.textContent = 'Enable interactive for click, keyboard and seek/scrub controls.';
-      else if (view.getAttribute('drag-mode') === 'scrub') help.textContent = 'Centered scrub: drag left toward later audio, or right toward earlier audio. Decoded players scratch at your speed; release coasts in position and sound, then restores the previous playback state. Other players move position only.';
-      else if (view.getAttribute('drag-mode') === 'none') help.textContent = 'Click or use arrow keys to seek. Dragging does not move playback.';
-      else help.textContent = 'Drag or click to seek to the time under the pointer. Arrow keys seek too.';
-    };
-    updateHelp();
-    const observer = new MutationObserver((records) => {
-      updateHelp();
-      if (records.some((record) => record.attributeName === 'type' || record.attributeName === 'color-mode')) scope.run(update());
-    });
-    observer.observe(view, {attributes: true, attributeFilter: ['type', 'color-mode', 'drag-mode', 'interactive', 'annotate', 'scrollable']});
+    const observer = new MutationObserver(() => scope.run(update()));
+    observer.observe(view, {attributes: true, attributeFilter: ['type', 'color-mode']});
     scope.add(() => observer.disconnect());
     const tap = (): void => {
       if (view.type === 'meter' && player.analyser) view.type = 'meter';

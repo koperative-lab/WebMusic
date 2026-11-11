@@ -1,30 +1,52 @@
 ---
 // The demo card every Score / Audio element page uses: the house `wui-panel`
 // chrome (import entry + tag) and the live element in its default composition,
-// with the real controls it needs to be used. The page documents attributes,
-// properties and events in its reference tables; adjusting them interactively
-// and copying the resulting code is not part of the documentation site.
+// with the real controls it needs to be used. An element whose catalog marks
+// one attribute as its `switch` (its `type`, or an equivalent such as `layout`)
+// also gets one row of type buttons, so every drawing or recipe can be seen.
+// The page documents attributes, properties and events in its reference
+// tables; other adjustment and copying code belong to the component library.
 import { ELEMENT_PARAMS } from '../lib/params';
 import LiveDemoCanvas from './LiveDemoCanvas.astro';
+import { defaultType, typeLabel } from './element-demo-types';
 
 interface Props {
   /** Catalog key — the custom element tag. */
   tag: string;
   /** Extra class on the panel, for demo-specific element styling. */
   class?: string;
+  /**
+   * Show the catalog's type switch (default). A topic demo, which shows one
+   * behavior of a page whose main demo already switches, passes false.
+   */
+  typeSwitch?: boolean;
 }
 
-const {tag, class: extraClass = ''} = Astro.props;
+const {tag, class: extraClass = '', typeSwitch = true} = Astro.props;
 
 const spec = ELEMENT_PARAMS[tag];
 if (!spec) throw new Error(`<ElementDemo tag="${tag}"> has no entry in src/lib/params`);
+const types = typeSwitch ? spec.params.find((param) => param.switch) : undefined;
+const options = types?.options ?? [];
+const fallback = types ? defaultType(options, types.fallback) : undefined;
 ---
 
-<div class={`wui-panel wui-panel--flow not-content wm-pg ${extraClass}`.trim()} data-wm-pg>
+<div class={`wui-panel wui-panel--flow not-content wm-pg ${extraClass}`.trim()} data-wm-pg data-pg-tag={tag}>
   <div class="wui-panel__title">
     <span>{spec.entry}</span>
     <strong>{`<${tag}>`}</strong>
   </div>
+
+  {types && (
+    <div class="wm-pg__types" role="group" aria-label={`${types.name} attribute`} data-pg-types={types.name} data-pg-default={fallback}>
+      <span class="wm-pg__types-name" aria-hidden="true">{types.name}</span>
+      <div class="wui-seg wm-pg__types-seg">
+        {options.map((option) => (
+          <button type="button" class="wui-btn" data-role="toggle" data-on={String(option === fallback)} aria-pressed={option === fallback ? 'true' : 'false'} data-value={option}>{typeLabel(option)}</button>
+        ))}
+      </div>
+    </div>
+  )}
 
   <LiveDemoCanvas>
     <div class="wm-pg__stage" data-pg-stage>
@@ -32,3 +54,9 @@ if (!spec) throw new Error(`<ElementDemo tag="${tag}"> has no entry in src/lib/p
     </div>
   </LiveDemoCanvas>
 </div>
+
+<script>
+  import {mountDemos} from './demo-lifecycle';
+  import {bindTypeSwitch} from './element-demo-types';
+  mountDemos('[data-pg-types]', bindTypeSwitch);
+</script>

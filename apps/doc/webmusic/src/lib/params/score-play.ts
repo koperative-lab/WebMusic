@@ -224,6 +224,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         name: 'layout',
         kind: 'enum',
         options: ['piano', 'grid', 'chords'],
+        switch: true,
         fallback: 'piano',
         note: 'Which surface renders. An unrecognised value falls back to piano; every change releases the held notes first.',
       },
@@ -387,7 +388,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     tag: 'score-effect',
     entry: ENTRY,
     params: [
-      {"name": "type", "kind": "enum", "options": ["gain", "panner", "filter", "delay", "reverb", "compressor", "limiter", "tremolo", "chorus", "distortion", "bitcrusher"], "fallback": "gain", "note": "Lazy recipe type; only attributes used by this recipe affect the realized insert."},
+      {"name": "type", "kind": "enum", "switch": true, "options": ["gain", "panner", "filter", "delay", "reverb", "compressor", "limiter", "tremolo", "chorus", "distortion", "bitcrusher"], "fallback": "gain", "note": "Lazy recipe type; only attributes used by this recipe affect the realized insert."},
       {"name": "gain", "kind": "number", "fallback": "recipe default", "note": "Finite gain setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "pan", "kind": "number", "fallback": "recipe default", "note": "Finite pan setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},
       {"name": "frequency", "kind": "number", "fallback": "recipe default", "note": "Finite frequency setting for the selected recipe; changing a declaration replaces this slot while preserving other inserts."},

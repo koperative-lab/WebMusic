@@ -1,41 +1,21 @@
 ---
-// Canonical demo pattern: drop the tag and register it. The recorder captures
-// the microphone, so it only does anything after the browser grants mic
-// permission — we never auto-start it. A small listener logs the captured clip's
-// duration when a take finishes.
-//
-// Three of the attributes shape the getUserMedia constraints for the NEXT take
-// and the fourth needs a finished take, so on a page whose reader may never
-// grant the microphone they are wired but silent. `max-seconds` is not: the
-// status line shows the pending limit with no permission at all.
+// The recorder in its default composition: a player session and the recorder
+// bound to it. It captures the microphone, so it does nothing until the reader
+// presses Record and the browser grants permission; it never auto-starts.
 import ElementDemo from './ElementDemo.astro';
 import AudioPlayStage from './AudioPlayStage.astro';
-
-const MIC = 'shapes the getUserMedia request for the next take — invisible until you grant microphone permission and record';
-
 ---
 
 <ElementDemo tag="audio-recorder" class="wa-demo">
   <AudioPlayStage>
     <audio-player id="recorder-session"></audio-player>
     <audio-recorder input="#recorder-session" id="wa-recorder-demo"></audio-recorder>
-    <p class="wm-demo-help">Press Record to start; press again to stop. Needs microphone permission.</p>
   </AudioPlayStage>
 </ElementDemo>
 
 <script>
   import { defineAudioRecorderElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
-  import type { AudioRecorderRecordedDetail } from '@webmusic/audio/play/element';
 
   defineAudioPlayerElement();
   defineAudioRecorderElement();
-
-  const el = document.getElementById('wa-recorder-demo');
-  el?.addEventListener('webaudio:recorded', ((event: CustomEvent<AudioRecorderRecordedDetail>) => {
-    const clip = event.detail?.clip;
-    if (clip) console.log('[audio-recorder demo] captured', clip.duration, 's');
-  }) as EventListener);
 </script>
-
-<style>
-</style>

@@ -9,7 +9,7 @@ import AnalysisFeaturePlayground from '../../../../../components/elements/Analys
 
 <AnalysisFeaturePlayground tag="score-scale-analysis" />
 
-Choose a tonic and a textbook scale, then inspect each note’s degree and alteration against that reference. This tool does not estimate a key. Altered degrees describe the supplied spelling and are not labeled musical errors.
+`<score-scale-analysis>` takes a tonic and a textbook scale, then reads each note’s degree and alteration against that reference. This tool does not estimate a key. Altered degrees describe the supplied spelling and are not labeled musical errors.
 
 ## Import
 
@@ -147,3 +147,9 @@ Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` a
 Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
 
 </details>
+
+## Related
+
+- [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) — chords within the scale.
+- [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) — intervals between the same notes.
+- [Analysis session](/score/headless/analyze/analysis-session/) — the Headless analysis behind these lanes.

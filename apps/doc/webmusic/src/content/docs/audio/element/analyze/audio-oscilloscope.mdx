@@ -9,7 +9,7 @@ import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/Au
 
 <AudioAnalyzeFeaturePlayground tag="audio-oscilloscope" />
 
-The oscilloscope inspects the most recent time-domain window from a live
+`<audio-oscilloscope>` inspects the most recent time-domain window from a live
 signal. Adjust the trigger edge and level, narrow the timebase, freeze a frame,
 and probe its time and linear sample amplitude. Unlike the scrolling
 [`<audio-live-view>`](/audio/element/view/audio-live-view/), it is a short-window
@@ -152,3 +152,9 @@ horizontal controls. Canvas foreground and muted colors follow the presenter
 tokens; its transparent clear preserves the configured plot background.
 
 </details>
+
+## Related
+
+- [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) — the same signal in the frequency domain.
+- [`<audio-meter>`](/audio/element/analyze/audio-meter/) — its oscilloscope type alongside six other displays.
+- [`RealtimeAnalyzer`](/audio/headless/analyze/realtime-analyzer/) — the Headless analyzer behind live readouts.

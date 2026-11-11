@@ -210,6 +210,7 @@ describe('agent context release and output contracts', () => {
       const page = pages.files.get(`agent-context/${route}.md`);
       expect(page).toContain(`[Interactive example on the documentation page](https://docs.example.test/WebMusic/${route}/)`);
       expect(page).not.toContain('<ModularCompositionDemo');
+      expect(page).not.toContain('<EffectDemo');
       expect(page).not.toContain('<ModularModulationDemo');
       expect(page).not.toContain('<ModularProjectDemo');
     }

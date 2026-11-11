@@ -20,29 +20,6 @@ For several Rack members, nest a [`<score-rack-control>`](/score/element/play/sc
 desk with nonvisual `<score-rack-part>` declarations inside this player. Applications
 that already own an engine can use [the borrowed controller mode](#four-ways-to-drive-it).
 
-## Add an effect chain
-
-Reverb, a three-band equalizer, filters, delay, chorus, compression and distortion are public `Effect` recipes; an equalizer is three peaking filters. Effects in a chain run in order.
-
-An effect is an object graph, not an HTML attribute, so assign it to the real `.effect` property from JavaScript. Assigning a new chain updates the realized compatibility insert; explicit declaration slots remain in place. Assigning `undefined` returns to dry output.
-
-That property belongs to the element's single-score mode. When `.rack` is the
-active source (including a nested `<score-rack-control>` composition), the Rack owns
-the shared audio graph; put the chain on `rack.effect` or
-`rackControl.effect` instead, with the same `Effect.chain(...)` recipes on its
-summed master bus.
-
-```js
-import { Effect } from '@webmusic/score/play/headless';
-
-/** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */
-const player = document.querySelector('score-player');
-if (player) player.effect = Effect.chain(
-  Effect.reverb({ wet: 0.28, dry: 0.82 }),
-  Effect.filter({ type: 'peaking', frequency: 1000, gain: 3, Q: 0.9 }),
-);
-```
-
 ## Import
 
 ```html
@@ -124,6 +101,29 @@ Closed contexts, context/destination mismatches and conflicts with a prepared
 borrowed provider reject before replacing the current configuration. If a
 destination belongs to the previous context, clear it before assigning a new
 context. Borrowed contexts and destination nodes remain caller-owned.
+
+## Add an effect chain
+
+Reverb, a three-band equalizer, filters, delay, chorus, compression and distortion are public `Effect` recipes; an equalizer is three peaking filters. Effects in a chain run in order.
+
+An effect is an object graph, not an HTML attribute, so assign it to the real `.effect` property from JavaScript. Assigning a new chain updates the realized compatibility insert; explicit declaration slots remain in place. Assigning `undefined` returns to dry output.
+
+That property belongs to the element's single-score mode. When `.rack` is the
+active source (including a nested `<score-rack-control>` composition), the Rack owns
+the shared audio graph; put the chain on `rack.effect` or
+`rackControl.effect` instead, with the same `Effect.chain(...)` recipes on its
+summed master bus.
+
+```js
+import { Effect } from '@webmusic/score/play/headless';
+
+/** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */
+const player = document.querySelector('score-player');
+if (player) player.effect = Effect.chain(
+  Effect.reverb({ wet: 0.28, dry: 0.82 }),
+  Effect.filter({ type: 'peaking', frequency: 1000, gain: 3, Q: 0.9 }),
+);
+```
 
 ## Four ways to drive it
 
@@ -431,3 +431,10 @@ score-player {
 | — | `--wm-transport-radius` → `--wm-control-radius` | `0` | Corner radius. There is no `--webscore-play-*` name for it: rounding is only reachable through the shared tokens. |
 
 </details>
+
+## Related
+
+- [`<score-view>`](/score/element/view/score-view/) — draw the score this player loads.
+- [`<score-rack-control>`](/score/element/play/score-rack-control/) — a mixing desk for several parts in one player.
+- [`<score-effect>`](/score/element/play/score-effect/) — declare an insert in markup.
+- [`ScorePlayer`](/score/headless/play/score-player/) — the Headless engine behind this element.

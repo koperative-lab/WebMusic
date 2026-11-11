@@ -28,7 +28,7 @@ const demoComponents = new Set([
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',
   'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo', 'ModularCompositionDemo', 'ModularModulationDemo', 'ModularProjectDemo', 'ScoreEditorHeadlessDemo', 'ScoreEditingDemo',
-  'ScoreGridViewDemo',
+  'ScoreGridViewDemo', 'EffectDemo',
 ]);
 const htmlElements = new Set(['details', 'summary', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'p', 'div', 'span', 'strong', 'em', 'code', 'sup', 'sub']);
 const digest = (value) => createHash('sha256').update(value).digest('hex');

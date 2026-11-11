@@ -9,7 +9,7 @@ import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/Au
 
 <AudioAnalyzeFeaturePlayground tag="audio-transient-analyzer" />
 
-The transient analyzer makes recent attacks visible while a signal sounds.
+`<audio-transient-analyzer>` makes recent attacks visible while a signal sounds.
 It compares successive frequency and RMS snapshots, shows strength against a
 sensitivity threshold, and marks accepted cues in a short history. Freeze
 holds the display; Clear starts a fresh inspection. For a decoded clip's
@@ -147,3 +147,9 @@ are not additional styling contracts. The fader also exposes `fader`; use
 icon-button height and fader thickness, and `--wm-fader-*` styles the shared horizontal fader.
 
 </details>
+
+## Related
+
+- [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/) — level rather than onsets.
+- [`<audio-view>`](/audio/element/view/audio-view/) — the waveform the onsets fall on.
+- [`RealtimeAnalyzer`](/audio/headless/analyze/realtime-analyzer/) — the Headless analyzer behind live readouts.

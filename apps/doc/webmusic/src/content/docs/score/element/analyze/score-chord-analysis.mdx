@@ -9,7 +9,7 @@ import AnalysisFeaturePlayground from '../../../../../components/elements/Analys
 
 <AnalysisFeaturePlayground tag="score-chord-analysis" />
 
-Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the input player’s held MIDI notes. The demo shows score mode. Degree labels require an explicit key and never infer harmonic function.
+`<score-chord-analysis>` inspects complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the input player’s held MIDI notes. The switch above the demo changes between `score` and `live` mode; live mode follows chords while the player plays. Degree labels require an explicit key and never infer harmonic function.
 
 ## Import
 
@@ -162,3 +162,9 @@ Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` a
 Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`; chord live mode uses `nameplate` and `symbol` in place of the lane. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
 
 </details>
+
+## Related
+
+- [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) — the scale the chords belong to.
+- [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) — intervals between single notes.
+- [Analysis session](/score/headless/analyze/analysis-session/) — the Headless analysis behind these lanes.

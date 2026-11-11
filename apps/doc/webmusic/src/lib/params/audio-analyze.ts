@@ -33,7 +33,7 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     params: [
       INPUT,
       PORT,
-      {name: 'type', kind: 'enum', options: [...METER_TYPES], fallback: 'vu — needle dial with peak and clip lamps', note: 'Select the display: VU, loudness bars, scrolling waveform, oscilloscope, spectrum, spectrogram or stereometer. The graph stays connected.'},
+      {name: 'type', kind: 'enum', options: [...METER_TYPES], switch: true, fallback: 'vu — needle dial with peak and clip lamps', note: 'Select the display: VU, loudness bars, scrolling waveform, oscilloscope, spectrum, spectrogram or stereometer. The graph stays connected.'},
       {name: 'theme', kind: 'enum', options: ['mono', 'color'], fallback: 'mono — intensity as a surface-to-ink grey ramp', note: 'mono paints sound with the page greys; color adds hue for frequency and a colormap for intensity.'},
       {name: 'size', kind: 'enum', options: ['sm', 'md', 'lg'], fallback: 'md — height up to the 144px surface tier', note: 'Preset cap for the adaptive height: the kit surface tiers of 72, 144 or 216px. Width stays fluid.'},
       {name: 'width', kind: 'text', placeholder: '320 or 20rem', fallback: 'fluid — fills the container', note: 'Explicit host width as a CSS length; a bare number is pixels.'},

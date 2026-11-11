@@ -10,7 +10,7 @@ const source = `${import.meta.env.BASE_URL}${sourcePath}`;
 const playerId = `${idPrefix}-player`;
 ---
 
-<ElementDemo tag="score-view">
+<ElementDemo tag="score-view" typeSwitch={false}>
   <section data-editing-demo data-editing-src={source} aria-label="Shared MIDI editing workflow">
     <div data-editing-composition data-pg-fragment>
       <score-player data-editing-player id={playerId} time-control="full"></score-player>

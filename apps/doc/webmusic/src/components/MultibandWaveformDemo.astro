@@ -6,7 +6,7 @@ import ElementDemo from './ElementDemo.astro';
 
 ---
 
-<ElementDemo tag="audio-view">
+<ElementDemo tag="audio-view" typeSwitch={false}>
   <div class="mm-device" data-mm>
     <audio-player id="mm-player" controls></audio-player>
     <audio-view id="mm-view" input="#mm-player" type="waveform" pixels-per-second="90" height="160" interactive drag-mode="scrub" color-mode="multiband"></audio-view>

@@ -9,35 +9,15 @@ import NoteInputDemo from '../../../../../components/NoteInputDemo.astro';
 
 <NoteInputDemo />
 
-**`<score-note-input>`** is the discrete-note performance surface. Set `layout` to pick the rendering and interaction model; all layouts share multi-touch, drag glissando, per-note reference counting, and the same output contract (`webscore:noteon` / `webscore:noteoff` + `.onNote`). Every layout also accepts the boolean `keyboard` attribute for QWERTY musical typing (see **Keyboard** below).
+`<score-note-input>` is the discrete-note performance surface. Its `layout` attribute picks the rendering and interaction model — `piano`, `grid` or `chords`; use the type switch above the demo to try each one. All layouts share multi-touch, drag glissando, per-note reference counting, and the same output contract (`webscore:noteon` / `webscore:noteoff` + `.onNote`), and each accepts the boolean `keyboard` attribute for QWERTY musical typing.
 
 Its mapping rules and layout templates are separate from DOM lifecycle and
 held-note state. In a modular composition it can play the nearest instrument
 without an application callback; the same events remain available for observation.
 
-## Live demo
-
-The demo shows the default piano layout. The same element also takes `layout="grid"`, which starts with a playable pad map, and `layout="chords"` with its default chord set.
-
 To capture a performance as a `Score`, connect this input to a
 [`<score-recorder>`](/score/element/play/score-recorder/). Its own page covers
 recording, take playback and MIDI / MusicXML export.
-
-## Piano
-
-An on-screen piano keyboard. Hold and drag across keys to glissando. Set `start` and `end` to choose its MIDI range.
-
-## Grid
-
-A **10×3 Launchpad** laid out like the physical keyboard — **Q–P**, **A–;**, **Z–/** — for triggering samples or a percussion SoundFont. Map cells with the `map` attribute (`z1=35,a1=50,…`) or assign `.pads` (`{ midi, label? }` per cell, bottom-left = index `0`); only mapped cells are playable — the rest render dimmed and ignore pointer input. Row letters are **`q`** (top), **`a`** (middle), **`z`** (bottom); columns **`1`–`10`** left to right. Add `keyboard` for QWERTY musical typing.
-
-## Chords
-
-Buttons that each trigger a **whole chord** — diatonic triads of C major by default; override with `.chords`. Notes shared between held chords are reference-counted, so overlapping presses don't cut each other off.
-
-## Keyboard
-
-Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chords — for QWERTY **musical typing**: press the **Musical typing** keyboard icon button in the surface's top bar (or click or Tab to the surface) to focus it, then `A S D F …` play white keys, `W E T Y …` black keys, **Z** / **X** shift the octave, and **Esc** blurs. Blurring releases every held note and stops listening. Enable it in the same live demo by entering a value in the **keyboard** row; clear the field to turn it off.
 
 ## Import
 
@@ -47,12 +27,6 @@ Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chord
   defineNoteInputElement();
 </script>
 <score-note-input layout="piano" start="48" end="71"></score-note-input>
-<score-note-input layout="grid"></score-note-input>
-<score-note-input layout="grid" map="z1=35,a1=50,a7=75"></score-note-input>
-<score-note-input layout="chords"></score-note-input>
-<score-note-input layout="piano" keyboard start="48" end="71"></score-note-input>
-<score-note-input layout="grid" keyboard></score-note-input>
-<score-note-input layout="chords" keyboard></score-note-input>
 ```
 
 ## Ports and composition
@@ -97,6 +71,32 @@ The existing `.onNote` callback and DOM events still fire once for observation.
 pending preparation. Set `routing="manual"` when your callback already plays an
 instrument. This prevents the same interaction from reaching both the automatic
 route and your own synth wiring. See [the shared sound example](/bridge/modular-composition/#sound-and-modulation).
+
+## Layouts
+
+### Piano
+
+An on-screen piano keyboard. Hold and drag across keys to glissando. Set `start` and `end` to choose its MIDI range.
+
+### Grid
+
+A **10×3 Launchpad** laid out like the physical keyboard — **Q–P**, **A–;**, **Z–/** — for triggering samples or a percussion SoundFont. Map cells with the `map` attribute (`z1=35,a1=50,…`) or assign `.pads` (`{ midi, label? }` per cell, bottom-left = index `0`); only mapped cells are playable — the rest render dimmed and ignore pointer input. Row letters are **`q`** (top), **`a`** (middle), **`z`** (bottom); columns **`1`–`10`** left to right. Add `keyboard` for QWERTY musical typing.
+
+```html
+<score-note-input layout="grid" map="z1=35,a1=50,a7=75"></score-note-input>
+```
+
+### Chords
+
+Buttons that each trigger a **whole chord** — diatonic triads of C major by default; override with `.chords`. Notes shared between held chords are reference-counted, so overlapping presses don't cut each other off.
+
+## Keyboard
+
+Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chords — for QWERTY **musical typing**: press the **Musical typing** keyboard icon button in the surface's top bar (or click or Tab to the surface) to focus it, then `A S D F …` play white keys, `W E T Y …` black keys, **Z** / **X** shift the octave, and **Esc** blurs. Blurring releases every held note and stops listening.
+
+```html
+<score-note-input layout="chords" keyboard></score-note-input>
+```
 
 <details class="component-section">
 <summary>API</summary>
@@ -192,3 +192,9 @@ score-note-input {
 ```
 
 </details>
+
+## Related
+
+- [`<score-recorder>`](/score/element/play/score-recorder/) — capture a performance from this input.
+- [`<score-synth-panel>`](/score/element/play/score-synth-panel/) — edit the instrument the input plays.
+- [`<score-player>`](/score/element/play/score-player/) — the player whose instrument the input borrows.

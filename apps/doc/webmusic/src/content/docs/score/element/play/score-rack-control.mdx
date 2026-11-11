@@ -10,17 +10,8 @@ import RackControlDemo from '../../../../../components/RackControlDemo.astro';
 <RackControlDemo />
 
 `<score-rack-control>` is the mixing desk for a [`Rack`](/score/headless/play/rack/): a fader per member,
-a master over them, and mute and solo on each. Write the parts inside it, wrap the whole thing in a
-player, and the composition is the markup:
-
-```html
-<score-player>                       <!-- the transport, for every part at once -->
-  <score-rack-control>                     <!-- the desk, and the rack's owner -->
-    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle"></score-rack-part>
-    <score-rack-part id="bass" src="/midi/Arabesque%20No.1.mid" sound="sawtooth"></score-rack-part>
-  </score-rack-control>
-</score-player>
-```
+a master over them, and mute and solo on each. Write the parts inside it and wrap the whole thing in a
+player; the demo mixes three parts of Arabesque No. 1 this way.
 
 A [`<score-rack-part>`](#score-rack-part) is a **declaration**, not a player: it renders nothing and owns no
 engine. A rack member is headless — a score and a sound, and the rack builds the `ScorePlayer` that
@@ -29,28 +20,6 @@ plays it — and this is how one is written down without pretending otherwise.
 The desk announces its Rack to the containing player. Its direct `<score-rack-part>`
 children supply member declarations; script can also add members to an assigned
 Rack. The Rack owns the member players and their musical state.
-
-Its attributes are about what the desk **shows**. `master`, `mute` and `solo` each add or take away a
-control, which is the only thing a mixing surface has to configure that is not already a property of
-the rack behind it. Hiding mute or solo does not grey a button out: the command is not offered to the
-mixer at all.
-
-The rack is the single source of truth. Levels, mute and solo are read back off it rather than
-mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
-change as well as a membership change, anything else driving the rack repaints this desk too.
-
-Effects on the desk use the same recipes as
-[`<score-player>`](/score/element/play/score-player/#add-an-effect-chain). Assign an
-`Effect.chain(...)` to the desk's `.effect` property: its order is signal order, from the rack's
-summed output through each effect, and it processes the master bus once rather than creating a
-separate copy for every part.
-
-A desk without resolved members shows the shared outlined-square waiting animation.
-While a child `score-rack-part` loads its score, the desk shows the four-square loading
-animation; existing channel controls remain available. A failed child load displays its
-error, and replacement or cancellation cannot leave stale loading feedback. The declaration
-itself stays nonvisual. Both animations use the shared grayscale status tokens and stop
-for reduced motion, with descriptions retained for assistive technology.
 
 ## Import
 
@@ -117,6 +86,32 @@ context: declarations become its members and an enclosing player drives it. See
   </score-rack-control>
 </score-player>
 ```
+
+## What the desk shows
+
+Its attributes are about what the desk **shows**. `master`, `mute` and `solo` each add or take away a
+control, which is the only thing a mixing surface has to configure that is not already a property of
+the rack behind it. Hiding mute or solo does not grey a button out: the command is not offered to the
+mixer at all.
+
+The rack is the single source of truth. Levels, mute and solo are read back off it rather than
+mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
+change as well as a membership change, anything else driving the rack repaints this desk too.
+
+A desk without resolved members shows the shared outlined-square waiting animation.
+While a child `score-rack-part` loads its score, the desk shows the four-square loading
+animation; existing channel controls remain available. A failed child load displays its
+error, and replacement or cancellation cannot leave stale loading feedback. The declaration
+itself stays nonvisual. Both animations use the shared grayscale status tokens and stop
+for reduced motion, with descriptions retained for assistive technology.
+
+## Master effects
+
+Effects on the desk use the same recipes as
+[`<score-player>`](/score/element/play/score-player/#add-an-effect-chain). Assign an
+`Effect.chain(...)` to the desk's `.effect` property: its order is signal order, from the rack's
+summed output through each effect, and it processes the master bus once rather than creating a
+separate copy for every part.
 
 ## `<score-rack-part>`
 
@@ -233,3 +228,10 @@ score-rack-control {
 ```
 
 </details>
+
+## Related
+
+- [`Rack`](/score/headless/play/rack/) — the Headless rack this desk mixes.
+- [`<score-player>`](/score/element/play/score-player/) — the transport that drives every part.
+- [`<score-effect>`](/score/element/play/score-effect/) — inserts on the master or a part channel.
+- [Modular composition](/bridge/modular-composition/) — score and Audio sources on one desk.

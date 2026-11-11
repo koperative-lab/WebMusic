@@ -9,7 +9,7 @@ import AudioLiveViewPlayground from '../../../../../components/elements/AudioLiv
 
 <AudioLiveViewPlayground />
 
-Draw what is being heard **right now**. The newest column sits at the right edge and history slides left, so the strip reads as "now" scrolling away.
+`<audio-live-view>` draws what is being heard **right now**. The newest column sits at the right edge and history slides left, so the strip reads as "now" scrolling away. Each column is painted as a `waveform` (default) or a `spectrogram`; use the type switch above the demo to see both.
 
 This is the capability's missing cardinality. Every other surface here draws data that already exists — a decoded clip, a peaks pyramid, a precomputed spectrogram. The only live path was [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs), which is **instantaneous**: it has no time axis at all, so nothing could show what the microphone did a second ago. This element is the only live time-axis surface in the package.
 
@@ -58,6 +58,35 @@ The node is **borrowed**. This element never creates, mutates or disposes it, so
 </audio-player>
 ```
 
+## Headless controller and binding
+
+The model behind the drawing is `LiveViewController` from `@webmusic/audio/view/headless`. It borrows
+the analyser and owns type/window configuration, capture clock, reusable byte/float scratch arrays
+and a [`LiveScrollBuffer`](/audio/api/view/) — a fixed-capacity ring covering the most recent
+`windowSeconds`. Capacity never grows, so a view that runs for hours has bounded history.
+
+```ts
+import {createLiveViewController} from '@webmusic/audio/view/headless';
+import {paintLiveProjection} from '@webmusic/audio/view/render';
+
+const live = createLiveViewController({analyser, type: 'waveform', windowSeconds: 4});
+
+function draw(frame) {
+  live.capture(frame.time);
+  paintLiveProjection(frame, live.buffer, live.type, {waveColor: '#4a9eff'});
+}
+```
+
+The `input` selector must match one element in the current Document or ShadowRoot.
+Late insertion, replacement and source readiness events refresh the borrowed analyser.
+Invalid or ambiguous selectors show an error. Disconnect releases discovery and event
+subscriptions without stopping the source. An explicit `.analyser` takes precedence over
+bound-source feedback.
+
+Changing analyser, type or window clears incompatible scratch/history state. The controller never
+schedules, mutates or disconnects the borrowed node. It is DOM-free and the painter accepts a
+structural canvas frame, so both halves are independently reusable without the Element.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -88,38 +117,6 @@ reduced-motion preferences and use the shared [Status tokens](/uikit/layout-feed
 </details>
 
 <details class="component-section">
-<summary>Headless</summary>
-
-The model behind the drawing is `LiveViewController` from `@webmusic/audio/view/headless`. It borrows
-the analyser and owns type/window configuration, capture clock, reusable byte/float scratch arrays
-and a [`LiveScrollBuffer`](/audio/api/view/) — a fixed-capacity ring covering the most recent
-`windowSeconds`. Capacity never grows, so a view that runs for hours has bounded history.
-
-```ts
-import {createLiveViewController} from '@webmusic/audio/view/headless';
-import {paintLiveProjection} from '@webmusic/audio/view/render';
-
-const live = createLiveViewController({analyser, type: 'waveform', windowSeconds: 4});
-
-function draw(frame) {
-  live.capture(frame.time);
-  paintLiveProjection(frame, live.buffer, live.type, {waveColor: '#4a9eff'});
-}
-```
-
-The `input` selector must match one element in the current Document or ShadowRoot.
-Late insertion, replacement and source readiness events refresh the borrowed analyser.
-Invalid or ambiguous selectors show an error. Disconnect releases discovery and event
-subscriptions without stopping the source. An explicit `.analyser` takes precedence over
-bound-source feedback.
-
-Changing analyser, type or window clears incompatible scratch/history state. The controller never
-schedules, mutates or disconnects the borrowed node. It is DOM-free and the painter accepts a
-structural canvas frame, so both halves are independently reusable without the Element.
-
-</details>
-
-<details class="component-section">
 <summary>Styling</summary>
 
 The `CanvasStage` root is the labelled image; its internal canvas is presentational and its status
@@ -143,3 +140,9 @@ wider columns rather than a stretched history. `CanvasStage` owns device-pixel s
 after host resize.
 
 </details>
+
+## Related
+
+- [Live projection](/audio/headless/view/live-projection/) — the Headless controller and painter behind this element.
+- [`<audio-recorder>`](/audio/element/play/audio-recorder/) — a live input this view can follow.
+- [`<audio-view>`](/audio/element/view/audio-view/) — draw decoded audio rather than a live tap.

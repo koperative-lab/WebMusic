@@ -22,77 +22,9 @@ macro presenters. Parameter descriptors, `LfoController`, `EqController` and the
 behavior behind those controls. The panel borrows its AudioContext and target callbacks;
 it creates no player or synth voice.
 
-The `sections` attribute is an ordered comma list. One element can show only the
-controls a view needs. In standalone mode, assign the following properties;
-attached mode resolves the target's capabilities as described below.
-
-| Section | Assign | What appears |
-| --- | --- | --- |
-| `sound` | `.sound` / `.params` | Grouped rotary parameters whose `apply(value)` callbacks drive your synth. |
-| `effects` | `.context` + `.effects` | Live parameters from an ordered array of `Effect` recipes. |
-| `envelope` | `.envelope`, `.ranges`, `.apply` | An accessible draggable ADSR curve. |
-| `eq` | `.context` + `.bands` | A draggable frequency-response editor and three-band Web Audio graph. |
-| `lfo` | `.lfo` + `.target` | Shape, rate, depth, phase and run controls for a borrowed modulation target. |
-| `macros` | `.macros` | Knobs that map one normalized value onto several targets. |
-
-In standalone mode, changing `sections` re-renders the visible section presenters without disposing the panel's
-`LfoController`. Reordering sections or changing only `sound`, `envelope`, `lfo` or `macros`
-does not rebuild the audio chain. In particular, hiding `lfo` leaves an already-running controller active, so
-modulation continues; showing it again presents the same shape, rate, depth and phase. Disconnecting
-the whole panel disposes the controller and stops modulation. Reconnection restores those values
-into a fresh stopped controller.
-
-When both `effects` and `eq` are active their audio is spliced into one serial chain (effects → eq)
-behind the shared `.input` / `.output`.
-
-Unconfigured sound and macro sections, and effects/EQ sections without their required
-graph configuration, show the shared outlined-square waiting animation. Assigning their
-properties replaces the indicator with the configured controls. Envelope and LFO editors
-remain immediately usable with their defaults; they do not wait for sound or a held note.
-Status descriptions remain available to assistive technology, and reduced motion uses a
-static square.
-
-## The demo
-
 The demo nests a piano `<score-note-input>` and the panel inside a `<score-player>` that loads
 Arabesque No. 1. Nested, both find the player's instrument through the module context: play the
 keyboard or the piece, and the **sound** and **envelope** sections edit that instrument live.
-
-The other sections are configured from JavaScript, as the property table below describes:
-`.sound` replaces the sound descriptor array, `.bands` rebuilds the equalizer, `.effects` assigns real
-`Effect[]` entries whose parameters the effects section then exposes, and the LFO and macro
-properties configure modulation. `sections` orders or hides modules.
-
-## Audio routing
-
-Assigning `.context` creates stable `.input` and `.output` boundary nodes. Route a synth into the
-input once and the output to a destination once. Changing `.effects`, `.bands`, or `sections` only
-replaces the internal path; it does not invalidate those external connections. When neither effects
-nor EQ is active, the boundaries are connected by a dry bypass.
-
-```js
-panel.context = context;
-synth.connect(panel.input);
-panel.output.connect(context.destination);
-
-panel.effects = [Effect.reverb(), Effect.delay()];
-// The two external connections above are still valid.
-```
-
-Effects run before EQ. Hiding `effects` or `eq` removes that module from the signal path while
-retaining its configuration for a later render.
-
-## Section state and lifetime
-
-In standalone mode, changing `sections` re-renders the visible presenters while preserving sound values, ADSR, EQ bands,
-effect parameters and macro positions. A running LFO also remains active when its section is hidden;
-showing it again restores the same shape, rate, depth and phase. Disconnecting the whole element
-tears down its audio nodes and LFO loop. Reconnecting creates a fresh stopped controller with the
-retained modulation settings.
-
-The standalone panel borrows `.context`, `.target`, descriptor callbacks and every object they close over. It
-never disposes your synth or target. It owns only the Web Audio nodes and UI presenters that it
-creates from those assignments.
 
 ## Import
 
@@ -129,6 +61,67 @@ behavior.
   <score-synth-panel sections="sound,envelope"></score-synth-panel>
 </score-player>
 ```
+
+## Sections
+
+The `sections` attribute is an ordered comma list. One element can show only the
+controls a view needs. In standalone mode, assign the following properties;
+attached mode resolves the target's capabilities as described below.
+
+| Section | Assign | What appears |
+| --- | --- | --- |
+| `sound` | `.sound` / `.params` | Grouped rotary parameters whose `apply(value)` callbacks drive your synth. |
+| `effects` | `.context` + `.effects` | Live parameters from an ordered array of `Effect` recipes. |
+| `envelope` | `.envelope`, `.ranges`, `.apply` | An accessible draggable ADSR curve. |
+| `eq` | `.context` + `.bands` | A draggable frequency-response editor and three-band Web Audio graph. |
+| `lfo` | `.lfo` + `.target` | Shape, rate, depth, phase and run controls for a borrowed modulation target. |
+| `macros` | `.macros` | Knobs that map one normalized value onto several targets. |
+
+The other sections are configured from JavaScript, as the property table below describes:
+`.sound` replaces the sound descriptor array, `.bands` rebuilds the equalizer, `.effects` assigns real
+`Effect[]` entries whose parameters the effects section then exposes, and the LFO and macro
+properties configure modulation. `sections` orders or hides modules.
+
+When both `effects` and `eq` are active their audio is spliced into one serial chain (effects → eq)
+behind the shared `.input` / `.output`.
+
+Unconfigured sound and macro sections, and effects/EQ sections without their required
+graph configuration, show the shared outlined-square waiting animation. Assigning their
+properties replaces the indicator with the configured controls. Envelope and LFO editors
+remain immediately usable with their defaults; they do not wait for sound or a held note.
+Status descriptions remain available to assistive technology, and reduced motion uses a
+static square.
+
+## Section state and lifetime
+
+In standalone mode, changing `sections` re-renders the visible presenters while preserving sound values, ADSR, EQ bands,
+effect parameters and macro positions. A running LFO also remains active when its section is hidden;
+showing it again restores the same shape, rate, depth and phase. Disconnecting the whole element
+tears down its audio nodes and LFO loop. Reconnecting creates a fresh stopped controller with the
+retained modulation settings.
+
+The standalone panel borrows `.context`, `.target`, descriptor callbacks and every object they close over. It
+never disposes your synth or target. It owns only the Web Audio nodes and UI presenters that it
+creates from those assignments.
+
+## Standalone audio routing
+
+Assigning `.context` creates stable `.input` and `.output` boundary nodes. Route a synth into the
+input once and the output to a destination once. Changing `.effects`, `.bands`, or `sections` only
+replaces the internal path; it does not invalidate those external connections. When neither effects
+nor EQ is active, the boundaries are connected by a dry bypass.
+
+```js
+panel.context = context;
+synth.connect(panel.input);
+panel.output.connect(context.destination);
+
+panel.effects = [Effect.reverb(), Effect.delay()];
+// The two external connections above are still valid.
+```
+
+Effects run before EQ. Hiding `effects` or `eq` removes that module from the signal path while
+retaining its configuration for a later render.
 
 ## Audio routing and parameter updates
 
@@ -346,3 +339,10 @@ colour. Panel border, padding and section gap can be set with `--wm-panel-border
 `--wm-panel-padding` and `--wm-panel-gap` (default `0`).
 
 </details>
+
+## Related
+
+- [`<score-player>`](/score/element/play/score-player/) — the player whose instrument an attached panel edits.
+- [`<score-note-input>`](/score/element/play/score-note-input/) — play the instrument while you shape it.
+- [`<score-effect>`](/score/element/play/score-effect/) — a realized insert the panel can target.
+- [Synth backends](/score/headless/play/sound/#synth-backends-synthpanelaudiograph) — the DOM-free graph behind the standalone panel.

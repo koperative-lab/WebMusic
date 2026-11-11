@@ -58,6 +58,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         name: 'type',
         kind: 'enum',
         options: ['piano-roll', 'staff', 'waterfall'],
+        switch: true,
         fallback: 'piano-roll',
         note: 'Which drawing is rendered; changing it disposes the old visualizer and re-renders. An unknown value (including the removed map and thumbnail) falls back to piano-roll.',
       },
@@ -294,7 +295,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
   'score-pitch-view': {
     tag: 'score-pitch-view', entry: ENTRY,
     params: [
-      {name: 'type', kind: 'enum', options: ['keyboard', 'staff', 'fretboard'], fallback: 'keyboard', note: 'One passive sounding-pitch surface; switching preserves the current held notes.'},
+      {name: 'type', kind: 'enum', options: ['keyboard', 'staff', 'fretboard'], switch: true, fallback: 'keyboard', note: 'One passive sounding-pitch surface; switching preserves the current held notes.'},
       {name: 'direction', kind: 'enum', options: ['up', 'down', 'left', 'right'], fallback: 'down', note: 'Keyboard only: key-front direction. Low pitches stay left on horizontal keyboards and bottom on vertical keyboards; set a CSS height for left/right.', when: pitchTypes('keyboard')},
       {name: 'input', kind: 'text', placeholder: '#my-player', fallback: 'follow the enclosing player or Rack part, else wait for notes', note: 'Explicit input: borrow held-note snapshots and events from one player; no score load or playback commands. An unresolved selector never falls back.'},
       {name: 'port', kind: 'text', placeholder: 'source', fallback: 'follow the input element’s own playback', note: 'Follow this named source port (a webmusic.score playback source) on the input module instead of the element; with no input, on the enclosing scope’s module. Also selects the port of an explicit .inputModule (default source).'},

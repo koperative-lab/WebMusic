@@ -20,6 +20,40 @@
   min-width: 0;
 }
 
+/* The one type switch of an Element demo: the attribute name, then one square
+   toggle per value, edge to edge. It never wraps; a long list (the effect
+   recipes) scrolls sideways without a visible scrollbar. */
+.wm-pg__types {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  margin-bottom: 0.75rem;
+}
+
+.wm-pg__types-name {
+  flex: none;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wm-pg__types-seg {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wm-pg__types-seg::-webkit-scrollbar {
+  display: none;
+}
+
+.wm-pg__types-seg .wui-btn {
+  flex: none;
+}
+
 /* Explicit demo siblings retain independent component surfaces. */
 .wm-play-composition {
   display: grid;

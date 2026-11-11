@@ -11,32 +11,19 @@ import MultibandWaveformDemo from '../../../../../components/MultibandWaveformDe
 
 <AudioViewDemo />
 
-`<audio-view>` is the Audio **projection stage** — one element that draws decoded audio onto a canvas and follows a player. The three drawings are the *same* tag with a different `type` attribute (and the matching data property). Switching `type` at runtime disposes the old visualizer and re-renders; unknown values fall back to `waveform`.
+`<audio-view>` is the Audio **projection stage** — one element that draws decoded audio onto a canvas and follows a player. Its three drawings, `waveform`, `spectrogram` and `meter`, are the *same* tag with a different `type` attribute (and the matching data property); use the type switch above the demo to see each one. Switching `type` at runtime disposes the old visualizer and re-renders; unknown values fall back to `waveform`.
 
-| `type` | Draws | Needs |
-| --- | --- | --- |
-| **`waveform`** (default) | Min/max waveform with a playhead. | `.peaks` — an `AudioPeaks` pyramid from [`computePeaks`](/audio/api/analyze/), a `peaks-src` JSON file, a `.clip` or a bound player. |
-| **`spectrogram`** | STFT magnitude heatmap (time × frequency). | `.spectrogram` — `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/). |
-| **`meter`** | Live RMS / spectrum level bars, with no time axis. | An `AnalyserNode`, tapped from the bound player. |
-
-The examples on this page share one decoded clip and peaks pyramid. The first
-waveform does not wait for a spectrogram: spectra are prepared through the
-analysis worker when a spectral mode is selected. The lower examples activate
-when they approach the viewport or receive keyboard/pointer interaction, and
-reuse their prepared data. Loading animates inside each view; failures appear
-beside the relevant demo.
-The demos start in `drag-mode="scrub"`: the playhead stays centered while the
+The demo starts in `drag-mode="scrub"`: the playhead stays centered while the
 track moves underneath. Drag left toward later audio, or right toward earlier
-audio. Their decoded player sounds the movement at your gesture speed, then
+audio. The decoded player sounds the movement at your gesture speed, then
 coasts in both position and sound before restoring its previous playing/paused
-state. `drag-mode="pan"` makes dragging move
-the viewport only.
+state. `drag-mode="pan"` makes dragging move the viewport only.
 
-The main demo authors `height="96"` and `amplitude="1.6"` for a compact, fuller
+The demo authors `height="96"` and `amplitude="1.6"` for a compact, fuller
 waveform. This fixed visual gain can crop tall peaks; it changes neither PCM nor
-playback volume.
-Switching drawing type retains the explicit height; the library defaults remain
-128 px for waveform, 256 px for spectrogram and amplitude 1.
+playback volume. Switching drawing type retains the explicit height; the
+library defaults remain 128 px for waveform, 256 px for spectrogram and
+amplitude 1.
 
 ## Import
 
@@ -84,6 +71,12 @@ to its Session. In `meter` mode the view reads the bound player's `.analyser`.
 ```
 
 ## What each drawing needs
+
+| `type` | Draws | Needs |
+| --- | --- | --- |
+| **`waveform`** (default) | Min/max waveform with a playhead. | `.peaks` — an `AudioPeaks` pyramid from [`computePeaks`](/audio/api/analyze/), a `peaks-src` JSON file, a `.clip` or a bound player. |
+| **`spectrogram`** | STFT magnitude heatmap (time × frequency). | `.spectrogram` — `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/). |
+| **`meter`** | Live RMS / spectrum level bars, with no time axis. | An `AnalyserNode`, tapped from the bound player. |
 
 **Waveform** — the default. Give it a multi-resolution `AudioPeaks` pyramid and it draws a min/max waveform; with a bound player (`input` or containment) and `interactive`, it follows the playhead and turns clicks into `webaudio:seek`. Build the peaks once from the decoded channels with [`computePeaks`](/audio/api/analyze/):
 
@@ -324,6 +317,13 @@ the view observe movement between those events.
 
 ## Loading and waiting feedback
 
+The examples on this page share one decoded clip and peaks pyramid. The first
+waveform does not wait for a spectrogram: spectra are prepared through the
+analysis worker when a spectral mode is selected. The lower examples activate
+when they approach the viewport or receive keyboard/pointer interaction, and
+reuse their prepared data. Loading animates inside each view; failures appear
+beside the relevant demo.
+
 Each `type` uses the shared `@webmusic/ui/status` presenter to distinguish pending
 work from missing input. An active `src` or `peaks-src` request shows the loading
 animation. When the selected drawing borrows its input from a player, source
@@ -386,6 +386,56 @@ disconnecting the view releases discovery and subscriptions. Events and commands
 from an older binding cannot update or seek its replacement.
 In `meter` mode, a failure while obtaining the player's analyser is visible and
 still emits `webaudio:error`; a later source or graph readiness event retries it.
+
+## Dressing the same peaks
+
+Every knob is an HTML attribute, so the *same* peaks can be dressed many ways — recolour the columns, make it taller and zoom in, give the inner canvas a dark fill, or map the colours through a palette. These four share one decoded clip:
+
+<WaveformExamplesDemo />
+
+```html
+<!-- recoloured -->
+<audio-view type="waveform" wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
+<!-- taller, zoomed in, gain-boosted -->
+<audio-view type="waveform" height="180" pixels-per-second="240" amplitude="1.3"></audio-view>
+<!-- compact, with a dark inner canvas -->
+<audio-view type="waveform" height="64" background-color="#0b0d12"></audio-view>
+<!-- colour-mapped (needs .frequencyData) -->
+<audio-view type="waveform" color-mode="colormap" color-map="magma" background-color="#000"></audio-view>
+```
+
+For frequency-tinted **multi-band** colouring, **split** stereo, channel selection (L/R/M/S) and a **history** glow, see [Colour modes](#colour-modes).
+
+## Colour modes
+
+The waveform's **shape** is always the amplitude peaks, but its **colour** can read the audio's frequency content — the `color-mode` attribute works like a multi-band meter:
+
+- **`static`** (default) — one flat colour (`wave-color` / `progress-color`).
+- **`multiband`** — each column is tinted by its spectral balance: bass → red, mids → green, treble → blue, blended additively (so a bass-and-air column reads magenta, a full-range hit reads white). `bands` sets the band count (default `3`, clamped 1–12).
+- **`colormap`** — each column's spectral centroid is mapped through `color-map` (`viridis` · `magma` · `grayscale` · `gray`).
+
+The two frequency modes need STFT data (from [`computeSpectrogram`](/audio/api/analyze/)) computed from the **same channel** as the `.peaks`. Assign it to `.frequencyData` — a first-class property — or to `.spectrogram`, which is the same payload seen from the other mode's point of view. The resolution order is `.options.frequencyData`, then `.frequencyData`, then `.spectrogram`. Two more knobs complete the meter feel: `channel-layout="split"` stacks the first two peaks channels as a stereo display (each half coloured by its own spectrum, from a `.frequencyData` array), and `history` glows a recent-history window that trails the playhead during playback. The demo below draws the left channel in `multiband`, with its spectrogram computed from the same channel:
+
+<MultibandWaveformDemo />
+
+```html
+<audio-view type="waveform" color-mode="multiband"></audio-view>
+```
+```ts
+view.peaks = computePeaks([channel], sampleRate);                 // shape
+view.frequencyData = computeSpectrogram(channel, sampleRate, {}); // colour source
+view.setAttribute('color-mode', 'multiband');                     // bass→red · mid→green · treble→blue
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `color-mode` | attribute | `multiband` or `colormap` (default `static`). |
+| `bands` | attribute | Band count for `multiband` (default `3`, clamped 1–12). |
+| `channel-layout` | attribute | `split` stacks L/R with per-channel spectra. |
+| `history` | attribute | Playhead glow window in seconds. |
+| `.frequencyData` | property | The STFT the two frequency modes read; an array colours a `split` display per channel. |
+
+Multiband mode tints columns additively; `history` dims columns outside the trailing window. All other colour knobs are the ordinary waveform paint attributes in the Styling block below.
 
 <details class="component-section">
 <summary>API</summary>
@@ -572,52 +622,9 @@ not be created) or `source-conflict`, and `data-playback-state` reports
 
 </details>
 
-## Dressing the same peaks
+## Related
 
-Every knob is an HTML attribute, so the *same* peaks can be dressed many ways — recolour the columns, make it taller and zoom in, give the inner canvas a dark fill, or map the colours through a palette. These four share one decoded clip:
-
-<WaveformExamplesDemo />
-
-```html
-<!-- recoloured -->
-<audio-view type="waveform" wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
-<!-- taller, zoomed in, gain-boosted -->
-<audio-view type="waveform" height="180" pixels-per-second="240" amplitude="1.3"></audio-view>
-<!-- compact, with a dark inner canvas -->
-<audio-view type="waveform" height="64" background-color="#0b0d12"></audio-view>
-<!-- colour-mapped (needs .frequencyData) -->
-<audio-view type="waveform" color-mode="colormap" color-map="magma" background-color="#000"></audio-view>
-```
-
-For frequency-tinted **multi-band** colouring, **split** stereo, channel selection (L/R/M/S) and a **history** glow, see [Colour modes](#colour-modes).
-
-## Colour modes
-
-The waveform's **shape** is always the amplitude peaks, but its **colour** can read the audio's frequency content — the `color-mode` attribute works like a multi-band meter:
-
-- **`static`** (default) — one flat colour (`wave-color` / `progress-color`).
-- **`multiband`** — each column is tinted by its spectral balance: bass → red, mids → green, treble → blue, blended additively (so a bass-and-air column reads magenta, a full-range hit reads white). `bands` sets the band count (default `3`, clamped 1–12).
-- **`colormap`** — each column's spectral centroid is mapped through `color-map` (`viridis` · `magma` · `grayscale` · `gray`).
-
-The two frequency modes need STFT data (from [`computeSpectrogram`](/audio/api/analyze/)) computed from the **same channel** as the `.peaks`. Assign it to `.frequencyData` — a first-class property — or to `.spectrogram`, which is the same payload seen from the other mode's point of view. The resolution order is `.options.frequencyData`, then `.frequencyData`, then `.spectrogram`. Two more knobs complete the meter feel: `channel-layout="split"` stacks the first two peaks channels as a stereo display (each half coloured by its own spectrum, from a `.frequencyData` array), and `history` glows a recent-history window that trails the playhead during playback. The demo below draws the left channel in `multiband`, with its spectrogram computed from the same channel:
-
-<MultibandWaveformDemo />
-
-```html
-<audio-view type="waveform" color-mode="multiband"></audio-view>
-```
-```ts
-view.peaks = computePeaks([channel], sampleRate);                 // shape
-view.frequencyData = computeSpectrogram(channel, sampleRate, {}); // colour source
-view.setAttribute('color-mode', 'multiband');                     // bass→red · mid→green · treble→blue
-```
-
-| Member | Kind | Description |
-| --- | --- | --- |
-| `color-mode` | attribute | `multiband` or `colormap` (default `static`). |
-| `bands` | attribute | Band count for `multiband` (default `3`, clamped 1–12). |
-| `channel-layout` | attribute | `split` stacks L/R with per-channel spectra. |
-| `history` | attribute | Playhead glow window in seconds. |
-| `.frequencyData` | property | The STFT the two frequency modes read; an array colours a `split` display per channel. |
-
-Multiband mode tints columns additively; `history` dims columns outside the trailing window. All other colour knobs are the ordinary waveform paint attributes in the Styling block above.
+- [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) — the editable clip timeline.
+- [`<audio-live-view>`](/audio/element/view/audio-live-view/) — a scrolling view of live input.
+- [`<audio-player>`](/audio/element/play/audio-player/) — the player this view follows.
+- [Audio Analyze API](/audio/api/analyze/) — `computePeaks` and `computeSpectrogram`.

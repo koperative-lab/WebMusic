@@ -9,7 +9,7 @@ import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/Au
 
 <AudioAnalyzeFeaturePlayground tag="audio-level-analyzer" />
 
-The level analyzer is a live dynamics tool beside an
+`<audio-level-analyzer>` is a live dynamics tool beside an
 [`<audio-player>`](/audio/element/play/audio-player/). Its recent-sample display,
 peak hold and adjustable threshold help inspect the signal while it sounds.
 For offline loudness estimates over a decoded clip, use
@@ -136,3 +136,9 @@ fader. Public parts are `root surface`, `freeze`, `reset` and `threshold`; the
 slider also has `fader`, so use `[part~="threshold"]`.
 
 </details>
+
+## Related
+
+- [`<audio-meter>`](/audio/element/analyze/audio-meter/) — the drawn level, loudness and spectrum display.
+- [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/) — onsets rather than level.
+- [`RealtimeAnalyzer`](/audio/headless/analyze/realtime-analyzer/) — the Headless analyzer behind live readouts.

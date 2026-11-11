@@ -5,7 +5,7 @@
 //
 //   1. params catalog  ==  each element's `static observedAttributes`
 //   2. catalog integrity — every tag has a page, an entry and a live href
-//   3. selected element page structure, shared Score Headless leaf/demo shape and exports
+//   3. one Web Component page shape and type switch, shared Score Headless leaf/demo shape and exports
 //   4. live demo integration — every rendered demo uses LiveDemoCanvas
 //   5. plan rules — both family form inventories exist and carry no demos, dense
 //      element order, UI Kit labels mirror the catalog, root API entry coverage
@@ -21,6 +21,7 @@ import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
+import {elementDocProblems} from './element-docs-policy.mjs';
 import {requiredFeatureLayers} from './package-policy.mjs';
 import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
 import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
@@ -241,24 +242,25 @@ function checkElementPages(files, paramsCatalog) {
     }
     const title = frontmatter(source).title;
     if (title !== `'<${tag}>'`) fail('page', `${page}: title is ${title}, expected '<${tag}>'`);
+  }
+}
 
-    const playgrounds = source.match(/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b[^>]*\/>/gm) ?? [];
-    if (playgrounds.length === 0) fail('page', `${page}: no live demo`);
-
-    // Element pages lead with the real demo. Strip only non-rendered preamble;
-    // fenced examples, prose, headings and notices must not precede the stage.
-    const body = source
-      .replace(/^---\r?\n[\s\S]*?\r?\n---/, '')
-      .replace(/<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/g, '')
-      .replace(/^\s*import\s+(?:[\w\s{},*]+\s+from\s+)?['"][^'"\r\n]+['"];?[ \t]*(?:\r?\n|$)/gm, '')
-      .trimStart();
-    if (!/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b/.test(body)) {
-      fail('page', `${page}: the main demo must be the first visible body content, before introduction and headings`);
-    }
-
-    for (const section of ['API', 'Styling']) {
-      if (!source.includes(`<summary>${section}</summary>`)) {
-        fail('page', `${page}: missing the ${section} <details> block`);
+/**
+ * The catalog's `switch` marks the one attribute an Element demo offers as its
+ * type switch. It must be an enum with at least two values whose fallback names
+ * the value an absent attribute resolves to, so the switch starts pressed on
+ * the drawing the element actually shows.
+ */
+async function checkTypeSwitches(catalog) {
+  const {defaultType} = await load('apps/doc/webmusic/src/components/element-demo-types.ts');
+  for (const [tag, spec] of Object.entries(catalog)) {
+    const switches = spec.params.filter((param) => param.switch);
+    if (switches.length > 1) fail('params', `<${tag}> marks ${switches.length} switch attributes; at most one`);
+    for (const param of switches) {
+      if (param.kind !== 'enum' || (param.options?.length ?? 0) < 2) {
+        fail('params', `<${tag}> ${param.name}: a switch must be an enum with at least two options`);
+      } else if (!defaultType(param.options, param.fallback)) {
+        fail('params', `<${tag}> ${param.name}: the fallback must start with the default option`);
       }
     }
   }
@@ -753,6 +755,12 @@ const paramsCatalog = await checkParams(sources);
 const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
+for (const message of elementDocProblems({
+  pages: files.filter((file) => /\/(?:score|audio)\/element\//.test(file)).map((file) => ({file, source: read(file)})),
+  readFile: read,
+  frameFile: 'apps/doc/webmusic/src/components/ElementDemo.astro',
+})) fail('page', message);
+await checkTypeSwitches(paramsCatalog);
 for (const message of headlessDocProblems({
   pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file === `${DOCS}/audio/headless/view/audio-clip-editor.mdx`).map((file) => ({file, source: read(file)})),
   readFile: read,

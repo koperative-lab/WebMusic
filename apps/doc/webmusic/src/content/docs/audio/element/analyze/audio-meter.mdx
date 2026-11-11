@@ -13,7 +13,8 @@ import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/Au
 signal. One tag draws one of seven displays, chosen with `type`, beside an
 [`<audio-player>`](/audio/element/play/audio-player/): a needle VU dial,
 loudness bars, a scrolling waveform, a triggered oscilloscope, a spectrum, a
-scrolling spectrogram or a stereometer. Every display is a square-cornered
+scrolling spectrogram or a stereometer; use the type switch above the demo
+to see each one. Every display is a square-cornered
 canvas drawn in the page's own greys; `theme="color"` adds hue for frequency
 and a colormap for intensity. For sampled dBFS history, a peak threshold and
 freeze, choose
@@ -288,3 +289,9 @@ audio-meter {
 ```
 
 </details>
+
+## Related
+
+- [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/) — level readouts without a drawing.
+- [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) — a dedicated spectrum surface.
+- [Audio meter model](/audio/headless/view/audio-meter/) — the Headless meter behind the drawings.

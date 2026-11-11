@@ -9,7 +9,7 @@ import PitchViewPlayground from '../../../../../components/elements/PitchViewPla
 
 <PitchViewPlayground />
 
-`<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources.
+`<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources. Use the type switch above the demo to see each one while the piece plays.
 
 Without a resolved input, the view shows the shared outlined-square waiting
 animation. A native source that is loading shows the four-square loading animation;
@@ -217,4 +217,7 @@ ancestor to give a player, score view and keyboard the same border color.
 
 ## Related
 
-[Whole-score views](/score/element/view/score-view/) · [Engraving](/score/element/view/score-sheet-view/) · [Headless PitchView](/score/headless/view/pitch-view/) · [Analyze composition](/score/element/#compose-a-performance)
+- [`<score-view>`](/score/element/view/score-view/) — whole-score drawings over time.
+- [`<score-sheet-view>`](/score/element/view/score-sheet-view/) — engraved sheet music.
+- [Headless PitchView](/score/headless/view/pitch-view/) — the model behind this element.
+- [Analyze composition](/score/element/#compose-a-performance) — pitch views beside analysis lanes.

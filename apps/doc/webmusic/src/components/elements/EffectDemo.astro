@@ -1,0 +1,50 @@
+---
+// One insert declaration in its smallest audible composition: a player whose
+// own chain the effect joins by containment, and the attached panel that edits
+// the realized instance. The type switch replaces the recipe in place.
+import ElementDemo from '../ElementDemo.astro';
+import ElementComposition from '../ElementComposition.astro';
+
+interface Props { tag: 'score-effect' | 'audio-effect'; }
+const {tag} = Astro.props;
+const id = `pg-${tag}`;
+const MIDI = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+const WAV = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<ElementDemo tag={tag}>
+  <div data-effect-demo>
+    <ElementComposition>
+      {tag === 'score-effect' && (
+        <score-player src={MIDI}>
+          <score-effect id={id} type="reverb" seconds="2" wet="0.35" dry="1"></score-effect>
+        </score-player>
+      )}
+      {tag === 'audio-effect' && (
+        <audio-player src={WAV} controls>
+          <audio-effect id={id} type="filter" frequency="1200" q="0.7"></audio-effect>
+        </audio-player>
+      )}
+      <score-synth-panel target={`#${id}`} sections="effects"></score-synth-panel>
+    </ElementComposition>
+  </div>
+</ElementDemo>
+
+<script>
+  import {defineScorePlayerElement, defineScoreEffectElement, defineSynthPanelElement} from '@webmusic/score/play/element';
+  import {defineAudioPlayerElement, defineAudioEffectElement} from '@webmusic/audio/play/element';
+  import {mountDemos} from '../demo-lifecycle';
+
+  defineScorePlayerElement();
+  defineScoreEffectElement();
+  defineSynthPanelElement();
+  defineAudioPlayerElement();
+  defineAudioEffectElement();
+
+  mountDemos('[data-effect-demo]', (root, scope) => {
+    scope.add(() => {
+      // Page hide may retain connected DOM; stop the owning player explicitly.
+      for (const player of root.querySelectorAll<HTMLElement & {stop?: () => void}>('score-player, audio-player')) player.stop?.();
+    });
+  });
+</script>

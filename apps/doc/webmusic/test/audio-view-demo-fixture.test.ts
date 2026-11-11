@@ -155,7 +155,7 @@ function runDemo(name: string): void {
 
 describe('actual Audio View demo wiring', () => {
   it('shows initial peaks without spectral work, then ignores superseded spectral completion', async () => {
-    document.body.innerHTML = '<div data-wm-pg><div data-audio-view-demo><audio-player></audio-player><audio-view type="waveform" interactive drag-mode="scrub"></audio-view><p data-drag-help></p><p data-view-status></p></div></div>';
+    document.body.innerHTML = '<div data-wm-pg><div data-audio-view-demo><audio-player></audio-player><audio-view type="waveform" interactive drag-mode="scrub"></audio-view><p data-view-status></p></div></div>';
     const view = document.querySelector('audio-view')! as HTMLElement & {type: string; peaks?: unknown; spectrogram?: unknown; loading: boolean};
     Object.defineProperty(view, 'type', {get: () => view.getAttribute('type'), set: (value) => view.setAttribute('type', value)});
     const player = document.querySelector('audio-player')! as HTMLElement & {stop(): void; clip?: unknown; loading: boolean};
@@ -171,17 +171,9 @@ describe('actual Audio View demo wiring', () => {
     expect(player.clip).toBe(clip);
     expect(mocks.analyze).toHaveBeenCalledOnce();
     expect(mocks.analyze.mock.calls[0][1].tasks).toEqual(['peaks']);
-    const help = document.querySelector<HTMLElement>('[data-drag-help]')!;
-    expect(help.textContent).toContain('left toward later audio');
     view.setAttribute('drag-mode', 'pan');
-    await flush();
-    expect(help.textContent).toContain('Playback is unchanged');
-    view.setAttribute('scrollable', 'false');
-    await flush();
-    expect(help.textContent).toContain('Panning is disabled');
     view.setAttribute('annotate', '');
     await flush();
-    expect(help.textContent).toContain('Annotation takes priority');
     expect(mocks.analyze).toHaveBeenCalledOnce();
     view.removeAttribute('annotate');
     let resolve!: (value: unknown) => void;

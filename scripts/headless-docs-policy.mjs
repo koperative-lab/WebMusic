@@ -4,7 +4,7 @@ import {dirname, join} from 'node:path';
 // literal relative default Astro imports and rendered component names. Ignore
 // fenced examples and comments so a copied skeleton cannot satisfy the policy.
 const blank = (text) => text.replace(/[^\n]/g, ' ');
-function prose(source) {
+export function prose(source) {
   let fence;
   return source.split('\n').map((line) => {
     const match = /^\s*(`{3,}|~{3,})/.exec(line);
@@ -17,12 +17,12 @@ function prose(source) {
   }).join('\n').replace(/<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/g, blank);
 }
 
-function imports(source) {
+export function imports(source) {
   return [...source.matchAll(/\bimport\s+([A-Z][A-Za-z0-9]*)\s+from\s+['"](\.[^'"]*\.astro)['"]/g)]
     .map((match) => ({name: match[1], specifier: match[2]}));
 }
 
-function markup(source) {
+export function markup(source) {
   return source.replace(/^---\r?\n[\s\S]*?\r?\n---/, blank)
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, blank);
 }

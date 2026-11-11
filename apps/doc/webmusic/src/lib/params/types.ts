@@ -58,6 +58,13 @@ export interface ParamSpec {
    * not provide. The control is still wired; the flag is an honesty marker.
    */
   readonly inert?: string;
+  /**
+   * This enum selects the element's drawing, surface or recipe — its `type`,
+   * or an equivalent such as `layout`. `<ElementDemo>` renders its options as
+   * the demo's one type switch, so readers can see every variant. At most one
+   * attribute per element sets it.
+   */
+  readonly switch?: true;
   /** Show this row only for these values; hidden rows retain their attributes. */
   readonly when?: {
     readonly attribute: string;
