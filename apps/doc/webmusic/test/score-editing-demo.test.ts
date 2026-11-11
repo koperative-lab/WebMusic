@@ -52,7 +52,6 @@ async function mount(initial: 'ready' | 'pending' = 'ready') {
     '@webmusic/score/view/element': {defineScoreGridViewElement() {}, defineScoreViewElement() {}},
     '@webmusic/score/view/headless': headless,
     '@webmusic/score/io': io,
-    '../playground-client': {PLAYGROUND_RESET_EVENT: 'webmusic:playground-reset'},
     '../demo-lifecycle': {mountDemos: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void) => registrations.push(mountDemos(selector, setup))},
   };
   new Function('require', 'exports', code)((name: string) => {
@@ -154,22 +153,6 @@ describe('Score editing workflow demo', () => {
     expect(headless.createScoreEditor).not.toHaveBeenCalled();
     expect(player.editor).toBe(reloaded);
     expect(first.dispose).toHaveBeenCalledOnce();
-  });
-
-  it('invalidates imports at Reset and reports a failed restore while keeping the current editor', async () => {
-    const {first, headless, player, io, choose, result} = await mount();
-    const bytes = deferred<ArrayBuffer>();
-    let rejectReload!: (error: unknown) => void;
-    headless.loadScoreEditor.mockReturnValueOnce(new Promise((_yes, no) => {rejectReload = no;}));
-    choose({size: 4, name: 'selected.mid', arrayBuffer: () => bytes.promise});
-    document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset'));
-    bytes.resolve(new ArrayBuffer(4)); await flush();
-    expect(io.loadScore).not.toHaveBeenCalled();
-    expect(result.textContent).toBe('Reloading the configured source.');
-    rejectReload(new Error('download failed')); await flush();
-    expect(result.textContent).toBe('Error: download failed');
-    expect(player.editor).toBe(first);
-    expect(first.dispose).not.toHaveBeenCalled();
   });
 
   it('checks the input limit before reading a selected file', async () => {

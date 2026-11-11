@@ -36,9 +36,8 @@ describe('Audio Analyze live-tool demos', () => {
     expect(page).toContain(`<${tag} input="#session"`);
   });
 
-  it('copies the complete player/companion composition and registers real tags', () => {
+  it('shows the complete player/companion composition and registers real tags', () => {
     const demo = read('src/components/elements/AudioAnalyzeFeaturePlayground.astro');
-    expect(demo).toContain('markup="[data-demo-composition]"');
     expect(demo).toContain('<ElementComposition>');
     expect(demo.match(/<audio-player\b/g)).toHaveLength(1);
     for (const tag of tags) expect(demo).toContain(`<${tag} input={`);

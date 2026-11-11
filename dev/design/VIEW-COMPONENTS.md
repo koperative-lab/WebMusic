@@ -144,9 +144,8 @@ Each instance mounts only its selected surface. Passive Elements have no type
 switch, settings toolbar, extra keyboard or embedded player. The editable grid's
 toolbar appears only while editing and offers only the features its `tools`
 attribute lists; it provides local musical input and accessible numeric alternatives; custom UI may
-use the same Headless controllers without the supplied controls. Parameters belongs to the
-documentation/application and shows the options relevant to the selected type.
-Changing type preserves other attribute values, so returning to it restores its
+use the same Headless controllers without the supplied controls. Type selection belongs to the
+application. Changing type preserves other attribute values, so returning to it restores its
 configuration. Copy includes the player connection; Reset restores the initial
 attributes of both displayed elements.
 
@@ -229,7 +228,7 @@ DEC-056; their Headless/API/render helpers remain available.
 - Verify staff annotations default off in the Element, explicit opt-in and
   property precedence, while imperative renderer defaults remain unchanged.
 - Verify all types at narrow and wide widths, two simultaneous instances,
-  keyboard interaction, type-specific Parameters, Copy and Reset.
+  keyboard interaction and type switching.
 
 Owning references: [View overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view),
 [player binding](PLAYER-BINDING.md), and [component design template](COMPONENT-DESIGN.md).

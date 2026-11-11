@@ -1,5 +1,5 @@
 ---
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 import ElementComposition from '../ElementComposition.astro';
 
 interface Props {
@@ -11,11 +11,7 @@ const playerId = `pg-${tag}-player`;
 const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
 ---
 
-<ElementPlayground
-  tag={tag}
-  markup="[data-demo-composition]"
-  companions={[{tag: 'audio-player', target: `#${playerId}`}]}
->
+<ElementDemo tag={tag}>
   <ElementComposition>
     <audio-player id={playerId} src={SRC} controls></audio-player>
     {tag === 'audio-meter' && <audio-meter input={`#${playerId}`}></audio-meter>}
@@ -24,7 +20,7 @@ const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
     {tag === 'audio-oscilloscope' && <audio-oscilloscope input={`#${playerId}`}></audio-oscilloscope>}
     {tag === 'audio-transient-analyzer' && <audio-transient-analyzer input={`#${playerId}`}></audio-transient-analyzer>}
   </ElementComposition>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineAudioPlayerElement} from '@webmusic/audio/play/element';

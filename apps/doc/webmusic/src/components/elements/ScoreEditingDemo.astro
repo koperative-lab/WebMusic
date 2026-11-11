@@ -1,5 +1,5 @@
 ---
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 import './editing-import.css';
 interface Props {
   sourcePath?: string;
@@ -10,8 +10,7 @@ const source = `${import.meta.env.BASE_URL}${sourcePath}`;
 const playerId = `${idPrefix}-player`;
 ---
 
-<ElementPlayground tag="score-view" target="[data-editing-staff]" markup="[data-editing-composition]"
-  companions={[{tag: 'score-grid-view', target: '[data-editing-grid]'}, {tag: 'score-player', target: '[data-editing-player]'}]}>
+<ElementDemo tag="score-view">
   <section data-editing-demo data-editing-src={source} aria-label="Shared MIDI editing workflow">
     <div data-editing-composition data-pg-fragment>
       <score-player data-editing-player id={playerId} time-control="full"></score-player>
@@ -26,7 +25,7 @@ const playerId = `${idPrefix}-player`;
     </div>
     <p data-editing-result aria-live="polite">Edit notes in the grid, then press Play to hear the committed version. The read-only staff follows the same document.</p>
   </section>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineScoreGridViewElement, defineScoreViewElement, type ScoreGridViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
@@ -34,7 +33,6 @@ const playerId = `${idPrefix}-player`;
   import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
   import {loadScore, serializeMIDI, assertScoreInputByteLength, DEFAULT_LOAD_SCORE_LIMITS} from '@webmusic/score/io';
   import {mountDemos} from '../demo-lifecycle';
-  import {PLAYGROUND_RESET_EVENT} from '../playground-client';
   defineScorePlayerElement(); defineScoreGridViewElement(); defineScoreViewElement();
   mountDemos('[data-editing-demo]', (root, scope) => {
     // The demo owns one editor at a time. The player, the editable grid and the
@@ -173,10 +171,6 @@ const playerId = `${idPrefix}-player`;
       }
     };
     scope.listen(root.querySelector('[data-editing-restore]')!, 'click', restore);
-    scope.listen(root.closest('[data-wm-pg]')!, PLAYGROUND_RESET_EVENT, () => {
-      invalidateLoad();
-      queueMicrotask(() => { if (scope.active) scope.run(restore()); });
-    });
     scope.add(() => {
       invalidateLoad(); generation += 1; stop?.(); stop = undefined;
       const owned = editor; editor = undefined;

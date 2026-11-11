@@ -148,7 +148,7 @@ clock and DOM contract tests.
 
 Transport actions, mixer actions, live note gestures and recorder actions are
 each the primary interaction of their own component. Layout/section/display
-configuration belongs in external Parameters or application code. There is no
+configuration belongs in application code. There is no
 new all-in-one control panel or duplicate settings toolbar in this pass.
 UIKit owns presenter layout, focus and disabled feedback. Note keys and grid
 cells retain a minimum operating size inside a local scroll viewport; chord
@@ -164,12 +164,10 @@ feedback alongside its existing transport geometry. Synth Panel delegates its
 section structure to UIKit rather than duplicating panel layout. No new tag is
 needed for these shared presentation improvements.
 
-The docs use a neutral composition wrapper for separately reusable elements.
-Parameters track note layout applicability, Rack member edits retain a stable
-target after renaming, and Reset removes added members. The Synth Panel demo
-supplies real descriptors and routes for all selectable sections, with app-owned
-audio cleanup. Its oscillator backend applies attack/release; the envelope's
-decay/sustain controls remain editor state in this demo.
+The docs use a neutral composition wrapper for separately reusable elements and
+show each in its default composition (DEC-071). The Synth Panel demo nests the
+panel and a note input in a player, so its sound and envelope sections edit the
+player's instrument.
 
 The [frontend source audit](../audits/2026-09-09/SCORE-PLAY-FRONTEND.md) distinguishes
 DOM and source checks from rendered evidence. Browser screenshots, touch hit

@@ -33,7 +33,7 @@ technology; reduced-motion preferences stop the animation.
 <score-pitch-view input="#piece" type="keyboard"></score-pitch-view>
 ```
 
-The demo contains one player and one pitch view. Change `type` in external Parameters. Type-specific rows appear only when relevant; their attribute values survive switching types. The player has its own parameter group. Copy includes both tags, and Reset restores their original attributes.
+The demo contains one player and one pitch view in its default type. Attributes that apply to one type are retained, and ignored, while another type is shown.
 
 ## Ports and composition
 
@@ -90,11 +90,9 @@ scrolling configuration. Key heights and held notes stay unchanged.
 
 The legacy `fit-to-width` attribute is still accepted when `scroll` is absent:
 `true` fits the range, while `false` enables scrolling. Explicit `scroll` always
-takes precedence. Removing both attributes restores the default fit. The
-Parameters panel offers `scroll` for new configurations and shows the legacy
-control only when that attribute is already present. The scroll control's
-`default (on/off)` choice removes `scroll` and reports the current fallback;
-explicit `on` or `off` overrides any retained legacy value.
+takes precedence. Removing both attributes restores the default fit. New
+configurations should use `scroll`. Without `scroll`, a retained legacy value
+or the default applies; an explicit `scroll` value overrides it.
 
 `follow="active"` reveals newly sounding pitches when scrolling is enabled.
 The requested follow mode stays `active` by default, but fitting does not scroll.

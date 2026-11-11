@@ -11,7 +11,7 @@ import ScoreEditingDemo from '../../../../../components/elements/ScoreEditingDem
 
 <ScoreViewDemo />
 
-`<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface. Select `type` in the demo’s external Parameters; only relevant drawing controls appear, and switching back restores their retained values.
+`<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface; drawing attributes for another type are retained, and ignored, until that type is shown.
 
 The view is read-only. It can [follow an editor](#follow-an-editor) and draw its current content, but it never edits notes; use [`<score-grid-view>`](/score/element/view/score-grid-view/) to edit them.
 
@@ -31,7 +31,7 @@ The view is read-only. It can [follow an editor](#follow-an-editor) and draw its
 
 The demo starts in staff mode with `public/mxl/Arabesque No.1.mxl`, the *Arabesque No. 1* notation source with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
 
-The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes.
+The demo contains one player and one score view.
 
 ## Ports and composition
 
@@ -70,9 +70,8 @@ annotations and reserve no space for them. These
 directions are visual and do not change playback tempo, volume or sustain.
 
 `show-annotations` affects only `type="staff"` and defaults to false. Set
-`show-annotations="false"` or omit it to keep the staff's directions hidden. The
-demo shows the **show-annotations** control only for the staff type; Copy and
-Reset include it. `.options.showAnnotations` overrides the attribute. Changing
+`show-annotations="false"` or omit it to keep the staff's directions hidden.
+`.options.showAnnotations` overrides the attribute. Changing
 this option retains the loaded score and playback position. On the other types
 the attribute is retained but has no effect.
 
@@ -314,8 +313,7 @@ borrows it and never disposes it.
 
 In this composition, a [`<score-grid-view editable>`](/score/element/view/score-grid-view/)
 edits Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) and the staff follows
-the same editor. The player auditions committed revisions. The main Parameters
-group configures the staff; the grid and player have their own groups.
+the same editor. The player auditions committed revisions.
 
 <ScoreEditingDemo />
 

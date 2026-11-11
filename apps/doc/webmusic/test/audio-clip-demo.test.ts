@@ -20,8 +20,9 @@ afterEach(() => {
 });
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(yes => {resolve = yes;});
-  return {promise, resolve};
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {resolve = yes; reject = no;});
+  return {promise, resolve, reject};
 }
 function runDemo(file: string, modules: Record<string, unknown>) {
   const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), `../src/components/${file}.astro`), 'utf8')
@@ -29,7 +30,6 @@ function runDemo(file: string, modules: Record<string, unknown>) {
   const code = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS}}).outputText;
   modules['../demo-lifecycle'] = {mountDemos: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void) =>
     registrations.push(mountDemos(selector, setup))};
-  modules['../playground-client'] = {PLAYGROUND_RESET_EVENT: 'webmusic:playground-reset'};
   new Function('require', 'exports', code)((name: string) => {
     if (!(name in modules)) throw new Error(`Unexpected import ${name}`);
     return modules[name];
@@ -89,27 +89,11 @@ describe('Audio clip editing demo', () => {
     expect(view.editor).toBe(first);
   });
 
-  it('reloads on Reset, disposing the replaced editor after both elements detach from it', async () => {
-    const {first, headless, view, player} = await mountWorkflow();
-    const next = editor();
-    headless.loadAudioClipEditor.mockResolvedValueOnce(next);
-    first.dispose.mockImplementation(() => { expect(player.editor).not.toBe(first); expect(view.editor).not.toBe(first); });
-    document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset'));
-    await flush();
-    expect(player.editor).toBe(next); expect(view.editor).toBe(next);
-    expect(first.dispose).toHaveBeenCalledOnce();
-  });
-
-  it('disposes a superseded load and reports a failed one without narration otherwise', async () => {
-    const {first, configured, headless, player, status} = await mountWorkflow('pending');
-    const options = headless.loadAudioClipEditor.mock.calls[0][1] as {signal: AbortSignal};
-    headless.loadAudioClipEditor.mockRejectedValueOnce(new Error('decode failed'));
-    document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset'));
-    await flush();
-    expect(options.signal.aborted).toBe(true);
-    configured.resolve(first); await flush();
-    expect(first.dispose).toHaveBeenCalledOnce();
+  it('reports a failed load in its one error line and lends no editor', async () => {
+    const {configured, player, view, status} = await mountWorkflow('pending');
+    configured.reject(new Error('decode failed')); await flush();
     expect(player.editor).toBeUndefined();
+    expect(view.editor).toBeUndefined();
     expect(status.hidden).toBe(false);
     expect(status.textContent).toBe('decode failed');
   });

@@ -27,9 +27,8 @@ describe('Score Analyze live-tool demos', () => {
     }
   });
 
-  it('copies one player and the selected analysis surface from the real composition', () => {
+  it('shows one player and the selected analysis surface in the real composition', () => {
     const demo = read('src/components/elements/AnalysisFeaturePlayground.astro');
-    expect(demo).toContain('markup="[data-demo-composition]"');
     expect(demo).toContain('<ElementComposition>');
     expect(demo.match(/<score-player\b/g)).toHaveLength(1);
     expect(demo).toContain('const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;');

@@ -1,20 +1,10 @@
 ---
 import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 
-const setup = `const input = document.querySelector('score-note-input');
-const recorder = document.querySelector('score-recorder');
-recorder.source = input; // capture events; keep any existing input monitoring
-// When removing this composition: recorder.source = undefined;`;
 ---
 
-<ElementPlayground
-  tag="score-recorder"
-  target="[data-sr-recorder]"
-  markup="[data-sr-composition]"
-  class="sr-demo"
-  companions={[{tag: 'score-note-input', target: '[data-sr-input]'}]}
->
+<ElementDemo tag="score-recorder" class="sr-demo">
   <div class="sr-demo__composition" data-sr-composition data-pg-fragment>
     <score-note-input
       data-sr-input
@@ -26,11 +16,7 @@ recorder.source = input; // capture events; keep any existing input monitoring
     <score-recorder data-sr-recorder bpm="120" quantize="0"></score-recorder>
   </div>
 
-  <div class="wm-pg__code-extra" slot="setup">
-    <span class="wm-pg__code-label">JavaScript setup</span>
-    <pre class="wm-pg__markup" data-pg-copy-source>{setup}</pre>
-  </div>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {

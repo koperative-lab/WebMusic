@@ -3,16 +3,13 @@
 // ships the thing making the sound: an <audio-player> next to it.
 //
 // The component follows player readiness and tap replacement through `input`.
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 
 const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
 const PLAYER_ID = 'pg-live-view-player';
 ---
 
-<ElementPlayground
-  tag="audio-live-view"
-  class="pg-live-view"
->
+<ElementDemo tag="audio-live-view" class="pg-live-view">
   <audio-player id={PLAYER_ID} src={SRC} controls></audio-player>
   <audio-live-view
     input={`#${PLAYER_ID}`}
@@ -21,7 +18,7 @@ const PLAYER_ID = 'pg-live-view-player';
     height="120"
     data-pg-live
   ></audio-live-view>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import { defineAudioPlayerElement } from '@webmusic/audio/play/element';

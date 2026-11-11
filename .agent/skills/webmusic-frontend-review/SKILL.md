@@ -1,6 +1,6 @@
 ---
 name: webmusic-frontend-review
-description: Build, review or repair any visible WebMusic UI — presenters, Element surfaces, toolbars, popups, live-demo Parameters — to the required visual design, with responsive sizing, UIKit reuse, focus and clipping checks. Use whenever UI is added or changed, not only when a review is requested.
+description: Build, review or repair any visible WebMusic UI — presenters, Element surfaces, toolbars, popups, live demos — to the required visual design, with responsive sizing, UIKit reuse, focus and clipping checks. Use whenever UI is added or changed, not only when a review is requested.
 ---
 
 # WebMusic frontend review
@@ -19,8 +19,9 @@ owner rather than relying on corrective demo-only CSS.
 
 Inspect the host's container in composed layouts, not just the viewport.
 For time-based plots, verify clipping, scroll, drawing and pointer coordinates
-together. External demo Parameters configure the surface; intrinsic musical
-controls such as seeking and note input remain interactive.
+together. Element demos show the default composition (no Parameters); Headless
+and presenter demos keep external Parameters. Intrinsic musical controls such
+as seeking and note input remain interactive.
 
 Preserve review-only scope. For authorized fixes, verify the same scenarios
 afterwards and report tested sizes, focus behavior, modes and screenshots.

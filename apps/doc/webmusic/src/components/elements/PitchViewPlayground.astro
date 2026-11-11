@@ -1,16 +1,15 @@
 ---
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 const playerId = 'pg-pitch-view-player';
 const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
-const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 
-<ElementPlayground tag="score-pitch-view" markup="[data-pitch-composition]" companions={companions} class="pg-pitch-view">
+<ElementDemo tag="score-pitch-view" class="pg-pitch-view">
   <div data-pitch-composition data-pg-fragment>
     <score-player id={playerId} src={SRC}></score-player>
     <score-pitch-view input={`#${playerId}`}></score-pitch-view>
   </div>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineScorePlayerElement} from '@webmusic/score/play/element';

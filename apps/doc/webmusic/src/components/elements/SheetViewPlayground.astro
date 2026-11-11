@@ -2,14 +2,13 @@
 // <score-sheet-view> engraves Arabesque No. 1 from its MusicXML, the format
 // that carries clefs, key signatures, voices and staff assignment. The page
 // owns one editor and lends it to the player and the sheet.
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 
 const source = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
 const features = ['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', 'history', 'zoom'];
 ---
 
-<ElementPlayground tag="score-sheet-view" target="[data-sheet-view]" markup="[data-sheet-composition]"
-  companions={[{tag: 'score-player', target: '[data-sheet-player]'}]}>
+<ElementDemo tag="score-sheet-view">
   <section data-sheet-demo data-sheet-src={source} aria-label="Score sheet editing">
     <div data-sheet-composition data-pg-fragment>
       <score-player data-sheet-player id="sheet-player" time-control="full"></score-player>
@@ -17,19 +16,17 @@ const features = ['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', '
     </div>
     <p data-sheet-status role="alert" hidden></p>
   </section>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineSheetViewElement, type SheetViewElement} from '@webmusic/score/view/element';
   import {loadScoreEditor, type ScoreEditor} from '@webmusic/score/view/headless';
   import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
   import {mountDemos} from '../demo-lifecycle';
-  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from '../playground-client';
   defineScorePlayerElement(); defineSheetViewElement();
   mountDemos('[data-sheet-demo]', (root, scope) => {
     // The demo owns one editor at a time; the player and the sheet borrow it.
     const source = root.dataset.sheetSrc!;
-    const panel = root.closest<HTMLElement>('[data-wm-pg]');
     const player = root.querySelector<ScorePlayerElement>('[data-sheet-player]')!;
     const sheet = root.querySelector<SheetViewElement>('[data-sheet-view]')!;
     const status = root.querySelector<HTMLElement>('[data-sheet-status]')!;
@@ -66,13 +63,6 @@ const features = ['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', '
     };
 
     // Toolbar and keyboard changes are reflected to attributes; keep Parameters current.
-    scope.listen(sheet, 'sheetsettingschange', () => { panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT)); });
-    if (panel) {
-      // Reset restores the authored attributes; reloading also discards the edits.
-      scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
-        queueMicrotask(() => { if (scope.active) scope.run(load()); });
-      });
-    }
     scope.add(() => {
       loadGeneration += 1; loadController?.abort();
       const owned = editor; editor = undefined;

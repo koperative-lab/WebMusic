@@ -39,10 +39,12 @@ install browser tooling or authorize commits, pushes or publication by itself.
 3. Check host `hidden`, minimum sizing, long-label wrapping and type switching.
    Preserve readable notation/keys with local scrolling where fitting would
    shrink them excessively; keep pointer coordinates aligned with the plot.
-4. Put demo configuration in external Parameters while preserving intrinsic
-   musical controls such as seeking, note input and direct plot gestures.
-5. Verify each parameter affects its intended instance/mode. Preserve inactive
-   mode values, accurate copied markup, visibility settings and Reset behavior.
+4. Show a Web Component demo in its default composition with its intrinsic
+   musical controls, such as seeking, note input and direct plot gestures; it
+   has no Parameters or Copy/Reset (DEC-071). Headless and presenter demos keep
+   their configuration in external Parameters.
+5. Verify each Headless or presenter parameter affects its intended instance or
+   mode, with accurate copied code and Reset behavior.
 6. Remove redundant framing only when the remaining surface retains orientation,
    accessible names, status feedback and operable focus targets.
 

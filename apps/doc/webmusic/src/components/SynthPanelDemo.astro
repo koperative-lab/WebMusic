@@ -1,66 +1,28 @@
 ---
-// One live composition exposes every score-synth-panel section and the property
-// graph that feeds it. Attribute controls still come from ElementPlayground;
-// JavaScript-only configuration is handled by the structured editors below.
-import EffectChainEditor from './EffectChainEditor.astro';
-import ElementPlayground from './ElementPlayground.astro';
-import SynthPanelPropertyEditor from './SynthPanelPropertyEditor.astro';
+// The composition the page documents: the player owns the instrument, the note
+// input plays it, and the panel edits its sound and envelope. Nested, the
+// panel and the keys find the player's instrument through the module context.
+import ElementDemo from './ElementDemo.astro';
+
+const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 ---
 
-<ElementPlayground
-  tag="score-synth-panel"
-  target="[data-syp]"
-  markup="[data-syp-composition]"
-  class="syp-demo"
-  companions={[{tag: 'score-note-input', target: '[data-syp-input]'}]}
->
-  <div class="syp-demo__composition" data-syp-composition data-pg-fragment>
-    <score-note-input data-syp-input layout="piano" start="48" end="71"></score-note-input>
-    <score-synth-panel
-      data-syp
-      sections="sound,envelope"
-    ></score-synth-panel>
-  </div>
-
-  <SynthPanelPropertyEditor slot="controls" />
-
-  <EffectChainEditor
-    slot="controls"
-    assignment="effects"
-    initial={['reverb']}
-    target="[data-syp]"
-    setupSelector="score-synth-panel"
-    setupIdentifier="synthPanelEffects"
-  />
-
-  <div class="wm-pg__code-extra" slot="setup" data-syp-code-block>
-    <span class="wm-pg__code-label">JavaScript property setup</span>
-    <pre class="wm-pg__markup" data-syp-code data-pg-copy-source></pre>
-  </div>
-
-  <div class="wm-pg__code-extra" slot="setup" data-fx-code-block hidden>
-    <span class="wm-pg__code-label">Effect setup</span>
-    <pre class="wm-pg__markup" data-fx-code data-pg-copy-source></pre>
-  </div>
-</ElementPlayground>
+<ElementDemo tag="score-synth-panel" class="syp-demo">
+  <score-player src={SRC}>
+    <score-note-input layout="piano" start="48" end="71"></score-note-input>
+    <score-synth-panel sections="sound,envelope"></score-synth-panel>
+  </score-player>
+</ElementDemo>
 
 <script>
-  import {defineNoteInputElement, defineSynthPanelElement} from '@webmusic/score/play/element';
-  import {mountEffectChainEditors} from './effect-chain-editor-client';
-  import {mountSynthPanelPlaygrounds} from './synth-panel-playground-client';
+  import {defineNoteInputElement, defineScorePlayerElement, defineSynthPanelElement} from '@webmusic/score/play/element';
 
+  defineScorePlayerElement();
   defineNoteInputElement();
   defineSynthPanelElement();
-  mountSynthPanelPlaygrounds();
-  mountEffectChainEditors();
 </script>
 
 <style>
-  .syp-demo :global(.syp-demo__composition) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
+  /* The gap between the nested members belongs to the composition. */
+  .syp-demo :global(score-player > :is(score-note-input, score-synth-panel)) { display: block; margin-top: 0.5rem; }
 </style>

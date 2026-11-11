@@ -25,7 +25,7 @@ Read interval number, quality, direction and semitone distance for authored scor
 <score-interval-analysis input="#piece" window="1"></score-interval-analysis>
 ```
 
-Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window keeps the dense opening notes readable; adjust `window` to inspect a longer passage. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the `input` connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
+Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window keeps the dense opening notes readable; `window` sets how long a passage it shows. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
 
 ## Ports and composition
 

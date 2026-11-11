@@ -8,7 +8,7 @@ and conventions, then choose the template for the page being changed.
 |---|---|
 | [DOCS-SITE-PLAN.md](DOCS-SITE-PLAN.md) | Routes, navigation, page ownership and demo placement |
 | [DOCS-CONVENTIONS.md](DOCS-CONVENTIONS.md) | Maintained English prose, links, demos, actual check coverage and manual acceptance |
-| [COMPONENT-PAGE-TEMPLATE.md](COMPONENT-PAGE-TEMPLATE.md) | A Web Component or a complete workflow, Parameters, attributes/properties/events and styling |
+| [COMPONENT-PAGE-TEMPLATE.md](COMPONENT-PAGE-TEMPLATE.md) | A Web Component or a complete workflow, its default demo, attributes/properties/events and styling |
 | [HEADLESS-PAGE-TEMPLATE.md](HEADLESS-PAGE-TEMPLATE.md) | Factories, options, commands, state, events and lifecycle |
 | [UIKIT-PAGE-TEMPLATE.md](UIKIT-PAGE-TEMPLATE.md) | Presenter bindings, named handles, interaction, styling and composition |
 | [API-PAGE-TEMPLATE.md](API-PAGE-TEMPLATE.md) | Public package entries and complete API ownership |

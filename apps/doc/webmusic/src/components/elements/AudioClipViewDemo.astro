@@ -3,13 +3,12 @@
 // editor with every built-in range processor and lends it to the player and
 // the clip view. A starting beat grid is estimated from the opening; Grid Edit
 // refines it.
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 
 const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 ---
 
-<ElementPlayground tag="audio-clip-view" target="[data-clip-view]" markup="[data-clip-composition]"
-  companions={[{tag: 'audio-player', target: '[data-clip-player]'}]}>
+<ElementDemo tag="audio-clip-view">
   <section data-clip-demo data-clip-src={source} aria-label="Audio clip editing">
     <div data-clip-composition data-pg-fragment>
       <audio-player data-clip-player id="clip-player"></audio-player>
@@ -17,7 +16,7 @@ const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
     </div>
     <p data-clip-status role="alert" hidden></p>
   </section>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
@@ -27,12 +26,10 @@ const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
   import {readAudioSequenceRange} from '@webmusic/audio';
   import {detectTempo} from '@webmusic/audio/analyze';
   import {mountDemos} from '../demo-lifecycle';
-  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from '../playground-client';
   defineAudioPlayerElement(); defineAudioClipViewElement();
   mountDemos('[data-clip-demo]', (root, scope) => {
     // The demo owns one editor at a time; the player and the clip view borrow it.
     const source = root.dataset.clipSrc!;
-    const panel = root.closest<HTMLElement>('[data-wm-pg]');
     const player = root.querySelector<AudioPlayerElement>('[data-clip-player]')!;
     const view = root.querySelector<AudioClipViewElement>('[data-clip-view]')!;
     const status = root.querySelector<HTMLElement>('[data-clip-status]')!;
@@ -86,13 +83,6 @@ const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
     };
 
     // Toolbar, keyboard and wheel changes are reflected to attributes; keep Parameters current.
-    scope.listen(view, 'clipsettingschange', () => { panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT)); });
-    if (panel) {
-      // Reset restores the authored attributes; reloading also discards the edits.
-      scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
-        queueMicrotask(() => { if (scope.active) scope.run(load()); });
-      });
-    }
     scope.add(() => {
       loadGeneration += 1; loadController?.abort();
       const owned = editor; editor = undefined;

@@ -7,7 +7,6 @@ import ts from 'typescript';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {mountDemos, type DemoScope} from '../src/components/demo-lifecycle';
 import {monitorNoteInput} from '../src/components/note-input-monitor';
-import {mountPlaygrounds} from '../src/components/playground-client';
 
 const audio = vi.hoisted(() => ({players: [] as Array<{
   addVoice: ReturnType<typeof vi.fn>;
@@ -197,57 +196,5 @@ describe('Score recorder demo composition', () => {
     input.onNote!(67, 90, true);
     await flush();
     expect(player.noteOn).toHaveBeenLastCalledWith('chords', 67, 90, 3600);
-  });
-
-  it('keeps recorder and input parameters scoped and copies their connection', async () => {
-    const root = composition();
-    const panel = document.createElement('div');
-    panel.dataset.wmPg = '';
-    panel.dataset.target = astroSource.match(/\btarget="([^"]+)"/)![1];
-    panel.dataset.markup = astroSource.match(/\bmarkup="([^"]+)"/)![1];
-    panel.innerHTML = `<div data-pg-stage></div>
-      <div data-pg-controls>
-        <label><input data-pg-attr="bpm"></label>
-        <label><input data-pg-attr="quantize"></label>
-        <label data-pg-scope="[data-sr-input]"><input data-pg-attr="layout"></label>
-      </div>
-      <div data-pg-code-stack><pre data-pg-markup data-pg-copy-source></pre><pre data-setup data-pg-copy-source></pre></div>
-      <button data-pg-reset>Reset</button><button data-pg-copy>Copy</button>`;
-    panel.querySelector('[data-pg-stage]')!.append(root);
-    panel.querySelector('[data-setup]')!.textContent = astroSource.match(/const setup = `([\s\S]*?)`;/)![1]!;
-    document.body.append(panel);
-    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue();
-    Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
-    runDemo();
-    mountPlaygrounds();
-    const input = root.querySelector<Input>('score-note-input')!;
-    const recorder = root.querySelector<Recorder>('score-recorder')!;
-    const setControl = (name: string, value: string): void => {
-      const control = panel.querySelector<HTMLInputElement>(`[data-pg-attr="${name}"]`)!;
-      control.value = value;
-      control.dispatchEvent(new Event('input', {bubbles: true}));
-    };
-    setControl('bpm', '90');
-    setControl('quantize', '0.25');
-    setControl('layout', 'grid');
-    expect(recorder.getAttribute('bpm')).toBe('90');
-    expect(recorder.getAttribute('quantize')).toBe('0.25');
-    expect(input.layout).toBe('grid');
-    expect(input.hasAttribute('bpm')).toBe(false);
-    expect(recorder.hasAttribute('layout')).toBe(false);
-    panel.querySelector<HTMLButtonElement>('[data-pg-copy]')!.click();
-    await flush();
-    expect(writeText).toHaveBeenCalledOnce();
-    const copied = writeText.mock.calls[0]![0];
-    expect(copied).toContain('<score-recorder bpm="90" quantize="0.25">');
-    expect(copied).toContain('layout="grid"');
-    expect(copied).toContain('recorder.source = input;');
-    expect(copied).not.toContain('data-sr-');
-    panel.querySelector<HTMLButtonElement>('[data-pg-reset]')!.click();
-    expect(recorder.getAttribute('bpm')).toBe('120');
-    expect(recorder.getAttribute('quantize')).toBe('0');
-    expect(input.layout).toBe('piano');
-    expect(recorder.source).toBe(input);
-    expect(audio.players).toHaveLength(1);
   });
 });

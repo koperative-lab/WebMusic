@@ -1,14 +1,13 @@
 ---
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 import ElementComposition from '../ElementComposition.astro';
 interface Props { tag: 'score-chord-analysis' | 'score-interval-analysis' | 'score-scale-analysis' | 'score-rhythm-analysis'; }
 const {tag} = Astro.props;
 const playerId = `pg-${tag}-player`;
 const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
-const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 
-<ElementPlayground tag={tag} markup="[data-demo-composition]" companions={companions}>
+<ElementDemo tag={tag}>
   <ElementComposition>
     <score-player id={playerId} src={SRC}></score-player>
     {tag === 'score-chord-analysis' && <score-chord-analysis input={`#${playerId}`} window="1" grouping="beat"></score-chord-analysis>}
@@ -16,7 +15,7 @@ const companions = [{tag: 'score-player', target: 'score-player'}];
     {tag === 'score-scale-analysis' && <score-scale-analysis input={`#${playerId}`} window="1" tonic="E" scale="major"></score-scale-analysis>}
     {tag === 'score-rhythm-analysis' && <score-rhythm-analysis input={`#${playerId}`} window="1"></score-rhythm-analysis>}
   </ElementComposition>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineScorePlayerElement} from '@webmusic/score/play/element';

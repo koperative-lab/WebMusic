@@ -8,31 +8,20 @@
 // and the fourth needs a finished take, so on a page whose reader may never
 // grant the microphone they are wired but silent. `max-seconds` is not: the
 // status line shows the pending limit with no permission at all.
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 import AudioPlayStage from './AudioPlayStage.astro';
 
 const MIC = 'shapes the getUserMedia request for the next take — invisible until you grant microphone permission and record';
 
-const INERT = {
-  'device-id': MIC,
-  'echo-cancellation': MIC,
-  'sample-rate': MIC,
-  'auto-export': 'there is nothing to serialize until a take exists, which again needs the microphone',
-};
 ---
 
-<ElementPlayground
-  tag="audio-recorder"
-  class="wa-demo"
-  inert={INERT}
-  markup="[data-audio-play-stage]"
->
+<ElementDemo tag="audio-recorder" class="wa-demo">
   <AudioPlayStage>
     <audio-player id="recorder-session"></audio-player>
     <audio-recorder input="#recorder-session" id="wa-recorder-demo"></audio-recorder>
     <p class="wm-demo-help">Press Record to start; press again to stop. Needs microphone permission.</p>
   </AudioPlayStage>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import { defineAudioRecorderElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';

@@ -143,7 +143,7 @@ use.
 | [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music in pages or a continuous column, editable like a notation program. | `defineSheetViewElement(tag?)` |
 
 `defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
-Each type stays on its owning page, with its controls in external Parameters.
+Each type stays on its owning page.
 `score-view`, `score-grid-view` and `score-sheet-view` borrow resolved score data and position;
 `score-pitch-view` borrows held notes. Each connects to an enclosing player or Rack part by
 containment, or to the player named by `input`.

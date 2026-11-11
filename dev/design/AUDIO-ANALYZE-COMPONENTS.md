@@ -115,8 +115,8 @@ to the owner's connections or tuning. All other borrowed graph resources
 remain caller-owned. A frozen display never
 becomes a second signal authority; the current player retains data, sound and
 transport ownership. Each visible Element owns one neutral outer component
-surface and public tokens/parts; application Parameters configure attributes
-outside the component. Inspection gestures remain inside the applicable tool.
+surface and public tokens/parts; applications configure attributes outside the
+component. Inspection gestures remain inside the applicable tool.
 
 ## Presentation and controls
 
@@ -161,7 +161,7 @@ display types in both themes and the legacy mode alias, late/replaced sources,
 pause/seek/end, graph loss, frozen/held-state reset, threshold, spectrum probe,
 oscilloscope trigger/timebase/probe, transient sensitivity/refractory interval,
 silence, callback cancellation and repeated cleanup. Each tag demo pairs one
-real player with that tool, with external Parameters and truthful Copy/Reset.
+real player with that tool in its default configuration (DEC-071).
 Browser checks inspect normal/narrow widths, keyboard/focus, live data and
 device behavior. Static tests alone do not establish acoustic accuracy,
 calibrated sound pressure, true-peak capture or sample-accurate onset timing.

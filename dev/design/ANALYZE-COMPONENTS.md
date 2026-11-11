@@ -197,7 +197,8 @@ are secondary text with no candidate buttons or redundant time caption.
 Each component retains one neutral frame using public surface, padding, border
 and radius tokens (DEC-034). Inner presenters remain unframed. Light-DOM public
 parts and named handles remain the styling seams; private presenter selectors
-are not public API. External demo Parameters own configuration. The demo's
+are not public API. Applications own configuration; a demo shows the default
+(DEC-071). The demo's
 full-width sibling composition and `0.5rem` gap do not alter component geometry.
 
 ## Compatibility and documentation

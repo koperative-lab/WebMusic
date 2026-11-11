@@ -24,12 +24,11 @@ Use [`<score-view>`](/score/element/view/score-view/) for read-only staff,
 waterfall or seconds-based piano-roll drawings; it can follow the same editor.
 
 The demo loads Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) into one
-editor. The page owns that editor and lends it to the player and the grid.
-Every switch and setting is in **Parameters**: clear a box in the **tools** row
-to remove that feature's toolbar button, gestures, keys and note-value fields.
-Toolbar, wheel and keyboard changes update **tool**, **snap**,
-**velocity-lane**, **pixels-per-quarter** and **note-height** there. Reset
-restores the attributes and reloads the piece, discarding edits.
+editor. The page owns that editor and lends it to the player and the grid,
+with every tool enabled. Leaving a feature out of `tools` removes its toolbar
+button, gestures, keys and note-value fields. Toolbar, wheel and keyboard
+changes update **tool**, **snap**, **velocity-lane**, **pixels-per-quarter**
+and **note-height** on the element. Reloading the page discards edits.
 
 ## Import
 

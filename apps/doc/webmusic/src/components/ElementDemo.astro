@@ -1,0 +1,34 @@
+---
+// The demo card every Score / Audio element page uses: the house `wui-panel`
+// chrome (import entry + tag) and the live element in its default composition,
+// with the real controls it needs to be used. The page documents attributes,
+// properties and events in its reference tables; adjusting them interactively
+// and copying the resulting code is not part of the documentation site.
+import { ELEMENT_PARAMS } from '../lib/params';
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  /** Catalog key — the custom element tag. */
+  tag: string;
+  /** Extra class on the panel, for demo-specific element styling. */
+  class?: string;
+}
+
+const {tag, class: extraClass = ''} = Astro.props;
+
+const spec = ELEMENT_PARAMS[tag];
+if (!spec) throw new Error(`<ElementDemo tag="${tag}"> has no entry in src/lib/params`);
+---
+
+<div class={`wui-panel wui-panel--flow not-content wm-pg ${extraClass}`.trim()} data-wm-pg>
+  <div class="wui-panel__title">
+    <span>{spec.entry}</span>
+    <strong>{`<${tag}>`}</strong>
+  </div>
+
+  <LiveDemoCanvas>
+    <div class="wm-pg__stage" data-pg-stage>
+      <slot />
+    </div>
+  </LiveDemoCanvas>
+</div>

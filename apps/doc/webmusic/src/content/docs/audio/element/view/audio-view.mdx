@@ -29,12 +29,12 @@ The demos start in `drag-mode="scrub"`: the playhead stays centered while the
 track moves underneath. Drag left toward later audio, or right toward earlier
 audio. Their decoded player sounds the movement at your gesture speed, then
 coasts in both position and sound before restoring its previous playing/paused
-state. Parameters can switch
-to viewport-only `pan`.
+state. `drag-mode="pan"` makes dragging move
+the viewport only.
 
 The main demo authors `height="96"` and `amplitude="1.6"` for a compact, fuller
 waveform. This fixed visual gain can crop tall peaks; it changes neither PCM nor
-playback volume. Parameters, copied markup and Reset use those authored values.
+playback volume.
 Switching drawing type retains the explicit height; the library defaults remain
 128 px for waveform, 256 px for spectrogram and amplitude 1.
 
@@ -368,8 +368,8 @@ current operation settles. This flag describes the application's pending work,
 not the combined readiness of every loader: clearing it restores automatic
 `src` / `peaks-src` / player/data feedback and cannot cancel or hide an internal
 request that is still pending. Clearing it without usable data returns to
-waiting. The Parameters `loading` control demonstrates this presentation flag;
-it does not initiate a fetch or STFT.
+waiting. The `loading` flag only changes this presentation; it does not
+initiate a fetch or STFT.
 
 A failed `src` or `peaks-src` request shows its error message when no drawable data
 is available, while still emitting `webaudio:error`. Retrying, removing that URL,
@@ -599,7 +599,7 @@ The waveform's **shape** is always the amplitude peaks, but its **colour** can r
 - **`multiband`** — each column is tinted by its spectral balance: bass → red, mids → green, treble → blue, blended additively (so a bass-and-air column reads magenta, a full-range hit reads white). `bands` sets the band count (default `3`, clamped 1–12).
 - **`colormap`** — each column's spectral centroid is mapped through `color-map` (`viridis` · `magma` · `grayscale` · `gray`).
 
-The two frequency modes need STFT data (from [`computeSpectrogram`](/audio/api/analyze/)) computed from the **same channel** as the `.peaks`. Assign it to `.frequencyData` — a first-class property — or to `.spectrogram`, which is the same payload seen from the other mode's point of view. The resolution order is `.options.frequencyData`, then `.frequencyData`, then `.spectrogram`. Two more knobs complete the meter feel: `channel-layout="split"` stacks the first two peaks channels as a stereo display (each half coloured by its own spectrum, from a `.frequencyData` array), and `history` glows a recent-history window that trails the playhead during playback. The demo caches peaks + spectrogram on first request per channel for Left / Right / Mid / Side (Channel 1 and an optional Channel 2), and flips `color-mode` / `history` live:
+The two frequency modes need STFT data (from [`computeSpectrogram`](/audio/api/analyze/)) computed from the **same channel** as the `.peaks`. Assign it to `.frequencyData` — a first-class property — or to `.spectrogram`, which is the same payload seen from the other mode's point of view. The resolution order is `.options.frequencyData`, then `.frequencyData`, then `.spectrogram`. Two more knobs complete the meter feel: `channel-layout="split"` stacks the first two peaks channels as a stereo display (each half coloured by its own spectrum, from a `.frequencyData` array), and `history` glows a recent-history window that trails the playhead during playback. The demo below draws the left channel in `multiband`, with its spectrogram computed from the same channel:
 
 <MultibandWaveformDemo />
 

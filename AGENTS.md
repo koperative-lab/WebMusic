@@ -202,7 +202,9 @@ alternative specification:
 - Every visible UI follows [Visual design](dev/design/VISUAL-DESIGN.md):
   neutral monochrome tokens, square one-height controls, icon-only toolbars,
   adjustment cards inside the component over a scrim, no visible scrollbars,
-  no explanatory text in the component, and demo settings in Parameters.
+  no explanatory text in the component; Web Component demos show the default
+  composition without Parameters, and Headless and presenter demo settings go
+  in Parameters.
 
 ## Implement a change
 

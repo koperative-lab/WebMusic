@@ -1,16 +1,15 @@
 ---
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
 const PLAYER_ID = 'sv-demo-player';
-const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 
-<ElementPlayground tag="score-view" markup="[data-score-composition]" companions={companions} class="sv-demo">
+<ElementDemo tag="score-view" class="sv-demo">
   <div data-score-composition data-pg-fragment>
     <score-player id={PLAYER_ID} src={SRC}></score-player>
     <score-view input={`#${PLAYER_ID}`} type="staff"></score-view>
   </div>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineScorePlayerElement} from '@webmusic/score/play/element';

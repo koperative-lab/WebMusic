@@ -39,12 +39,11 @@ The rack is the single source of truth. Levels, mute and solo are read back off 
 mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
 change as well as a membership change, anything else driving the rack repaints this desk too.
 
-The **Effects** collection in Parameters is the same chain editor used by
-[`<score-player>`](/score/element/play/score-player/). Its order is signal order: the rack's summed
-output enters the first card, then each card below it. The editor assigns the resulting
-`Effect.chain(...)` to the desk's `.effect` property, so it processes the master bus once rather
-than creating a separate copy for every part. The generated JavaScript beneath the markup is part
-of the Copy result too.
+Effects on the desk use the same recipes as
+[`<score-player>`](/score/element/play/score-player/#add-an-effect-chain). Assign an
+`Effect.chain(...)` to the desk's `.effect` property: its order is signal order, from the rack's
+summed output through each effect, and it processes the master bus once rather than creating a
+separate copy for every part.
 
 A desk without resolved members shows the shared outlined-square waiting animation.
 While a child `score-rack-part` loads its score, the desk shows the four-square loading

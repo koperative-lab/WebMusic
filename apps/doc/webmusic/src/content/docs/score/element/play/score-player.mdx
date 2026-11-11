@@ -22,15 +22,15 @@ that already own an engine can use [the borrowed controller mode](#four-ways-to-
 
 ## Add an effect chain
 
-Use **Effects** in the demo's Parameters panel to add reverb, a three-band equalizer, filters, delay, chorus, compression, or distortion. Effects run from top to bottom; each card can be expanded, reordered, or removed. The equalizer is compiled to three peaking filters, so the demo uses the same public `Effect` recipes as application code rather than a docs-only audio path.
+Reverb, a three-band equalizer, filters, delay, chorus, compression and distortion are public `Effect` recipes; an equalizer is three peaking filters. Effects in a chain run in order.
 
-An effect is an object graph, not an HTML attribute. The editor therefore assigns the real `.effect` property and adds a **JavaScript setup** block beside the live markup. **Copy** includes both blocks. Committing an effect edit updates the realized compatibility insert; explicit declaration slots remain in place. **Reset** clears this editor's legacy chain back to dry output.
+An effect is an object graph, not an HTML attribute, so assign it to the real `.effect` property from JavaScript. Assigning a new chain updates the realized compatibility insert; explicit declaration slots remain in place. Assigning `undefined` returns to dry output.
 
 That property belongs to the element's single-score mode. When `.rack` is the
 active source (including a nested `<score-rack-control>` composition), the Rack owns
 the shared audio graph; put the chain on `rack.effect` or
-`rackControl.effect` instead. The Rack editor uses this same stack UI and the
-same `Effect.chain(...)` recipes on its summed master bus.
+`rackControl.effect` instead, with the same `Effect.chain(...)` recipes on its
+summed master bus.
 
 ```js
 import { Effect } from '@webmusic/score/play/headless';
@@ -54,7 +54,7 @@ if (player) player.effect = Effect.chain(
 <score-player src="/midi/Arabesque%20No.1.mid"></score-player>
 ```
 
-That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
+That is the whole setup. The attribute table below lists what each attribute does.
 
 `@webmusic/score/play/auto` registers this element (and the other Score elements) on import instead; `@webmusic/score/play/global` is the prebuilt `<script>`-tag bundle for pages with no build step.
 

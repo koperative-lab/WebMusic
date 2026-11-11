@@ -3,16 +3,10 @@
 // parameter switches that same element between piano, grid, and chords; the
 // preloaded map keeps the grid playable when readers switch to it.
 import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 ---
 
-<ElementPlayground
-  tag="score-note-input"
-  target="[data-ni-input]"
-  markup="[data-ni-composition]"
-  class="ni-demo"
-  omit={['row-interval']}
->
+<ElementDemo tag="score-note-input" class="ni-demo">
   <div class="ni-demo__composition" data-ni-composition data-pg-fragment>
     <score-note-input
       data-ni-input
@@ -24,7 +18,7 @@ import ElementPlayground from './ElementPlayground.astro';
     ></score-note-input>
   </div>
 
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineNoteInputElement, type NoteInputElement} from '@webmusic/score/play/element';

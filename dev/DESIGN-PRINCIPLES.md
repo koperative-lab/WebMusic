@@ -104,7 +104,7 @@ examples demonstrate the same task with different ownership of presentation.
 Cross-domain reference compositions exercise replacement, late attachment,
 seek/rate/loop and cleanup through public contracts.
 
-LiveDemoCanvas, its grid and Live label, parameter panels, and Copy/Reset are documentation chrome. They are not mandatory package UI or application design. [Site architecture](docs/DOCS-SITE-PLAN.md) and the page templates own demo presentation; [Component design](design/COMPONENT-DESIGN.md) owns the capability being demonstrated.
+LiveDemoCanvas, its grid and Live label, and the Headless and presenter demos' parameter panels and Copy/Reset are documentation chrome. They are not mandatory package UI or application design. [Site architecture](docs/DOCS-SITE-PLAN.md) and the page templates own demo presentation; [Component design](design/COMPONENT-DESIGN.md) owns the capability being demonstrated.
 
 ## 9. Make resources and failure boundaries explicit
 

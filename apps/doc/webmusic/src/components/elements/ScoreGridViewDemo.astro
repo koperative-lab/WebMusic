@@ -1,11 +1,10 @@
 ---
-import ElementPlayground from '../ElementPlayground.astro';
+import ElementDemo from '../ElementDemo.astro';
 const source = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 const features = ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom', 'history'];
 ---
 
-<ElementPlayground tag="score-grid-view" target="[data-grid-view]" markup="[data-grid-composition]"
-  companions={[{tag: 'score-player', target: '[data-grid-player]'}]}>
+<ElementDemo tag="score-grid-view">
   <section data-grid-demo data-grid-src={source} aria-label="Score grid editing">
     <div data-grid-composition data-pg-fragment>
       <score-player data-grid-player id="grid-player" time-control="full"></score-player>
@@ -13,19 +12,17 @@ const features = ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom'
     </div>
     <p data-grid-status role="alert" hidden></p>
   </section>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import {defineScoreGridViewElement, type ScoreGridViewElement} from '@webmusic/score/view/element';
   import {loadScoreEditor, type ScoreEditor} from '@webmusic/score/view/headless';
   import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
   import {mountDemos} from '../demo-lifecycle';
-  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from '../playground-client';
   defineScorePlayerElement(); defineScoreGridViewElement();
   mountDemos('[data-grid-demo]', (root, scope) => {
     // The demo owns one editor at a time; the player and the grid borrow it.
     const source = root.dataset.gridSrc!;
-    const panel = root.closest<HTMLElement>('[data-wm-pg]');
     const player = root.querySelector<ScorePlayerElement>('[data-grid-player]')!;
     const grid = root.querySelector<ScoreGridViewElement>('[data-grid-view]')!;
     const status = root.querySelector<HTMLElement>('[data-grid-status]')!;
@@ -62,13 +59,6 @@ const features = ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom'
     };
 
     // Toolbar, wheel and keyboard changes are reflected to attributes; keep Parameters current.
-    scope.listen(grid, 'gridsettingschange', () => { panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT)); });
-    if (panel) {
-      // Reset restores the authored attributes; reloading also discards the edits.
-      scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
-        queueMicrotask(() => { if (scope.active) scope.run(load()); });
-      });
-    }
     scope.add(() => {
       loadGeneration += 1; loadController?.abort();
       const owned = editor; editor = undefined;

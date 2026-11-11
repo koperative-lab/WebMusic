@@ -165,8 +165,7 @@ The shared Stage owns equal outer padding on all four sides; the waveform adds
 no extra vertical inset. Preserve the supplied peak amplitudes and explicit
 `amplitude` gain. Quiet material may leave vertical space; viewport changes must
 not automatically normalize its height. A demo may author a fixed height and
-visual gain to choose its density; the Parameters/copy/Reset flow must preserve
-those attributes. Visual gain may crop peaks but does not change PCM or volume.
+visual gain to choose its density. Visual gain may crop peaks but does not change PCM or volume.
 
 Presentation cadence is independent of transport notification cadence. A
 `ViewPlayerBinding` may expose live read-only `playing` and `scratching` flags;

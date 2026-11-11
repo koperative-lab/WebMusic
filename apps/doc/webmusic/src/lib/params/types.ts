@@ -1,12 +1,11 @@
 // ============================================================================
-// The parameter catalog behind <ElementPlayground>.
+// The parameter catalog behind <ElementDemo> and the site checks.
 //
 // One entry per Score / Audio web component. `params` is the element's COMPLETE
 // observed-attribute surface — every name in its `static observedAttributes`,
-// including the ones no demo would normally set — so the docs can put a live
-// control on each of them instead of showing only the two or three a canned
-// demo happens to use. `properties` and `events` round out the members that
-// have no attribute form, so a reader can see the whole surface in one place.
+// including the ones no demo would normally set — so a tool can describe every
+// one of them. `properties` and `events` round out the members that have no
+// attribute form, so the whole surface is in one place.
 // ============================================================================
 
 /** How the playground renders a control for one attribute. */

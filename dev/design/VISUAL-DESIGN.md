@@ -123,11 +123,13 @@ window:
 
 ## Documentation demos
 
-The live canvas shows the component and the real controls it needs to be used
-(for example its transport). Configuration — feature switches, modes, sizes and
-settings — goes in Parameters as controls bound to attributes. No demo-only
-checkboxes, hint text or event logs inside the canvas; a failed load may show
-one error line.
+The live canvas shows the component in its default composition with the real
+controls it needs to be used (for example its transport). Web Component demos
+have no Parameters strip, markup readout or Copy/Reset (DEC-071): the page's
+reference tables document configuration, and interactive adjustment is not part
+of the documentation site. No demo-only checkboxes, hint text or event logs
+inside the canvas; a failed load may show one error line. Headless and UI Kit
+presenter demos keep their external Parameters for configuration.
 
 ## Styling mechanics
 
@@ -159,6 +161,6 @@ inversion.
 - [ ] Adjustments open as an in-component card over a scrim, with modal focus.
 - [ ] No scrollbars are visible; labels of scrolling content are sticky.
 - [ ] No explanatory text inside the component or the demo canvas.
-- [ ] Demo configuration is in Parameters.
+- [ ] Element demos show the default composition without Parameters; Headless and presenter demo configuration is in Parameters.
 - [ ] Checked in a browser beside an existing component, at a narrow width and
       with keyboard focus; dark-scheme fallbacks are present.

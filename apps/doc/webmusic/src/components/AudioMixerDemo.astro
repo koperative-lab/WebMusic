@@ -2,46 +2,19 @@
 // Canonical demo pattern: drop the tag, build a small AudioMixer in a client
 // script block and assign `.members` to the owning element. Two members share one clip and a scheduled start, which is what gives
 // the desk two strips — and gives `solo` an id to actually name.
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 import AudioPlayStage from './AudioPlayStage.astro';
 
 const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
-const SETUP = `import {loadClipFromUrl} from '@webmusic/audio/play';
-import {defineAudioPlayerElement, defineAudioMixerElement} from '@webmusic/audio/play/element';
-
-defineAudioPlayerElement();
-defineAudioMixerElement();
-const mixer = document.querySelector('audio-mixer');
-const player = document.querySelector('audio-player');
-player.loading = mixer.loading = true;
-try {
-  const clip = await loadClipFromUrl(${JSON.stringify(SRC)});
-  if (mixer.isConnected) {
-    mixer.members = [
-      {id: 'track A', clip},
-      {id: 'track B', clip, volume: 0.6},
-    ];
-  }
-} finally {
-  player.loading = mixer.loading = false;
-}`;
 ---
 
-<ElementPlayground
-  tag="audio-mixer"
-  class="wa-demo"
-  markup="[data-audio-play-stage]"
->
+<ElementDemo tag="audio-mixer" class="wa-demo">
   <AudioPlayStage>
     <audio-player id="mixer-session"></audio-player>
     <audio-mixer input="#mixer-session" id="wa-mixer-demo" data-src={SRC}></audio-mixer>
     <p role="status" data-mixer-status hidden></p>
   </AudioPlayStage>
-  <div class="wm-pg__code-extra" slot="setup">
-    <span class="wm-pg__code-label">JavaScript data setup</span>
-    <pre class="wm-pg__markup" data-pg-copy-source>{SETUP}</pre>
-  </div>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   import { loadClipFromUrl } from '@webmusic/audio/play';

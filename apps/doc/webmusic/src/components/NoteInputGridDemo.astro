@@ -3,7 +3,7 @@
 // The real tag has always been in the markup here, so the playground strip can
 // resolve it; the map is shipped as an attribute rather than `.pads` so the
 // `map` control stays live.
-import ElementPlayground from './ElementPlayground.astro';
+import ElementDemo from './ElementDemo.astro';
 import { DEFAULT_TR808_GRID_MAP } from '@webmusic/score/play/element';
 
 interface Props {
@@ -13,18 +13,14 @@ const { keyboard = false } = Astro.props;
 
 ---
 
-<ElementPlayground
-  tag="score-note-input"
-  class="ni-demo"
-  omit={['row-interval']}
->
+<ElementDemo tag="score-note-input" class="ni-demo">
   <score-note-input
     data-ni-grid
     layout="grid"
     map={DEFAULT_TR808_GRID_MAP}
     keyboard={keyboard || undefined}
   ></score-note-input>
-</ElementPlayground>
+</ElementDemo>
 
 <script>
   // Astro hoists and dedupes this module, so it scans for its own marker.

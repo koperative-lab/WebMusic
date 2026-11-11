@@ -3107,6 +3107,47 @@ navigation, search dialog and page chrome are site code, covered by
 `npm run docs:build`; every built anchor link resolves; the shell is checked in
 a browser at wide and phone widths with keyboard focus.
 
+## DEC-071 — Web Component demos show the default interaction only
+
+**Date / status:** 2026-11-11; accepted by the repository owner.
+
+**Problem:** every Web Component page carried a playground: a Parameters strip
+with one control per observed attribute, structured editors for effects, Rack
+parts and synth-panel properties, a live markup readout, Copy and Reset. It
+duplicated the reference tables, cost a large client runtime with its own tests,
+and is the job of a component library with an editor rather than of reference
+documentation.
+
+**Decision:** a Web Component demo shows the component in its default
+composition with the real controls it needs, such as its transport, keys or
+toolbar. `ElementDemo` frames it with the entry and tag; there is no Parameters
+strip, markup readout, Copy or Reset, and no structured editors. The attribute,
+property and event tables document configuration, and code examples show it.
+Interactive adjustment and code generation belong to the separately maintained
+component library. The parameter catalog (`src/lib/params`) stays as data for
+the site checks and other tools. Headless and UI Kit presenter demos keep their
+Parameters. This supersedes the demo-configuration rule of DEC-059 for Web
+Component demos, and the Parameters, copied-markup and Copy/Reset consequences
+recorded for Element demos in earlier decisions (DEC-012, DEC-013, DEC-015,
+DEC-031, DEC-033, DEC-048, DEC-050 and DEC-051).
+
+**Alternatives considered:** keeping the strip collapsed by default, which keeps
+its runtime and tests; keeping Copy without Parameters, which only copies the
+markup already shown in the page's code examples.
+
+**Consequences:** demos that a property editor used to configure set what they
+need from their own script; the synth panel demo nests the panel and a note
+input in a player, so it edits the player's instrument. Page prose no longer
+refers to Parameters, Copy or Reset on Element pages.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md) §"Documentation demos",
+[Component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the
+[site plan](docs/DOCS-SITE-PLAN.md).
+
+**Verification:** the documentation tests and build; every Element page renders
+its demo without a Parameters strip, and the changed demos are checked in a
+browser.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

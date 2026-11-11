@@ -8,7 +8,6 @@ import {createAudioClip} from '../../../../packages/audio/src/core';
 import {computePeaks} from '../../../../packages/audio/src/analyze/core/peaks';
 import {acquireAudioViewFixture, whenDemoVisible} from '../src/components/audio-view-fixture';
 import {mountDemos} from '../src/components/demo-lifecycle';
-import {mountPlaygrounds} from '../src/components/playground-client';
 
 const mocks = vi.hoisted(() => ({decode: vi.fn(), disposeDecode: vi.fn(), analyze: vi.fn(), disposeAnalysis: vi.fn()}));
 vi.mock('@webmusic/audio/play', () => ({createDecoderWorker: () => ({decodeFromUrl: mocks.decode, dispose: mocks.disposeDecode})}));
@@ -147,7 +146,6 @@ function runDemo(name: string): void {
     '@webmusic/audio/view/element': {defineAudioViewElement() {}},
     './demo-lifecycle': {mountDemos: (...args: Parameters<typeof mountDemos>) => { releases.push(mountDemos(...args)); }},
     './audio-view-fixture': {acquireAudioViewFixture, whenDemoVisible},
-    './playground-client': {PLAYGROUND_RESET_EVENT: 'webmusic:playground-reset', PLAYGROUND_SYNC_EVENT: 'webmusic:playground-sync'},
   };
   new Function('require', 'exports', code)((name: string) => {
     if (!(name in modules)) throw new Error(`Unexpected module ${name}`);
@@ -252,41 +250,6 @@ describe('actual Audio View demo wiring', () => {
     } finally { error.mockRestore(); }
   });
 
-  it('resets the loading control to actual preparation, even when its baseline was captured while pending', async () => {
-    document.body.innerHTML = `<div data-wm-pg data-target="audio-view"><div data-audio-view-demo>
-      <audio-player></audio-player><audio-view type="waveform"></audio-view><p data-view-status></p></div>
-      <select data-pg-attr="loading" data-pg-kind="bool"><option value="unset">Default</option><option value="on">on</option><option value="off">off</option></select>
-      <button data-pg-reset>Reset</button></div>`;
-    const player = document.querySelector('audio-player')! as HTMLElement & {stop(): void};
-    const view = document.querySelector('audio-view')! as HTMLElement & {loading: boolean};
-    Object.defineProperty(view, 'loading', {
-      get: () => view.hasAttribute('loading') && view.getAttribute('loading') !== 'false',
-      set: (value: boolean) => view.setAttribute('loading', String(value)),
-    });
-    player.stop = vi.fn();
-    let resolve!: (value: typeof clip) => void;
-    mocks.decode.mockReturnValueOnce(new Promise((yes) => { resolve = yes; }));
-    runDemo('AudioViewDemo');
-    mountPlaygrounds();
-    const reset = document.querySelector<HTMLButtonElement>('[data-pg-reset]')!;
-    const loading = document.querySelector<HTMLSelectElement>('[data-pg-attr="loading"]')!;
-    reset.click();
-    await flush();
-    expect(view.loading).toBe(true);
-    expect(loading.value).toBe('on');
-    resolve(clip);
-    await flush();
-    expect(view.loading).toBe(false);
-    expect(loading.value).toBe('off');
-    loading.value = 'on';
-    loading.dispatchEvent(new Event('change', {bubbles: true}));
-    expect(view.loading).toBe(true);
-    reset.click();
-    await flush();
-    expect(view.loading).toBe(false);
-    expect(loading.value).toBe('off');
-  });
-
   it('loads optional waveforms only on activation, keeping only the colour map pending for spectra', async () => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
     document.body.innerHTML = '<div data-wave-examples><audio-view></audio-view><audio-view data-wave-spec></audio-view><p data-wave-status></p></div>';
@@ -333,16 +296,11 @@ describe('actual Audio View demo wiring', () => {
     }
   });
 
-  it('keeps the latest multiband preparation loading, writes playback rate and resets custom controls', async () => {
+  it('prepares the left channel and its spectrum only on activation', async () => {
     vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
-    document.body.innerHTML = `<div data-wm-pg data-target="audio-view"><div data-mm>
-      <audio-player></audio-player><audio-view color-mode="multiband" interactive drag-mode="scrub"></audio-view><p data-drag-help></p><p data-mm-status></p>
-      <div class="mm-seg" data-group="ch1"><button data-val="left"></button><button data-val="right"></button></div>
-      <div class="mm-seg" data-group="ch2"><button data-val="off"></button><button data-val="left"></button></div>
-      <div class="mm-seg" data-group="colormode"><button data-val="static"></button><button data-val="multiband"></button></div>
-      <div class="mm-seg" data-group="history"><button data-val="0"></button><button data-val="2.5"></button></div>
-      <input type="checkbox" data-ctl="loop"><input type="range" min="0.25" max="2" step="0.05" value="1" data-ctl="speed"><output data-speed></output>
-      </div><select data-pg-attr="drag-mode" data-pg-kind="enum"><option value="">Default</option><option value="seek">seek</option><option value="scrub">scrub</option><option value="pan">pan</option><option value="none">none</option></select><button data-pg-reset>Reset</button></div>`;
+    document.body.innerHTML = `<div data-wm-pg><div data-mm>
+      <audio-player></audio-player><audio-view color-mode="multiband" interactive drag-mode="scrub"></audio-view><p data-mm-status></p>
+      </div></div>`;
     const player = document.querySelector('audio-player')! as HTMLElement & {stop(): void; loading: boolean};
     const view = document.querySelector('audio-view')! as HTMLElement & {loading: boolean; frequencyData?: unknown};
     player.stop = vi.fn();
@@ -351,7 +309,6 @@ describe('actual Audio View demo wiring', () => {
     mocks.analyze.mockImplementation((input, options) => options.tasks.includes('spectrogram')
       ? new Promise((resolve) => { spectralResolves.push(resolve); }) : analyze(input, options));
     runDemo('MultibandWaveformDemo');
-    mountPlaygrounds();
     expect(view.loading).not.toBe(true);
     view.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));
     expect(view.loading).toBe(true);
@@ -359,37 +316,10 @@ describe('actual Audio View demo wiring', () => {
     await flush();
     expect(spectralResolves).toHaveLength(1);
     expect(player.loading).toBe(false);
-    document.querySelector<HTMLButtonElement>('[data-group="ch1"] [data-val="right"]')!.click();
-    await flush();
-    expect(spectralResolves).toHaveLength(2);
+    expect(view.getAttribute('channel-layout')).toBe('merge');
     spectralResolves[0]({spectrogram: spectrum});
-    await flush();
-    expect(view.loading).toBe(true);
-    expect(view.frequencyData).toBeUndefined();
-    spectralResolves[1]({spectrogram: spectrum});
     await flush();
     expect(view.loading).toBe(false);
     expect(view.frequencyData).toBe(spectrum);
-    const mode = document.querySelector<HTMLSelectElement>('[data-pg-attr="drag-mode"]')!;
-    expect(mode.value).toBe('scrub');
-    mode.value = 'pan'; mode.dispatchEvent(new Event('change', {bubbles: true}));
-    await flush();
-    expect(document.querySelector('[data-drag-help]')!.textContent).toContain('Playback is unchanged');
-    const speed = document.querySelector<HTMLInputElement>('[data-ctl="speed"]')!;
-    speed.value = '1.5'; speed.dispatchEvent(new Event('input', {bubbles: true}));
-    expect(player.getAttribute('rate')).toBe('1.5');
-    const history = document.querySelector<HTMLButtonElement>('[data-val="2.5"]')!;
-    history.click();
-    expect(document.querySelector('audio-view')!.getAttribute('history')).toBe('2.5');
-    document.querySelector<HTMLButtonElement>('[data-pg-reset]')!.click();
-    await flush();
-    expect(mode.value).toBe('scrub');
-    expect(document.querySelector('[data-drag-help]')!.textContent).toContain('left toward later audio');
-    expect(player.hasAttribute('rate')).toBe(false);
-    expect(speed.value).toBe('1');
-    expect(document.querySelector('audio-view')!.hasAttribute('history')).toBe(false);
-    expect(history.getAttribute('aria-pressed')).toBe('false');
-    expect(player.stop).toHaveBeenCalledOnce();
-    expect(view.loading).toBe(false);
   });
 });
