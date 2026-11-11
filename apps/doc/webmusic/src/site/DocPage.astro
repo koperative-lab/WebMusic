@@ -41,6 +41,8 @@ const tree = navigationTree(pages);
 const sections = navigationSections(tree);
 const section = sectionFor(sections, path);
 const {prev, next} = pager(tree, path);
+// The start pages are a reading path of their own: no left column, the article centred.
+const centred = section.slug === '';
 const contents = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 const pageTitle = title === 'Introduction' && path === '/' ? 'WebMusic' : `${title} | WebMusic`;
@@ -67,8 +69,8 @@ const pageTitle = title === 'Introduction' && path === '/' ? 'WebMusic' : `${tit
   <body>
     <a class="doc-skip" href="#doc-main">Skip to content</a>
     <header class="doc-bar">
-      <button type="button" class="doc-icon doc-bar__menu" data-nav-toggle aria-controls="doc-nav" aria-expanded="false" aria-label="Navigation" title="Navigation"><Icon name="menu" /></button>
-      <a class="doc-brand" href={href('/')}>WebMusic</a>
+      {!centred && <button type="button" class="doc-icon doc-bar__menu" data-nav-toggle aria-controls="doc-nav" aria-expanded="false" aria-label="Navigation" title="Navigation"><Icon name="menu" /></button>}
+      <a class="doc-brand" href={href('/')} aria-label="WebMusic documentation"><span>WebMusic</span><span class="doc-brand__module">Documentation</span></a>
       <nav class="doc-tabs" aria-label="Sections">
         {sections.map((entry) => (
           <a class="doc-tab" href={href(entry.href)} aria-current={entry === section ? 'true' : undefined}>{entry.label}</a>
@@ -78,10 +80,12 @@ const pageTitle = title === 'Introduction' && path === '/' ? 'WebMusic' : `${tit
       <Search />
       <a class="doc-icon" href="https://github.com/koperative-lab/WebMusic" aria-label="GitHub" title="GitHub"><Icon name="github" /></a>
     </header>
-    <div class="doc-body">
-      <nav id="doc-nav" class="doc-nav" aria-label={`${section.label} pages`} data-search-ignore>
-        <NavTree entries={section.entries} path={path} />
-      </nav>
+    <div class:list={['doc-body', {'doc-body--centred': centred}]}>
+      {!centred && (
+        <nav id="doc-nav" class="doc-nav" aria-label={`${section.label} pages`} data-search-ignore>
+          <NavTree entries={section.entries} path={path} />
+        </nav>
+      )}
       <div class="doc-page">
         <main id="doc-main" class="doc-main" tabindex="-1">
           <header class="doc-head">

@@ -50,7 +50,9 @@ a { color: inherit; }
 .mt-bar > * { display: inline-flex; align-items: center; padding-inline: var(--mt-pad); }
 .mt-bar > .mt-action { border-width: 0 0 0 1px; min-height: 0; }
 .mt-bar > .mt-value { border-left: 1px solid var(--mt-line); font-size: .75rem; }
-.mt-brand { font: 600 .75rem var(--mt-mono); text-transform: uppercase; letter-spacing: .12em; text-decoration: none; }
+.mt-brand { gap: .6em; font: 600 .75rem var(--mt-mono); text-transform: uppercase; letter-spacing: .12em; text-decoration: none; }
+/* The module name beside the project name, as in the documentation and the library. */
+.mt-brand__module { color: var(--mt-muted); font-weight: 400; }
 .mt-build { font: .75rem var(--mt-mono); border-left: 1px solid var(--mt-line); }
 .mt-build--warn { color: var(--mt-error); }
 .mt-loading { padding: var(--mt-gap); }

@@ -301,8 +301,8 @@ and the acceptance runner's chrome. Light only.
 
 | Part | Behaviour |
 |---|---|
-| Top bar | One control height: the brand, a tab per section (the current one inverted; the tabs scroll sideways on narrow screens), the search icon and the repository link. |
-| Navigation | The current section's tree in the left column. Groups are collapsible; a collapsed group opens when it holds the current page. The column keeps its scroll offset per tab and otherwise centres the current page. Below 60rem it opens over the page from a menu button, with a scrim. |
+| Top bar | One control height: the brand naming the module (`WebMusic Documentation`, as the runner says `Acceptance`; phones keep only the module name), a tab per section (the current one inverted; the tabs scroll sideways on narrow screens), the search icon and the repository link. |
+| Navigation | The current section's tree in the left column; the Start pages (Introduction, Quick Start) have none and centre the article. Groups are collapsible; a collapsed group opens when it holds the current page. The column keeps its scroll offset per tab and otherwise centres the current page. Below 60rem it opens over the page from a menu button, with a scrim. |
 | Article | Breadcrumbs, the title, the content, then the previous and next pages in reading order across all sections. |
 | Contents | Level-two and level-three headings beside the article from 78rem, marking the heading being read. |
 | Search | A modal card over a scrim, opened by the icon, `/` or Ctrl/⌘ K; it reads the built `search-index.json`. |

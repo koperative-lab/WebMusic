@@ -80,7 +80,7 @@ function renderChrome(): void {
   const save = element('button', {type: 'button', class: 'mt-action'}, 'Download Markdown');
   save.addEventListener('click', download);
   header.replaceChildren(
-    element('a', {class: 'mt-brand', href: '#/'}, 'WebMusic acceptance'),
+    element('a', {class: 'mt-brand', href: '#/', 'aria-label': 'WebMusic acceptance'}, element('span', {}, 'WebMusic'), element('span', {class: 'mt-brand__module'}, 'Acceptance')),
     element('span', {class: `mt-build${identity.changes > 0 || identity.commit === 'unknown' ? ' mt-build--warn' : ''}`, title: `Commit ${identity.commit} on ${identity.branch}`}, describeBuild(identity)),
     element('span', {class: 'mt-value', 'aria-label': 'Progress'},
       `${environmentLabel(environment, store.environments.indexOf(environment))} · ${counts.done}/${counts.total}${counts.failed ? ` · ${counts.failed} failed` : ''}`),

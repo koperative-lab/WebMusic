@@ -122,11 +122,13 @@ button { font: inherit; color: inherit; border-radius: 0; }
 }
 .doc-bar__menu { display: none; border-right: 1px solid var(--ws-line-strong); }
 .doc-brand {
-  display: inline-flex; align-items: center; padding-inline: var(--ws-pad); flex: none;
+  display: inline-flex; align-items: center; gap: 0.6em; padding-inline: var(--ws-pad); flex: none;
   width: var(--ws-nav); border-right: 1px solid var(--ws-line-strong);
   font: 600 0.75rem var(--ws-mono); text-transform: uppercase; letter-spacing: 0.14em; color: var(--ws-fg); text-decoration: none;
 }
 /* Only the tabs scroll sideways, so search and the repository link stay put. */
+/* The module name beside the project name, as in the runner and the library. */
+.doc-brand__module { color: var(--ws-text-muted); font-weight: 400; }
 .doc-tabs { display: flex; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .doc-tabs::-webkit-scrollbar { display: none; }
 .doc-tab {
@@ -167,6 +169,9 @@ webmusic-doc-search { display: flex; }
 .doc-nav > .doc-nav__list > li:has(> .doc-nav__group) { border-top: 1px solid var(--ws-line-strong); }
 .doc-nav > .doc-nav__list > li:has(> .doc-nav__group) + li:not(:has(> .doc-nav__group)) { border-top: 1px solid var(--ws-line-strong); }
 
+/* Start pages: one column, the article centred and its contents to the right. */
+.doc-body--centred { grid-template-columns: minmax(0, 1fr); }
+.doc-body--centred .doc-main { margin-inline: auto; }
 .doc-page { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; min-width: 0; }
 .doc-main {
   min-width: 0; width: 100%; max-width: calc(var(--ws-measure) + var(--ws-gap) * 4);
@@ -191,6 +196,11 @@ webmusic-doc-search { display: flex; }
     margin-top: calc(var(--ws-gap) * 1.5); padding-right: var(--ws-gap);
   }
   .doc-toc::-webkit-scrollbar { display: none; }
+  .doc-body--centred .doc-page {
+    grid-template-columns: minmax(0, 1fr) minmax(0, calc(var(--ws-measure) + var(--ws-gap) * 4)) minmax(0, 1fr);
+  }
+  .doc-body--centred .doc-main { grid-column: 2; }
+  .doc-body--centred .doc-toc { grid-column: 3; width: var(--ws-toc); }
 }
 .doc-toc ul { list-style: none; margin: 0.5rem 0 0; padding: 0; border-left: 1px solid var(--ws-line-strong); }
 .doc-toc a {
@@ -336,7 +346,8 @@ body[data-webmusic-search-open] { overflow: hidden; }
   .doc-main { padding: var(--ws-gap) var(--ws-gap) calc(var(--ws-gap) * 3); }
 }
 @media (max-width: 30rem) {
-  .doc-brand { display: none; }
+  /* Phones keep the module name; the project name is the tab strip's home. */
+  .doc-brand > :first-child { display: none; }
   .doc-head h1 { font-size: 1.35rem; }
   .doc-pager { grid-template-columns: minmax(0, 1fr); }
   webmusic-doc-search dialog { width: calc(100% - 1rem); margin: 0.5rem auto; max-height: calc(100dvh - 1rem); }
