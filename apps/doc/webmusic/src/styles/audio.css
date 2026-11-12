@@ -2,7 +2,7 @@
    components own their surfaces and are not re-skinned by the site. */
 
 :root {
-  --wa-edge: #b0b0b0; /* output-block borders and waveform scrollbars */
+  --wa-edge: #b0b0b0; /* output-block borders */
   --wa-muted: #666;
 }
 
@@ -19,28 +19,3 @@
   min-width: 0;
 }
 
-/* <audio-view> draws the waveform / spectrogram onto a canvas that is
-   intentionally WIDER than its box (duration × pixels-per-second) and lives in a
-   horizontally scrollable wrapper. The article's content reset applies
-   `canvas { max-width: 100% }`, which clamps that canvas back to the box —
-   squashing a long clip into a few pixels and killing the scroll. Opt these
-   canvases out so the wrapper can overflow and pan. */
-.wa-demo audio-view canvas {
-  max-width: none;
-}
-/* Keep the horizontal scrollbar visible so the pannable area is discoverable
-   (macOS overlay scrollbars hide it, which is what made the clip look cut off). */
-.wa-demo audio-view div {
-  scrollbar-width: thin;
-  scrollbar-color: var(--wa-edge) transparent;
-}
-.wa-demo audio-view div::-webkit-scrollbar {
-  height: 9px;
-}
-.wa-demo audio-view div::-webkit-scrollbar-thumb {
-  background: var(--wa-edge);
-  border-radius: 0;
-}
-.wa-demo audio-view div::-webkit-scrollbar-track {
-  background: transparent;
-}

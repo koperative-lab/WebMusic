@@ -15,7 +15,7 @@ const PARTS = [
 ];
 ---
 
-<ElementDemo tag="score-rack-control" class="rc-demo">
+<ElementDemo tag="score-rack-control">
   <score-player data-rc-master>
     <score-rack-control data-rc-desk>
       {PARTS.map((part) => (
@@ -40,8 +40,3 @@ const PARTS = [
   defineRackControlElement();
   defineRackPartElement();
 </script>
-
-<style>
-  /* This gap belongs to the composition, not either component's own surface. */
-  .rc-demo :global(score-rack-control) { margin-top: 0.5rem; }
-</style>

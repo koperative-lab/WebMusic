@@ -1634,3 +1634,14 @@ describe('readable pitch viewports', () => {
     handle.destroy();
   });
 });
+
+describe('pitch surface frame', () => {
+  it('draws the one outer component frame in the line colour on every surface root', () => {
+    for (const root of ['.wui-pitch-keyboard', '.wui-pitch-staff', '.wui-pitch-fretboard']) {
+      const rule = pitchStyle.split('}').find((block) => block.trim().startsWith(`${root} {`) || block.includes(`\n${root} {`));
+      expect(rule, root).toBeDefined();
+      expect(rule, root).toContain('border: var(--wm-pitch-surface-border, var(--wm-component-border, 1px solid var(--wm-border');
+    }
+  });
+});
+

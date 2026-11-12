@@ -6,7 +6,7 @@ import ElementDemo from '../ElementDemo.astro';
 const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 ---
 
-<ElementDemo tag="score-player" class="sp-demo">
+<ElementDemo tag="score-player">
   <score-player src={SRC}></score-player>
 </ElementDemo>
 
@@ -15,10 +15,3 @@ const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 
   defineScorePlayerElement();
 </script>
-
-<style>
-  /* :global so the rule reaches the transport the element builds at runtime */
-  .sp-demo :global(score-player) {
-    display: block;
-  }
-</style>

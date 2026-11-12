@@ -1,14 +1,15 @@
 ---
 import ElementDemo from '../ElementDemo.astro';
+import ElementComposition from '../ElementComposition.astro';
 const playerId = 'pg-pitch-view-player';
 const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 ---
 
-<ElementDemo tag="score-pitch-view" class="pg-pitch-view">
-  <div data-pitch-composition data-pg-fragment>
+<ElementDemo tag="score-pitch-view">
+  <ElementComposition>
     <score-player id={playerId} src={SRC}></score-player>
     <score-pitch-view input={`#${playerId}`}></score-pitch-view>
-  </div>
+  </ElementComposition>
 </ElementDemo>
 
 <script>
@@ -17,11 +18,3 @@ const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
   defineScorePlayerElement();
   definePitchViewElement();
 </script>
-
-<style>
-  .pg-pitch-view :global([data-pitch-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
-  .pg-pitch-view :global([data-pitch-composition] > *) { min-width: 0; }
-  .pg-pitch-view :global(score-pitch-view:not([type=staff]):not([type=fretboard])[direction=left]),
-  .pg-pitch-view :global(score-pitch-view:not([type=staff]):not([type=fretboard])[direction=right]) { height: 320px; }
-  .pg-pitch-view :global(score-player) { --webscore-play-height: 2.1rem; }
-</style>

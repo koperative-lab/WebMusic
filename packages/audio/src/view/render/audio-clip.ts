@@ -184,7 +184,7 @@ const STYLE = `
   --ac-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   color: var(--ac-ink); background: var(--ac-surface);
-  border: var(--wm-component-border, 1px solid var(--ac-line)); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
+  border: var(--wm-component-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
 }
 :where([data-audio-clip] [part~="toolbar"]) {
   display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; height: var(--ac-control); flex: none;

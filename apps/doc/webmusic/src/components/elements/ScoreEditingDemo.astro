@@ -1,5 +1,6 @@
 ---
 import ElementDemo from '../ElementDemo.astro';
+import ElementComposition from '../ElementComposition.astro';
 import './editing-import.css';
 interface Props {
   sourcePath?: string;
@@ -12,18 +13,18 @@ const playerId = `${idPrefix}-player`;
 
 <ElementDemo tag="score-view" typeSwitch={false}>
   <section data-editing-demo data-editing-src={source} aria-label="Shared MIDI editing workflow">
-    <div data-editing-composition data-pg-fragment>
+    <ElementComposition>
       <score-player data-editing-player id={playerId} time-control="full"></score-player>
       <score-grid-view data-editing-grid input={`#${playerId}`} editable note-height="14"></score-grid-view>
       <score-view data-editing-staff input={`#${playerId}`} type="staff"></score-view>
-    </div>
+    </ElementComposition>
     <p data-editing-status role="status">Loading Arabesque No. 1.</p>
     <div class="editing-actions">
       <label class="editing-import">Import MIDI <input data-editing-import type="file" accept=".mid,.midi,audio/midi" aria-label="Import MIDI" /></label>
       <button class="wui-btn" data-editing-export type="button">Export MIDI</button>
       <button class="wui-btn" data-editing-restore type="button">Reload configured source</button>
     </div>
-    <p data-editing-result aria-live="polite">Edit notes in the grid, then press Play to hear the committed version. The read-only staff follows the same document.</p>
+    <p data-editing-result aria-live="polite"></p>
   </section>
 </ElementDemo>
 
@@ -185,7 +186,7 @@ const playerId = `${idPrefix}-player`;
 </script>
 
 <style>
-  [data-editing-demo], [data-editing-composition] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  [data-editing-demo] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; min-width: 0; }
   [data-editing-demo] p { margin: 0; font-size: .85rem; overflow-wrap: anywhere; }
   .editing-actions { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
 </style>

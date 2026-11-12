@@ -6,8 +6,7 @@ import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
 import ElementDemo from './ElementDemo.astro';
 ---
 
-<ElementDemo tag="score-note-input" class="ni-demo">
-  <div class="ni-demo__composition" data-ni-composition data-pg-fragment>
+<ElementDemo tag="score-note-input">
     <score-note-input
       data-ni-input
       data-ni-wire
@@ -16,8 +15,6 @@ import ElementDemo from './ElementDemo.astro';
       end="71"
       map={DEFAULT_TR808_GRID_MAP}
     ></score-note-input>
-  </div>
-
 </ElementDemo>
 
 <script>
@@ -30,12 +27,3 @@ import ElementDemo from './ElementDemo.astro';
     monitorNoteInput(node as NoteInputElement, scope);
   });
 </script>
-
-<style>
-  .ni-demo :global(.ni-demo__composition) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.5rem;
-    min-width: 0;
-  }
-</style>

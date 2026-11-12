@@ -182,7 +182,7 @@ const SHEET_STYLE = `
   --ss-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   color: var(--ss-ink); background: var(--ss-surface);
-  border: var(--wm-component-border, 1px solid var(--ss-line)); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
+  border: var(--wm-component-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
 }
 :where([data-score-sheet] [part~="toolbar"]) {
   display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; height: var(--ss-control); flex: none;

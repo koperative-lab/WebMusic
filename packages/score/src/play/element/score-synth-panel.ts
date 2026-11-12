@@ -153,7 +153,7 @@ const SYNTH_PANEL_COMPATIBILITY_STYLE = `
 }
 :host([hidden]) { display: none; }
 .panel {
-  border: var(--wm-synth-panel-surface-border, var(--wm-panel-surface-border, var(--wm-component-border, var(--wm-panel-border, 1px solid ${LINE}))));
+  border: var(--wm-synth-panel-surface-border, var(--wm-panel-surface-border, var(--wm-component-border, var(--wm-panel-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))))));
   padding: var(--wm-synth-panel-surface-padding, var(--wm-panel-surface-padding, var(--wm-component-padding, var(--wm-panel-padding, 0))));
   background: var(--wm-synth-panel-surface-background, var(--wm-panel-surface-background, var(--wm-component-background, var(--synth-bg, var(--wm-panel-background, ${SURFACE})))));
   border-radius: var(--wm-synth-panel-surface-radius, var(--wm-panel-surface-radius, var(--wm-component-radius, var(--synth-radius, var(--wm-control-radius, 0)))));

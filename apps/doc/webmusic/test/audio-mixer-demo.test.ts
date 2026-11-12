@@ -20,7 +20,7 @@ function deferred() {
 }
 
 function mount() {
-  document.body.innerHTML = '<div class="wa-demo"><audio-player id="mixer-session"></audio-player><audio-mixer id="wa-mixer-demo" data-src="/wav/Arabesque%20No.1.wav"></audio-mixer><p data-mixer-status></p></div>';
+  document.body.innerHTML = '<div data-wm-pg><audio-player id="mixer-session"></audio-player><audio-mixer id="wa-mixer-demo" data-src="/wav/Arabesque%20No.1.wav"></audio-mixer><p data-mixer-status></p></div>';
   const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/components/AudioMixerDemo.astro'), 'utf8')
     .match(/<script>([\s\S]*?)<\/script>/)![1];
   const code = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS}}).outputText;

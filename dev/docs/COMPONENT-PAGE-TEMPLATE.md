@@ -141,8 +141,13 @@ complete API table.
 
 Use `ElementDemo`, whose stage reaches `LiveDemoCanvas`. The shared facilities
 own background, spacing, and Live status; the demo supplies the real
-components, wiring, and necessary local layout. Use `ElementComposition` for
-stacked sibling components: stretch to the available width with a `0.5rem` gap.
+components and wiring. Use `ElementComposition` for stacked sibling components:
+stretch to the available width with a `0.5rem` gap. Components nested in a
+player get the same `0.5rem` below its transport from the shared stage rule.
+`ElementDemo` takes no class: Astro scopes a demo's `<style>` to its own
+template, so a rule aimed at the panel would silently not apply. Every
+component draws its own one outer frame from `--wm-component-border`, falling
+back to `--wm-border`; the demo adds no frame, gap or colour of its own.
 Preserve package control geometry; do not override a companion player's height
 just for its demo.
 

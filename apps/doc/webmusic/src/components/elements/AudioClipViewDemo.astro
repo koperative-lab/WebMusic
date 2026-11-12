@@ -4,16 +4,17 @@
 // the clip view. A starting beat grid is estimated from the opening; Grid Edit
 // refines it.
 import ElementDemo from '../ElementDemo.astro';
+import ElementComposition from '../ElementComposition.astro';
 
 const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 ---
 
 <ElementDemo tag="audio-clip-view">
   <section data-clip-demo data-clip-src={source} aria-label="Audio clip editing">
-    <div data-clip-composition data-pg-fragment>
+    <ElementComposition>
       <audio-player data-clip-player id="clip-player"></audio-player>
       <audio-clip-view data-clip-view input="#clip-player" editable grid quantize></audio-clip-view>
-    </div>
+    </ElementComposition>
     <p data-clip-status role="alert" hidden></p>
   </section>
 </ElementDemo>
@@ -96,6 +97,6 @@ const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 </script>
 
 <style>
-  [data-clip-demo], [data-clip-composition] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  [data-clip-demo] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; min-width: 0; }
   [data-clip-demo] p { margin: 0; font-size: .85rem; overflow-wrap: anywhere; }
 </style>

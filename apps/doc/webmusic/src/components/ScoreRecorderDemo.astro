@@ -1,11 +1,12 @@
 ---
 import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
 import ElementDemo from './ElementDemo.astro';
-
+import ElementComposition from './ElementComposition.astro';
 ---
 
-<ElementDemo tag="score-recorder" class="sr-demo">
-  <div class="sr-demo__composition" data-sr-composition data-pg-fragment>
+<ElementDemo tag="score-recorder">
+  <div data-sr-composition>
+  <ElementComposition>
     <score-note-input
       data-sr-input
       layout="piano"
@@ -14,8 +15,8 @@ import ElementDemo from './ElementDemo.astro';
       map={DEFAULT_TR808_GRID_MAP}
     ></score-note-input>
     <score-recorder data-sr-recorder bpm="120" quantize="0"></score-recorder>
+  </ElementComposition>
   </div>
-
 </ElementDemo>
 
 <script>
@@ -39,12 +40,3 @@ import ElementDemo from './ElementDemo.astro';
     monitorNoteInput(input, scope);
   });
 </script>
-
-<style>
-  .sr-demo :global(.sr-demo__composition) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.5rem;
-    min-width: 0;
-  }
-</style>

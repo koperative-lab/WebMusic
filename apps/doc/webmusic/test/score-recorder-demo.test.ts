@@ -72,7 +72,7 @@ function runDemo(): void {
 }
 
 function composition(): HTMLElement {
-  const markup = astroSource.match(/<div class="sr-demo__composition"[\s\S]*?<\/div>/)?.[0];
+  const markup = astroSource.match(/<div data-sr-composition>[\s\S]*?<\/div>/)?.[0];
   if (!markup) throw new Error('ScoreRecorderDemo has no composition');
   const holder = document.createElement('div');
   holder.innerHTML = markup.replace('map={DEFAULT_TR808_GRID_MAP}', 'map="z1=35,a1=50"');

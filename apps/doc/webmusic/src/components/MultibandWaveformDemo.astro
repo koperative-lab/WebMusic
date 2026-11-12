@@ -3,14 +3,15 @@
 // content (bass → red, mid → green, treble → blue). The SHAPE is amplitude
 // peaks of the left channel; the COLOUR is its spectrogram.
 import ElementDemo from './ElementDemo.astro';
-
+import ElementComposition from './ElementComposition.astro';
 ---
 
 <ElementDemo tag="audio-view" typeSwitch={false}>
-  <div class="mm-device" data-mm>
+  <div data-mm>
+    <ElementComposition>
     <audio-player id="mm-player" controls></audio-player>
     <audio-view id="mm-view" input="#mm-player" type="waveform" pixels-per-second="90" height="160" interactive drag-mode="scrub" color-mode="multiband"></audio-view>
-
+    </ElementComposition>
     <p role="status" class="wm-demo-status" data-mm-status></p>
   </div>
 </ElementDemo>
@@ -87,9 +88,3 @@ import ElementDemo from './ElementDemo.astro';
     });
   });
 </script>
-
-<style>
-  /* The device follows the kit: neutral surface, hairlines, square cells. */
-  .mm-device { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
-  .mm-device :global(audio-view) { display: block; min-height: 160px; }
-</style>

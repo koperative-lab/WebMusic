@@ -139,7 +139,7 @@ const GRID_STYLE = `
   --sg-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   color: var(--sg-ink); background: var(--sg-surface);
-  border: var(--wm-component-border, 1px solid var(--sg-line)); border-radius: var(--wm-component-radius, var(--sg-radius));
+  border: var(--wm-component-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))); border-radius: var(--wm-component-radius, var(--sg-radius));
 }
 :where([data-score-grid] [part~="toolbar"]) {
   display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; height: var(--sg-control);

@@ -3,14 +3,14 @@
 // bound to it. It captures the microphone, so it does nothing until the reader
 // presses Record and the browser grants permission; it never auto-starts.
 import ElementDemo from './ElementDemo.astro';
-import AudioPlayStage from './AudioPlayStage.astro';
+import ElementComposition from './ElementComposition.astro';
 ---
 
-<ElementDemo tag="audio-recorder" class="wa-demo">
-  <AudioPlayStage>
+<ElementDemo tag="audio-recorder">
+  <ElementComposition>
     <audio-player id="recorder-session"></audio-player>
     <audio-recorder input="#recorder-session" id="wa-recorder-demo"></audio-recorder>
-  </AudioPlayStage>
+  </ElementComposition>
 </ElementDemo>
 
 <script>

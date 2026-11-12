@@ -2,6 +2,7 @@
 // One visible view; data is shared with the optional examples below it.
 // Spectral analysis starts only when the selected representation needs it.
 import ElementDemo from './ElementDemo.astro';
+import ElementComposition from './ElementComposition.astro';
 
 // "Wired, but nothing visible changes HERE" — honest rather than flattering.
 // Only demo-scoped reasons belong here: an attribute that merely applies to one
@@ -10,8 +11,9 @@ import ElementDemo from './ElementDemo.astro';
 const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
 ---
 
-<ElementDemo tag="audio-view" class="wa-demo">
+<ElementDemo tag="audio-view">
   <div data-audio-view-demo>
+  <ElementComposition>
   <audio-player id="wa-v-player" controls></audio-player>
   <audio-view
     id="wa-v-view"
@@ -24,6 +26,7 @@ const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
     drag-mode="scrub"
     data-view-demo
   ></audio-view>
+  </ElementComposition>
   <p role="status" class="wm-demo-status" data-view-status></p>
   </div>
 </ElementDemo>
@@ -108,13 +111,3 @@ const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
     });
   });
 </script>
-
-<style>
-  .wa-demo :global(audio-player) {
-    display: block;
-    margin-bottom: 0.6rem;
-  }
-  .wa-demo :global(audio-view) {
-    display: block;
-  }
-</style>

@@ -88,7 +88,7 @@ export const audioBridgeContext = Object.freeze({
     'HlAudioPlayerDemo', 'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
     'AudioCustomStyleDemo', 'AudioHistogramPlayground',
     'AudioClipEditorHeadlessDemo', 'AudioClipViewDemo',
-    'AudioLiveViewPlayground', 'AudioMeterDemo', 'AudioMixerDemo',
+    'AudioLiveViewPlayground', 'AudioMixerDemo',
     'AudioPlaylistPlayground', 'AudioViewDemo', 'AudioWorkbenchDemo',
     'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSessionDemo',
   ],

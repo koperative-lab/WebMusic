@@ -13,8 +13,6 @@ import { defaultType, typeLabel } from './element-demo-types';
 interface Props {
   /** Catalog key — the custom element tag. */
   tag: string;
-  /** Extra class on the panel, for demo-specific element styling. */
-  class?: string;
   /**
    * Show the catalog's type switch (default). A topic demo, which shows one
    * behavior of a page whose main demo already switches, passes false.
@@ -22,7 +20,7 @@ interface Props {
   typeSwitch?: boolean;
 }
 
-const {tag, class: extraClass = '', typeSwitch = true} = Astro.props;
+const {tag, typeSwitch = true} = Astro.props;
 
 const spec = ELEMENT_PARAMS[tag];
 if (!spec) throw new Error(`<ElementDemo tag="${tag}"> has no entry in src/lib/params`);
@@ -31,7 +29,7 @@ const options = types?.options ?? [];
 const fallback = types ? defaultType(options, types.fallback) : undefined;
 ---
 
-<div class={`wui-panel wui-panel--flow not-content wm-pg ${extraClass}`.trim()} data-wm-pg data-pg-tag={tag}>
+<div class="wui-panel wui-panel--flow not-content wm-pg" data-wm-pg data-pg-tag={tag}>
   <div class="wui-panel__title">
     <span>{spec.entry}</span>
     <strong>{`<${tag}>`}</strong>

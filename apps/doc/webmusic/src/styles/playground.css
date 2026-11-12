@@ -54,6 +54,23 @@
   flex: none;
 }
 
+/* One spacing rule for every Element demo: 0.5rem between component
+   surfaces. Siblings get it from ElementComposition's gap; components nested in
+   a player get it here, below the player's own transport. Nonvisual
+   declarations (effects, Rack parts) render nothing and take no space. */
+.wm-pg__stage :where(score-player, audio-player) {
+  display: block;
+}
+
+.wm-pg__stage :where(score-player, audio-player) > :where(:not(div, span, p, section, template, script, style)) {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.wm-pg__stage :where(score-effect, audio-effect, score-rack-part) {
+  display: none;
+}
+
 /* Explicit demo siblings retain independent component surfaces. */
 .wm-play-composition {
   display: grid;

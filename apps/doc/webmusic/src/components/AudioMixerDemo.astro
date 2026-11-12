@@ -3,17 +3,17 @@
 // script block and assign `.members` to the owning element. Two members share one clip and a scheduled start, which is what gives
 // the desk two strips — and gives `solo` an id to actually name.
 import ElementDemo from './ElementDemo.astro';
-import AudioPlayStage from './AudioPlayStage.astro';
+import ElementComposition from './ElementComposition.astro';
 
 const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 ---
 
-<ElementDemo tag="audio-mixer" class="wa-demo">
-  <AudioPlayStage>
+<ElementDemo tag="audio-mixer">
+  <ElementComposition>
     <audio-player id="mixer-session"></audio-player>
     <audio-mixer input="#mixer-session" id="wa-mixer-demo" data-src={SRC}></audio-mixer>
     <p role="status" data-mixer-status hidden></p>
-  </AudioPlayStage>
+  </ElementComposition>
 </ElementDemo>
 
 <script>
@@ -25,7 +25,7 @@ const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
   defineAudioPlayerElement();
   defineAudioMixerElement();
 
-  mountDemos('.wa-demo:has(#wa-mixer-demo)', (root, scope) => {
+  mountDemos('[data-wm-pg]:has(#wa-mixer-demo)', (root, scope) => {
     const el = root.querySelector<AudioMixerElement>('#wa-mixer-demo')!;
     const player = root.querySelector<AudioPlayerElement>('#mixer-session')!;
     const status = root.querySelector<HTMLElement>('[data-mixer-status]')!;

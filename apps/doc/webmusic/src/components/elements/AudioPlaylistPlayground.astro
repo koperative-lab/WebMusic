@@ -10,7 +10,7 @@
 // rather than decoded. Typing into the `src` control takes over from the
 // children, which is the one attribute swap worth watching here.
 import ElementDemo from '../ElementDemo.astro';
-import AudioPlayStage from '../AudioPlayStage.astro';
+import ElementComposition from '../ElementComposition.astro';
 
 const WAV = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 const MP3 = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
@@ -21,15 +21,15 @@ const ENTRIES = [
 ];
 ---
 
-<ElementDemo tag="audio-playlist" class="pg-playlist">
-  <AudioPlayStage>
+<ElementDemo tag="audio-playlist">
+  <ElementComposition>
     <audio-player id="playlist-session"></audio-player>
     <audio-playlist input="#playlist-session" loop>
       {ENTRIES.map((entry) => (
         <li data-id={entry.id} data-src={entry.src} data-label={entry.label} data-streaming={entry.streaming ? '' : undefined}>{entry.label}</li>
       ))}
     </audio-playlist>
-  </AudioPlayStage>
+  </ElementComposition>
 </ElementDemo>
 
 <script>

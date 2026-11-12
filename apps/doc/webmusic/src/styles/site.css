@@ -64,8 +64,10 @@ body {
 }
 ::selection { background: var(--ws-fg); color: var(--ws-on-accent); }
 :where(a, button, input, select, textarea, summary, pre):focus-visible { outline: var(--ws-focus); outline-offset: -2px; }
-img, svg, video, canvas { max-width: 100%; }
-button { font: inherit; color: inherit; border-radius: 0; }
+/* Site resets have zero specificity and stop at demos: a component's own
+   `:where()` rules, such as a pressed toolbar button's inverted icon, must win. */
+:where(img, svg, video, canvas):where(:not(.not-content *)) { max-width: 100%; }
+:where(button):where(:not(.not-content *)) { font: inherit; color: inherit; border-radius: 0; }
 
 .doc-caption {
   margin: 0;

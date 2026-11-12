@@ -48,8 +48,10 @@ is ink, not colour.
   toolbar rows and card headers share it.
 - Lines are 1px hairlines in the line colour. Separate groups with a hairline,
   not with spacing, shadows or nested boxes.
-- One outer frame per component (`--wm-component-border`, `--wm-component-radius`).
-  Inner parts do not draw a second card.
+- One outer frame per component (`--wm-component-border`, `--wm-component-radius`),
+  falling back to `1px solid var(--wm-border)`. Outer frames never fall back to
+  `--wm-control-border`, which is for controls inside the frame, so every
+  component edge has the same colour. Inner parts do not draw a second card.
 - No shadows, gradients or blur, except the single shadow under a floating card.
 
 ## Type
@@ -130,7 +132,9 @@ reference tables document configuration, and interactive adjustment is not part
 of the documentation site. The one exception is the type switch between the
 panel title and the canvas: a mono uppercase attribute name, then one square
 toggle per value, edge to edge, the current one inverted, for an element with
-several drawings, surfaces or recipes. No demo-only checkboxes, hint text or event logs
+several drawings, surfaces or recipes. Components in a demo stand 0.5rem apart,
+whether siblings or nested in a player, and each shows its own single frame in
+the line colour. No demo-only checkboxes, hint text or event logs
 inside the canvas; a failed load may show one error line. Headless and UI Kit
 presenter demos keep their external Parameters for configuration.
 
