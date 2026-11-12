@@ -3107,7 +3107,7 @@ navigation, search dialog and page chrome are site code, covered by
 `npm run docs:build`; every built anchor link resolves; the shell is checked in
 a browser at wide and phone widths with keyboard focus.
 
-## DEC-071 — Web Component demos show the default interaction only
+## DEC-071 — Web Component and Headless demos show the default interaction only
 
 **Date / status:** 2026-11-11; accepted by the repository owner.
 
@@ -3132,7 +3132,11 @@ Ports and composition, topics, API, Styling and Related, checked by
 property and event tables document configuration, and code examples show it.
 Interactive adjustment and code generation belong to the separately maintained
 component library. The parameter catalog (`src/lib/params`) stays as data for
-the site checks and other tools. Headless and UI Kit presenter demos keep their
+the site checks and other tools. Headless demos follow the same rule
+(extended by the owner on 2026-11-12): the shared `HeadlessDemoFrame` shows the
+object working in its default configuration with only the controls that
+operate it, and no Parameters, code readout, Copy or Reset; the Headless page
+explains how it works and documents its API. UI Kit presenter demos keep their
 Parameters. This supersedes the demo-configuration rule of DEC-059 for Web
 Component demos, and the Parameters, copied-markup and Copy/Reset consequences
 recorded for Element demos in earlier decisions (DEC-012, DEC-013, DEC-015,
@@ -3148,6 +3152,10 @@ input in a player, so it edits the player's instrument. Page prose no longer
 refers to Parameters, Copy or Reset on Element pages. The two effect pages use
 their own demo, an effect inside a player with an attached panel, instead of
 the shared modular-composition example, so their recipe switch is audible.
+Headless demos build their objects with fixed defaults; operation controls (a
+playlist's next entry, a Rack part's mute, an editor's edit and undo) sit in the
+canvas, and debugging consoles such as raw edit-operation fields are gone. The
+Headless parameter catalog (`src/lib/headless-params`) stays as data.
 
 **Owner:** [Visual design](design/VISUAL-DESIGN.md) §"Documentation demos",
 [Component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the
@@ -3155,8 +3163,8 @@ the shared modular-composition example, so their recipe switch is audible.
 
 **Verification:** the documentation tests and build, including the page-shape
 policy and its unit tests; every Element page renders its demo without a
-Parameters strip, and the changed demos and type switches are checked in a
-browser.
+Parameters strip, and every Headless frame has none (`headless-docs-policy`);
+the changed demos and type switches are checked in a browser.
 
 ## Recording the next decision
 

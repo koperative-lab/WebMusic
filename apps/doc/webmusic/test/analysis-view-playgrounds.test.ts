@@ -17,7 +17,7 @@ afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); document.
 function setup<T>(html: string, mount: (root: HTMLElement, scope: DemoScope) => T) {
   const root = document.createElement('div');
   root.dataset.testDemo = String(++id);
-  root.innerHTML = `${html}<p data-hl-feedback hidden></p><pre data-hl-readout></pre>`;
+  root.innerHTML = `${html}<p data-hl-feedback hidden></p>`;
   document.body.append(root);
   let handle!: T;
   const dispose = mountDemos(`[data-test-demo="${id}"]`, (root, scope) => { handle = mount(root, scope); });
@@ -27,44 +27,34 @@ function setup<T>(html: string, mount: (root: HTMLElement, scope: DemoScope) => 
     input.value = value;
     input.dispatchEvent(new Event(event, {bubbles: true}));
   };
-  return {root, handle, change, dispose, reset: () => root.dispatchEvent(new CustomEvent('wm:headless-reset', {bubbles: true}))};
+  return {root, handle, change, dispose};
 }
 
 describe('Headless analysis and score-window live demos', () => {
-  it('edits immutable scores through the same session, recreates fixed options and resets controls', () => {
-    const {root, handle, change, reset, dispose} = setup(`
-      <select data-session-score><option value="opening">Opening</option><option value="extended">Extended</option></select>
-      <select data-session-pitch><option selected>C#5</option><option>D5</option><option>F#5</option></select>
-      <select data-session-window><option>1</option><option selected>2</option><option>4</option></select>
-      <p data-session-summary></p><div data-session-notes></div><div data-session-chords></div><p data-session-detail></p>`, (root, scope) => mountAnalysisSessionDemo(root, scope, source));
+  it('edits immutable scores through the same session and stops after disposal', () => {
+    const {root, handle, dispose} = setup(`
+      <p data-session-summary></p><div data-session-notes></div><div data-session-chords></div><p data-session-detail></p>
+      <button data-session-edit>Edit first note</button>`, (root, scope) => mountAnalysisSessionDemo(root, scope, source));
     const original = handle.model;
     const originalScore = original.score;
-    change('[data-session-pitch]', 'F#5');
+    const edit = () => root.querySelector<HTMLButtonElement>('[data-session-edit]')!.click();
+    edit();
     expect(handle.model).toBe(original);
     expect(original.score).not.toBe(originalScore);
-    expect(original.score.parts[0].notes[0].pitch?.toString()).toBe('F#5');
-    expect(root.querySelector('[data-session-notes]')?.textContent).toContain('F#5');
-    expect(root.querySelector('[data-hl-readout]')?.textContent).toContain("Pitch.parse('F#5')");
-    change('[data-session-score]', 'extended');
-    expect(handle.model).toBe(original);
-    expect(original.score.metadata.title).toBe('Arabesque No. 1');
-    expect(original.score.notes.length).toBeGreaterThan(originalScore.notes.length);
-    change('[data-session-window]', '1');
-    expect(handle.model).not.toBe(original);
-    expect(root.querySelector('[data-session-detail]')?.textContent).toContain('window 1 quarters');
-    reset();
-    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
-    expect(root.querySelector('[data-session-summary]')?.textContent).toContain('0 score updates');
-    expect(root.querySelector('[data-hl-readout]')?.textContent).toContain('windowQuarters: 2');
-    const resetModel = handle.model;
+    expect(original.score.parts[0].notes[0].pitch?.toString()).toBe('D5');
+    expect(root.querySelector('[data-session-notes]')?.textContent).toContain('D5');
+    expect(root.querySelector('[data-session-summary]')?.textContent).toContain('1 score update');
+    edit();
+    expect(original.score.parts[0].notes[0].pitch?.toString()).toBe('E5');
+    expect(root.querySelector('[data-session-summary]')?.textContent).toContain('2 score updates');
     dispose();
-    change('[data-session-score]', 'extended');
-    expect(handle.model).toBe(resetModel);
-    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
+    const after = handle.model.score;
+    edit();
+    expect(handle.model.score).toBe(after);
   });
 
-  it('feeds real held chords and heard-note key analysis, preserves history on release and clears it on reset', () => {
-    const {root, handle, reset, dispose} = setup(`
+  it('feeds real held chords and heard-note key analysis, preserves history on release and resets on disposal', () => {
+    const {root, handle, dispose} = setup(`
       <button data-live-midi="60" aria-pressed="false">C4</button><button data-live-preset="C">C</button>
       <button data-live-preset="G7">G7</button><button data-live-release>Release</button>
       <p data-live-chord></p><div data-live-notes></div><p data-live-key></p><div data-live-history></div>`, mountLiveTrackersDemo);
@@ -83,14 +73,9 @@ describe('Headless analysis and score-window live demos', () => {
     for (let index = 0; index < 10; index += 1) press(`[data-live-preset="${index % 2 ? 'C' : 'G7'}"]`);
     expect(handle.state.history).toHaveLength(8);
     expect(root.querySelector('[data-live-history]')?.children).toHaveLength(8);
-    reset();
-    expect(handle.state.midis).toEqual([]);
-    expect(handle.state.history).toEqual([]);
-    expect(handle.key.heard).toBe(0);
-    expect(root.querySelector('[data-live-key]')?.textContent).toContain('no notes heard');
+    press('[data-live-release]');
     press('[data-live-midi]');
     expect(root.querySelector('[data-live-midi]')?.getAttribute('aria-pressed')).toBe('true');
-    expect(handle.key.heard).toBe(1);
     dispose();
     const before = root.textContent;
     press('[data-live-preset="C"]');
@@ -99,28 +84,16 @@ describe('Headless analysis and score-window live demos', () => {
     expect(handle.key.heard).toBe(0);
   });
 
-  it('renders actual viewport candidates and local active notes, then disposes replaced and unmounted views', () => {
-    const {root, handle, change, reset, dispose} = setup(`
-      <select data-window-viewport><option value="0">0–2</option><option value="2">2–4</option><option value="all">All</option></select>
-      <input data-window-position type="range" min="0" max="4" step=".05" value="0" />
+  it('renders the viewport candidates and local active notes, then disposes the view on unmount', () => {
+    const {root, handle, change, dispose} = setup(`
+      <input data-window-position type="range" min="0" max="2" step=".05" value="0" />
       <p data-window-summary></p><div data-window-lane></div><p data-window-time></p><div data-window-active></div>`, (root, scope) => mountScoreWindowDemo(root, scope, source));
+    expect(handle.model.state.viewport).toEqual({startTime: 0, endTime: 2});
     expect(handle.model.state.visibleNotes.length).toBeGreaterThan(0);
     expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(0);
-    change('[data-window-viewport]', '2');
-    change('[data-window-position]', '2.25', 'input');
-    expect(handle.model.state.currentTime).toBe(2.25);
-    expect(handle.model.state.viewport).toEqual({startTime: 2, endTime: 4});
-    expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(0);
-    change('[data-window-viewport]', 'all');
-    expect(handle.model.state.visibleNotes.length).toBeGreaterThan(8);
-    expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(8);
-    expect(root.querySelector('[data-hl-readout]')?.textContent).toContain('view.seek(2.25)');
-    const old = handle.model;
-    reset();
-    expect(() => old.seek(1)).toThrow('disposed');
-    expect(handle.model).not.toBe(old);
-    expect(handle.model.state.viewport).toEqual({startTime: 0, endTime: 2});
-    expect(handle.model.state.currentTime).toBe(0);
+    change('[data-window-position]', '1.25', 'input');
+    expect(handle.model.state.currentTime).toBe(1.25);
+    expect(root.querySelector('[data-window-time]')?.textContent).toContain('1.25s');
     dispose();
     expect(() => handle.model.seek(1)).toThrow('disposed');
     const before = root.textContent;

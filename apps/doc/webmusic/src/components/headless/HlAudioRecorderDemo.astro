@@ -1,19 +1,12 @@
 ---
 // AudioRecorder: Record asks for the microphone and captures a take; the take
-// then plays through an AudioClipPlayer. Parameters shape the next take.
+// then plays through an AudioClipPlayer.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="AudioRecorder"
-  hint="Record asks for microphone permission; nothing is captured until you allow it."
-  code={`import {AudioRecorder} from '@webmusic/audio/play/headless';
-
-const recorder = new AudioRecorder({echoCancellation: false});
-// In a record gesture: await recorder.start();
-// Later: const take = await recorder.stop();
-// On cleanup: recorder.dispose();`}
   rootAttrs={{'data-hl-recorder': true}}
 >
   <div class="wui-row">
@@ -22,34 +15,22 @@ const recorder = new AudioRecorder({echoCancellation: false});
     <span class="wui-readout" data-take>no take</span>
   </div>
   <HeadlessTransport />
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">echoCancellation</span><input type="checkbox" data-echo aria-label="Echo cancellation" /><span class="wm-pg__note">Constructor option for the next take's getUserMedia request.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {AudioClipPlayer, AudioRecorder} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-recorder]', (root, scope) => {
     const record = root.querySelector<HTMLButtonElement>('[data-record]')!;
     const level = root.querySelector<HTMLElement>('[data-level]')!;
     const take = root.querySelector<HTMLElement>('[data-take]')!;
-    const echo = root.querySelector<HTMLInputElement>('[data-echo]')!;
     let recorder: AudioRecorder | undefined = undefined;
     let player: AudioClipPlayer | undefined = undefined;
     let recording = false;
     const transport = bindTransport(root, scope, () => player);
     scope.add(() => { recorder?.dispose(); player?.dispose(); });
-    const code = (): void => programmaticCode(root, `import {AudioRecorder} from '@webmusic/audio/play/headless';
-
-const recorder = new AudioRecorder({echoCancellation: ${echo.checked}});
-// In a record gesture: await recorder.start();
-// Later: const take = await recorder.stop();
-// On cleanup: recorder.dispose();`);
-    scope.listen(echo, 'change', code);
-    code();
     scope.listen(record, 'click', async () => {
       // One request at a time: the button waits for permission and for a take to finish.
       record.disabled = true;
@@ -70,7 +51,7 @@ const recorder = new AudioRecorder({echoCancellation: ${echo.checked}});
         player = undefined;
         transport.paint();
         recorder?.dispose();
-        recorder = new AudioRecorder({echoCancellation: echo.checked});
+        recorder = new AudioRecorder();
         recorder.on('level', (rms) => { level.style.width = `${Math.min(100, rms * 320)}%`; });
         try {
           await recorder.start();

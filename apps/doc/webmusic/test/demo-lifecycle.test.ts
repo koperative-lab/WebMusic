@@ -6,7 +6,7 @@ import {dirname, resolve} from 'node:path';
 import ts from 'typescript';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {mountDemos, type DemoScope} from '../src/components/demo-lifecycle';
-import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../src/components/programmatic/programmatic-demo-lifecycle';
+import {mountProgrammaticDemo, programmaticFeedback} from '../src/components/programmatic/programmatic-demo-lifecycle';
 
 const registrations: Array<() => void> = [];
 const flush = async (): Promise<void> => {
@@ -45,7 +45,6 @@ function runDemo(file: string, modules: Record<string, unknown>): void {
         registrations.push(stop);
         return stop;
       },
-      programmaticCode,
       programmaticFeedback,
     };
     if (!(name in modules)) throw new Error(`Unexpected import: ${name}`);
@@ -355,95 +354,67 @@ describe('actual programmatic demo lifetimes', () => {
 });
 
 
-describe('programmatic Parameters reset', () => {
-  it('releases the previous instance, restores controls and ignores old async work', async () => {
-    document.body.innerHTML = `<div data-reset-demo>
-      <div data-hl-stage><button>Play</button><output>initial</output></div>
-      <details class="wm-pg__params"><input value="120"></details>
-      <pre data-hl-readout>initial code</pre><p data-hl-feedback hidden></p>
+describe('programmatic demo lifecycle', () => {
+  it('shows a failure on its one line, clears it on the next action and releases late work on removal', async () => {
+    document.body.innerHTML = `<div data-lifecycle-demo>
+      <div data-hl-stage><button>Play</button><output>initial</output></div><p data-hl-feedback hidden></p>
     </div>`;
-    const root = document.querySelector<HTMLElement>('[data-reset-demo]')!;
+    const root = document.querySelector<HTMLElement>('[data-lifecycle-demo]')!;
     const pending = deferred<void>();
     const disposed = vi.fn();
     const lateResource = vi.fn();
-    const clicked = vi.fn();
-    let generations = 0;
-    const setup = (_root: HTMLElement, scope: DemoScope): void => {
-      const generation = ++generations;
-      scope.add(() => disposed(generation));
+    let calls = 0;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    registrations.push(mountProgrammaticDemo('[data-lifecycle-demo]', (_root, scope) => {
+      scope.add(disposed);
       scope.listen(root.querySelector('button')!, 'click', async () => {
-        clicked(generation);
+        calls += 1;
+        if (calls === 1) throw new Error('Audio is unavailable');
         await pending.promise;
         scope.add(lateResource);
-        if (scope.active) root.querySelector('output')!.textContent = `instance ${generation}`;
+        if (scope.active) root.querySelector('output')!.textContent = 'played';
       });
-    };
-    registrations.push(mountProgrammaticDemo('[data-reset-demo]', setup));
-    const oldButton = root.querySelector('button')!;
-    oldButton.click();
-    root.querySelector('input')!.value = '180';
-    root.querySelector('output')!.textContent = 'changed';
-    programmaticCode(root, 'changed code');
-    programmaticFeedback(root, 'failed');
-    expect(root.querySelector<HTMLElement>('[data-hl-feedback]')!.hidden).toBe(false);
-    root.dispatchEvent(new CustomEvent('wm:headless-reset', {bubbles: true}));
-    expect(disposed).toHaveBeenCalledExactlyOnceWith(1);
-    expect(generations).toBe(2);
-    expect(root.querySelector('input')!.value).toBe('120');
-    expect(root.querySelector('output')!.textContent).toBe('initial');
-    expect(root.querySelector('[data-hl-readout]')!.textContent).toBe('initial code');
-    expect(root.querySelector<HTMLElement>('[data-hl-feedback]')!.hidden).toBe(true);
-    oldButton.click();
-    expect(clicked).toHaveBeenCalledTimes(1);
-    pending.resolve();
-    await flush();
-    expect(lateResource).toHaveBeenCalledTimes(1);
-    expect(root.querySelector('output')!.textContent).toBe('initial');
+    }));
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
     root.querySelector('button')!.click();
     await flush();
-    expect(root.querySelector('output')!.textContent).toBe('instance 2');
+    expect(feedback.hidden).toBe(false);
+    expect(feedback.textContent).toBe('Audio is unavailable');
+    root.querySelector('button')!.click();
+    expect(feedback.hidden).toBe(true);
     root.remove();
     await flush();
-    expect(disposed.mock.calls).toEqual([[1], [2]]);
-    expect(lateResource).toHaveBeenCalledTimes(2);
+    expect(disposed).toHaveBeenCalledOnce();
+    pending.resolve();
+    await flush();
+    expect(lateResource).toHaveBeenCalledOnce();
+    expect(root.querySelector('output')!.textContent).toBe('initial');
   });
 
-  it('replaces the real transport polling binding and releases it again on Reset', async () => {
+  it('binds the transport driver once at its default interval and releases it on removal', async () => {
     document.body.innerHTML = `<div data-programmatic-transportdriver>
-      <div data-hl-stage><input data-scrub value="0"><div data-fill></div><span data-time></span></div>
-      <details class="wm-pg__params"><input data-interval value="50"></details><pre data-hl-readout></pre>
+      <div data-hl-stage><input data-scrub value="0"><div data-fill></div><span data-time></span></div><p data-hl-feedback hidden></p>
     </div>`;
     const players: Array<{dispose: ReturnType<typeof vi.fn>}> = [];
-    const stops: Array<ReturnType<typeof vi.fn>> = [];
+    const stop = vi.fn();
     class Player {
       seconds = 0; duration = 4; dispose = vi.fn();
       constructor() { players.push(this); }
       on() { return () => undefined; }
     }
-    const bindValue = vi.fn((_player: unknown, _options: unknown) => { const stop = vi.fn(); stops.push(stop); return stop; });
+    const bindValue = vi.fn((_player: unknown, _options: unknown) => stop);
     runDemo('programmatic/ProgrammaticTransportDriverDemo', {
       '@webmusic/score': scoreModule,
       '@webmusic/score/play/headless': {ScorePlayer: Player, Sound: {oscillator: () => ({})}},
       '@webmusic/score/play/drivers': {bindValue},
     });
     await flush();
-    const root = document.querySelector<HTMLElement>('[data-programmatic-transportdriver]')!;
-    const input = root.querySelector<HTMLInputElement>('[data-interval]')!;
-    input.value = '125';
-    input.dispatchEvent(new Event('change'));
-    expect(stops[0]).toHaveBeenCalledTimes(1);
-    expect(bindValue.mock.calls[1]?.[1]).toMatchObject({interval: 125, mode: 'seek'});
-    expect(root.querySelector('[data-hl-readout]')!.textContent).toContain('interval: 125');
-    root.dispatchEvent(new CustomEvent('wm:headless-reset', {bubbles: true}));
+    expect(bindValue).toHaveBeenCalledOnce();
+    expect(bindValue.mock.calls[0]?.[1]).toMatchObject({interval: 50, mode: 'seek'});
+    document.querySelector('[data-programmatic-transportdriver]')!.remove();
     await flush();
-    expect(stops[1]).toHaveBeenCalledTimes(1);
-    expect(players[0]!.dispose).toHaveBeenCalledTimes(1);
-    expect(root.querySelector<HTMLInputElement>('[data-interval]')!.value).toBe('50');
-    expect(bindValue.mock.calls[2]?.[1]).toMatchObject({interval: 50});
-    root.remove();
-    await flush();
-    expect(players[1]!.dispose).toHaveBeenCalledTimes(1);
-    expect(stops[2]).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledOnce();
+    expect(players[0]!.dispose).toHaveBeenCalledOnce();
   });
 });
 
@@ -470,13 +441,10 @@ describe('ScorePlayer playground ownership and feedback', () => {
       '@webmusic/score/play/headless': {ScorePlayer: Player, Sound: {oscillator: () => synth}},
     });
     const factory = (window as unknown as Record<string, (options: Record<string, unknown>, stage: HTMLElement) => Promise<{
-      construction: string; dispose: () => void;
+      dispose: () => void;
     }>>).__wmScorePlayerDemo!;
     const stage = document.querySelector<HTMLElement>('[data-stage]')!;
     const instance = await factory({synthOwnership: ownership, loop: true}, stage);
-    expect(instance.construction).toContain('const synth = Sound.oscillator()');
-    expect(instance.construction).toContain(`"synthOwnership": "${ownership}"`);
-    expect(instance.construction).toContain('"loop": true');
     stage.querySelector<HTMLButtonElement>('button')!.click();
     await flush();
     const feedback = document.querySelector<HTMLElement>('[data-hl-feedback]')!;
@@ -493,7 +461,7 @@ describe('ScorePlayer playground ownership and feedback', () => {
     delete (window as unknown as Record<string, unknown>).__wmScorePlayerDemo;
   });
 
-  it('does not report a late failure from a player disposed by Reset', async () => {
+  it('does not report a late failure from a disposed player', async () => {
     document.body.innerHTML = `<div data-headless-demo><p data-hl-feedback hidden></p>
       <div data-stage><button data-sp-play></button><div data-sp-fill></div><span data-sp-time></span></div></div>`;
     let reject!: (error: Error) => void;

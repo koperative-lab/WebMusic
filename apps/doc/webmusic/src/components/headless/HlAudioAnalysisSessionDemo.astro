@@ -1,13 +1,12 @@
 ---
 // createAudioAnalysisSession over the opening of Arabesque No. 1: Analyze runs
-// every requested task; Trim ½ hands the session an edited clip and update()
-// recomputes only what the edit touched. Parameters choose the tasks.
+// every task; Trim ½ hands the session an edited clip and update() recomputes
+// only what the edit touched.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/analyze/headless"
   name="createAudioAnalysisSession"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-analysis-session': true}}
 >
   <div class="wui-row">
@@ -22,11 +21,6 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
     <span class="wui-readout" data-row="key">key —</span>
     <span class="wui-readout" data-row="onsets">onsets —</span>
   </div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">tempo</span><input type="checkbox" data-task="tempo" checked aria-label="Tempo task" /><span class="wm-pg__note">Adds 'tempo' to tasks; peaks and loudness always run.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">key</span><input type="checkbox" data-task="key" checked aria-label="Key task" /><span class="wm-pg__note">Adds 'key'.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">onsets</span><input type="checkbox" data-task="onsets" checked aria-label="Onsets task" /><span class="wm-pg__note">Adds 'onsets'. Changing tasks creates a new session.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <style>
@@ -35,29 +29,16 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
 <script>
   import type {AudioClip} from '@webmusic/audio';
-  import type {AudioAnalysisResult, AudioAnalysisTask} from '@webmusic/audio/analyze';
-  import {createAudioAnalysisSession, type AudioAnalysisSession} from '@webmusic/audio/analyze/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import type {AudioAnalysisResult} from '@webmusic/audio/analyze';
+  import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
 
   mountProgrammaticDemo('[data-hl-analysis-session]', async (root, scope) => {
     const analyze = root.querySelector<HTMLButtonElement>('[data-analyze]')!;
     const trim = root.querySelector<HTMLButtonElement>('[data-trim]')!;
     const elapsed = root.querySelector<HTMLElement>('[data-elapsed]')!;
-    const tasks = [...root.querySelectorAll<HTMLInputElement>('[data-task]')];
     const row = (name: string) => root.querySelector<HTMLElement>(`[data-row="${name}"]`)!;
-    let clip: AudioClip | undefined = undefined;
-    let session: AudioAnalysisSession | undefined;
-    const chosen = (): AudioAnalysisTask[] => ['peaks', 'loudness', ...tasks.filter((input) => input.checked).map((input) => input.dataset.task as AudioAnalysisTask)];
-    const rebuild = (): void => {
-      const list = chosen();
-      session = clip ? createAudioAnalysisSession(clip, {tasks: list}) : undefined;
-      programmaticCode(root, `import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
-
-const session = createAudioAnalysisSession(clip, {tasks: ${JSON.stringify(list).replace(/"/g, "'").replace(/,/g, ', ')}});
-const result = await session.analyze();
-// After an edit: await session.update(editedClip) reuses untouched ranges.`);
-    };
     const render = (result: AudioAnalysisResult, source: AudioClip, label: string): void => {
       row('clip').textContent = `clip ${source.duration.toFixed(1)} s · ${source.sampleRate} Hz · ${label}`;
       row('loudness').textContent = `loudness ${result.loudness.integratedLufs.toFixed(1)} LUFS · true peak ${result.loudness.truePeakDb.toFixed(1)} dB`;
@@ -75,23 +56,19 @@ const result = await session.analyze();
         if (scope.active) analyze.disabled = trim.disabled = false;
       }
     };
-    for (const input of tasks) scope.listen(input, 'change', rebuild);
-    rebuild();
-    clip = await loadArabesqueAudioExcerpt(30);
+    const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
-    rebuild();
+    const session = createAudioAnalysisSession(clip, {tasks: ['peaks', 'loudness', 'tempo', 'key', 'onsets']});
     analyze.disabled = trim.disabled = false;
     scope.listen(analyze, 'click', () => run(async () => {
-      const current = session!;
-      const result = await current.analyze();
-      if (scope.active && current === session) render(result, current.clip, 'whole excerpt');
+      const result = await session.analyze();
+      if (scope.active) render(result, session.clip, 'whole excerpt');
     }));
     scope.listen(trim, 'click', () => run(async () => {
-      const current = session!;
-      await current.analyze();
-      const trimmed = current.clip.slice(0, current.clip.duration / 2);
-      const result = await current.update(trimmed);
-      if (scope.active && current === session) render(result, trimmed, 'first half, updated');
+      await session.analyze();
+      const trimmed = session.clip.slice(0, session.clip.duration / 2);
+      const result = await session.update(trimmed);
+      if (scope.active) render(result, trimmed, 'first half, updated');
     }));
   });
 </script>

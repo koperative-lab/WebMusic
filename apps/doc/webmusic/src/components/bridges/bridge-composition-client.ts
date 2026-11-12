@@ -34,7 +34,6 @@ export function mountBridgeComposition(
   const loop = query<HTMLInputElement>("[data-loop]");
   const status = query<HTMLOutputElement>("[data-status]");
   const position = query<HTMLOutputElement>("[data-position]");
-  const events = query<HTMLElement>("[data-events]");
   const views = query<HTMLElement>("[data-score-views]");
   const waveHost = query<HTMLElement>("[data-wave-surface]");
   const owner = query<PlaybackHost>("[data-playback-owner]");
@@ -51,7 +50,6 @@ export function mountBridgeComposition(
   let frame = 0;
   let lastPaint = 0;
   const observers = new Set<() => void>();
-  const history: string[] = [];
 
   const message = (value: string) => {
     if (scope.active) status.textContent = value;
@@ -75,11 +73,6 @@ export function mountBridgeComposition(
     disposeButton.disabled = !pair && !loading && !context;
     attach.textContent = attached ? "Detach Score views" : "Attach Score views";
     notify();
-  };
-  const appendEvent = (entry: string) => {
-    history.push(entry);
-    if (history.length > 6) history.shift();
-    events.textContent = history.join("\n");
   };
   const detachViews = () => {
     views.replaceChildren();
@@ -138,7 +131,7 @@ export function mountBridgeComposition(
     rate.value = "1";
     loop.checked = false;
     position.textContent = "No active session";
-    message("Disposed. Load an example to start a new session.");
+    message("Disposed.");
     refresh();
   };
   const command = async (input: TransportCommand) => {
@@ -192,7 +185,7 @@ export function mountBridgeComposition(
     const expected = ++generation;
     loading = true;
     refresh();
-    message("Preparing score and rendering its backing track…");
+    message("Preparing…");
     let candidate: Pair | undefined;
     try {
       context ??= new AudioContext();
@@ -264,19 +257,13 @@ export function mountBridgeComposition(
       loop.checked = false;
       offSync = pair.session.subscribe((event) => {
         if (!scope.active || pair !== observedPair) return;
-        if (event.type === "commit") {
-          appendEvent(
-            `r${event.commit.revision}: ${event.commit.status} at ${event.snapshot.position.toFixed(2)} score s`,
-          );
-        } else if (event.type === "error" || event.type === "operation-error")
+        if (event.type === "error" || event.type === "operation-error")
           report(event.error);
         refresh();
       });
       mountViews();
       wave.redraw(pair.clipPlayer.seconds);
-      message(
-        `Arabesque No. 1 opening (${extended ? 24 : 16} quarter-note beats) ready. Click Play, then attach views.`,
-      );
+      message(`Arabesque No. 1 opening · ${extended ? 24 : 16} quarter-note beats`);
     } catch (error) {
       candidate?.dispose();
       if (scope.active && expected === generation) {
@@ -316,11 +303,7 @@ export function mountBridgeComposition(
   scope.listen(attach, "click", () => {
     attached = !attached;
     mountViews();
-    message(
-      attached
-        ? "Views attached to the current score and playback snapshot."
-        : "Views detached; playback remains owned by the session.",
-    );
+    message(attached ? "Views attached" : "Views detached");
     refresh();
   });
   const draw = (now: number) => {

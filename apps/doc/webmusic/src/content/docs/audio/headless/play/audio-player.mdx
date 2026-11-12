@@ -13,10 +13,10 @@ its clip changes, borrows an editing document, or delegates to an existing queue
 second transport clock. Use [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/)
 when an immutable single-clip engine is all the application needs.
 
-The demo constructs one nonvisual player and controls it with plain inputs. Load
-the Arabesque No. 1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
-source. Its readouts follow the object's events; the demo owns decoding and queue
-cleanup, while the facade owns its context and clip engine.
+The demo keeps one player while its source changes between a clip of Arabesque
+No. 1 and a borrowed two-pass playlist of it; its readout follows the player's
+events. The demo owns decoding and the playlist, while the player owns its
+context and clip engine.
 
 ## Import
 

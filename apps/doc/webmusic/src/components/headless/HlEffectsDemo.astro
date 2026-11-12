@@ -1,65 +1,35 @@
 ---
-// Effect builders described as data and wired by a player: Parameters choose
-// the chain, and setEffect() swaps it on the live AudioClipPlayer.
+// An Effect chain described as data — a low-pass filter into a delay — and
+// realized by an AudioClipPlayer playing the opening of Arabesque No. 1.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="Effect"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-effects': true}}
 >
   <HeadlessTransport />
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">chain</span><select class="wui-select" data-chain aria-label="Effect chain"><option value="dry">dry (undefined)</option><option value="filter" selected>filter</option><option value="delay">delay</option><option value="filter-delay">filter → delay</option><option value="compressor">compressor</option></select><span class="wm-pg__note">The Effect passed to player.setEffect(effect); a chain runs in order.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">filter frequency</span><input class="wm-pg__input" type="number" data-frequency value="800" min="40" max="18000" step="10" aria-label="Filter frequency in hertz" /><span class="wm-pg__note">Low-pass filter cutoff, in Hz.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">delay seconds</span><input class="wm-pg__input" type="number" data-delay value="0.25" min="0.01" max="2" step="0.01" aria-label="Delay time in seconds" /><span class="wm-pg__note">Delay time in seconds, with feedback 0.35 and wet 0.4.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
-  import {AudioClipPlayer, chainEffects, compressor, delay, filter, type Effect} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {AudioClipPlayer, chainEffects, delay, filter} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-effects]', async (root, scope) => {
-    const chain = root.querySelector<HTMLSelectElement>('[data-chain]')!;
-    const frequency = root.querySelector<HTMLInputElement>('[data-frequency]')!;
-    const delaySeconds = root.querySelector<HTMLInputElement>('[data-delay]')!;
     let player: AudioClipPlayer | undefined = undefined;
     const transport = bindTransport(root, scope, () => player);
-    const build = (): {effect: Effect | undefined; code: string} => {
-      const hz = Number(frequency.value) || 800;
-      const seconds = Number(delaySeconds.value) || 0.25;
-      const lowpass = `filter({type: 'lowpass', frequency: ${hz}})`;
-      const echo = `delay({delaySeconds: ${seconds}, feedback: 0.35, wet: 0.4})`;
-      switch (chain.value) {
-        case 'filter': return {effect: filter({type: 'lowpass', frequency: hz}), code: lowpass};
-        case 'delay': return {effect: delay({delaySeconds: seconds, feedback: 0.35, wet: 0.4}), code: echo};
-        case 'filter-delay': return {effect: chainEffects(filter({type: 'lowpass', frequency: hz}), delay({delaySeconds: seconds, feedback: 0.35, wet: 0.4})), code: `chainEffects(${lowpass}, ${echo})`};
-        case 'compressor': return {effect: compressor({threshold: -24, ratio: 4}), code: 'compressor({threshold: -24, ratio: 4})'};
-        default: return {effect: undefined, code: 'undefined'};
-      }
-    };
-    const apply = (): void => {
-      const {effect, code} = build();
-      player?.setEffect(effect);
-      programmaticCode(root, `import {AudioClipPlayer, chainEffects, compressor, delay, filter} from '@webmusic/audio/play/headless';
-
-const player = new AudioClipPlayer(clip);
-player.setEffect(${code});
-// In a play gesture: await player.play();
-// On cleanup: player.dispose();`);
-    };
-    for (const input of [chain, frequency, delaySeconds]) scope.listen(input, 'change', apply);
-    apply();
     const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
     player = new AudioClipPlayer(clip);
     scope.add(() => player?.dispose());
-    apply();
+    // A chain described as data; the player realizes it in order.
+    player.setEffect(chainEffects(
+      filter({type: 'lowpass', frequency: 800}),
+      delay({delaySeconds: 0.25, feedback: 0.35, wet: 0.4}),
+    ));
     transport.paint();
   });
 </script>

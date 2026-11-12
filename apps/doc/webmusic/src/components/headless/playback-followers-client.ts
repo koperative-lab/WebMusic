@@ -36,18 +36,17 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
       value === 'player' ? player.playback : value === 'read-only' ? readOnly : undefined;
     const scoreFor = (value: unknown): Score | undefined =>
       value === 'sample' ? score : value === 'alternate' ? alternateScore : undefined;
-    const playbackMode = String(options.playback ?? (kind === 'pitch-view' ? 'none' : 'player'));
+    // Every model follows the demo's player by default, so Play shows it working.
+    const playbackMode = String(options.playback ?? 'player');
     const explicitMode = String(options.score ?? 'borrowed');
     const callbackMode = String(options.seekNominal ?? 'none');
     const pending: Array<() => void> = [];
     const cleanups: Array<() => void> = [];
     let active = true;
-    let modelDisposed = false;
     let analysis: AnalysisFollower | undefined;
     let map: ScoreMapView | undefined;
     let pitch: PitchView | undefined;
     let model: Model;
-    let currentMode = playbackMode;
     const status = stage.querySelector<HTMLElement>('[data-follow-status]');
     const summary = stage.querySelector<HTMLElement>('[data-follow-summary]');
     const data = stage.querySelector<HTMLElement>('[data-follow-data]');
@@ -87,7 +86,7 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
 
     const paint = (): void => {
       if (!active) return;
-      if (input) input.textContent = currentMode === 'none' ? 'Standalone input' : currentMode === 'read-only' ? 'Following the player · read-only source' : 'Following the player';
+      if (input) input.textContent = playbackMode === 'none' ? 'Standalone input' : playbackMode === 'read-only' ? 'Following the player · read-only source' : 'Following the player';
       if (analysis) {
         const state = analysis.state;
         const key = state.result?.key;
@@ -122,7 +121,7 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
       } else if (pitch) {
         const midis = pitch.state.activeMidis;
         if (summary) summary.textContent = `${midis.length} held pitch${midis.length === 1 ? '' : 'es'}`;
-        if (data) renderNoteChips(data, currentStaffMarks(midis).map((mark) => `${mark.label} · MIDI ${mark.midi}`), 'Send noteOn in Parameters or attach the player');
+        if (data) renderNoteChips(data, currentStaffMarks(midis).map((mark) => `${mark.label} · MIDI ${mark.midi}`), 'No held pitches');
       }
     };
     const paintOwner = (): void => {
@@ -145,7 +144,6 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
       if (player.isPlaying()) player.pause();
       else await player.play();
       paintOwner();
-      message(modelDisposed ? 'The model is disposed; its borrowed player still operates.' : 'Player state changed; the connected model follows its snapshots.');
     });
     listen('[data-follow-stop]', () => { player.stop(); paintOwner(); });
     listen('[data-follow-owner-seek]', async () => { await player.seekNominal(1); paintOwner(); });
@@ -165,65 +163,13 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
     if (completeButton) completeButton.hidden = kind !== 'score-map-view' || callbackMode !== 'deferred';
     paint();
     paintOwner();
-    message(kind === 'pitch-view' ? 'Use noteOn and noteOff, or attach the player.'
-      : kind === 'score-map-view' ? 'Select a measure to navigate.' : 'Play or seek to follow the current chord.');
-
-    const apiName = kind === 'analysis-follower' ? 'createAnalysisFollower' : kind === 'score-map-view' ? 'createScoreMapView' : 'createPitchView';
-    const entry = kind === 'analysis-follower' ? 'analyze' : 'view';
-    const constructionOptions: string[] = [];
-    if (kind !== 'pitch-view' && explicitMode !== 'borrowed') constructionOptions.push(`score: ${explicitMode === 'alternate' ? 'alternateScore' : 'score'}`);
-    if (playbackMode !== 'none') constructionOptions.push(`playback: ${playbackMode === 'player' ? 'player.playback' : 'readOnly'}`);
-    if (kind === 'analysis-follower' && options.analysis !== undefined) constructionOptions.push(`analysis: ${JSON.stringify(record(options.analysis, 'analysis'))}`);
-    if (kind === 'score-map-view') {
-      for (const name of ['part', 'maxCells', 'maxMarks']) if (options[name] !== undefined) constructionOptions.push(`${name}: ${JSON.stringify(options[name])}`);
-      if (adapter) constructionOptions.push('seekNominal');
-    }
-    const adapterCode = !adapter ? '' : callbackMode === 'deferred'
-      ? 'const pending = [];\nconst seekNominal = (seconds) => new Promise((resolve) => pending.push(resolve));\n// Complete pending commands: pending.splice(0).forEach((resolve) => resolve());\n'
-      : callbackMode === 'reject' ? "const seekNominal = (seconds) => Promise.reject(new Error('Seek rejected'));\n"
-        : 'const seekNominal = (seconds) => { /* application command completed */ };\n';
-    const construction = `import {${apiName}} from '@webmusic/score/${entry}/headless';\nimport {ScorePlayer} from '@webmusic/score/play/headless';\n// score and alternateScore are caller-supplied immutable Scores.\nconst player = new ScorePlayer(score);\n${playbackMode === 'read-only' ? 'const readOnly = {snapshot: () => player.playback.snapshot(), subscribe: (listener) => player.playback.subscribe(listener)};\n' : ''}${adapterCode}const model = ${apiName}({${constructionOptions.join(', ')}});\n// On application teardown:\nmodel.dispose();\nplayer.dispose();`;
 
     return {
       object: model as unknown as Record<string, unknown>,
-      construction,
       on(event, handler) {
         if (event !== 'subscribe') return () => undefined;
         // This is the actual object's subscription, not a fabricated emitter.
         return model.subscribe((state) => handler(state));
-      },
-      invoke(name, args) {
-        try {
-          let result: unknown;
-          if (name === 'setScore' && (analysis || map)) {
-            (analysis ?? map)!.setScore(scoreFor(args[0]));
-          } else if (name === 'setPlayback') {
-            currentMode = String(args[0]);
-            model.setPlayback(sourceFor(args[0]));
-          } else if (name === 'configure' && map) {
-            map.configure(record(args[0], 'configure'));
-          } else if (name === 'updatePlayback' && pitch) {
-            result = pitch.updatePlayback(player.playback.snapshot());
-          } else {
-            const callable = (model as unknown as Record<string, unknown>)[name];
-            if (typeof callable !== 'function') throw new Error(`Unknown model command ${name}.`);
-            result = callable.apply(model, args);
-          }
-          if (name === 'dispose') {
-            modelDisposed = true;
-            message('Model disposed. The demo-owned ScorePlayer remains available until Reset or navigation.');
-          } else message(`${name}() ${result instanceof Promise ? 'pending' : 'completed'}.`);
-          paint();
-          if (result instanceof Promise) return result.then((outcome: unknown) => {
-            if (active) {
-              const status = outcome && typeof outcome === 'object' && 'status' in outcome ? String(outcome.status) : 'completed';
-              message(`${name}() ${status}.`);
-              paint();
-            }
-            return outcome;
-          }, (error: unknown) => { fail(error); throw error; });
-          return result;
-        } catch (error) { fail(error); throw error; }
       },
       dispose() {
         if (!active) return;

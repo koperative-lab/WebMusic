@@ -41,10 +41,11 @@ install browser tooling or authorize commits, pushes or publication by itself.
    shrink them excessively; keep pointer coordinates aligned with the plot.
 4. Show a Web Component demo in its default composition with its intrinsic
    musical controls, such as seeking, note input and direct plot gestures; it
-   has no Parameters or Copy/Reset (DEC-071). Headless and presenter demos keep
-   their configuration in external Parameters.
-5. Verify each Headless or presenter parameter affects its intended instance or
-   mode, with accurate copied code and Reset behavior.
+   has no Parameters or Copy/Reset (DEC-071). A Headless demo shows its object
+   working with its defaults and only the controls that operate it. UI Kit
+   presenter demos keep their configuration in external Parameters.
+5. Verify each presenter parameter affects its intended instance or mode, with
+   accurate copied code and Reset behavior.
 6. Remove redundant framing only when the remaining surface retains orientation,
    accessible names, status feedback and operable focus targets.
 

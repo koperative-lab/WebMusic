@@ -135,8 +135,11 @@ toggle per value, edge to edge, the current one inverted, for an element with
 several drawings, surfaces or recipes. Components in a demo stand 0.5rem apart,
 whether siblings or nested in a player, and each shows its own single frame in
 the line colour. No demo-only checkboxes, hint text or event logs
-inside the canvas; a failed load may show one error line. Headless and UI Kit
-presenter demos keep their external Parameters for configuration.
+inside the canvas; a failed load may show one error line. Headless demos follow
+the same rule: the object works in its default configuration, with only the
+controls that operate it (play, a note, an edit and its undo) in the canvas,
+and no Parameters, code readout or Copy/Reset. UI Kit presenter demos keep their
+external Parameters for configuration.
 
 ## Styling mechanics
 
@@ -168,6 +171,6 @@ inversion.
 - [ ] Adjustments open as an in-component card over a scrim, with modal focus.
 - [ ] No scrollbars are visible; labels of scrolling content are sticky.
 - [ ] No explanatory text inside the component or the demo canvas.
-- [ ] Element demos show the default composition without Parameters, plus a type switch when the element has several drawings, surfaces or recipes; Headless and presenter demo configuration is in Parameters.
+- [ ] Element demos show the default composition without Parameters, plus a type switch when the element has several drawings, surfaces or recipes; Headless demos show the object with its defaults and no Parameters; presenter demo configuration is in Parameters.
 - [ ] Checked in a browser beside an existing component, at a narrow width and
       with keyboard focus; dark-scheme fallbacks are present.

@@ -28,70 +28,60 @@ function setup(kind: 'analysis-follower' | 'score-map-view' | 'pitch-view', opti
   document.body.append(stage);
   const demo = createPlaybackFollowerDemo(kind, source)(options, stage) as HeadlessDemoInstance;
   demos.push(demo);
-  return {demo, stage, invoke: (name: string, ...args: unknown[]) => demo.invoke!(name, args)};
+  return {demo, stage};
 }
 
 const flush = async () => { for (let i = 0; i < 8; i += 1) await Promise.resolve(); };
 
 describe('real Analyze/View Headless demonstrations', () => {
-  it('hydrates analysis from its real player, adapts score selection and reports read-only seek failure', async () => {
-    const {demo, stage, invoke} = setup('analysis-follower');
+  it('follows the demo player by default and reports a seek outcome from the real follower', async () => {
+    const {demo, stage} = setup('analysis-follower');
     const follower = demo.object as unknown as AnalysisFollower;
     expect(follower.state.score?.metadata.title).toBe('Arabesque No. 1');
     expect(follower.state.result?.chords.length).toBeGreaterThan(0);
+    expect(stage.querySelector('[data-follow-input]')?.textContent).toBe('Following the player');
     stage.querySelector<HTMLButtonElement>('[data-follow-owner-seek]')!.click();
     await flush();
     expect(follower.state.nominalSeconds).toBeCloseTo(1);
-    invoke('setScore', 'alternate');
-    expect(follower.state.readiness).toBe('mismatched');
-    invoke('setScore', 'borrowed');
-    invoke('setPlayback', 'read-only');
-    const result = await invoke('seekQuarters', 4);
-    expect(result).toMatchObject({status: 'failed'});
-    expect(stage.querySelector('[data-follow-status]')?.textContent).toContain('failed');
-    expect(demo.construction).toContain('playback: player.playback');
-    expect(demo.construction).not.toContain('"player"');
+    expect(await follower.seekQuarters(4)).toMatchObject({status: 'committed'});
   });
 
   it('exercises real latest-wins map commands and releases deferred work on cleanup', async () => {
-    const {demo, stage, invoke} = setup('score-map-view', {score: 'sample', playback: 'none', seekNominal: 'deferred'});
+    const {demo, stage} = setup('score-map-view', {score: 'sample', playback: 'none', seekNominal: 'deferred'});
     const map = demo.object as unknown as ScoreMapView;
-    const older = invoke('seekQuarters', 2) as Promise<unknown>;
-    const newer = invoke('seekQuarters', 6) as Promise<unknown>;
+    const older = map.seekQuarters(2);
+    const newer = map.seekQuarters(6);
     expect(map.state.pending).toBe(true);
     stage.querySelector<HTMLButtonElement>('[data-follow-complete]')!.click();
     expect(await older).toMatchObject({status: 'superseded'});
     expect(await newer).toMatchObject({status: 'committed', quarters: 6});
     expect(map.state.quarters).toBeCloseTo(6);
-    invoke('configure', '{"maxCells":1}');
+    map.configure({maxCells: 1});
     expect(map.state.map?.cells).toHaveLength(1);
-    expect(() => invoke('configure', '[]')).toThrow('JSON object');
-    const pending = invoke('seekQuarters', 3) as Promise<unknown>;
+    const pending = map.seekQuarters(3);
     demo.dispose();
     expect(await pending).toMatchObject({status: 'superseded'});
   });
 
-  it('uses counted pitch state and real projections, then replaces manual input from a player snapshot', () => {
-    const {demo, stage, invoke} = setup('pitch-view');
+  it('counts held pitches, follows the demo player and replaces manual input from its snapshot', () => {
+    const {demo, stage} = setup('pitch-view');
     const pitch = demo.object as unknown as PitchView;
     const changes = vi.fn();
     const off = demo.on!('subscribe', changes);
     expect(changes).not.toHaveBeenCalled();
-    invoke('noteOn', 60);
-    invoke('noteOn', 60);
-    invoke('noteOff', 60);
+    pitch.noteOn(60);
+    pitch.noteOn(60);
+    pitch.noteOff(60);
     expect(pitch.state.activeMidis).toEqual([60]);
     expect(stage.querySelector('[data-follow-data]')?.textContent).toContain('C4');
-    invoke('updatePlayback');
-    expect(pitch.state.activeMidis).toEqual([]);
     expect(pitch.state.playback?.readiness).toBe('ready');
     off();
   });
 
-  it('model disposal preserves the borrowed owner, while Reset/navigation cleanup releases it once', async () => {
+  it('model disposal preserves the borrowed owner, while navigation cleanup releases it once', async () => {
     const dispose = vi.spyOn(ScorePlayer.prototype, 'dispose');
-    const {demo, stage, invoke} = setup('analysis-follower');
-    invoke('dispose');
+    const {demo, stage} = setup('analysis-follower');
+    (demo.object as unknown as AnalysisFollower).dispose();
     expect(dispose).not.toHaveBeenCalled();
     stage.querySelector<HTMLButtonElement>('[data-follow-owner-seek]')!.click();
     await flush();
@@ -125,7 +115,7 @@ describe('real Analyze/View Headless demonstrations', () => {
     expect(stage.querySelector('[data-follow-status]')?.textContent).toContain('committed');
   });
 
-  it('ignores delayed command feedback from an old model after Reset recreates the stage', async () => {
+  it('ignores delayed command feedback from an old model after a new one takes the stage', async () => {
     const {demo: old, stage} = setup('score-map-view', {score: 'sample', playback: 'none', seekNominal: 'deferred'});
     stage.querySelectorAll<HTMLButtonElement>('[data-follow-quarter]')[4].click();
     old.dispose();

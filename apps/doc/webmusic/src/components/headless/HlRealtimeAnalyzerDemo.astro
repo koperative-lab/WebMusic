@@ -1,61 +1,38 @@
 ---
-// createRealtimeAnalyzer sampling an AudioClipPlayer's tap while it plays.
-// Parameters choose the sampling interval; a change recreates the analyzer.
+// createRealtimeAnalyzer sampling an AudioClipPlayer's tap every 50 ms while
+// it plays: level, peak and spectral centroid frames.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/analyze/headless"
   name="createRealtimeAnalyzer"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-realtime': true}}
 >
   <HeadlessTransport />
   <div class="wui-row"><span class="wui-readout" data-frame>rms 0.000 · peak 0.000 · centroid 0 Hz</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">intervalMs</span><input class="wm-pg__input" type="number" data-interval value="50" min="10" max="1000" step="10" aria-label="Sampling interval in milliseconds" /><span class="wm-pg__note">How often a frame is sampled; recreates the analyzer.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">running</span><input type="checkbox" data-running checked aria-label="Analyzer running" /><span class="wm-pg__note">start(onFrame) / stop(); the borrowed tap stays connected.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {AudioClipPlayer} from '@webmusic/audio/play/headless';
-  import {createRealtimeAnalyzer, type RealtimeAnalyzer} from '@webmusic/audio/analyze/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {createRealtimeAnalyzer} from '@webmusic/audio/analyze/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-realtime]', async (root, scope) => {
-    const interval = root.querySelector<HTMLInputElement>('[data-interval]')!;
-    const running = root.querySelector<HTMLInputElement>('[data-running]')!;
     const readout = root.querySelector<HTMLElement>('[data-frame]')!;
     let player: AudioClipPlayer | undefined = undefined;
-    let analyzer: RealtimeAnalyzer | undefined;
     const transport = bindTransport(root, scope, () => player);
-    scope.add(() => analyzer?.stop());
-    const apply = (): void => {
-      const ms = Math.max(10, Number(interval.value) || 50);
-      analyzer?.stop();
-      analyzer = player ? createRealtimeAnalyzer(player, {intervalMs: ms}) : undefined;
-      if (analyzer && running.checked) {
-        analyzer.start((frame) => {
-          readout.textContent = `rms ${frame.rms.toFixed(3)} · peak ${frame.peak.toFixed(3)} · centroid ${Math.round(frame.centroid)} Hz`;
-        });
-      }
-      programmaticCode(root, `import {createRealtimeAnalyzer} from '@webmusic/audio/analyze/headless';
-
-// player is an AudioClipPlayer (or any source exposing an analyser).
-const analyzer = createRealtimeAnalyzer(player, {intervalMs: ${ms}});
-${running.checked ? 'analyzer.start((frame) => console.log(frame.rms, frame.peak, frame.centroid));' : '// analyzer.start(onFrame) samples; stop() pauses it.'}
-// On cleanup: analyzer.stop(); the player keeps its tap.`);
-    };
-    for (const input of [interval, running]) scope.listen(input, 'change', apply);
-    apply();
     const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
     player = new AudioClipPlayer(clip);
     scope.add(() => player?.dispose());
-    apply();
+    const analyzer = createRealtimeAnalyzer(player, {intervalMs: 50});
+    scope.add(() => analyzer.stop());
+    analyzer.start((frame) => {
+      readout.textContent = `rms ${frame.rms.toFixed(3)} · peak ${frame.peak.toFixed(3)} · centroid ${Math.round(frame.centroid)} Hz`;
+    });
     transport.paint();
   });
 </script>

@@ -4,18 +4,13 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 <HeadlessDemoFrame
   entry="@webmusic/score/play/drivers"
   name="bindValue"
-  hint="Drag the slider to drive a paused ScorePlayer. Reset releases the player and its polling binding."
-  code={`// Configure bindValue below.`}
   rootAttrs={{'data-programmatic-transportdriver': true}}
 >
   <div class="wui-row"><div class="wui-field"><span class="wui-label">drag to scrub</span><input class="wui-range" data-scrub type="range" min="0" max="1" step="0.01" value="0" aria-label="Score playback position" /></div><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">interval</span><input class="wm-pg__input" type="number" data-interval value="50" min="16" max="1000" step="1" aria-label="Polling interval in milliseconds" /><span class="wm-pg__note">Polling interval in milliseconds. Changing it replaces and releases the previous binding.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
-  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
   import { ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import { bindValue } from '@webmusic/score/play/drivers';
   import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
@@ -45,29 +40,8 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
     // bindValue polls getValue() and calls transport.seekFraction(value) in the
     // default 'seek' mode, so dragging the slider scrubs the player position.
-    const intervalInput = root.querySelector<HTMLInputElement>('[data-interval]');
-    let unbind: (() => void) | undefined;
-    scope.add(() => unbind?.());
-    const applyInterval = () => {
-      const interval = Math.max(16, Math.min(1000, Number(intervalInput?.value) || 50));
-      unbind?.();
-      unbind = bindValue(player, {getValue: () => Number(scrub.value), interval, mode: 'seek'});
-      programmaticCode(root, `import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
-import {bindValue} from '@webmusic/score/play/drivers';
-
-const player = new ScorePlayer(score, {
-  synth: Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
-  synthOwnership: 'owned',
-});
-const unbind = bindValue(player, {
-  getValue: () => Number(slider.value), // Caller-owned input, 0–1
-  interval: ${interval}, // milliseconds
-  mode: 'seek',
-});
-// On cleanup: unbind(); player.dispose();`);
-    };
-    if (intervalInput) scope.listen(intervalInput, 'change', applyInterval);
-    applyInterval();
+    const unbind = bindValue(player, {getValue: () => Number(scrub.value), interval: 50, mode: 'seek'});
+    scope.add(unbind);
 
     paint();
   });

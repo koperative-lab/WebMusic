@@ -20,8 +20,7 @@ Public reference.
 `;
 const page = (content = body, order = 1, file = pageFile) => ({file, source: `---\nsidebar:\n  order: ${order}\n---\n${content}`});
 const frame = `<LiveDemoCanvas><slot /></LiveDemoCanvas>
-<details><summary>Parameters</summary><slot name="parameters" /></details>
-<button data-hl-copy>Copy</button><button data-hl-reset>Reset</button>`;
+<p data-hl-feedback hidden></p>`;
 const direct = `---\nimport Frame from './HeadlessDemoFrame.astro';\n---\n<Frame><slot /></Frame>`;
 function check(pages = [page()], overrides = {}) {
   const files = {[frameFile]: frame, [component]: direct, ...overrides};
@@ -97,9 +96,10 @@ test('rejects separate frame State/Events panels but allows musical state text a
   }
 });
 
-test('the frame retains one canvas, Parameters disclosure, Copy and Reset control', () => {
-  for (const token of ['<LiveDemoCanvas>', '<summary>Parameters</summary>', 'data-hl-copy', 'data-hl-reset']) {
-    assert.ok(check([page()], {[frameFile]: frame.replace(token, '')}).some((failure) => failure.includes('expected exactly one')));
-    assert.ok(check([page()], {[frameFile]: frame.replace(token, token + token + ' ')}).some((failure) => failure.includes('expected exactly one')));
+test('the frame keeps one canvas and no Parameters, code readout, Copy or Reset', () => {
+  assert.ok(check([page()], {[frameFile]: frame.replace('<LiveDemoCanvas><slot /></LiveDemoCanvas>', '<slot />')}).some((failure) => failure.includes('exactly one LiveDemoCanvas')));
+  assert.ok(check([page()], {[frameFile]: frame + frame}).some((failure) => failure.includes('exactly one LiveDemoCanvas')));
+  for (const extra of ['<details><summary>Parameters</summary></details>', '<pre data-hl-readout></pre>', '<button data-hl-copy>Copy</button>', '<button data-hl-reset>Reset</button>']) {
+    assert.ok(check([page()], {[frameFile]: frame + extra}).some((failure) => failure.includes('must not render')), extra);
   }
 });

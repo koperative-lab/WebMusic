@@ -36,16 +36,19 @@ function runDemo(file: string, modules: Record<string, unknown>) {
   }, {});
 }
 function editor() {
+  let undos = 0;
   let snapshot = {content: {length: 16, sampleRate: 8000, channelLayout: ['mono'], segments: []}, assets: {}, contentId: 'initial',
     documentId: 'document', documentRevision: 0, status: 'ready'};
   const session = {getSnapshot: () => ({documentId: 'document', selection: {startFrame: 2, endFrame: 8}, disposed: false}),
     subscribe: vi.fn(() => vi.fn()), dispose: vi.fn()};
   return {
     getSnapshot: () => snapshot,
-    getState: () => ({document: snapshot, dirty: true, processing: false, history: {undoCount: 0, redoCount: 0, historyOnlyBytes: 0}}),
+    getState: () => ({document: snapshot, dirty: true, processing: false, history: {undoCount: undos, redoCount: 0, historyOnlyBytes: 0}}),
     subscribeState: vi.fn((listener: () => void) => {listener(); return vi.fn();}),
     processRange: vi.fn(async (_request: unknown) => ({status: 'committed'})), cancelProcessing: vi.fn(),
-    markSaved: vi.fn(), clearHistory: vi.fn(), execute: vi.fn(), createInteractionSession: () => session, dispose: vi.fn(),
+    markSaved: vi.fn(), clearHistory: vi.fn(),
+    execute: vi.fn((_request: {operations: Array<{type: string}>}) => { undos += 1; return {status: 'committed'}; }),
+    undo: vi.fn(() => { undos -= 1; return {status: 'committed'}; }), redo: vi.fn(() => ({status: 'committed'})), createInteractionSession: () => session, dispose: vi.fn(),
     createCheckpoint: vi.fn(() => ({release: vi.fn()})), restoreCheckpoint: vi.fn(),
     replace: () => {snapshot = {...snapshot, contentId: 'changed', documentRevision: 1};},
   };
@@ -108,12 +111,11 @@ describe('Audio clip editing demo', () => {
 });
 
 describe('Audio editor Headless demo', () => {
-  it('resets Headless input and releases the old editor, session and checkpoint', async () => {
+  it('edits, undoes and redoes the opening second, then releases its editor and session', async () => {
     document.body.innerHTML = `<section data-audio-editor-demo><p data-summary></p><ul data-segments></ul><p data-last></p>
-      <p data-hl-feedback></p><input data-limit value="100"><textarea data-operations>[]</textarea>
-      <button data-action="checkpoint"></button><button data-action="restore"></button></section>`;
-    const first = editor(), next = editor();
-    const create = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(next);
+      <p data-hl-feedback hidden></p><button data-action="edit"></button><button data-action="undo"></button><button data-action="redo"></button></section>`;
+    const first = editor();
+    const create = vi.fn().mockReturnValue(first);
     const clip = {sampleRate: 44100};
     const excerpt = vi.fn(async () => clip);
     runDemo('headless/AudioClipEditorHeadlessDemo', {
@@ -124,21 +126,14 @@ describe('Audio editor Headless demo', () => {
     await flush();
     // The demo edits the opening second of the Arabesque No. 1 recording.
     expect(excerpt).toHaveBeenCalledWith(1);
-    expect(create.mock.calls[0][0]).toBe(clip);
-    document.querySelector<HTMLButtonElement>('[data-action="restore"]')!.click();
-    expect(document.querySelector('[data-hl-feedback]')!.textContent).toBe('Keep a checkpoint first.');
-    expect(first.restoreCheckpoint).not.toHaveBeenCalled();
-    document.querySelector<HTMLButtonElement>('[data-action="checkpoint"]')!.click();
-    const checkpoint = first.createCheckpoint.mock.results[0].value;
-    const operations = document.querySelector<HTMLTextAreaElement>('[data-operations]')!; operations.value = 'invalid JSON';
-    document.querySelector<HTMLInputElement>('[data-limit]')!.value = '3';
-    document.querySelector('[data-audio-editor-demo]')!.dispatchEvent(new Event('wm:headless-reset'));
-    await flush();
-    expect(operations.value).toBe('[]');
-    expect(create.mock.calls[1][1]).toEqual({history: {limit: 100}});
-    expect(checkpoint.release).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledWith(clip, {history: {limit: 100}});
+    document.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
+    expect(first.execute).toHaveBeenCalledOnce();
+    expect(first.execute.mock.calls[0][0].operations[0].type).toBe('insert-silence');
+    document.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+    expect(first.undo).toHaveBeenCalledOnce();
+    for (const stop of registrations.splice(0)) stop();
     expect(first.dispose).toHaveBeenCalledOnce();
     expect(first.createInteractionSession().dispose).toHaveBeenCalledOnce();
-    expect(next.dispose).not.toHaveBeenCalled();
   });
 });

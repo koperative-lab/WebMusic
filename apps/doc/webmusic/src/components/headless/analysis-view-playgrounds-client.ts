@@ -23,19 +23,16 @@ function controls(root: HTMLElement, scope: DemoScope) {
       try { action(); } catch (error) { feedback(error instanceof Error ? error.message : String(error)); }
     });
   };
-  const code = (source: string): void => { if (scope.active) query('[data-hl-readout]').textContent = source; };
-  return {query, feedback, listen, code};
+  return {query, feedback, listen};
 }
 
 
-/** The session keeps its cache while immutable score inputs are replaced. */
+/** One session re-analyzes each edited immutable score and keeps its reusable caches. */
 export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope, sourceScore: Score): {readonly model: AnalysisSession} {
   const ui = controls(root, scope);
-  const source = ui.query<HTMLSelectElement>('[data-session-score]');
-  const pitch = ui.query<HTMLSelectElement>('[data-session-pitch]');
-  const window = ui.query<HTMLSelectElement>('[data-session-window]');
+  const PITCHES = ['C#5', 'D5', 'E5', 'F#5'];
   let score = followerDemoScore(sourceScore);
-  let session = createAnalysisSession(score);
+  const session = createAnalysisSession(score);
   let edits = 0;
   const paint = (): void => {
     if (!scope.active) return;
@@ -43,34 +40,16 @@ export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope, so
     ui.query('[data-session-summary]').textContent = `${score.metadata.title} · ${result.key.tonic} ${result.key.mode} · ${edits} score update${edits === 1 ? '' : 's'}`;
     renderNoteChips(ui.query('[data-session-notes]'), score.parts.flatMap((part) => part.notes.map((note) => note.pitch?.toString() ?? 'Rest')));
     renderNoteChips(ui.query('[data-session-chords]'), result.roman.map((entry) => `${entry.chord || '—'} (${entry.roman || '—'}) · q${entry.startQuarters}–${entry.endQuarters}`), 'No chord segments');
-    ui.query('[data-session-detail]').textContent = `${result.motifs.length} repeated motif${result.motifs.length === 1 ? '' : 's'} · ${result.issues.length} voice-leading issue${result.issues.length === 1 ? '' : 's'} · window ${window.value} quarters`;
-    ui.code(`import {Pitch} from '@webmusic/score';\nimport {createAnalysisSession} from '@webmusic/score/analyze/headless';\n\n// score is an immutable Arabesque No. 1 ${source.value} excerpt.\nconst session = createAnalysisSession(score, {windowQuarters: ${window.value}});\nconst firstNote = score.parts[0].notes[0];\nconst next = score.edit((edit) => {\n  edit.updateNote(firstNote.id, {pitch: Pitch.parse('${pitch.value}')});\n});\nconst result = session.update(next);\n// Render result.key, result.roman, result.motifs and result.issues.\n// Session owns no external resources; release your references on teardown.`);
+    ui.query('[data-session-detail]').textContent = `${result.motifs.length} repeated motif${result.motifs.length === 1 ? '' : 's'} · ${result.issues.length} voice-leading issue${result.issues.length === 1 ? '' : 's'}`;
   };
-  const replaceScore = (): void => {
-    score = followerDemoScore(sourceScore, source.value === 'extended');
-    pitch.value = 'C#5';
-    session.update(score);
-    edits += 1;
-    paint();
-  };
-  ui.listen('[data-session-score]', 'change', replaceScore);
-  ui.listen('[data-session-window]', 'change', () => {
-    session = createAnalysisSession(score, {windowQuarters: Number(window.value)});
-    paint();
-    ui.feedback('Created a session with the selected chord window.');
-  });
-  ui.listen('[data-session-pitch]', 'change', () => {
+  // Each edit makes a new immutable score; the same session re-analyzes it.
+  ui.listen('[data-session-edit]', 'click', () => {
     const note = score.parts[0].notes[0];
-    score = score.edit((edit) => { edit.updateNote(note.id, {pitch: Pitch.parse(pitch.value)}); });
+    const pitch = PITCHES[(edits + 1) % PITCHES.length];
+    score = score.edit((edit) => { edit.updateNote(note.id, {pitch: Pitch.parse(pitch)}); });
     session.update(score);
     edits += 1;
     paint();
-    ui.feedback('Updated the immutable score and re-analyzed it with the same session.');
-  });
-  scope.listen(root, 'wm:headless-reset', () => {
-    source.value = 'opening'; pitch.value = 'C#5'; window.value = '2'; edits = 0;
-    score = followerDemoScore(sourceScore); session = createAnalysisSession(score);
-    ui.feedback(''); paint();
   });
   paint();
   return {get model() { return session; }};
@@ -82,7 +61,6 @@ const CHORDS: Record<string, readonly number[]> = {C: [60, 64, 67], Am: [57, 60,
 export function mountLiveTrackersDemo(root: HTMLElement, scope: DemoScope) {
   const ui = controls(root, scope);
   const held = new Set<number>();
-  let lastInput: readonly number[] = [];
   let chordState: LiveChordState = {chord: '', midis: [], history: []};
   const chord = createLiveChordTracker({onUpdate(next) { chordState = next; paintChord(); }});
   const key = createLiveKeyTracker(() => { paintKey(); });
@@ -100,7 +78,6 @@ export function mountLiveTrackersDemo(root: HTMLElement, scope: DemoScope) {
     const result = key.result();
     ui.query('[data-live-key]').textContent = result ? `${result.tonic} ${result.mode} · ${key.heard} notes heard` : 'Key estimate: no notes heard';
   }
-  const updateCode = (): void => ui.code(`import {createLiveChordTracker, createLiveKeyTracker} from '@webmusic/score/analyze/headless';\n\nconst chord = createLiveChordTracker({\n  onUpdate: ({chord, midis, history}) => {\n    // Render the held chord, pitches and up to eight recent chord names.\n  },\n});\nconst key = createLiveKeyTracker((result, heard) => {\n  // Render result.tonic, result.mode and heard.\n});\nconst midis = ${JSON.stringify(lastInput)};\nfor (const midi of midis) { chord.noteOn(midi); key.noteOn(midi); }\n// Release each note when your input ends:\nfor (const midi of midis) chord.noteOff(midi);\n// Reset musical state and release input listeners on teardown:\nchord.reset();\nkey.reset();`);
   const release = (): void => {
     const notes = [...held];
     held.clear();
@@ -112,24 +89,17 @@ export function mountLiveTrackersDemo(root: HTMLElement, scope: DemoScope) {
       const midi = Number(button.dataset.liveMidi);
       if (held.delete(midi)) chord.noteOff(midi);
       else press(midi);
-      lastInput = [...held]; updateCode();
     });
   }
   for (const button of root.querySelectorAll<HTMLButtonElement>('[data-live-preset]')) {
     scope.listen(button, 'click', () => {
       release();
-      lastInput = CHORDS[button.dataset.livePreset!];
-      for (const midi of lastInput) press(midi);
-      updateCode();
+      for (const midi of CHORDS[button.dataset.livePreset!]) press(midi);
     });
   }
-  ui.listen('[data-live-release]', 'click', () => { release(); lastInput = []; updateCode(); });
-  scope.listen(root, 'wm:headless-reset', () => {
-    held.clear(); chord.reset(); key.reset(); lastInput = [];
-    paintKey(); updateCode(); ui.feedback('');
-  });
+  ui.listen('[data-live-release]', 'click', release);
   scope.add(() => { held.clear(); chord.reset(); key.reset(); });
-  paintChord(); paintKey(); updateCode();
+  paintChord(); paintKey();
   return {chord, key, get state() { return chordState; }};
 }
 
@@ -137,9 +107,8 @@ export function mountLiveTrackersDemo(root: HTMLElement, scope: DemoScope) {
 export function mountScoreWindowDemo(root: HTMLElement, scope: DemoScope, sourceScore: Score): {readonly model: ScoreView} {
   const ui = controls(root, scope);
   const score = followerDemoScore(sourceScore);
-  const viewport = ui.query<HTMLSelectElement>('[data-window-viewport]');
   const position = ui.query<HTMLInputElement>('[data-window-position]');
-  let view = createScoreView(score, {viewport: {startTime: 0, endTime: 2}});
+  const view = createScoreView(score, {viewport: {startTime: 0, endTime: 2}});
   let off: () => void = () => undefined;
   const paint = (): void => {
     if (!scope.active) return;
@@ -174,19 +143,9 @@ export function mountScoreWindowDemo(root: HTMLElement, scope: DemoScope, source
     ui.query('[data-window-summary]').textContent = `${start.toFixed(1)}–${end.toFixed(1)}s window · ${state.visibleNotes.length} visible candidates of ${state.sequence.notes.length} notes`;
     renderNoteChips(ui.query('[data-window-active]'), currentStaffMarks(state.activeNotes.map((note) => note.pitch)).map((mark) => mark.label), 'No active notes');
     ui.query('[data-window-time]').textContent = `${state.currentTime.toFixed(2)}s · local position`;
-    ui.code(`import {createScoreView} from '@webmusic/score/view/headless';\n\n// score is your immutable Score. Times are nominal seconds.\nconst view = createScoreView(score${state.viewport ? `, {viewport: {startTime: ${start}, endTime: ${end}}}` : ''});\nconst off = view.subscribe((state) => {\n  // Draw state.visibleNotes; highlight state.activeNotes.\n  // The application chooses the DOM, SVG or canvas renderer.\n});\nview.seek(${state.currentTime});\n// To show the full sequence: view.clearViewport();\n// On teardown:\noff();\nview.dispose();`);
   };
   const bind = (): void => { off = view.subscribe(paint); view.seek(0); };
-  ui.listen('[data-window-viewport]', 'change', () => {
-    if (viewport.value === 'all') view.clearViewport();
-    else { const start = Number(viewport.value); view.setViewport(start, start + 2); }
-  });
   ui.listen('[data-window-position]', 'input', () => { view.seek(Number(position.value)); });
-  scope.listen(root, 'wm:headless-reset', () => {
-    off(); view.dispose(); viewport.value = '0'; position.value = '0';
-    view = createScoreView(score, {viewport: {startTime: 0, endTime: 2}});
-    bind(); ui.feedback('');
-  });
   scope.add(() => { off(); view.dispose(); });
   bind();
   return {get model() { return view; }};

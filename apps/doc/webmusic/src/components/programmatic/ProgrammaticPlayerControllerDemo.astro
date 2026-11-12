@@ -4,18 +4,13 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 <HeadlessDemoFrame
   entry="@webmusic/score/play/headless"
   name="PlayerController"
-  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
-  code={`// Configure PlayerController below.`}
   rootAttrs={{'data-programmatic-playercontroller': true}}
 >
   <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><button class="wui-btn" data-variant="ghost" data-pause type="button">⏸ Pause</button><button class="wui-btn" data-variant="ghost" data-seek type="button">Scrub +2s</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">scrub delta</span><input class="wm-pg__input" type="number" data-scrub-seconds value="2" min="-10" max="10" step="0.5" aria-label="Scrub delta in seconds" /><span class="wm-pg__note">Signed seconds passed to controller.scrub(deltaSeconds).</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
-  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from './programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo, programmaticFeedback} from './programmatic-demo-lifecycle';
   import { PlayerController, ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
@@ -30,22 +25,6 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
     const scrubInput = root.querySelector<HTMLInputElement>('[data-scrub-seconds]');
     const scrubSeconds = () => Math.max(-10, Math.min(10, Number(scrubInput?.value ?? 2)));
-    const updateCode = () => {
-      const seconds = scrubSeconds();
-      seekBtn.textContent = `Scrub ${seconds >= 0 ? '+' : ''}${seconds}s`;
-      programmaticCode(root, `import {PlayerController, ScorePlayer, Sound} from '@webmusic/score/play/headless';
-
-const player = new ScorePlayer(score, {
-  synth: Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
-  synthOwnership: 'owned',
-});
-const controller = new PlayerController(player, score);
-// In a play gesture: controller.play();
-// In a scrub gesture: controller.scrub(${seconds});
-// On cleanup: controller.destroy(); player.dispose();`);
-    };
-    if (scrubInput) scope.listen(scrubInput, 'input', updateCode);
-    updateCode();
 
     const player = new ScorePlayer(score, {
       synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),

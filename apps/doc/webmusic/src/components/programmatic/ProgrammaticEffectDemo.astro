@@ -4,18 +4,13 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 <HeadlessDemoFrame
   entry="@webmusic/score/play/headless"
   name="Effect"
-  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
-  code={`// Configure Effect below.`}
   rootAttrs={{'data-programmatic-effect': true}}
 >
   <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">effect</span><select class="wui-select" data-effect aria-label="Effect"><option value="dry">Dry</option><option value="reverb">Reverb</option><option value="delay">Delay</option></select><span class="wm-pg__note">Rebuild the player with the selected effect, preserving position and playback state.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
-  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
   import { Effect, ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
@@ -23,7 +18,6 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
     const score = arabesqueExcerpt(await loadArabesqueScore());
     if (!scope.active) return;
     const btn = root.querySelector('[data-play]') as HTMLButtonElement;
-    const select = root.querySelector('[data-effect]') as HTMLSelectElement;
     const fill = root.querySelector('[data-fill]') as HTMLElement;
     const time = root.querySelector('[data-time]') as HTMLElement;
 
@@ -44,18 +38,6 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
     };
 
     const buildPlayer = (kind: string) => {
-      const effectCode = kind === 'reverb' ? 'Effect.reverb({wet: 0.4})'
-        : kind === 'delay' ? 'Effect.delay({delaySeconds: 0.25, feedback: 0.35, wet: 0.4})' : 'undefined';
-      programmaticCode(root, `import {Effect, ScorePlayer, Sound} from '@webmusic/score/play/headless';
-
-const player = new ScorePlayer(score, {
-  synth: Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
-  synthOwnership: 'owned',
-  effect: ${effectCode},
-});
-// In a play gesture: await player.play();
-// On effect change: pause and dispose this player, then rebuild and seek.
-// On cleanup: player.dispose();`);
       player = new ScorePlayer(score, {
         synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
         synthOwnership: 'owned',
@@ -66,7 +48,7 @@ const player = new ScorePlayer(score, {
     };
 
     scope.add(() => player?.dispose());
-    buildPlayer(select.value);
+    buildPlayer('reverb');
 
     let playGeneration = 0;
     const startPlayer = () => {
@@ -86,16 +68,5 @@ const player = new ScorePlayer(score, {
       playing = !playing;
     });
 
-    scope.listen(select, 'change', () => {
-      // Rebuild around the chosen effect, preserving play position + state.
-      const wasPlaying = playing;
-      const at = player.currentTime.seconds;
-      player.pause();
-      player.dispose();
-      buildPlayer(select.value);
-      scope.run(player.seek(at));
-      if (wasPlaying) { startPlayer(); btn.textContent = '⏸ Pause'; playing = true; }
-      else { paint(); }
-    });
   });
 </script>

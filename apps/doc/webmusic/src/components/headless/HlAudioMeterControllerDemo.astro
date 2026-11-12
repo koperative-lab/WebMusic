@@ -1,77 +1,47 @@
 ---
-// AudioMeterController reading an AudioClipPlayer's analyser, and one
-// AudioMeterDisplay reducing it. The stage shows the numbers the reduction
-// returns; drawing them is the application's job.
+// AudioMeterController reading an AudioClipPlayer's analyser once per frame,
+// and a VU AudioMeterDisplay reducing it. The stage shows the numbers the
+// reduction returns; drawing them is the application's job.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/view/headless"
   name="AudioMeterController"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-meter-controller': true}}
 >
   <HeadlessTransport />
   <div class="wui-row"><span class="wui-readout" data-level>rms 0.000 · peak 0.000 · hold 0.000</span></div>
   <div class="wui-row"><span class="wui-readout" data-display>—</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">display type</span><select class="wui-select" data-type aria-label="Display type"><option value="vu" selected>vu</option><option value="loudness">loudness</option><option value="spectrum">spectrum</option><option value="stereometer">stereometer</option></select><span class="wm-pg__note">The display's type; a change creates a new display.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">bars</span><input class="wm-pg__input" type="number" data-bars value="28" min="4" max="64" step="1" aria-label="Spectrum bars" /><span class="wm-pg__note">readSpectrum(bars): bands in the spectrum read.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {AudioClipPlayer} from '@webmusic/audio/play/headless';
-  import {createAudioMeterController, createAudioMeterDisplay, type AudioMeterController, type AudioMeterDisplay, type AudioMeterDisplayType} from '@webmusic/audio/view/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {createAudioMeterController, createAudioMeterDisplay} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
-  /** A short, numeric summary of a snapshot: its numbers and the lengths of its arrays. */
-  const summarize = (snapshot: object): string => Object.entries(snapshot).flatMap(([name, value]) => {
-    if (typeof value === 'number') return [`${name} ${value.toFixed(3)}`];
-    if (typeof value === 'string') return [`${name} ${value}`];
-    if (ArrayBuffer.isView(value)) return [`${name}[${(value as unknown as ArrayLike<number>).length}]`];
-    return [];
-  }).slice(0, 6).join(' · ');
-
   mountProgrammaticDemo('[data-hl-meter-controller]', async (root, scope) => {
-    const type = root.querySelector<HTMLSelectElement>('[data-type]')!;
-    const bars = root.querySelector<HTMLInputElement>('[data-bars]')!;
     const levelOut = root.querySelector<HTMLElement>('[data-level]')!;
     const displayOut = root.querySelector<HTMLElement>('[data-display]')!;
     let player: AudioClipPlayer | undefined = undefined;
-    let meter: AudioMeterController | undefined = undefined;
-    let display: AudioMeterDisplay = createAudioMeterDisplay({type: type.value as AudioMeterDisplayType});
     const transport = bindTransport(root, scope, () => player);
-    const apply = (): void => {
-      display = createAudioMeterDisplay({type: type.value as AudioMeterDisplayType});
-      programmaticCode(root, `import {createAudioMeterController, createAudioMeterDisplay} from '@webmusic/audio/view/headless';
-
-// Borrow the player's analyser; the meter never connects or disconnects it.
-const meter = createAudioMeterController({analyser: player.analyser});
-const display = createAudioMeterDisplay({type: '${type.value}'});
-// Every animation frame:
-const level = meter.readLevel();
-const spectrum = meter.readSpectrum(${Number(bars.value) || 28});
-const snapshot = display.capture(meter, performance.now());
-// On cleanup: meter.dispose();`);
-    };
-    for (const input of [type, bars]) scope.listen(input, 'change', apply);
-    apply();
     const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
     player = new AudioClipPlayer(clip);
-    meter = createAudioMeterController({analyser: player.analyser});
-    scope.add(() => { meter?.dispose(); player?.dispose(); });
+    // Borrow the player's analyser; the meter never connects or disconnects it.
+    const meter = createAudioMeterController({analyser: player.analyser});
+    const display = createAudioMeterDisplay({type: 'vu', referenceDbfs: -18});
+    scope.add(() => { meter.dispose(); player?.dispose(); });
     transport.paint();
     let frame = 0;
     const tick = (now: number): void => {
-      if (!scope.active || !meter) return;
+      if (!scope.active) return;
       const level = meter.readLevel();
-      meter.readSpectrum(Number(bars.value) || 28);
       levelOut.textContent = `rms ${level.rms.toFixed(3)} · peak ${level.peak.toFixed(3)} · hold ${level.peakHold.toFixed(3)}`;
-      displayOut.textContent = summarize(display.capture(meter, now));
+      const snapshot = display.capture(meter, now);
+      if (snapshot.type === 'vu') displayOut.textContent = `vu ${snapshot.vu.toFixed(1)} · deflection ${snapshot.deflection.toFixed(3)}`;
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

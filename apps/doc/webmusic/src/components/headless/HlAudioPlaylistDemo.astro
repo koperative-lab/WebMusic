@@ -1,13 +1,12 @@
 ---
-// AudioPlaylist over two entries of Arabesque No. 1, the WAV and the MP3, played
-// in order on one context. Parameters call the playlist's own setters.
+// AudioPlaylist over two entries of Arabesque No. 1, the WAV and the MP3,
+// played in order on one context with an injected loader.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="AudioPlaylist"
-  code={`// Configure the playlist below.`}
   rootAttrs={{'data-hl-playlist': true}}
 >
   <HeadlessTransport>
@@ -15,31 +14,23 @@ import HeadlessTransport from './HeadlessTransport.astro';
     <button class="wui-btn" data-variant="ghost" data-next type="button">Next</button>
     <span class="wui-readout" data-track>—</span>
   </HeadlessTransport>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">loop</span><input type="checkbox" data-loop checked aria-label="Loop the list" /><span class="wm-pg__note">setLoop(loop): start the list again after its last entry.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">prefetch</span><input type="checkbox" data-prefetch checked aria-label="Prefetch the next entry" /><span class="wm-pg__note">setPrefetch(prefetch): load the next entry while the current one plays.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">volume</span><input class="wm-pg__input" type="number" data-volume value="0.8" min="0" max="1" step="0.05" aria-label="Volume" /><span class="wm-pg__note">setVolume(volume) for every entry.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {loadClipFromUrl} from '@webmusic/audio/play';
   import {AudioPlaylist} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-playlist]', (root, scope) => {
     const base = import.meta.env.BASE_URL;
-    const loop = root.querySelector<HTMLInputElement>('[data-loop]')!;
-    const prefetch = root.querySelector<HTMLInputElement>('[data-prefetch]')!;
-    const volume = root.querySelector<HTMLInputElement>('[data-volume]')!;
     const track = root.querySelector<HTMLElement>('[data-track]')!;
     const playlist = new AudioPlaylist({
       entries: [
         {id: 'wav', label: 'Arabesque No. 1 (WAV)', src: `${base}wav/Arabesque%20No.1.wav`},
         {id: 'mp3', label: 'Arabesque No. 1 (MP3)', src: `${base}mp3/Arabesque%20No.1.mp3`},
       ],
-      loop: loop.checked,
+      loop: true,
       // Loading is injected: the playlist decodes on its own context through this loader.
       loadEntry: (entry, context) => loadClipFromUrl(entry.src ?? '', {context, ...(entry.format ? {format: entry.format} : {})}),
     });
@@ -55,28 +46,6 @@ import HeadlessTransport from './HeadlessTransport.astro';
     scope.add(playlist.on('error', (error) => programmaticFeedback(root, error.message)));
     scope.listen(root.querySelector('[data-previous]')!, 'click', () => playlist.previous());
     scope.listen(root.querySelector('[data-next]')!, 'click', () => playlist.next());
-    const apply = (): void => {
-      playlist.setLoop(loop.checked);
-      playlist.setPrefetch(prefetch.checked);
-      playlist.setVolume(Number(volume.value));
-      programmaticCode(root, `import {loadClipFromUrl} from '@webmusic/audio/play';
-import {AudioPlaylist} from '@webmusic/audio/play/headless';
-
-const playlist = new AudioPlaylist({
-  entries: [
-    {id: 'wav', src: '/wav/Arabesque%20No.1.wav'},
-    {id: 'mp3', src: '/mp3/Arabesque%20No.1.mp3'},
-  ],
-  loop: ${loop.checked},
-  prefetch: ${prefetch.checked},
-  volume: ${Number(volume.value)},
-  loadEntry: (entry, context) => loadClipFromUrl(entry.src, {context}),
-});
-// In a play gesture: await playlist.play();
-// On cleanup: playlist.dispose();`);
-      paintTrack();
-    };
-    for (const input of [loop, prefetch, volume]) scope.listen(input, 'change', apply);
-    apply();
+    paintTrack();
   });
 </script>

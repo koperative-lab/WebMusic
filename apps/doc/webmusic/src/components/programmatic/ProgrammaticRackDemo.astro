@@ -4,18 +4,13 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 <HeadlessDemoFrame
   entry="@webmusic/score/play/headless"
   name="Rack"
-  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
-  code={`// Configure Rack below.`}
   rootAttrs={{'data-programmatic-rack': true}}
 >
-  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">mute upper part</span><button class="wui-btn" data-mute="upper" data-variant="ghost" type="button" aria-pressed="false">Upper</button><span class="wm-pg__note">Mute the first Arabesque No. 1 MIDI part through rack.mute(id, muted).</span></div><div class="wm-pg__param"><span class="wm-pg__name">mute lower part</span><button class="wui-btn" data-mute="lower" data-variant="ghost" type="button" aria-pressed="false">Lower</button><span class="wm-pg__note">Mute the second Arabesque No. 1 MIDI part through rack.mute(id, muted).</span></div>
-  </div>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span><span class="wui-seg" aria-label="Mute parts"><button class="wui-btn" data-mute="upper" data-variant="ghost" type="button" aria-pressed="false">Mute upper</button><button class="wui-btn" data-mute="lower" data-variant="ghost" type="button" aria-pressed="false">Mute lower</button></span></div>
 </HeadlessDemoFrame>
 
 <script>
-  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
   import { createRack, ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
@@ -48,18 +43,6 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
     let playing = false;
     const muted: Record<string, boolean> = {};
-    const updateCode = () => programmaticCode(root, `import {createRack, Sound} from '@webmusic/score/play/headless';
-
-const rack = createRack();
-// upperScore and lowerScore are the two imported MIDI parts.
-rack.add({id: 'upper', score: upperScore, soundOwnership: 'owned',
-  sound: Sound.oscillator({type: 'triangle', gain: 0.18, releaseSeconds: 0.05})});
-rack.add({id: 'lower', score: lowerScore, soundOwnership: 'owned',
-  sound: Sound.oscillator({type: 'sawtooth', gain: 0.1, releaseSeconds: 0.08})});
-${['upper', 'lower'].map((id) => "rack.mute('" + id + "', " + Boolean(muted[id]) + ');').join('\n')}
-// In a play gesture: await rack.play();
-// On cleanup: rack.dispose();`);
-    updateCode();
 
     // Each member has its own player clock. This display follows the upper part,
     // reading a fresh member snapshot after the rack builds its players lazily.
@@ -110,7 +93,6 @@ ${['upper', 'lower'].map((id) => "rack.mute('" + id + "', " + Boolean(muted[id])
         b.dataset.on = next ? 'true' : 'false';
         b.dataset.variant = next ? '' : 'ghost';
         b.setAttribute('aria-pressed', String(next));
-        updateCode();
       });
     });
   });

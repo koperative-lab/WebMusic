@@ -203,8 +203,9 @@ alternative specification:
   neutral monochrome tokens, square one-height controls, icon-only toolbars,
   adjustment cards inside the component over a scrim, no visible scrollbars,
   no explanatory text in the component; Web Component demos show the default
-  composition without Parameters, and Headless and presenter demo settings go
-  in Parameters.
+  composition without Parameters, Headless demos show the object with its
+  defaults and no Parameters either, and only UI Kit presenter demo settings
+  go in Parameters.
 
 ## Implement a change
 

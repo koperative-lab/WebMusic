@@ -127,7 +127,7 @@ function mount() {
   document.body.innerHTML = `<section data-composition-test>
     <button data-load></button><button data-replace></button><button data-dispose></button><button data-attach></button>
     <select data-rate><option value="1">1</option><option value="2">2</option></select><input data-loop type="checkbox">
-    <output data-status></output><output data-position></output><pre data-events></pre>
+    <output data-status></output><output data-position></output>
     <div data-score-views></div><div data-wave-surface></div><div data-playback-owner></div><div data-transport></div>
   </section>`;
   stop = mountDemos("[data-composition-test]", mountBridgeComposition);

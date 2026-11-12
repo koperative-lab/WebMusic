@@ -1,20 +1,15 @@
 ---
 // computeClipPeaks over the opening of Arabesque No. 1: the min/max pyramid a
-// waveform reads instead of the samples. The canvas draws its first level so
-// the numbers have a shape; Parameters set the base resolution.
+// waveform reads instead of the samples. The canvas draws its finest level.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/view/headless"
   name="computeClipPeaks"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-peaks': true}}
 >
   <canvas class="hl-peaks" data-canvas width="800" height="96" aria-label="First peaks level"></canvas>
   <div class="wui-row"><span class="wui-readout" data-summary>—</span></div>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">samplesPerPeak</span><select class="wui-select" data-spp aria-label="Samples per peak"><option>64</option><option selected>256</option><option>1024</option><option>4096</option></select><span class="wm-pg__note">Base resolution of the pyramid; coarser levels halve it again.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <style>
@@ -22,47 +17,31 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 </style>
 
 <script>
-  import type {AudioClip} from '@webmusic/audio';
   import {computeClipPeaks, peaksDuration} from '@webmusic/audio/view/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
 
   mountProgrammaticDemo('[data-hl-peaks]', async (root, scope) => {
-    const spp = root.querySelector<HTMLSelectElement>('[data-spp]')!;
     const canvas = root.querySelector<HTMLCanvasElement>('[data-canvas]')!;
     const summary = root.querySelector<HTMLElement>('[data-summary]')!;
-    let clip: AudioClip | undefined = undefined;
-    const apply = (): void => {
-      const samples = Number(spp.value);
-      programmaticCode(root, `import {computeClipPeaks, peaksDuration} from '@webmusic/audio/view/headless';
-
-const peaks = computeClipPeaks(clip, ${samples});
-if (peaks) console.log(peaks.levels.length, peaksDuration(peaks));`);
-      if (!clip) return;
-      const start = performance.now();
-      const peaks = computeClipPeaks(clip, samples);
-      const elapsed = performance.now() - start;
-      if (!peaks) { summary.textContent = 'no decoded samples'; return; }
-      // Interleaved 8-bit pairs, peak-major then channel: data[(peak * channels + channel) * 2 + 0|1].
-      const level = peaks.levels[0]!;
-      const count = Math.floor(level.data.length / (peaks.channels * 2));
-      summary.textContent = `${peaks.levels.length} levels · base ${peaks.baseSamplesPerPeak} samples/peak · ${peaksDuration(peaks).toFixed(1)} s · ${elapsed.toFixed(1)} ms`;
-      const context = canvas.getContext('2d')!;
-      const {width, height} = canvas;
-      context.clearRect(0, 0, width, height);
-      context.fillStyle = getComputedStyle(canvas).color || '#444';
-      for (let x = 0; x < width; x++) {
-        const index = Math.floor((x / width) * count) * peaks.channels * 2;
-        const min = (level.data[index] ?? 0) / 128;
-        const max = (level.data[index + 1] ?? 0) / 128;
-        const top = (1 - max) * height / 2;
-        context.fillRect(x, top, 1, Math.max(1, (max - min) * height / 2));
-      }
-    };
-    scope.listen(spp, 'change', apply);
-    apply();
-    clip = await loadArabesqueAudioExcerpt(30);
+    const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
-    apply();
+    const start = performance.now();
+    const peaks = computeClipPeaks(clip, 256);
+    const elapsed = performance.now() - start;
+    if (!peaks) { summary.textContent = 'no decoded samples'; return; }
+    summary.textContent = `${peaks.levels.length} levels · base ${peaks.baseSamplesPerPeak} samples/peak · ${peaksDuration(peaks).toFixed(1)} s · ${elapsed.toFixed(1)} ms`;
+    // Interleaved 8-bit pairs, peak-major then channel: data[(peak * channels + channel) * 2 + 0|1].
+    const level = peaks.levels[0]!;
+    const count = Math.floor(level.data.length / (peaks.channels * 2));
+    const context = canvas.getContext('2d')!;
+    const {width, height} = canvas;
+    context.fillStyle = getComputedStyle(canvas).color || '#444';
+    for (let x = 0; x < width; x++) {
+      const index = Math.floor((x / width) * count) * peaks.channels * 2;
+      const min = (level.data[index] ?? 0) / 128;
+      const max = (level.data[index + 1] ?? 0) / 128;
+      context.fillRect(x, (1 - max) * height / 2, 1, Math.max(1, (max - min) * height / 2));
+    }
   });
 </script>

@@ -340,8 +340,9 @@ topic examples retain their explanatory sections. Under DEC-071 a Web Component
 demo shows only the default interaction: the authored composition with the
 controls the component needs, and no Parameters strip, markup readout, Copy or
 Reset. Interactive adjustment and code generation belong to a separate
-component library, not to the documentation site. Headless and UI Kit presenter
-demos keep their Parameters.
+component library, not to the documentation site. Headless demos likewise show
+the object working with its defaults and no Parameters, code readout or
+Copy/Reset. UI Kit presenter demos keep their Parameters.
 Inventories and the Score family page carry no demo; the Audio family page
 may carry its reviewed workbench. Quick Start provides compact working examples.
 Shared `LiveDemoCanvas` owns the stage chrome; templates own the detailed

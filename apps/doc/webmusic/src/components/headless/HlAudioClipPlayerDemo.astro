@@ -1,55 +1,30 @@
 ---
-// AudioClipPlayer over the opening of Arabesque No. 1. Parameters call the
-// player's own setters on the live object; the readout is the same calls.
+// AudioClipPlayer over the opening of Arabesque No. 1, in its default
+// configuration: play, pause and the position it reports.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="AudioClipPlayer"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-clip-player': true}}
 >
   <HeadlessTransport />
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">loop</span><input type="checkbox" data-loop aria-label="Loop" /><span class="wm-pg__note">setLoop(loop): play the clip again from its start at the end.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">rate</span><input class="wm-pg__input" type="number" data-rate value="1" min="0.25" max="4" step="0.25" aria-label="Playback rate" /><span class="wm-pg__note">setRate(rate): playback speed; pitch follows unless preservesPitch is set.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">volume</span><input class="wm-pg__input" type="number" data-volume value="0.8" min="0" max="1" step="0.05" aria-label="Volume" /><span class="wm-pg__note">setVolume(volume): linear gain, 0–1.</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {AudioClipPlayer} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-clip-player]', async (root, scope) => {
-    const loop = root.querySelector<HTMLInputElement>('[data-loop]')!;
-    const rate = root.querySelector<HTMLInputElement>('[data-rate]')!;
-    const volume = root.querySelector<HTMLInputElement>('[data-volume]')!;
     let player: AudioClipPlayer | undefined = undefined;
     const transport = bindTransport(root, scope, () => player);
-    const apply = (): void => {
-      const values = {loop: loop.checked, rate: Number(rate.value) || 1, volume: Number(volume.value)};
-      player?.setLoop(values.loop);
-      player?.setRate(values.rate);
-      player?.setVolume(values.volume);
-      programmaticCode(root, `import {AudioClipPlayer} from '@webmusic/audio/play/headless';
-
-const player = new AudioClipPlayer(clip);
-player.setLoop(${values.loop});
-player.setRate(${values.rate});
-player.setVolume(${values.volume});
-// In a play gesture: await player.play();
-// On cleanup: player.dispose();`);
-    };
-    for (const input of [loop, rate, volume]) scope.listen(input, 'change', apply);
     const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
     player = new AudioClipPlayer(clip);
     scope.add(() => player?.dispose());
-    apply();
     transport.paint();
   });
 </script>

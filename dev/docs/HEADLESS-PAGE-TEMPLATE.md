@@ -48,15 +48,14 @@ Here, `src/` paths are relative to `apps/doc/webmusic/`.
 |---|---|
 | `src/content/docs/<family>/headless/index.mdx` | Family inventory: each entry's purpose, the layer boundary, and the export ownership table with its associated types, one section per capability |
 | `src/content/docs/<family>/headless/<capability>/<object>.mdx` | Explanation, Import, topics, complete API, and composition navigation |
-| `src/components/headless/<Name>Playground.astro` | Actual object, demo input, minimal UI, and cleanup |
-| `src/lib/headless-params/<family>-<capability>.ts` | Catalog entries for objects wired to the shared panel: options, commands, state, events, composedBy |
-| `src/components/HeadlessPlayground.astro` | Implemented shared panel using a catalog key and demo factory; it does not construct objects from export names automatically |
+| `src/components/headless/<Name>Demo.astro` | Actual object in its default configuration, demo input, the controls that operate it, and cleanup |
+| `src/lib/headless-params/<family>-<capability>.ts` | Catalog entries: entry, name, construction, options, commands, state, events and composedBy, kept as data for checks and tools |
+| `src/components/HeadlessDemoFrame.astro` | Shared card: entry and object title, the live canvas, and one failure line |
+| `src/components/HeadlessPlayground.astro` | The same card for a catalog object built by its page's demo factory with default options |
 | `src/components/LiveDemoCanvas.astro` | Shared stage, background, spacing, and Live status frame |
 
-`HeadlessPlayground` and its catalog types are available, but the catalog does
-not cover every object. Supply a real catalog entry and demo factory, or improve
-an existing working demo; do not assume the corresponding entry exists. Specific
-coverage and migration work belong in STATUS.
+The catalog does not cover every object; a demo can render `HeadlessDemoFrame`
+directly. Specific coverage and migration work belong in STATUS.
 
 **Composed by content does not depend on a generator.** A `composedBy` field
 exists, but there is no available `HeadlessComposedBy` component to import.
@@ -141,46 +140,32 @@ advances its clock, `InteractivePlayer` accepts caller-driven progress, and
 `PlayerController` wraps a state interface. Identify and link related Elements
 without retabling their attributes.
 
-### Main demo: drive the real object
-
-The complete authoring target for a `HeadlessPlayground` is:
+### Main demo: the object working
 
 ```text
 @webmusic/<family>/<capability>/headless                     Object
-Optional hint: operation and gesture requirements
 ┌───────────────────────────────────────────────────────────────┐
-│ Minimal UI driven by the object: buttons, time, meter, or list │
+│ The object with its defaults, and the controls that operate   │
+│ it: play, a note, an edit and its undo; readouts of its state │
 └───────────────────────────────────────────────────────────────┘
-▾ OPTIONS    Construction; release and recreate on a change
-▾ COMMANDS   Call methods on the live object
-▾ STATE      Read-only values refreshed through its public notifications
-▾ EVENTS     Event and payload trace
-┌───────────────────────────────────────────────────────────────┐
-│ Construction readout reflecting the current options            │
-└───────────────────────────────────────────────────────────────┘
-Copy / Reset
+One failure line, when something fails
 ```
 
-- Render the stage through `LiveDemoCanvas`, using documentation UI primitives
-  for necessary controls. The main demo exposes the object's own contract;
-  Element/presenter composition can be a topic example.
-- Every construction option, command, state getter, and event should be
-  controllable or observable. Explain limitations; do not remove a member from
-  the complete API table because demonstrating it is difficult.
-- Options recreate the object under its actual ownership rules. Commands use
-  the live instance. State follows public notifications rather than pretending
-  the object supplies a faster update contract. If it has no relevant event,
-  state the demo's refresh timing.
-- Objects with events provide a real trace; objects without events say so
-  rather than inventing an emitter. Show waiting/failure feedback for promises.
-- Use one row per member, name → control → short note. Mark an ineffective
-  control `inert` with a reason. Gesture-dependent operations need an operable
-  resting state and a short hint.
-- The readout shows the construction call, wrapping long options, followed by
-  Copy/Reset. Do not imply that required input, contexts, or synths materialize
-  automatically.
-- Release subscriptions, DOM listeners, and objects at reconstruction and
-  navigation, disposing only resources owned by the demo.
+- The demo shows how the object works, not every way to configure it
+  (DEC-071). It constructs the real object with fixed, sensible defaults and
+  shows its state as it changes. There is no Parameters panel, code readout,
+  Copy or Reset; the API table documents every option and member, and Import and
+  topic code show how to use them.
+- Controls in the canvas operate the object — they call the commands its
+  principle is about (play and pause, next entry, mute a part, one edit, undo,
+  seek). A construction option is not a control: pick the value the demo needs.
+- State follows public notifications rather than pretending the object supplies
+  a faster update contract. Show waiting and failure through the frame's one
+  feedback line; no hint text, instructions or event logs in the canvas.
+- A gesture-dependent operation needs an operable resting state: a disabled
+  Play button cannot obtain a user gesture.
+- Release subscriptions, DOM listeners and objects on navigation, disposing
+  only resources owned by the demo.
 
 Every page's main demo renders `HeadlessDemoFrame`. Audio demos that drive a
 transport-shaped object share its play row: `headless/HeadlessTransport.astro`
@@ -300,8 +285,9 @@ documented under this template.
   routes its name to the actual explanation.
 - Import, the complete API table, and object-specific lifecycle content exist;
   a demo or mentioned export name does not replace them.
-- The demo constructs the actual object; controls, state, events, and readout
-  agree, with feedback for asynchronous and gesture-dependent operations.
+- The demo constructs the actual object with its defaults; its controls and
+  readouts agree with the object, with feedback for asynchronous and
+  gesture-dependent operations.
 - Use real APIs and available facilities. Record missing infrastructure in
   STATUS rather than importing a proposed generator.
 - Exercise browser operation, errors, reconstruction, and navigation cleanup;

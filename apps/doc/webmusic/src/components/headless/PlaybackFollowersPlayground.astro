@@ -16,11 +16,9 @@ const factory = {
 <HeadlessPlayground
   object={object}
   factory={factory}
-  hint="Options recreate the model and demo player. Play requests audio; the remaining controls work silently."
 >
   <section class="wm-follower-demo wm-hl-music" aria-label="Playback-connected musical view">
     <div class="wm-follower-demo__owner">
-      <span>Demo-owned ScorePlayer</span>
       <button class="wui-btn" type="button" data-follow-play>Play</button>
       <button class="wui-btn" type="button" data-follow-stop>Stop</button>
       <button class="wui-btn" type="button" data-follow-owner-seek>Seek owner to 1s</button>
@@ -31,7 +29,7 @@ const factory = {
     <div class={object === 'score-map-view' ? 'wm-hl-music__map' : 'wm-hl-music__chips'} data-follow-data
       aria-label={object === 'score-map-view' ? 'Measure density and navigation' : object === 'pitch-view' ? 'Held pitches' : 'Chord segments'}></div>
     <button class="wui-btn" type="button" data-follow-complete hidden>Complete pending seeks</button>
-    <p data-follow-status role="status">Waiting for the model.</p>
+    <p data-follow-status role="status"></p>
   </section>
 </HeadlessPlayground>
 
@@ -44,7 +42,6 @@ const factory = {
   .wm-follower-demo { display: grid; gap: .75rem; min-width: 0; }
   .wm-follower-demo [hidden] { display: none; }
   .wm-follower-demo__owner { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-  .wm-follower-demo__owner span { flex-basis: 100%; font-size: .8rem; }
   .wm-follower-demo__owner output { font-size: .8rem; font-variant-numeric: tabular-nums; }
   .wm-follower-demo__summary { font-weight: 600; }
   .wm-follower-demo p { margin: 0; font-size: .8rem; }

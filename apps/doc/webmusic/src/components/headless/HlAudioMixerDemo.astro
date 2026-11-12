@@ -1,70 +1,38 @@
 ---
-// AudioMixer with two members over the same Arabesque excerpt. Parameters call
-// the mixer's member commands on the live object.
+// AudioMixer with two members over the same Arabesque excerpt, the second at
+// a lower volume: one transport starts both, aligned on the mixer's context.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="AudioMixer"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-mixer': true}}
 >
   <HeadlessTransport />
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">piano volume</span><input class="wm-pg__input" type="number" data-volume="piano" value="1" min="0" max="1" step="0.05" aria-label="Piano member volume" /><span class="wm-pg__note">setVolume('piano', volume): member gain, 0–1.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">double volume</span><input class="wm-pg__input" type="number" data-volume="double" value="0.4" min="0" max="1" step="0.05" aria-label="Double member volume" /><span class="wm-pg__note">setVolume('double', volume).</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">mute double</span><input type="checkbox" data-mute aria-label="Mute the double member" /><span class="wm-pg__note">mute('double') / unmute('double').</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">solo</span><select class="wui-select" data-solo aria-label="Solo member"><option value="">none</option><option value="piano">piano</option><option value="double">double</option></select><span class="wm-pg__note">solo(id | null): solo is exclusive.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">master volume</span><input class="wm-pg__input" type="number" data-master value="1" min="0" max="1" step="0.05" aria-label="Master volume" /><span class="wm-pg__note">setMasterVolume(volume).</span></div>
-  </div>
 </HeadlessDemoFrame>
 
 <script>
   import {AudioClipPlayer, createAudioMixer} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-mixer]', async (root, scope) => {
-    const volumes = [...root.querySelectorAll<HTMLInputElement>('[data-volume]')];
-    const mute = root.querySelector<HTMLInputElement>('[data-mute]')!;
-    const solo = root.querySelector<HTMLSelectElement>('[data-solo]')!;
-    const master = root.querySelector<HTMLInputElement>('[data-master]')!;
     const mixer = createAudioMixer({masterVolume: 1});
     scope.add(() => mixer.dispose());
     scope.add(mixer.on('error', (error) => programmaticFeedback(root, error.message)));
     let ready = false;
     const transport = bindTransport(root, scope, () => ready ? mixer : undefined);
-    const apply = (): void => {
-      const volume = (id: string) => Number(volumes.find((input) => input.dataset.volume === id)?.value ?? 1);
-      if (ready) {
-        for (const input of volumes) mixer.setVolume(input.dataset.volume!, Number(input.value));
-        if (mute.checked) mixer.mute('double'); else mixer.unmute('double');
-        mixer.solo(solo.value || null);
-        mixer.setMasterVolume(Number(master.value));
-      }
-      programmaticCode(root, `import {AudioClipPlayer, createAudioMixer} from '@webmusic/audio/play/headless';
-
-const mixer = createAudioMixer({masterVolume: ${Number(master.value)}});
-const {audioContext} = mixer; // members share the mixer's context
-mixer.add({id: 'piano', player: new AudioClipPlayer(clip, {audioContext}), volume: ${volume('piano')}});
-mixer.add({id: 'double', player: new AudioClipPlayer(clip, {audioContext}), volume: ${volume('double')}});
-${mute.checked ? "mixer.mute('double');\n" : ''}${solo.value ? `mixer.solo('${solo.value}');\n` : ''}// In a play gesture: await mixer.play();
-// On cleanup: mixer.dispose(); then dispose each player you created.`);
-    };
-    for (const input of [...volumes, mute, solo, master]) scope.listen(input, 'change', apply);
-    apply();
     const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
-    for (const id of ['piano', 'double']) {
+    for (const [id, volume] of [['piano', 1], ['double', 0.4]] as const) {
       // Members play on the mixer's context, so the mix starts aligned.
       const player = new AudioClipPlayer(clip, {audioContext: mixer.audioContext});
       scope.add(() => player.dispose());
-      mixer.add({id, player, volume: 1});
+      mixer.add({id, player, volume});
     }
     ready = true;
-    apply();
     transport.paint();
   });
 </script>

@@ -1,35 +1,31 @@
 ---
 // AudioPlayer as a stable owner over a source that changes: one clip of
-// Arabesque No. 1, or a borrowed two-pass playlist of it. Parameters switch the
-// source on the same player and set its volume.
+// Arabesque No. 1, or a borrowed two-pass playlist of it, on the same player.
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 import HeadlessTransport from './HeadlessTransport.astro';
 ---
 <HeadlessDemoFrame
   entry="@webmusic/audio/play/headless"
   name="AudioPlayer"
-  code={`// Loading Arabesque No. 1…`}
   rootAttrs={{'data-hl-audio-player': true}}
 >
-  <HeadlessTransport><span class="wui-readout" data-state>empty</span></HeadlessTransport>
-  <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">source</span><select class="wui-select" data-source aria-label="Source"><option value="clip" selected>setClip(clip)</option><option value="queue">setTransport(playlist)</option><option value="none">setClip(undefined)</option></select><span class="wm-pg__note">Switching pauses the previous source; the player object stays the same.</span></div>
-    <div class="wm-pg__param"><span class="wm-pg__name">volume</span><input class="wm-pg__input" type="number" data-volume value="0.7" min="0" max="1" step="0.05" aria-label="Volume" /><span class="wm-pg__note">setVolume(volume), kept across sources.</span></div>
-  </div>
+  <HeadlessTransport>
+    <span class="wui-seg"><button class="wui-btn" data-variant="ghost" data-role="toggle" type="button" data-source="clip" aria-pressed="true" disabled>Clip</button><button class="wui-btn" data-variant="ghost" data-role="toggle" type="button" data-source="queue" aria-pressed="false" disabled>Playlist</button></span>
+    <span class="wui-readout" data-state>empty</span>
+  </HeadlessTransport>
 </HeadlessDemoFrame>
 
 <script>
   import type {AudioClip} from '@webmusic/audio';
   import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
-  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
   import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   import {bindTransport} from './hl-transport';
 
   mountProgrammaticDemo('[data-hl-audio-player]', async (root, scope) => {
-    const source = root.querySelector<HTMLSelectElement>('[data-source]')!;
-    const volume = root.querySelector<HTMLInputElement>('[data-volume]')!;
+    const sources = [...root.querySelectorAll<HTMLButtonElement>('[data-source]')];
     const state = root.querySelector<HTMLElement>('[data-state]')!;
-    const player = new AudioPlayer(undefined, {volume: Number(volume.value)});
+    const player = new AudioPlayer(undefined, {volume: 0.7});
     scope.add(() => player.dispose());
     let clip: AudioClip | undefined = undefined;
     let queue: AudioPlaylist | undefined = undefined;
@@ -40,38 +36,29 @@ import HeadlessTransport from './HeadlessTransport.astro';
     const paint = (): void => {
       const backend = player.transport ? `playlist pass ${Math.max(0, (queue?.index ?? -1) + 1)}/2` : player.clip ? 'clip' : 'empty';
       state.textContent = `${backend} · revision ${revision}`;
+      for (const button of sources) button.setAttribute('aria-pressed', String((button.dataset.source === 'queue') === !!player.transport));
       transport.paint();
     };
     scope.add(player.on('sourcechange', (detail) => { revision = detail.revision; paint(); }));
     scope.add(player.on('statechange', paint));
     scope.add(player.on('error', (error) => programmaticFeedback(root, error.message)));
-    const apply = (): void => {
-      player.setVolume(Number(volume.value));
-      if (clip) {
-        if (source.value === 'queue' && queue) player.setTransport(queue);
-        else if (source.value === 'none') player.setClip(undefined);
+    // The same player object switches between a clip and a borrowed playlist.
+    for (const button of sources) {
+      scope.listen(button, 'click', () => {
+        if (!clip || !queue) return;
+        if (button.dataset.source === 'queue') player.setTransport(queue);
         else player.setClip(clip);
-      }
-      const call = source.value === 'queue' ? `player.setTransport(new AudioPlaylist({entries: [
-  {id: 'first-pass', clip},
-  {id: 'second-pass', clip},
-]}));` : source.value === 'none' ? 'player.setClip(undefined);' : 'player.setClip(clip);';
-      programmaticCode(root, `import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
-
-const player = new AudioPlayer(undefined, {volume: ${Number(volume.value)}});
-${call}
-// In a play gesture: await player.play();
-// On cleanup: dispose a playlist you created, then player.dispose();`);
-      paint();
-    };
-    for (const input of [source, volume]) scope.listen(input, 'change', apply);
-    apply();
+        paint();
+      });
+    }
     clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
     queue = new AudioPlaylist({audioContext: player.audioContext, entries: [
       {id: 'first-pass', label: 'First pass', clip},
       {id: 'second-pass', label: 'Second pass', clip},
     ]});
-    apply();
+    player.setClip(clip);
+    for (const button of sources) button.disabled = false;
+    paint();
   });
 </script>
