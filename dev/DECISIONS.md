@@ -7,6 +7,11 @@ three-package branch split for source integration; it does not change what was
 published in the first npm release. Read [STATUS](STATUS.md) and the target
 branch's tracked files before making a delivery claim.
 
+To find a decision without reading the register in order, use the generated
+[decision index](DECISION-INDEX.md). It groups every entry by topic, names the
+document that owns the current rule, and lists the later decisions that cite
+each entry, which is where a refinement or replacement is recorded.
+
 ## DEC-001 — A toolkit that grows from demos to music applications
 
 **Decision:** optimize for composable musical capabilities that can support interactive demos, music software, online workstations, and artistic installations.
@@ -3169,3 +3174,10 @@ the changed demos and type switches are checked in a browser.
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.
+
+File each new identifier under one topic in `DECISION_TOPICS` in
+[scripts/docs-catalog.mjs](../scripts/docs-catalog.mjs), then run
+`npm run docs:sync`; `npm run check:dev-docs` fails while a decision is unfiled.
+Keep verification totals and browser observations in a dated
+[audit](audits/README.md) and link it from the entry, so the register states
+the choice and its reason.

@@ -119,7 +119,7 @@ review; only the owner's explicit request in the current conversation changes it
 | Product scope | [PRODUCT.md](dev/PRODUCT.md) | Users, scenarios, integration choices, resource reuse, long-term goals |
 | Logic, interaction, and visual philosophy | [DESIGN-PRINCIPLES.md](dev/DESIGN-PRINCIPLES.md) | State/time authority, feedback, accessibility, styling and resource principles |
 | Visual language (required for all UI) | [VISUAL-DESIGN.md](dev/design/VISUAL-DESIGN.md) | Monochrome square palette and geometry, icon toolbars, in-component adjustment cards, hidden scrollbars, no in-canvas prose, demo Parameters, acceptance checklist |
-| Accepted choices | [DECISIONS.md](dev/DECISIONS.md) | Decisions, reasons, consequences and the next-decision format |
+| Accepted choices | [DECISIONS.md](dev/DECISIONS.md), by topic in the generated [decision index](dev/DECISION-INDEX.md) | Decisions, reasons, consequences and the next-decision format; the index names each entry's owner and the later decisions that cite it |
 | Technical architecture | [ARCHITECTURE.md](dev/ARCHITECTURE.md) | Package/capability boundaries, layers, timing, ownership and executable policy |
 | Component design | [COMPONENT-DESIGN.md](dev/design/COMPONENT-DESIGN.md) | Design questions, copyable design template and acceptance scenarios |
 | Analyze/View attachment to Play | [PLAYER-BINDING.md](dev/design/PLAYER-BINDING.md) | Accepted data/state/time binding direction, target companion syntax, open contract choices and acceptance scenarios; STATUS owns delivery gaps |

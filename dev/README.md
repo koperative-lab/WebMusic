@@ -37,7 +37,7 @@ indexes all repository Markdown/MDX files, including historical material.
 |---|---|
 | Who uses the toolkit and what should it enable? | [PRODUCT.md](PRODUCT.md) |
 | How should logic, interaction, visuals and resource use behave? | [DESIGN-PRINCIPLES.md](DESIGN-PRINCIPLES.md) |
-| Which choices are accepted and why? | [DECISIONS.md](DECISIONS.md) |
+| Which choices are accepted and why? | [DECISIONS.md](DECISIONS.md), found by topic through the generated [decision index](DECISION-INDEX.md) |
 | What are the package, layer, time and ownership boundaries? | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | What is implemented, incomplete or unverified in this checkout? | [STATUS.md](STATUS.md) |
 | How do I prepare, develop and verify a change? | [DEVELOPMENT.md](DEVELOPMENT.md) |
@@ -66,7 +66,10 @@ indexes all repository Markdown/MDX files, including historical material.
 - Manifests, barrels and reviewed policies own entries, dependencies and
   versions. Script calls own check coverage. Public leaf pages explain actual
   members, defaults, units, errors and cleanup using the relevant page template.
-- STATUS is the current work queue. Plans, audits and logs retain dated
+- STATUS is the current work queue and stays short: a closed item's
+  verification narrative moves to a dated audit or log record, as the
+  [status history record](log/2026-11-12-status-history.md) did for earlier
+  deliveries. Plans, audits and logs retain dated
   evidence; their counts and acceptance results describe their stated baseline.
   Their directory READMEs remain current navigation. Prototypes demonstrate an
   idea and do not establish implemented behavior.
