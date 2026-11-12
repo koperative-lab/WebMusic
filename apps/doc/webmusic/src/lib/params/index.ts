@@ -10,7 +10,8 @@ import {AUDIO_PLAY_PARAMS} from './audio-play';
 import {AUDIO_VIEW_PARAMS} from './audio-view';
 import {AUDIO_ANALYZE_PARAMS} from './audio-analyze';
 
-export type {ParamKind, ParamSpec, MemberSpec, ElementParamSpec, ElementParamCatalog} from './types';
+export type {ParamGroup, ParamKind, ParamSpec, MemberSpec, ElementParamSpec, ElementParamCatalog} from './types';
+export {paramGroup} from './group';
 
 export const ELEMENT_PARAMS: ElementParamCatalog = {
   ...SCORE_PLAY_PARAMS,

@@ -40,7 +40,7 @@ Here, `src/` paths are relative to `apps/doc/webmusic/`.
 |---|---|
 | `src/content/docs/<family>/element/<capability>/<tag>.mdx` | Page prose; a shared workflow uses its primary tag's filename |
 | `src/components/elements/<PascalTag>Demo.astro` | Real elements/workflow in their default composition, demo wiring, and local styles; use a descriptive workflow name for a composition |
-| `src/lib/params/<family>-<capability>.ts` | Attribute catalog: entry, names, kinds, options and fallbacks; reconcile names and order with source `static observedAttributes`, resolving spreads. `switch: true` marks the one enum that selects the element's drawing, surface or recipe |
+| `src/lib/params/<family>-<capability>.ts` | Attribute catalog: entry, names, kinds, options and fallbacks; reconcile names and order with source `static observedAttributes`, resolving spreads. `switch: true` marks the one enum that selects the element's drawing, surface or recipe. `paramGroup` files each attribute as param, style or data by name; an entry the rule would misfile sets `group` |
 | `src/components/ElementDemo.astro` | Shared panel: the entry and tag title, the type switch when the catalog marks one, then the live canvas |
 | `src/components/LiveDemoCanvas.astro` | Shared stage background, padding, and Live status frame |
 | `src/components/ElementComposition.astro` | Full-width sibling composition with a `0.5rem` gap |

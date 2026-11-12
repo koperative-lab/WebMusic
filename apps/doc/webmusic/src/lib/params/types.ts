@@ -25,6 +25,20 @@ export type ParamKind =
    */
   | 'tokens';
 
+/**
+ * The three kinds of setting a component has, so a tool can present them
+ * apart:
+ *
+ * - `param`: what the component does — its type, behaviour, ranges, tools and
+ *   musical choices.
+ * - `style`: how it looks and nothing else — colours, sizes, density, theme and
+ *   colour scheme. Changing one never changes what it plays or measures.
+ * - `data`: where its material comes from and what it is connected to — its
+ *   source file and format, the player, port or module it borrows from, its
+ *   Session, and its id in a composition.
+ */
+export type ParamGroup = 'param' | 'style' | 'data';
+
 export interface ParamSpec {
   /** Attribute name exactly as it appears in `observedAttributes`. */
   readonly name: string;
@@ -65,6 +79,11 @@ export interface ParamSpec {
    * attribute per element sets it.
    */
   readonly switch?: true;
+  /**
+   * Which of the three kinds of setting this attribute is, when the name rule
+   * in `paramGroup` would file it wrongly. See `ParamGroup`.
+   */
+  readonly group?: ParamGroup;
   /** Show this row only for these values; hidden rows retain their attributes. */
   readonly when?: {
     readonly attribute: string;
