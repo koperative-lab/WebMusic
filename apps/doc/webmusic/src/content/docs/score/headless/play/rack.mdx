@@ -4,26 +4,15 @@ description: 'Many instruments under one transport, so an ensemble starts, stops
 sidebar:
   order: 5
 ---
-
 import ProgrammaticRackDemo from '../../../../../components/programmatic/ProgrammaticRackDemo.astro';
+
+<ProgrammaticRackDemo />
 
 A `Rack` composes single-instrument players sharing an `AudioContext` and a
 master bus, with per-member volume / mute / solo. Timeline transport commands
 fan out to members; interactive members advance from caller input. Member
 players retain separate clocks. Rack does not inject one shared clock or pass
 one common future start timestamp to all timeline members.
-
-`rack.rename(oldId, newId)` changes a member's public name in place. Its player, route, order,
-volume, mute and solo state are preserved; renaming onto an existing id is rejected.
-
-`await rack.preload()` warms all members. `rack.play()` performs the same work
-automatically for timeline members; a caller driving interactive members should
-preload before its first `advance()`. Rack-supplied sounds are borrowed unless
-their `soundOwnership` is explicitly `'owned'`.
-
-Internally, member construction, mix-state calculation, and AudioContext adaptation are separate from transport orchestration.
-
-<ProgrammaticRackDemo />
 
 ## Import
 
@@ -80,6 +69,18 @@ Admission rejects an ID claimed during readiness callbacks and retires only the
 uncommitted candidate. Initial preparation also rejects an upstream admission
 revoked before commit. A child bus that was already prepared retains its own
 lifetime when its parent later releases the borrowed admission.
+
+## Members, preparation and ownership
+
+`rack.rename(oldId, newId)` changes a member's public name in place. Its player, route, order,
+volume, mute and solo state are preserved; renaming onto an existing id is rejected.
+
+`await rack.preload()` warms all members. `rack.play()` performs the same work
+automatically for timeline members; a caller driving interactive members should
+preload before its first `advance()`. Rack-supplied sounds are borrowed unless
+their `soundOwnership` is explicitly `'owned'`.
+
+Internally, member construction, mix-state calculation, and AudioContext adaptation are separate from transport orchestration.
 
 ## Reusable effects on the master bus
 
@@ -256,9 +257,8 @@ playback diagnostic path. Destroyed controllers ignore transport commands.
 
 ## Related
 
-[`<score-rack-control>` and `<score-rack-part>`](/score/element/play/score-rack-control/) compose
-Rack with [mixer UI](/uikit/mixing-capture/mixer/).
-[ScorePlayer](/score/headless/play/score-player/) owns timeline playback and
-shared error payload types; [InteractivePlayer](/score/headless/play/interactive-player/)
-owns `AdvanceOptions` and `BeatNote`. [Effect](/score/headless/play/effect/)
-owns the master/member recipes.
+- [`<score-rack-control>` and `<score-rack-part>`](/score/element/play/score-rack-control/) — mixer element for a shared Rack.
+- [mixer UI](/uikit/mixing-capture/mixer/) — renders master and channel faders and routes level, mute, solo, and optional transport commands through a structural binding.
+- [ScorePlayer](/score/headless/play/score-player/) — play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.
+- [InteractivePlayer](/score/headless/play/interactive-player/) — the pull engine.
+- [Effect](/score/headless/play/effect/) — the post-processing chain.

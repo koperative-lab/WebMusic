@@ -95,3 +95,27 @@ test('fenced skeletons and inventory pages are ignored', () => {
   assert.deepEqual(check([page(body + '\n```mdx\n## Import\n<ScoreViewDemo />\n```\n')]), []);
   assert.deepEqual(check([page('No demo here.', 'docs/score/element/index.mdx')]), []);
 });
+
+test('Headless pages share the shape without Styling and render HeadlessDemoFrame', async () => {
+  const {headlessShapeProblems} = await import('./element-docs-policy.mjs');
+  const headlessFrame = 'components/HeadlessDemoFrame.astro';
+  const demo = 'components/PlayerDemo.astro';
+  const file = 'docs/audio/headless/play/audio-player.mdx';
+  const headless = body
+    .replace("import ScoreViewDemo from '../../../../components/ScoreViewDemo.astro';", "import PlayerDemo from '../../../../components/PlayerDemo.astro';")
+    .replace('<ScoreViewDemo />', '<PlayerDemo />')
+    .replace(/<details class="component-section">\n<summary>Styling<\/summary>\nParts.\n<\/details>\n\n/, '');
+  const run = (content, demoSource = `---\nimport HeadlessDemoFrame from './HeadlessDemoFrame.astro';\n---\n<HeadlessDemoFrame />`) => headlessShapeProblems({
+    pages: [{file, source: `---\ntitle: 'AudioPlayer'\n---\n${content}`}],
+    frameFile: headlessFrame,
+    readFile(path) {
+      const files = {[headlessFrame]: '<div><slot /></div>', [demo]: demoSource};
+      if (!(path in files)) throw new Error('missing fixture');
+      return files[path];
+    },
+  });
+  assert.deepEqual(run(headless), []);
+  assert.ok(run(body.replace('ScoreViewDemo', 'PlayerDemo').replace('ScoreViewDemo', 'PlayerDemo').replace("'../../../../components/ScoreViewDemo.astro'", "'../../../../components/PlayerDemo.astro'")).some((failure) => failure.includes('no Styling')));
+  assert.ok(run(headless, '<div>own chrome</div>').some((failure) => failure.includes('HeadlessDemoFrame')));
+  assert.ok(run(headless.replace('<PlayerDemo />\n\n', '').replace('It follows a player.', 'It follows a player.\n\n<PlayerDemo />')).some((failure) => failure.includes('first visible content')));
+});

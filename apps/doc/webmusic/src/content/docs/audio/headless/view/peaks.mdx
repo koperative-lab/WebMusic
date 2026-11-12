@@ -2,8 +2,11 @@
 title: 'computeClipPeaks and peaksDuration'
 description: 'computeClipPeaks and peaksDuration: the compact min/max pyramid a waveform reads instead of the samples.'
 sidebar:
-  order: 3
+  order: 4
 ---
+import HlPeaksDemo from '../../../../../components/headless/HlPeaksDemo.astro';
+
+<HlPeaksDemo />
 
 `computeClipPeaks(clip, samplesPerPeak?)` reduces a clip's channel data to a
 **pyramid** of min/max pairs — a base level at the requested resolution, then
@@ -86,4 +89,6 @@ fields into public API.
 
 ## Related
 
-[View models](/audio/headless/view/view-models/) · [Core audio data](/audio/api/) · [View API](/audio/api/view/)
+- [View models](/audio/headless/view/view-models/) — project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.
+- [Core audio data](/audio/api/) — the thin, DOM-free Audio root.
+- [View API](/audio/api/view/) — audio visualization.

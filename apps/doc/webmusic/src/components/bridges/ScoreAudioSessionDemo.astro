@@ -1,54 +1,52 @@
 ---
-import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+// createScoreAudioSession: the opening of Arabesque No. 1's MIDI rendered as a
+// clip and conducted with its muted Score player by one Session. The stage
+// holds the session's own commands; rate, loop and the command trace are in
+// Parameters.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 ---
-<section class="composition-demo not-content" data-bridge-composition>
-  <LiveDemoCanvas size="tall" label="Score and Audio playback composition">
-    <div class="composition-demo__body">
-      <div class="composition-demo__actions">
-        <button type="button" data-load>Load example</button>
-        <button type="button" data-replace disabled>Replace source</button>
-        <button type="button" data-attach disabled>Attach Score views</button>
-        <button type="button" data-dispose disabled>Dispose session</button>
-      </div>
-      <output role="status" data-status>Load an example to enable audio and prepare a matched score and recording.</output>
-      <div data-transport></div>
-      <div class="composition-demo__actions">
-        <label>Rate
-          <select data-rate disabled>
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
-          </select>
-        </label>
-        <label><input type="checkbox" data-loop disabled /> Repeat the Session</label>
-      </div>
-      <output data-position>No active session</output>
-      <p>The opening of the public Arabesque No. 1 MIDI is rendered as audio. Replace source switches between excerpts of 16 and 24 quarter-note beats. Score views borrow the muted score player's data and current state.</p>
-      <div data-wave-surface role="img" aria-label="Rendered backing track and its playback position"></div>
-      <div data-playback-owner hidden></div>
-      <div class="composition-demo__views" data-score-views></div>
-      <details>
-        <summary>Recent completed commands</summary>
-        <pre data-events aria-label="Last six command results">No commands yet.</pre>
-      </details>
+<HeadlessDemoFrame
+  entry="@webmusic/bridge"
+  name="createScoreAudioSession"
+  code={`import {createScoreAudioSession, renderScoreToClip} from '@webmusic/bridge';
+
+const clip = await renderScoreToClip(score, {tailSeconds: 0});
+const composition = createScoreAudioSession(score, clip);
+composition.scoreModule.player.setVolume(0); // the clip is the sounding source
+// In a play gesture: await composition.session.play();
+// On cleanup: composition.dispose();`}
+  rootAttrs={{'data-bridge-composition': true}}
+>
+  <div class="composition-demo__body">
+    <div class="wui-row">
+      <button class="wui-btn" type="button" data-load>Load</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-replace disabled>Replace source</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-attach disabled>Attach Score views</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-dispose disabled>Dispose</button>
     </div>
-  </LiveDemoCanvas>
-</section>
+    <div data-transport></div>
+    <output class="wui-readout" data-position>No active session</output>
+    <output class="wui-readout" role="status" data-status></output>
+    <div data-wave-surface role="img" aria-label="Rendered backing track and its playback position"></div>
+    <div data-playback-owner hidden></div>
+    <div class="composition-demo__views" data-score-views></div>
+  </div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">rate</span><select class="wui-select" data-rate disabled aria-label="Session rate"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select><span class="wm-pg__note">session.setRate(rate): both participants follow the one Session.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">loop</span><input type="checkbox" data-loop disabled aria-label="Repeat the Session" /><span class="wm-pg__note">session.setLoop(): repeat the whole Session.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">commands</span><pre class="wm-pg__markup composition-demo__events" data-events aria-label="Last six command results">—</pre><span class="wm-pg__note">The last six completed Session commands and their outcomes.</span></div>
+  </div>
+</HeadlessDemoFrame>
 <script>
-  import {mountDemos} from '../demo-lifecycle';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
   import {mountBridgeComposition} from './bridge-composition-client';
-  mountDemos('[data-bridge-composition]', mountBridgeComposition);
+  mountProgrammaticDemo('[data-bridge-composition]', mountBridgeComposition);
 </script>
 <style>
-  .composition-demo__body { width: 100%; min-width: 0; padding: 0.8rem; }
-  .composition-demo__actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.7rem 0; }
-  .composition-demo__actions button, .composition-demo__actions select { font: inherit; padding: 0.4rem 0.6rem; }
-  .composition-demo__actions label { display: inline-flex; gap: 0.4rem; align-items: center; }
-  .composition-demo__actions :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-  .composition-demo__body output { display: block; margin: 0.5rem 0; font-size: 0.85rem; }
-  .composition-demo__body p { font-size: 0.85rem; }
-  .composition-demo__body details { margin-top: 0.8rem; }
-  .composition-demo__body pre { overflow-x: auto; white-space: pre; font-size: 0.75rem; }
-  .composition-demo__views { min-width: 0; overflow-x: auto; }
-  .composition-demo__views :global(score-view), .composition-demo__views :global(score-chord-analysis) { margin-top: 0.7rem; }
+  .composition-demo__body { display: grid; gap: .5rem; width: 100%; min-width: 0; }
+  .composition-demo__body output { display: block; }
+  .composition-demo__body output:empty { display: none; }
+  .composition-demo__views { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .composition-demo__views :global(score-view), .composition-demo__views :global(score-chord-analysis) { margin-top: 0.5rem; }
+  .composition-demo__events { margin: 0; white-space: pre; overflow-x: auto; scrollbar-width: none; font-size: .72rem; }
 </style>

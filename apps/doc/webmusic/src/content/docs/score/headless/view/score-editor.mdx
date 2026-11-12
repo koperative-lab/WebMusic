@@ -4,8 +4,9 @@ description: 'One immutable Score document with URL loading, atomic commands, bo
 sidebar:
   order: 2
 ---
-
 import ScoreEditorHeadlessDemo from '../../../../../components/headless/ScoreEditorHeadlessDemo.astro';
+
+<ScoreEditorHeadlessDemo />
 
 `ScoreEditor` owns the current immutable Score, document identity, monotonic
 revision and optional local history. `createScoreEditor(score, options?)` returns
@@ -22,8 +23,6 @@ can borrow this owner through `setDocumentSource(editor)`, and
 [`<score-grid-view>`](/score/element/view/score-grid-view/) and
 [`<score-view>`](/score/element/view/score-view/#follow-an-editor) borrow it
 through their `.editor` property.
-
-<ScoreEditorHeadlessDemo />
 
 ## Import
 
@@ -255,11 +254,9 @@ re-exported by `@webmusic/score/view`, with their runtime checks documented in
 
 ## Related
 
-[Score I/O](/score/api/io/) loads Scores, owns the load options and exports an
-explicit committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
-the lower-level batch primitive. [`<score-grid-view>`](/score/element/view/score-grid-view/)
-borrows this editor to edit notes, [`<score-view>`](/score/element/view/score-view/#follow-an-editor)
-follows it read-only, and
-[`<score-player>`](/score/element/play/score-player/) and
-[ScorePlayer](/score/headless/play/score-player/) apply committed revisions
-through their document binding.
+- [Score I/O](/score/api/io/) — MIDI, MusicXML, MXL and ABC import/export for Score.
+- [Score Core](/score/api/#batch-edits-with-scoreedit) — the thin, DOM-free Score root.
+- [`<score-grid-view>`](/score/element/view/score-grid-view/) — a DAW-style piano-roll grid that follows a player and, with a borrowed editor, edits notes from a switchable toolbar.
+- [`<score-view>`](/score/element/view/score-view/#follow-an-editor) — one score, three views.
+- [`<score-player>`](/score/element/play/score-player/) — the Score transport widget.
+- [ScorePlayer](/score/headless/play/score-player/) — play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.

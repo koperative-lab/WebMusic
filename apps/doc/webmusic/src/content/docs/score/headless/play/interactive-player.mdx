@@ -4,8 +4,9 @@ description: 'The pull engine: notes sound as you send them, so a keyboard or a 
 sidebar:
   order: 2
 ---
-
 import ProgrammaticInteractivePlayerDemo from '../../../../../components/programmatic/ProgrammaticInteractivePlayerDemo.astro';
+
+<ProgrammaticInteractivePlayerDemo />
 
 `InteractivePlayer` owns **no musical clock** — it sounds only when *you* feed it a signal. Each `advance()` pulls and plays the next beat's notes, so a gesture, metronome, scroll, or `requestAnimationFrame` drives playback. It supports many voices and sources; source selection is synchronous and the next driven beat uses the selected source.
 
@@ -19,9 +20,6 @@ their disposal to the player.
 
 Optional [clock input](#clock-input) and [Web MIDI input](#web-midi-input)
 helpers are documented below with the engine they drive.
-
-
-<ProgrammaticInteractivePlayerDemo />
 
 ## Import
 
@@ -202,7 +200,6 @@ const notes = session.finish();
 const score = notes ? recordedNotesToScore(notes, {bpm: 100, quantize: 0.25}) : undefined;
 ```
 
-
 **Construction** — `new ScoreRecorderSession(clock?)`; `clock` defaults to
 `recorderNow`.
 
@@ -217,7 +214,6 @@ const score = notes ? recordedNotesToScore(notes, {bpm: 100, quantize: 0.25}) : 
 | `recordedNotesToScore(notes, {bpm, quantize, title?})` | helper | Assembles captured notes into a `Score`; `quantize` is a fraction of a quarter (`0.25` means sixteenths, `0` disables snapping). Returns `undefined` for an empty list. |
 | `recorderNow()` | helper | The default monotonic seconds clock, SSR-safe. |
 | `SCORE_RECORDER_VOICE` | constant | The voice id captured notes are written to (`'rec'`). |
-
 
 The recorder retains one press per MIDI pitch: another press of the same
 pitch replaces its pending onset. A completed note stores `midi`, `velocity`,
@@ -293,7 +289,6 @@ Prepare the player's audio separately, from a user gesture, before allowing
 input. Automatic device lookup has no readiness/error event; request access
 yourself and pass `input` when the UI must report permission or device errors.
 
-
 **Input and options — `bindMidiInput(player, options?): () => void`**
 
 | Member | Default / contract |
@@ -327,7 +322,6 @@ from attaching a listener. It does not close the device or dispose/silence the p
 There are no helper state getters or emitted events. Without Web MIDI and
 without an explicit input, the helper warns and returns a harmless cleanup;
 automatic access rejection is swallowed.
-
 
 #### MIDI input Related
 

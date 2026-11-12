@@ -1,158 +1,77 @@
 ---
-import LiveDemoCanvas from '../LiveDemoCanvas.astro';
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+// AudioPlayer as a stable owner over a source that changes: one clip of
+// Arabesque No. 1, or a borrowed two-pass playlist of it. Parameters switch the
+// source on the same player and set its volume.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
 ---
-
-<div class="wui-panel wui-panel--flow not-content">
-  <div class="wui-panel__title">
-    <span>@webmusic/audio/play/headless</span>
-    <strong>AudioPlayer</strong>
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="AudioPlayer"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-audio-player': true}}
+>
+  <HeadlessTransport><span class="wui-readout" data-state>empty</span></HeadlessTransport>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">source</span><select class="wui-select" data-source aria-label="Source"><option value="clip" selected>setClip(clip)</option><option value="queue">setTransport(playlist)</option><option value="none">setClip(undefined)</option></select><span class="wm-pg__note">Switching pauses the previous source; the player object stays the same.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">volume</span><input class="wm-pg__input" type="number" data-volume value="0.7" min="0" max="1" step="0.05" aria-label="Volume" /><span class="wm-pg__note">setVolume(volume), kept across sources.</span></div>
   </div>
-  <LiveDemoCanvas size="compact" label="Headless audio player">
-    <div class="audio-player-demo" data-hl-audio-player data-src={SRC}>
-      <div class="wui-row">
-        <button class="wui-btn" data-load type="button">Load sample</button>
-        <label>Source
-          <select data-source disabled>
-            <option value="" disabled>Choose source</option>
-            <option value="clip" selected>Single clip</option>
-            <option value="queue">Two-pass playlist</option>
-          </select>
-        </label>
-        <button class="wui-btn" data-play type="button" disabled>Play</button>
-        <button class="wui-btn" data-stop type="button" disabled>Stop</button>
-        <button class="wui-btn" data-clear type="button" disabled>Clear source</button>
-      </div>
-      <label class="audio-player-demo__seek">Position
-        <input data-seek type="range" min="0" max="1" step="0.001" value="0" disabled />
-        <output class="wui-readout" data-time>0.0 / 0.0 s</output>
-      </label>
-      <div class="wui-row">
-        <label>Volume
-          <input data-volume type="range" min="0" max="1" step="0.01" value="0.7" />
-        </label>
-        <output class="wui-readout" data-state>Empty · source revision 0</output>
-      </div>
-      <p class="doc-status" data-status role="status">Load the sample, then play. Switching sources keeps this same AudioPlayer object.</p>
-    </div>
-  </LiveDemoCanvas>
-</div>
+</HeadlessDemoFrame>
 
 <script>
-  import {loadClipFromUrl} from '@webmusic/audio/play';
-  import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
   import type {AudioClip} from '@webmusic/audio';
-  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
 
-  const setup = (root: HTMLElement, scope: DemoScope): void => {
-    const load = root.querySelector<HTMLButtonElement>('[data-load]')!;
+  mountProgrammaticDemo('[data-hl-audio-player]', async (root, scope) => {
     const source = root.querySelector<HTMLSelectElement>('[data-source]')!;
-    const play = root.querySelector<HTMLButtonElement>('[data-play]')!;
-    const stop = root.querySelector<HTMLButtonElement>('[data-stop]')!;
-    const clear = root.querySelector<HTMLButtonElement>('[data-clear]')!;
-    const seek = root.querySelector<HTMLInputElement>('[data-seek]')!;
     const volume = root.querySelector<HTMLInputElement>('[data-volume]')!;
-    const time = root.querySelector<HTMLOutputElement>('[data-time]')!;
-    const state = root.querySelector<HTMLOutputElement>('[data-state]')!;
-    const status = root.querySelector<HTMLElement>('[data-status]')!;
-    const player = new AudioPlayer(undefined, {volume: 0.7, cursorIntervalMs: 50});
-    let clip: AudioClip | undefined;
-    let queue: AudioPlaylist | undefined;
-    let revision = 0;
-    let loadRevision = 0;
-    let loadController: AbortController | undefined;
+    const state = root.querySelector<HTMLElement>('[data-state]')!;
+    const player = new AudioPlayer(undefined, {volume: Number(volume.value)});
     scope.add(() => player.dispose());
-    // The demo owns the queue; the facade only borrows it. Release it before
-    // the facade closes the context that decoding and both sources share.
-    scope.add(() => {loadRevision++; loadController?.abort(); queue?.dispose();});
-
-    const refresh = (): void => {
-      if (!scope.active) return;
-      const available = !!player.clip || !!player.transport;
-      play.disabled = stop.disabled = clear.disabled = !available;
-      source.disabled = !clip;
-      seek.disabled = !available || player.duration <= 0;
-      play.textContent = player.playing ? 'Pause' : 'Play';
-      seek.value = String(Math.max(0, Math.min(1, player.progress)));
-      seek.setAttribute('aria-valuetext', `${player.seconds.toFixed(1)} seconds`);
-      time.textContent = `${player.seconds.toFixed(1)} / ${player.duration.toFixed(1)} s`;
-      const backend = player.transport ? `Playlist · pass ${Math.max(0, (queue?.index ?? -1) + 1)}/2` : player.clip ? 'Clip' : 'Empty';
-      state.textContent = `${backend} · ${player.playing ? 'playing' : 'paused'} · source revision ${revision}`;
+    let clip: AudioClip | undefined = undefined;
+    let queue: AudioPlaylist | undefined = undefined;
+    // The demo owns the queue; the player only borrows it. Release it before the player closes its context.
+    scope.add(() => queue?.dispose());
+    let revision = 0;
+    const transport = bindTransport(root, scope, () => player.clip || player.transport ? player : undefined);
+    const paint = (): void => {
+      const backend = player.transport ? `playlist pass ${Math.max(0, (queue?.index ?? -1) + 1)}/2` : player.clip ? 'clip' : 'empty';
+      state.textContent = `${backend} · revision ${revision}`;
+      transport.paint();
     };
-    const failure = (error: unknown): void => {
-      if (!scope.active) return;
-      status.textContent = error instanceof Error ? error.message : String(error);
-      refresh();
-    };
-    const selectSource = (): void => {
-      if (!clip) return;
-      if (source.value === 'queue' && queue) player.setTransport(queue);
-      else {source.value = 'clip'; player.setClip(clip);}
-      refresh();
-    };
-    scope.add(player.on('sourcechange', (detail) => {revision = detail.revision; refresh();}));
-    scope.add(player.on('statechange', refresh));
-    scope.add(player.on('timeupdate', refresh));
-    scope.add(player.on('end', () => {if (scope.active) status.textContent = 'Playback complete.'; refresh();}));
-    scope.add(player.on('error', failure));
-
-    scope.listen(load, 'click', async () => {
-      const request = ++loadRevision;
-      loadController?.abort();
-      const controller = new AbortController();
-      loadController = controller;
-      load.disabled = true;
-      status.textContent = 'Loading sample…';
-      try {
-        const context = player.audioContext;
-        const loaded = await loadClipFromUrl(root.dataset.src!, {context, signal: controller.signal});
-        if (!scope.active || request !== loadRevision) return;
-        const previousQueue = queue;
-        clip = loaded;
-        queue = new AudioPlaylist({audioContext: context, entries: [
-          {id: 'first-pass', label: 'First pass', clip},
-          {id: 'second-pass', label: 'Second pass', clip},
-        ]});
-        selectSource();
-        previousQueue?.dispose();
-        status.textContent = 'Ready. Source switching pauses the previous backend; Play starts the selected one.';
-        load.textContent = 'Reload sample';
-      } catch (error) {
-        if (request === loadRevision) failure(error);
-      } finally {
-        if (scope.active && request === loadRevision) {loadController = undefined; load.disabled = false; refresh();}
+    scope.add(player.on('sourcechange', (detail) => { revision = detail.revision; paint(); }));
+    scope.add(player.on('statechange', paint));
+    scope.add(player.on('error', (error) => programmaticFeedback(root, error.message)));
+    const apply = (): void => {
+      player.setVolume(Number(volume.value));
+      if (clip) {
+        if (source.value === 'queue' && queue) player.setTransport(queue);
+        else if (source.value === 'none') player.setClip(undefined);
+        else player.setClip(clip);
       }
-    });
-    scope.listen(source, 'change', () => {try {selectSource();} catch (error) {failure(error);}});
-    scope.listen(play, 'click', async () => {
-      try {
-        if (player.playing) player.pause();
-        else await player.play();
-        refresh();
-      } catch (error) {failure(error);}
-    });
-    scope.listen(stop, 'click', () => {player.stop(); refresh();});
-    scope.listen(clear, 'click', () => {
-      loadRevision++; loadController?.abort(); loadController = undefined; load.disabled = false;
-      player.stop();
-      player.setClip(undefined);
-      source.value = '';
-      status.textContent = 'Source cleared. Choose a source to reuse this same player.';
-      refresh();
-    });
-    scope.listen(seek, 'input', () => {player.seekFraction(Number(seek.value)); refresh();});
-    scope.listen(volume, 'input', () => {player.setVolume(Number(volume.value)); refresh();});
-    refresh();
-  };
+      const call = source.value === 'queue' ? `player.setTransport(new AudioPlaylist({entries: [
+  {id: 'first-pass', clip},
+  {id: 'second-pass', clip},
+]}));` : source.value === 'none' ? 'player.setClip(undefined);' : 'player.setClip(clip);';
+      programmaticCode(root, `import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
 
-  const unregister = mountDemos('[data-hl-audio-player]', setup);
-  if (import.meta.hot) import.meta.hot.dispose(unregister);
+const player = new AudioPlayer(undefined, {volume: ${Number(volume.value)}});
+${call}
+// In a play gesture: await player.play();
+// On cleanup: dispose a playlist you created, then player.dispose();`);
+      paint();
+    };
+    for (const input of [source, volume]) scope.listen(input, 'change', apply);
+    apply();
+    clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    queue = new AudioPlaylist({audioContext: player.audioContext, entries: [
+      {id: 'first-pass', label: 'First pass', clip},
+      {id: 'second-pass', label: 'Second pass', clip},
+    ]});
+    apply();
+  });
 </script>
-
-<style>
-  .audio-player-demo { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; min-width: 0; }
-  .audio-player-demo label { display: inline-flex; align-items: center; gap: .5rem; }
-  .audio-player-demo__seek { display: flex; flex-wrap: wrap; }
-  .audio-player-demo__seek input { flex: 1; min-width: 6rem; }
-  .audio-player-demo p { margin: 0; }
-</style>

@@ -21,7 +21,7 @@ import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
-import {elementDocProblems} from './element-docs-policy.mjs';
+import {elementDocProblems, headlessShapeProblems} from './element-docs-policy.mjs';
 import {requiredFeatureLayers} from './package-policy.mjs';
 import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
 import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
@@ -761,8 +761,13 @@ for (const message of elementDocProblems({
   frameFile: 'apps/doc/webmusic/src/components/ElementDemo.astro',
 })) fail('page', message);
 await checkTypeSwitches(paramsCatalog);
+for (const message of headlessShapeProblems({
+  pages: files.filter((file) => /\/(?:score|audio|bridge)\/headless\//.test(file)).map((file) => ({file, source: read(file)})),
+  readFile: read,
+  frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
+})) fail('headless-page', message);
 for (const message of headlessDocProblems({
-  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file === `${DOCS}/audio/headless/view/audio-clip-editor.mdx`).map((file) => ({file, source: read(file)})),
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file.startsWith(`${DOCS}/audio/headless/`)).map((file) => ({file, source: read(file)})),
   readFile: read,
   frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);

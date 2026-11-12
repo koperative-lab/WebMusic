@@ -1,0 +1,12 @@
+---
+// The one transport row Audio Headless demos share: a play/pause button, the
+// position and the time, bound by `bindTransport` to whatever object the demo
+// drives. Extra readouts go in the slot after it.
+---
+
+<div class="wui-row" data-hl-transport>
+  <button class="wui-btn" data-hl-play type="button" disabled>▶ Play</button>
+  <div class="wui-track"><div class="wui-track__fill" data-hl-fill></div></div>
+  <span class="wui-readout" data-hl-time>0.0 / 0.0 s</span>
+  <slot />
+</div>

@@ -1,11 +1,12 @@
 import {dirname, join} from 'node:path';
 import {imports, markup, prose} from './headless-docs-policy.mjs';
 
-// One page shape for every Web Component page (COMPONENT-PAGE-TEMPLATE.md):
+// One page shape for every Web Component page (COMPONENT-PAGE-TEMPLATE.md)
+// and every Headless object page (HEADLESS-PAGE-TEMPLATE.md):
 //
 //   main demo → introduction → ## Import → ## Ports and composition
 //   → optional ## topics (topic demos allowed) → API <details>
-//   → Styling <details> → ## Related (a bullet list)
+//   → Styling <details> (Web Components only) → ## Related (a bullet list)
 //
 // Deliberately constrained source checks, not an MDX evaluator. Fenced
 // examples and comments are blanked first, so a copied skeleton inside a code
@@ -19,8 +20,28 @@ const blankImports = (text) => text.replace(/^[ \t]*import\s[^\n]*$/gm, (line) =
 const lineStart = (name) => new RegExp(`^[ \\t]*<${name}\\b[^>]*\\/>`, 'gm');
 const detailsBlock = (summary) => new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*${summary}\\s*<\\/summary>`, 'g');
 
+/**
+ * The two page kinds. A Web Component page renders its demo through
+ * `ElementDemo` and documents styling; a Headless page renders its demo
+ * through `HeadlessDemoFrame` and has no styling of its own.
+ */
+const KINDS = {
+  element: {page: /(?:^|\/)element\/(?:play|analyze|view)\/([^/]+)\.mdx$/, frame: 'ElementDemo', styling: true},
+  headless: {page: /(?:^|\/)headless\/(?:(?:play|analyze|view)\/)?([^/]+)\.mdx$/, frame: 'HeadlessDemoFrame', styling: false},
+};
+
 /** Return actionable failures for the Web Component leaf pages. */
 export function elementDocProblems({pages, readFile, frameFile}) {
+  return pageShapeProblems({pages, readFile, frameFile, kind: 'element'});
+}
+
+/** Return actionable failures for the Headless object pages, Bridge included. */
+export function headlessShapeProblems({pages, readFile, frameFile}) {
+  return pageShapeProblems({pages, readFile, frameFile, kind: 'headless'});
+}
+
+function pageShapeProblems({pages, readFile, frameFile, kind}) {
+  const {page: pagePattern, frame: frameName, styling: hasStyling} = KINDS[kind];
   const failures = [];
   const loaded = new Map();
   const load = (file) => {
@@ -29,7 +50,7 @@ export function elementDocProblems({pages, readFile, frameFile}) {
     try {
       source = prose(readFile(file));
     } catch {
-      failures.push(`${file}: cannot read imported Element demo component`);
+      failures.push(`${file}: cannot read imported ${kind === 'element' ? 'Element' : 'Headless'} demo component`);
     }
     loaded.set(file, source);
     return source;
@@ -46,7 +67,7 @@ export function elementDocProblems({pages, readFile, frameFile}) {
   };
 
   for (const {file, source: raw} of pages) {
-    const match = /(?:^|\/)element\/(?:play|analyze|view)\/([^/]+)\.mdx$/.exec(file);
+    const match = pagePattern.exec(file);
     if (!match || match[1] === 'index') continue;
     const text = prose(raw);
     const body = blankImports(markup(text));
@@ -61,7 +82,7 @@ export function elementDocProblems({pages, readFile, frameFile}) {
     if (!main || main.index + body.slice(main.index).search(/\S/) !== first) {
       problem('the main demo must be the first visible content, before the introduction and every heading');
     } else if (!reachesFrame(join(dirname(file), main.specifier))) {
-      problem(`<${main.name}> must render the shared ElementDemo through relative Astro imports`);
+      problem(`<${main.name}> must render the shared ${frameName} through relative Astro imports`);
     }
 
     const headings = [...body.matchAll(/^## (.+?)[ \t]*$/gm)].map((heading) => ({title: heading[1], index: heading.index}));
@@ -89,15 +110,17 @@ export function elementDocProblems({pages, readFile, frameFile}) {
     const api = [...body.matchAll(detailsBlock('API'))];
     const styling = [...body.matchAll(detailsBlock('Styling'))];
     const otherDetails = [...body.matchAll(/<details\b[^>]*>\s*<summary>\s*([^<]*?)\s*<\/summary>/g)]
-      .map((found) => found[1]).filter((summary) => summary !== 'API' && summary !== 'Styling');
+      .map((found) => found[1]).filter((summary) => summary !== 'API' && !(hasStyling && summary === 'Styling'));
     if (api.length !== 1) problem(`expected one API <details> block, found ${api.length}`);
-    if (styling.length !== 1) problem(`expected one Styling <details> block, found ${styling.length}`);
+    if (hasStyling && styling.length !== 1) problem(`expected one Styling <details> block, found ${styling.length}`);
+    if (!hasStyling && styling.length) problem('a Headless page has no Styling block');
     for (const summary of otherDetails) problem(`<details> "${summary}" is not part of the page shape; make it a ## topic before API`);
     const ports = headings.find((heading) => heading.title === 'Ports and composition');
     const related = headings.find((heading) => heading.title === 'Related');
-    if (api.length === 1 && styling.length === 1 && ports && related) {
-      if (!(ports.index < api[0].index && api[0].index < styling[0].index && styling[0].index < related.index)) {
-        problem('required order is Ports and composition → topics → API → Styling → Related');
+    const close = hasStyling ? styling[0] : api[0];
+    if (api.length === 1 && close && ports && related) {
+      if (!(ports.index < api[0].index && api[0].index <= close.index && close.index < related.index)) {
+        problem(`required order is Ports and composition → topics → API${hasStyling ? ' → Styling' : ''} → Related`);
       }
       const late = headings.filter((heading) => heading.index > api[0].index && heading !== related);
       for (const heading of late) problem(`## ${heading.title} sits after the API block; topics come before API`);

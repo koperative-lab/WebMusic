@@ -4,8 +4,9 @@ description: One immutable Audio sequence with URL loading, structural history, 
 sidebar:
   order: 1
 ---
-
 import AudioClipEditorHeadlessDemo from '../../../../../components/headless/AudioClipEditorHeadlessDemo.astro';
+
+<AudioClipEditorHeadlessDemo />
 
 `AudioClipEditor` owns one editable contiguous sequence. `createAudioClipEditor`
 returns the same class from decoded input, and `loadAudioClipEditor` fetches and
@@ -13,8 +14,6 @@ decodes one file first. Edits and history retain immutable asset references;
 they do not save a complete PCM copy per edit. Construction creates no player,
 AudioContext, worker or UI. Existing `ClipEditSession` remains a separate,
 materializing clip-transform API.
-
-<AudioClipEditorHeadlessDemo />
 
 ## Import
 
@@ -41,6 +40,14 @@ Supplying `assets` together with a decoded clip is rejected; construct a sequenc
 when you need to share an existing store.
 Streaming clips cannot become editable assets. Empty sequences require an
 explicit format and remain valid ready documents.
+
+## Ports and composition
+
+`AudioClipEditor` is a document owner, not a module: it exposes no ports and
+joins no Session. A player borrows it as its `AudioDocumentSource` through
+`AudioPlayer.setDocumentSource(editor)` or `<audio-player>`'s `.editor`, and
+plays the edited sequence through its own module output; views borrow the same
+editor.
 
 ## Load from a URL
 
@@ -153,14 +160,6 @@ cancellation and disposal release their asset leases even when an adapter callba
 disposes the session or changes the document. Session disposal is terminal before
 cleanup callbacks run, including for new synchronous subscriptions.
 
-## Ports and composition
-
-`AudioClipEditor` is a document owner, not a module: it exposes no ports and
-joins no Session. A player borrows it as its `AudioDocumentSource` through
-`AudioPlayer.setDocumentSource(editor)` or `<audio-player>`'s `.editor`, and
-plays the edited sequence through its own module output; views borrow the same
-editor.
-
 ## Explicit range processing
 
 Register processors in construction options, then call `processRange` with an
@@ -250,4 +249,7 @@ processing and asset types are described by the
 
 ## Related
 
-[`<audio-player>`](/audio/element/play/audio-player/) · [AudioPlayer](/audio/headless/play/audio-player/) · [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) · [Editable documents API](/audio/api/view/#editable-documents)
+- [`<audio-player>`](/audio/element/play/audio-player/) — central play/pause, seek and time controls for a selected audio clip, playlist or mix.
+- [AudioPlayer](/audio/headless/play/audio-player/) — a stable playback owner over clips, borrowed group transports and revisioned editing sequences.
+- [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) — a waveform clip editor modeled on audio editors such as Adobe Audition.
+- [Editable documents API](/audio/api/view/#editable-documents) — audio visualization.

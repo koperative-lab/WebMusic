@@ -2,8 +2,11 @@
 title: 'AudioTimeline'
 description: 'Zoom, offset, playhead and hit testing for an audio view — the geometry every waveform and spectrogram surface shares, with nothing drawn.'
 sidebar:
-  order: 1
+  order: 2
 ---
+import HlAudioTimelineDemo from '../../../../../components/headless/HlAudioTimelineDemo.astro';
+
+<HlAudioTimelineDemo />
 
 `AudioTimeline` owns where a view is looking. It converts between seconds and
 pixels, keeps the playhead, holds the clip's regions for hit testing, and
@@ -149,4 +152,6 @@ fields into public API.
 
 ## Related
 
-[View models](/audio/headless/view/view-models/) · [Render adapters](/audio/api/view/) · [AudioClipPlayer](/audio/headless/play/audio-clip-player/)
+- [View models](/audio/headless/view/view-models/) — project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.
+- [Render adapters](/audio/api/view/) — audio visualization.
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.

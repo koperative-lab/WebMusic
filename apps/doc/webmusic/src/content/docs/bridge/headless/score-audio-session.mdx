@@ -4,8 +4,9 @@ description: 'One Session that conducts a Score engine and an Audio clip player 
 sidebar:
   order: 1
 ---
-
 import ScoreAudioSessionDemo from '../../../../components/bridges/ScoreAudioSessionDemo.astro';
+
+<ScoreAudioSessionDemo />
 
 `createScoreAudioSession(score, clip, options?)` composes a Score and an Audio
 clip under one `SessionTransport` — the single command authority of
@@ -14,8 +15,6 @@ joins as a `ScorePlayerModule` participant on `score-nominal-seconds`; the clip
 player joins on `clip-seconds`, the same axis `<audio-player>` uses. There is no
 master/follower pair: play, pause, stop, seek, rate and loop go to the Session,
 which schedules both engines from one anchor.
-
-<ScoreAudioSessionDemo />
 
 ## Import
 
@@ -32,13 +31,6 @@ await composition.session.seek(12.5);
 const dispose = () => composition.dispose();
 ```
 
-## Ownership
-
-The composition owns its Session, both engines and their routes. Without
-`options.context` it creates a lazy audio environment and closes that context on
-`dispose()`; a supplied context stays open for its owner. Nothing is allocated
-until the Session prepares or plays.
-
 ## Ports and composition
 
 `composition.context` is the `ModuleContext` both engines live in: its
@@ -53,6 +45,13 @@ or run together. Derive mappings between musical and audio time with
 `registerAudioParticipant(session, player, options)` is the adapter the
 composition and the project plugins use to register any Headless Audio engine on
 the shared `clip-seconds` axis.
+
+## Ownership
+
+The composition owns its Session, both engines and their routes. Without
+`options.context` it creates a lazy audio environment and closes that context on
+`dispose()`; a supplied context stays open for its owner. Nothing is allocated
+until the Session prepares or plays.
 
 <details class="component-section">
 <summary>API</summary>
@@ -89,4 +88,8 @@ and are never asked to activate, as under `<audio-player>`.
 
 ## Related
 
-[Modular composition](/bridge/modular-composition/) · [ScorePlayer](/score/headless/play/score-player/) · [AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Bridge conversions](/bridge/api/) · [Kernel contracts](/kernel/api/)
+- [Modular composition](/bridge/modular-composition/) — compose Score and Audio leaves under one source-free Session, mix them once, and share realized effect controls and analysis taps.
+- [ScorePlayer](/score/headless/play/score-player/) — play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [Bridge conversions](/bridge/api/) — bridge exports for timeline conversion, offline rendering, transport adapters, transcription assembly and modular project factories.
+- [Kernel contracts](/kernel/api/) — kernel entries for lifecycle, module capabilities, routing, parameters, effects and Session coordination.

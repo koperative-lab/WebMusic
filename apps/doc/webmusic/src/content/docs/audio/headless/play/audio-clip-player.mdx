@@ -4,6 +4,9 @@ description: 'Single-clip transport over a buffer or a media element, with regio
 sidebar:
   order: 2
 ---
+import HlAudioClipPlayerDemo from '../../../../../components/headless/HlAudioClipPlayerDemo.astro';
+
+<HlAudioClipPlayerDemo />
 
 `AudioClipPlayer` plays one `AudioClip`. It picks an engine, owns the audio
 graph between the source and the destination, and emits the events a transport
@@ -33,6 +36,20 @@ player.seek(12.5);
 const dispose = () => player.dispose();
 ```
 
+## Ports and composition
+
+`AudioClipPlayer` is an engine, not a module: it has no `.module`. Its prepared
+output is `outputPort`, an `AudioOutputPort` named `main`; `peekOutputPort()`
+observes it without preparing. With the `moduleContext` option it takes its
+AudioContext from that scope's audio environment and never closes it, while its
+default route stays the `destination` option or the context's speakers until a
+Rack, mixer or [`routeModuleOutput`](/kernel/api/#module--webmusickernelmodule) takes it over. It joins a Session
+only through an adapter: Bridge's [`registerAudioParticipant`](/bridge/headless/score-audio-session/)
+registers it on `clip-seconds`, reporting `shared-anchor` for the buffer engine
+and `media-follower` for the media engine. The
+[`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition) facade
+supplies a `ModuleHandle` around one.
+
 ## Two engines, one contract
 
 `engine: 'auto'` selects BufferEngine for decoded clips up to ten minutes.
@@ -54,20 +71,6 @@ reconfigure it, since every other reader of the same tap would see the change.
 which can happen during `play()`, `preload()` or access to `analyser`. The bridge
 reads it live rather than snapshotting it. Reading `analyser` materializes the graph
 and throws after disposal; it is not a resource-free inspection.
-
-## Ports and composition
-
-`AudioClipPlayer` is an engine, not a module: it has no `.module`. Its prepared
-output is `outputPort`, an `AudioOutputPort` named `main`; `peekOutputPort()`
-observes it without preparing. With the `moduleContext` option it takes its
-AudioContext from that scope's audio environment and never closes it, while its
-default route stays the `destination` option or the context's speakers until a
-Rack, mixer or [`routeModuleOutput`](/kernel/api/#module--webmusickernelmodule) takes it over. It joins a Session
-only through an adapter: Bridge's [`registerAudioParticipant`](/bridge/headless/score-audio-session/)
-registers it on `clip-seconds`, reporting `shared-anchor` for the buffer engine
-and `media-follower` for the media engine. The
-[`AudioPlayer`](/audio/headless/play/audio-player/#ports-and-composition) facade
-supplies a `ModuleHandle` around one.
 
 ## Scratch sessions
 
@@ -194,7 +197,6 @@ backend does not invent a chain. Explicit preparation and ownership follow the
 selected backend. Use [Kernel routing leases](/kernel/api/#module--webmusickernelmodule)
 when admitting an output to a mixer or adding a side tap.
 
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -297,4 +299,6 @@ when admitting an output to a mixer or adding a side tap.
 
 ## Related
 
-[Load/decode API](/audio/api/play/) · [Engines and metering](/audio/headless/play/engines/) · [Score and Audio in one Session](/bridge/headless/score-audio-session/)
+- [Load/decode API](/audio/api/play/) — audio playback and I/O.
+- [Engines and metering](/audio/headless/play/engines/) — buffer and host-adapted media engines for low-level audio transport.
+- [Score and Audio in one Session](/bridge/headless/score-audio-session/) — one Session that conducts a Score engine and an Audio clip player as two participants, each with an explicit mapping onto its own time axis.

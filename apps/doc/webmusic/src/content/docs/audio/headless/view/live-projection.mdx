@@ -2,8 +2,11 @@
 title: 'LiveViewController and LiveScrollBuffer'
 description: 'Caller-paced analyser projection and fixed-capacity timestamped column storage, without a renderer or scheduler.'
 sidebar:
-  order: 4
+  order: 5
 ---
+import HlLiveProjectionDemo from '../../../../../components/headless/HlLiveProjectionDemo.astro';
+
+<HlLiveProjectionDemo />
 
 `LiveViewController` turns a borrowed `AnalyserNode` into a scrolling
 projection: it samples frames, converts each to a column, and appends it to a
@@ -163,4 +166,6 @@ controller.
 
 ## Related
 
-[AudioTimeline](/audio/headless/view/audio-timeline/) · [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) · [Metering](/audio/headless/play/engines/)
+- [AudioTimeline](/audio/headless/view/audio-timeline/) — zoom, offset, playhead and hit testing for an audio view.
+- [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) — sample a borrowed AnalyserNode for level, spectrum or time-domain frames, and derive approximate live transient cues.
+- [Metering](/audio/headless/play/engines/) — buffer and host-adapted media engines for low-level audio transport.

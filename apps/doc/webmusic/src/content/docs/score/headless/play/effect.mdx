@@ -4,15 +4,14 @@ description: 'The post-processing chain: describe an effect as data, and let a p
 sidebar:
   order: 4
 ---
-
 import ProgrammaticEffectDemo from '../../../../../components/programmatic/ProgrammaticEffectDemo.astro';
+
+<ProgrammaticEffectDemo />
 
 `Effect` describes post-processing for a player, interactive voice, or
 [`Rack`](/score/headless/play/rack/) master bus. A recipe allocates no Web Audio
 nodes until `build()` or `createAudioNodes()` runs. The built result belongs to
 the graph that realizes it; the recipe itself has no running clock or disposal.
-
-<ProgrammaticEffectDemo />
 
 ## Import
 
@@ -29,6 +28,14 @@ await player.play(); // Starts the player; does not wait for completion.
 // Keep the player during playback and release its realized graph at teardown.
 const dispose = () => player.dispose();
 ```
+
+## Ports and composition
+
+`Effect` is a recipe, not a module, and adds no port. A module's `InsertChain`
+(its `inserts`) realizes it between the module's source and its audio output
+port, as described under [realized insert instances](#realized-insert-instances).
+`<score-effect>` declares one insert on the module found by containment or named
+by `target`. `EqController` is likewise a graph helper, not a module.
 
 ## Graph ownership and time
 
@@ -58,14 +65,6 @@ handle for its own insertion edges and the realized bundle. Built-in constructio
 does not impose a uniform option validator: stated clamps apply, while other
 invalid values can fail in the underlying Web Audio API. Custom factories are
 responsible for cleaning allocations made before they throw.
-
-## Ports and composition
-
-`Effect` is a recipe, not a module, and adds no port. A module's `InsertChain`
-(its `inserts`) realizes it between the module's source and its audio output
-port, as described under [realized insert instances](#realized-insert-instances).
-`<score-effect>` declares one insert on the module found by containment or named
-by `target`. `EqController` is likewise a graph helper, not a module.
 
 ## EqController
 
@@ -121,7 +120,6 @@ recipe again. Numeric base-value edits update the existing instance; replacing
 a recipe builds a candidate chain and preserves the working chain on failure.
 The legacy effect occupies the reserved compatibility slot before explicit
 inserts. See [Kernel effect ownership](/kernel/api/#effect--webmusickerneleffect).
-
 
 <details class="component-section">
 <summary>API</summary>
@@ -201,9 +199,9 @@ throw; disposal still marks the controller final before releasing its graph.
 
 ## Related
 
-[`ScorePlayer`](/score/headless/play/score-player/),
-[`InteractivePlayer`](/score/headless/play/interactive-player/), and
-[`Rack`](/score/headless/play/rack/) consume effects.
-[`<score-synth-panel>`](/score/element/play/score-synth-panel/) composes effects and EQ through
-[`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph).
-Use [`Sound`](/score/headless/play/sound/) to choose the timbre before processing.
+- [`ScorePlayer`](/score/headless/play/score-player/) — play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.
+- [`InteractivePlayer`](/score/headless/play/interactive-player/) — the pull engine.
+- [`Rack`](/score/headless/play/rack/) — many instruments under one transport, so an ensemble starts, stops and seeks as a unit.
+- [`<score-synth-panel>`](/score/element/play/score-synth-panel/) — one control panel for every knob and curve surface.
+- [`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph) — the timbre namespace.
+- [`Sound`](/score/headless/play/sound/) — the timbre namespace.

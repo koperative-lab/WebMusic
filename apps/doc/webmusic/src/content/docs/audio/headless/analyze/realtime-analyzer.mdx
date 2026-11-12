@@ -4,6 +4,9 @@ description: 'Sample a borrowed AnalyserNode for level, spectrum or time-domain 
 sidebar:
   order: 2
 ---
+import HlRealtimeAnalyzerDemo from '../../../../../components/headless/HlRealtimeAnalyzerDemo.astro';
+
+<HlRealtimeAnalyzerDemo />
 
 `createRealtimeAnalyzer(source, options?)` polls an `AnalyserNode` and reports
 what is passing through it — level, brightness, and optionally pitch — as a
@@ -182,4 +185,6 @@ detector. Use these Headless contracts directly for application-owned live UI.
 
 ## Related
 
-[Metering](/audio/headless/play/engines/) · [Live projection](/audio/headless/view/live-projection/) · [Clip analysis](/audio/headless/analyze/audio-analysis-session/)
+- [Metering](/audio/headless/play/engines/) — buffer and host-adapted media engines for low-level audio transport.
+- [Live projection](/audio/headless/view/live-projection/) — caller-paced analyser projection and fixed-capacity timestamped column storage, without a renderer or scheduler.
+- [Clip analysis](/audio/headless/analyze/audio-analysis-session/) — a memoized analysis over a clip that survives edits.

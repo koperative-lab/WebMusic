@@ -2,8 +2,11 @@
 title: 'WaveformViewModel and SpectrogramViewModel'
 description: 'Project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.'
 sidebar:
-  order: 2
+  order: 3
 ---
+import HlViewModelsDemo from '../../../../../components/headless/HlViewModelsDemo.astro';
+
+<HlViewModelsDemo />
 
 Two view models, one job: given a clip and a viewport, produce the **columns**
 a renderer paints — and only the columns in view. They share a page because a
@@ -141,4 +144,7 @@ caller-owned canvas without instantiating both model classes.
 
 ## Related
 
-[AudioTimeline](/audio/headless/view/audio-timeline/) · [Peaks](/audio/headless/view/peaks/) · [Analyze API](/audio/api/analyze/) · [Render adapters](/audio/api/view/)
+- [AudioTimeline](/audio/headless/view/audio-timeline/) — zoom, offset, playhead and hit testing for an audio view.
+- [Peaks](/audio/headless/view/peaks/) — computeClipPeaks and peaksDuration.
+- [Analyze API](/audio/api/analyze/) — audio analysis.
+- [Render adapters](/audio/api/view/) — audio visualization.

@@ -4,8 +4,9 @@ description: 'Whole-score map state and quarter-note navigation with optional bo
 sidebar:
   order: 3
 ---
-
 import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+<PlaybackFollowersPlayground object="score-map-view" />
 
 `createScoreMapView(options?)` combines the plain
 [`createScoreMap`](/score/api/view/#whole-score-map-data) projection with a
@@ -16,8 +17,6 @@ It performs no analysis, engraving, file loading or audio scheduling.
 Use it for a navigator or density strip in a custom interface.
 [createScoreView](/score/headless/view/score-view/) instead maintains individual
 notes and visible time windows for score renderers.
-
-<PlaybackFollowersPlayground object="score-map-view" />
 
 ## Import
 
@@ -133,9 +132,5 @@ that throws is removed. No background event or animation loop is created.
 
 ## Related
 
-No built-in element wraps this model. Applications compose it with a browser
-player adapter and the [UI Kit timeline](/uikit/transport-time/timeline/)
-presenter themselves.
-[createAnalysisFollower](/score/headless/analyze/analysis-follower/) adds score
-analysis to a borrowed timeline. [UI Kit timeline](/uikit/transport-time/timeline/)
-provides presentation independently of these musical contracts.
+- [UI Kit timeline](/uikit/transport-time/timeline/) — a domain-neutral ruler with ticks, regions, markers, loops, selection, playhead, and seeking.
+- [createAnalysisFollower](/score/headless/analyze/analysis-follower/) — analysis, current position and held-note state borrowed from a playback source, with explicit navigation outcomes.

@@ -4,8 +4,9 @@ description: 'A stable playback owner over clips, borrowed group transports and 
 sidebar:
   order: 1
 ---
-
 import HlAudioPlayerDemo from '../../../../../components/headless/HlAudioPlayerDemo.astro';
+
+<HlAudioPlayerDemo />
 
 `AudioPlayer` is the central Audio command surface. It retains one identity while
 its clip changes, borrows an editing document, or delegates to an existing queue/mix backend. It creates no
@@ -16,8 +17,6 @@ The demo constructs one nonvisual player and controls it with plain inputs. Load
 the Arabesque No. 1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
 source. Its readouts follow the object's events; the demo owns decoding and queue
 cleanup, while the facade owns its context and clip engine.
-
-<HlAudioPlayerDemo />
 
 ## Import
 
@@ -50,21 +49,6 @@ const dispose = () => {
 };
 ```
 
-## Ownership and source selection
-
-`setClip` selects an owned low-level clip engine, stopped at zero. The engine is
-created lazily. Replacing it releases only that owned engine, preserving facade
-identity and its output tap/context. Assigning the same selected clip is a no-op.
-`setTransport` selects a borrowed backend and preserves its state. Selecting a
-new nonempty clip or transport pauses the previous backend first, preserving its
-position and preventing hidden overlap. Clearing a connection only detaches it. The facade
-never stops or disposes a borrowed backend merely because it is detached.
-
-The backend supplies all position/state readback. A queue uses seconds within its
-active entry and exposes that clip. A mix uses its group axis and has no single
-clip or aggregate analyser. Unsupported analyser/clock/scratch capabilities are absent; unsupported live control setters throw rather than silently succeeding.
-Sharing this facade does not complete shared-clock injection across mix members.
-
 ## Ports and composition
 
 `player.module` is the facade's `ModuleHandle`: its `id`, `inserts`,
@@ -88,6 +72,21 @@ in rendered time. It does not register itself with a Session; its host does.
 it on `clip-seconds`, reporting `shared-anchor` when the buffer engine attaches
 Session scheduling and `media-follower` otherwise; `<audio-player>` registers a
 borrowed queue once on `queue-entry-seconds`.
+
+## Ownership and source selection
+
+`setClip` selects an owned low-level clip engine, stopped at zero. The engine is
+created lazily. Replacing it releases only that owned engine, preserving facade
+identity and its output tap/context. Assigning the same selected clip is a no-op.
+`setTransport` selects a borrowed backend and preserves its state. Selecting a
+new nonempty clip or transport pauses the previous backend first, preserving its
+position and preventing hidden overlap. Clearing a connection only detaches it. The facade
+never stops or disposes a borrowed backend merely because it is detached.
+
+The backend supplies all position/state readback. A queue uses seconds within its
+active entry and exposes that clip. A mix uses its group axis and has no single
+clip or aggregate analyser. Unsupported analyser/clock/scratch capabilities are absent; unsupported live control setters throw rather than silently succeeding.
+Sharing this facade does not complete shared-clock injection across mix members.
 
 ## Shared Session scheduling
 
@@ -294,9 +293,9 @@ ownership and timing contract as the owned buffer clip.
 
 ## Related
 
-[`<audio-player>`](/audio/element/play/audio-player/) ·
-[AudioClipEditor](/audio/headless/view/audio-clip-editor/) ·
-[AudioClipPlayer](/audio/headless/play/audio-clip-player/) ·
-[AudioPlaylist](/audio/headless/play/audio-playlist/) ·
-[AudioMixer](/audio/headless/play/audio-mixer/) ·
-[AudioMeterController](/audio/headless/view/audio-meter/)
+- [`<audio-player>`](/audio/element/play/audio-player/) — central play/pause, seek and time controls for a selected audio clip, playlist or mix.
+- [AudioClipEditor](/audio/headless/view/audio-clip-editor/) — one immutable Audio sequence with URL loading, structural history, explicit asset leases, range processing and interaction sessions.
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [AudioPlaylist](/audio/headless/play/audio-playlist/) — ordered entries played in sequence on one shared context, prefetching the next while the current one plays.
+- [AudioMixer](/audio/headless/play/audio-mixer/) — coordinates clip/player starts and per-member volume, solo, mute and effect construction.
+- [AudioMeterController](/audio/headless/view/audio-meter/) — read live level, spectrum, float window and stereo frames from a borrowed analyser or an owned transparent tap, and reduce them into the seven meter displays.

@@ -4,8 +4,9 @@ description: 'An event-driven transport controller over a ScorePlayer.'
 sidebar:
   order: 7
 ---
-
 import ProgrammaticPlayerControllerDemo from '../../../../../components/programmatic/ProgrammaticPlayerControllerDemo.astro';
+
+<ProgrammaticPlayerControllerDemo />
 
 `PlayerController` wraps a push `Player` in a small event-driven API (play /
 pause / seek / scrub + `timeupdate` / `transportchange` / `end`), handy for
@@ -14,8 +15,6 @@ when code calls the controller's play/pause commands, so presenters do not need 
 Its `error` event is an operational `play()` failure;
 `listenerError` independently reports a subscriber that threw or rejected, so
 application bugs never masquerade as engine failures. It does not install MIDI listeners.
-
-<ProgrammaticPlayerControllerDemo />
 
 ## Import
 
@@ -44,6 +43,15 @@ Use the controller as the UI's command path. Its `playing` and `rate` are
 controller state, not a general observer of calls made directly on the
 borrowed player. `playing` becomes true when `play()` requests startup,
 before asynchronous audio preparation completes.
+
+## Ports and composition
+
+`PlayerController` is not a module. It is an event-driven transport surface over
+one borrowed `ScorePlayer`; `<score-player>`'s `.controller` borrows it to drive
+that engine instead of creating its own. In a Session composition, wrap the
+engine in a [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition) and send
+transport commands to the Session: while the engine follows a Session, its direct
+transport commands reject.
 
 <details class="component-section">
 <summary>API</summary>
@@ -92,15 +100,6 @@ pause the player separately according to its owner; do not keep using a
 destroyed controller as an active view binding.
 
 </details>
-
-## Ports and composition
-
-`PlayerController` is not a module. It is an event-driven transport surface over
-one borrowed `ScorePlayer`; `<score-player>`'s `.controller` borrows it to drive
-that engine instead of creating its own. In a Session composition, wrap the
-engine in a [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition) and send
-transport commands to the Session: while the engine follows a Session, its direct
-transport commands reject.
 
 ## Related
 

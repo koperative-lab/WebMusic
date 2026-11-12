@@ -4,6 +4,9 @@ description: 'The effect builders and the two graph helpers: describe a chain as
 sidebar:
   order: 7
 ---
+import HlEffectsDemo from '../../../../../components/headless/HlEffectsDemo.astro';
+
+<HlEffectsDemo />
 
 An `Effect` here is a **description**, not a node: `gain(0.5)` or
 `filter({type: 'lowpass', frequency: 800})` returns a plain value that knows
@@ -29,6 +32,16 @@ const player = new AudioClipPlayer(clip, {
 });
 const dispose = () => player.dispose(); // when the owning session is removed
 ```
+
+## Ports and composition
+
+Effect recipes are not modules and add no ports. A module's `InsertChain`
+realizes them between its source and its audio output: `AudioPlayer`'s
+`module.inserts`, `AudioClipPlayer.insertChain`, the mixer's master
+`insertChain` or a channel's `channelInserts(id)`. The realized instance takes
+that module's place in the graph and Session. `<audio-effect>` declares one
+insert on the module found by containment, named by `target` or assigned to
+`.moduleTarget`.
 
 ## Live parameters
 
@@ -68,16 +81,6 @@ The public barrel and `packages/audio/src/play/headless/effects.ts, play/core/ef
 contracts described below. The reference does not turn private implementation
 fields into public API.
 
-## Ports and composition
-
-Effect recipes are not modules and add no ports. A module's `InsertChain`
-realizes them between its source and its audio output: `AudioPlayer`'s
-`module.inserts`, `AudioClipPlayer.insertChain`, the mixer's master
-`insertChain` or a channel's `channelInserts(id)`. The realized instance takes
-that module's place in the graph and Session. `<audio-effect>` declares one
-insert on the module found by containment, named by `target` or assigned to
-`.moduleTarget`.
-
 ## Realized insert instances
 
 Built-in recipes expose optional `parameterDescriptors` for their realized
@@ -93,7 +96,6 @@ recipe again. Numeric base-value edits update the existing instance; replacing
 a recipe builds a candidate chain and preserves the working chain on failure.
 The legacy effect occupies the reserved compatibility slot before explicit
 inserts. See [Kernel effect ownership](/kernel/api/#effect--webmusickerneleffect).
-
 
 <details class="component-section">
 <summary>API</summary>
@@ -159,4 +161,6 @@ elements through the player effect property and mixer member effect definitions 
 
 ## Related
 
-[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [AudioMixer](/audio/headless/play/audio-mixer/) · [Offline export](/audio/api/play/)
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [AudioMixer](/audio/headless/play/audio-mixer/) — coordinates clip/player starts and per-member volume, solo, mute and effect construction.
+- [Offline export](/audio/api/play/) — audio playback and I/O.

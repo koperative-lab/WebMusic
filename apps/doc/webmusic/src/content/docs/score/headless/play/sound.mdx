@@ -4,8 +4,9 @@ description: 'The timbre namespace — oscillator, FM, wavetable, noise, sampler
 sidebar:
   order: 3
 ---
-
 import ProgrammaticSoundDemo from '../../../../../components/programmatic/ProgrammaticSoundDemo.astro';
+
+<ProgrammaticSoundDemo />
 
 `Sound` wraps oscillator, FM, wavetable, noise, sample-map, SFZ, SoundFont, MIDI,
 and custom backends behind the `HeadlessSynth` contract. A factory creates a
@@ -15,9 +16,6 @@ as a [`ScorePlayer`](/score/headless/play/score-player/) synth or an
 
 The [synth backend reference](#synth-backends) below also covers direct synths,
 range samplers, modulation, metering and the synth-panel audio graph.
-
-
-<ProgrammaticSoundDemo />
 
 ## Import
 
@@ -34,6 +32,16 @@ await player.play(); // Starts playback; does not wait for the piece to finish.
 // Keep the player while playing; call this when its session is removed.
 const dispose = () => player.dispose();
 ```
+
+## Ports and composition
+
+`Sound` is an instrument backend, not a module: it has no `ModuleHandle`, ports
+or Session membership. A [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition)
+consumes it as its `synth`. The module's audio `main` output carries the sound,
+its control `params` port exposes the Sound's `params`, and
+`ScorePlayer.sessionTiming` reports the participant timing it allows:
+`shared-anchor` when the backend schedules and cancels attacks on the audio
+clock, otherwise `callback`.
 
 ## Routing, readiness, and ownership
 
@@ -60,16 +68,6 @@ backend disposal. For a custom backend that returns no route cleanup, a released
 Sound cannot reconnect until its backend has been globally disconnected or
 disposed. Built-in recipes can create fresh backends on a later connection;
 an adopted instance must itself remain reusable.
-
-## Ports and composition
-
-`Sound` is an instrument backend, not a module: it has no `ModuleHandle`, ports
-or Session membership. A [`ScorePlayerModule`](/score/headless/play/score-player/#ports-and-composition)
-consumes it as its `synth`. The module's audio `main` output carries the sound,
-its control `params` port exposes the Sound's `params`, and
-`ScorePlayer.sessionTiming` reports the participant timing it allows:
-`shared-anchor` when the backend schedules and cancels attacks on the audio
-clock, otherwise `callback`.
 
 ## Time and environment
 
@@ -363,7 +361,6 @@ const dispose = () => {
 };
 ```
 
-
 ##### Synth backends Shared commands and lifecycle
 
 | Member | Contract |
@@ -532,7 +529,6 @@ rebuild and has no `dispose()` alias or event subscription. Construction
 failures throw; failures retiring an already-replaced graph are reported through
 the playback-operation diagnostic path without undoing the replacement.
 
-
 #### Synth backends Related
 
 [`<score-synth-panel>`](/score/element/play/score-synth-panel/) controls supplied timbres and
@@ -546,7 +542,7 @@ and polled by any UI without introducing another musical clock.
 
 ## Related
 
-[`ScorePlayer`](/score/headless/play/score-player/),
-[`InteractivePlayer`](/score/headless/play/interactive-player/), and
-[`<score-synth-panel>`](/score/element/play/score-synth-panel/).
-Use [`Effect`](/score/headless/play/effect/) for processing after the timbre.
+- [`ScorePlayer`](/score/headless/play/score-player/) — play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.
+- [`InteractivePlayer`](/score/headless/play/interactive-player/) — the pull engine.
+- [`<score-synth-panel>`](/score/element/play/score-synth-panel/) — one control panel for every knob and curve surface.
+- [`Effect`](/score/headless/play/effect/) — the post-processing chain.

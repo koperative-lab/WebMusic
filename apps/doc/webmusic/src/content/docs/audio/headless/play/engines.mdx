@@ -4,6 +4,9 @@ description: 'Buffer and host-adapted media engines for low-level audio transpor
 sidebar:
   order: 6
 ---
+import HlBufferEngineDemo from '../../../../../components/headless/HlBufferEngineDemo.astro';
+
+<HlBufferEngineDemo />
 
 Audio Play uses two low-level engines for decoded-buffer and streaming playback.
 Monitoring is owned separately by [AudioMeterController](/audio/headless/view/audio-meter/)
@@ -13,6 +16,29 @@ Both engines implement `PlaybackEngine`.
 [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) picks between
 them and owns the one it built, so constructing an engine yourself is for
 hosting a transport of your own.
+
+## Import
+
+```ts
+import {BufferEngine} from '@webmusic/audio/play/headless';
+
+// context is caller-owned; clip already contains decoded PCM.
+const engine = new BufferEngine(context, clip);
+engine.output.connect(context.destination);
+engine.prepare();
+await engine.play(0, context.currentTime + 0.06);
+const dispose = () => engine.dispose();
+// The context owner retains its eventual cleanup path.
+```
+
+## Ports and composition
+
+`BufferEngine` and `MediaEngine` are transports beneath a player, not modules:
+they expose no `ModuleHandle` or ports. Their `timingCapabilities` decide the
+timing a hosting participant reports. `BufferEngine` declares
+`sharedSessionClock: true` and attaches Session scheduling, so its player joins
+as `shared-anchor`; `MediaEngine` cannot attach, so its player joins as a
+`media-follower`.
 
 ## BufferEngine — sample-accurate, resident
 
@@ -63,29 +89,6 @@ A later explicit `setLoop` or `play` re-evaluates the available duration.
 Disposal is terminal for both engines: it releases their sources/adapters and
 output connections, and later transport/preparation calls cannot recreate them.
 The borrowed AudioContext remains open.
-
-## Import
-
-```ts
-import {BufferEngine} from '@webmusic/audio/play/headless';
-
-// context is caller-owned; clip already contains decoded PCM.
-const engine = new BufferEngine(context, clip);
-engine.output.connect(context.destination);
-engine.prepare();
-await engine.play(0, context.currentTime + 0.06);
-const dispose = () => engine.dispose();
-// The context owner retains its eventual cleanup path.
-```
-
-## Ports and composition
-
-`BufferEngine` and `MediaEngine` are transports beneath a player, not modules:
-they expose no `ModuleHandle` or ports. Their `timingCapabilities` decide the
-timing a hosting participant reports. `BufferEngine` declares
-`sharedSessionClock: true` and attaches Session scheduling, so its player joins
-as `shared-anchor`; `MediaEngine` cannot attach, so its player joins as a
-`media-follower`.
 
 ## Time, ownership and contract source
 
@@ -178,4 +181,7 @@ fields into public API.
 
 ## Related
 
-[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [AudioMeterController](/audio/headless/view/audio-meter/) · [Realtime analysis](/audio/headless/analyze/realtime-analyzer/) · [View models](/audio/headless/view/view-models/)
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [AudioMeterController](/audio/headless/view/audio-meter/) — read live level, spectrum, float window and stereo frames from a borrowed analyser or an owned transparent tap, and reduce them into the seven meter displays.
+- [Realtime analysis](/audio/headless/analyze/realtime-analyzer/) — sample a borrowed AnalyserNode for level, spectrum or time-domain frames, and derive approximate live transient cues.
+- [View models](/audio/headless/view/view-models/) — project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.

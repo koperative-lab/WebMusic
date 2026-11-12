@@ -64,7 +64,7 @@ covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
 | `plan`: groups | No `index.mdx` remains in an element capability directory; every element leaf has an integer `sidebar.order` and the group's orders are dense from 1; both of a family's `element/index.mdx` and `headless/index.mdx` exist and carry no recognizable demo; UI Kit category labels match the catalog | A stray capability `index.mdx` under `headless/`, or Headless object order. Also what an inventory actually lists, whether it has a section per capability, a demo mounted in an unrecognized form, or whether a removed route gained a redirect |
 | `plan`: entries | The five package root API pages name every published sub-entry and no nonexistent sub-entry; Kernel also has a path-bearing section per sub-entry | Complete API Reference members, or a requirement that matched paths occur in a table |
 | `plan`: Headless | Recognizable value exports from the six Score/Audio `/headless` barrels occur as backticked names in the family `headless/index.mdx` read together with that capability's object pages; relative `export *` is followed, and a failure names the capability and its barrel | Types, unique ownership, whether the inventory rather than one leaf names an export, whether a name appears in its own capability's section, whether a name is linked to an explanation, or Bridge's root exports |
-| Score Headless leaf shape | All Score Headless leaves checked by `scripts/headless-docs-policy.mjs` have the shared demo frame, ordered sections and compact controls; the frame has one copy/reset pair and no separate State/Events panels | Audio leaves retain their existing export/link checks until their demos migrate; source shape does not prove running interactions |
+| Headless leaf shape | Every Score and Audio Headless leaf renders the shared `HeadlessDemoFrame` (one copy/reset pair, no separate State/Events panels) and has dense sidebar orders (`scripts/headless-docs-policy.mjs`). Every Score, Audio and Bridge Headless page has the Web Component page shape without Styling: main demo first, a one-to-three-paragraph prose introduction, `## Import`, `## Ports and composition`, topics, one API `<details>`, and a last `## Related` bullet list (`headlessShapeProblems`) | Source shape does not prove running interactions; Bridge has no dense-order check |
 | `live-demo` | Rendered Astro imports named with a Demo/Playground/Showcase/Sandbox suffix have a recursive import path to `LiveDemoCanvas.astro` | Browser rendering or successful mounting; this is static import reachability |
 | `docs-css` | `wui-*` classes in shared `apps/doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
 | `css-variable` | Backticked non-`--wm-*` variables in site pages have a recognizable read, write, or declaration somewhere in Score/Audio/UI source | Whether the variable affects this particular component or demo |
@@ -135,8 +135,8 @@ Documentation-related assertions include:
 “Aligned UI Kit page” in an error message does not identify a permitted exempt
 set: a missing skeleton fails an earlier assertion. These checks still do not
 verify member completeness, state controls, accessibility, styles, or cleanup.
-Element pages have their own section-order gate (the `page` row above); do not
-infer equivalent coverage for Headless or API pages.
+Element and Headless pages have section-order gates (the `page` and Headless
+leaf shape rows); do not infer equivalent coverage for API pages.
 
 ## `check:dev-docs`: inventories, reading routes and repository links
 

@@ -85,7 +85,9 @@ export const audioBridgeContext = Object.freeze({
   htmlElements: ['kbd'],
   demoComponents: [
     'AudioAnalysisDemo', 'AudioAnalysisTimelinePlayground', 'AudioAnalysisViewDemo',
-    'HlAudioPlayerDemo', 'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
+    'HlAudioPlayerDemo', 'HlAudioClipPlayerDemo', 'HlAudioMixerDemo', 'HlAudioPlaylistDemo', 'HlAudioRecorderDemo', 'HlEffectsDemo', 'HlBufferEngineDemo',
+    'HlAudioAnalysisSessionDemo', 'HlRealtimeAnalyzerDemo', 'HlAudioMeterControllerDemo', 'HlAudioTimelineDemo', 'HlLiveProjectionDemo', 'HlPeaksDemo', 'HlViewModelsDemo',
+    'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
     'AudioCustomStyleDemo', 'AudioHistogramPlayground',
     'AudioClipEditorHeadlessDemo', 'AudioClipViewDemo',
     'AudioLiveViewPlayground', 'AudioMixerDemo',

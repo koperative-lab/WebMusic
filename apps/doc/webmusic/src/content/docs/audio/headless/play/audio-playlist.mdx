@@ -4,6 +4,9 @@ description: 'Ordered entries played in sequence on one shared context, prefetch
 sidebar:
   order: 3
 ---
+import HlAudioPlaylistDemo from '../../../../../components/headless/HlAudioPlaylistDemo.astro';
+
+<HlAudioPlaylistDemo />
 
 `AudioPlaylist` is the third cardinality: one clip is a
 [player](/audio/headless/play/audio-clip-player/), N at once is a
@@ -227,4 +230,6 @@ Audio / Play, which supplies `loadClipFromUrl` as the loader and composes
 
 ## Related
 
-[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Loader API](/audio/api/play/) · [Playlist presenter](/uikit/transport-time/playlist/)
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [Loader API](/audio/api/play/) — audio playback and I/O.
+- [Playlist presenter](/uikit/transport-time/playlist/) — playlist transport, track selection, seeking, and per-entry state in one presenter.

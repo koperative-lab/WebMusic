@@ -1,115 +1,70 @@
 ---
-// HEADLESS demo: AudioMixer — several clips on ONE shared clock. Here both
-// members share the bundled demo clip; the mixer owns master/per-member volume
-// + mute, while transport (play/pause) fans out to every member at once.
-import LiveDemoCanvas from '../LiveDemoCanvas.astro';
-
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+// AudioMixer with two members over the same Arabesque excerpt. Parameters call
+// the mixer's member commands on the live object.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
 ---
-
-<div class="wui-panel wui-panel--flow not-content">
-  <div class="wui-panel__title">
-    <span>@webmusic/audio/play/headless</span>
-    <strong>AudioMixer</strong>
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="AudioMixer"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-mixer': true}}
+>
+  <HeadlessTransport />
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">piano volume</span><input class="wm-pg__input" type="number" data-volume="piano" value="1" min="0" max="1" step="0.05" aria-label="Piano member volume" /><span class="wm-pg__note">setVolume('piano', volume): member gain, 0–1.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">double volume</span><input class="wm-pg__input" type="number" data-volume="double" value="0.4" min="0" max="1" step="0.05" aria-label="Double member volume" /><span class="wm-pg__note">setVolume('double', volume).</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">mute double</span><input type="checkbox" data-mute aria-label="Mute the double member" /><span class="wm-pg__note">mute('double') / unmute('double').</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">solo</span><select class="wui-select" data-solo aria-label="Solo member"><option value="">none</option><option value="piano">piano</option><option value="double">double</option></select><span class="wm-pg__note">solo(id | null): solo is exclusive.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">master volume</span><input class="wm-pg__input" type="number" data-master value="1" min="0" max="1" step="0.05" aria-label="Master volume" /><span class="wm-pg__note">setMasterVolume(volume).</span></div>
   </div>
-  <LiveDemoCanvas label="Audio mixer">
-    <div data-hl-mixer data-src={SRC}>
-      <!-- Also a wui-row: the kit's row + row rule is what spaces the strips below. -->
-      <div class="wui-row doc-transport">
-        <button class="wui-btn" data-play type="button">▶ Play</button>
-        <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
-        <span class="doc-transport__time" data-time>0.0s</span>
-      </div>
-
-      <div class="wui-row" data-member="track A">
-        <span class="wui-label">track A</span>
-        <input class="wui-range" type="range" min="0" max="1" step="0.05" value="1" data-vol aria-label="track A volume" />
-        <button class="wui-btn" data-variant="ghost" data-mute type="button">Mute</button>
-      </div>
-
-      <div class="wui-row" data-member="track B">
-        <span class="wui-label">track B</span>
-        <input class="wui-range" type="range" min="0" max="1" step="0.05" value="0.4" data-vol aria-label="track B volume" />
-        <button class="wui-btn" data-variant="ghost" data-mute type="button">Mute</button>
-      </div>
-
-      <p class="doc-status" data-status></p>
-    </div>
-  </LiveDemoCanvas>
-</div>
+</HeadlessDemoFrame>
 
 <script>
-  import {mountDemos, type DemoScope} from '../demo-lifecycle';
-  import { loadClipFromUrl } from '@webmusic/audio/play';
-  import { AudioClipPlayer, createAudioMixer } from '@webmusic/audio/play/headless';
+  import {AudioClipPlayer, createAudioMixer} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
 
-  const setup = async (root: HTMLElement, scope: DemoScope) => {
-
-    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
-    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
-    const time = root.querySelector<HTMLElement>('[data-time]')!;
-    const status = root.querySelector<HTMLElement>('[data-status]')!;
-
-    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
-    if (!scope.active) return;
-
-    // Two members share the one clip. We build the players ourselves so we can
-    // read timeupdate/progress for the bar; the mixer drives transport + gains.
-    // Timer cursor (vs default rAF) keeps timeupdate firing in a backgrounded tab.
-    const playerA = new AudioClipPlayer(clip, { cursorIntervalMs: 100, volume: 1 });
-    scope.add(() => playerA.dispose());
-    const playerB = new AudioClipPlayer(clip, { cursorIntervalMs: 100, volume: 0.4 });
-    scope.add(() => playerB.dispose());
-
-    const mixer = createAudioMixer({ masterVolume: 1 });
+  mountProgrammaticDemo('[data-hl-mixer]', async (root, scope) => {
+    const volumes = [...root.querySelectorAll<HTMLInputElement>('[data-volume]')];
+    const mute = root.querySelector<HTMLInputElement>('[data-mute]')!;
+    const solo = root.querySelector<HTMLSelectElement>('[data-solo]')!;
+    const master = root.querySelector<HTMLInputElement>('[data-master]')!;
+    const mixer = createAudioMixer({masterVolume: 1});
     scope.add(() => mixer.dispose());
-    mixer.add({ id: 'track A', player: playerA, volume: 1 });
-    mixer.add({ id: 'track B', player: playerB, volume: 0.4 });
-
-    let playing = false;
-    playerA.on('timeupdate', ({ seconds, progress }) => {
-      fill.style.width = `${Math.min(100, progress * 100)}%`;
-      time.textContent = `${seconds.toFixed(1)}s`;
-    });
-    mixer.on('end', () => {
-      playing = false;
-      btn.textContent = '▶ Play';
-      fill.style.width = '0%';
-      time.textContent = '0.0s';
-    });
-
-    scope.listen(btn, 'click', () => {
-      if (playing) {
-        mixer.pause();
-        btn.textContent = '▶ Play';
-      } else {
-        scope.run(mixer.play(), () => { playing = false; btn.textContent = '▶ Play'; });
-        btn.textContent = '⏸ Pause';
+    scope.add(mixer.on('error', (error) => programmaticFeedback(root, error.message)));
+    let ready = false;
+    const transport = bindTransport(root, scope, () => ready ? mixer : undefined);
+    const apply = (): void => {
+      const volume = (id: string) => Number(volumes.find((input) => input.dataset.volume === id)?.value ?? 1);
+      if (ready) {
+        for (const input of volumes) mixer.setVolume(input.dataset.volume!, Number(input.value));
+        if (mute.checked) mixer.mute('double'); else mixer.unmute('double');
+        mixer.solo(solo.value || null);
+        mixer.setMasterVolume(Number(master.value));
       }
-      playing = !playing;
-    });
+      programmaticCode(root, `import {AudioClipPlayer, createAudioMixer} from '@webmusic/audio/play/headless';
 
-    root.querySelectorAll<HTMLElement>('[data-member]').forEach((row) => {
-      const id = row.dataset.member!;
-      const vol = row.querySelector<HTMLInputElement>('[data-vol]')!;
-      const mute = row.querySelector<HTMLButtonElement>('[data-mute]')!;
-      let muted = false;
-
-      scope.listen(vol, 'input', () => {
-        mixer.setVolume(id, Number(vol.value));
-        status.textContent = `${id} volume ${Number(vol.value).toFixed(2)}`;
-      });
-
-      scope.listen(mute, 'click', () => {
-        muted = !muted;
-        if (muted) mixer.mute(id);
-        else mixer.unmute(id);
-        mute.dataset.on = String(muted);
-        mute.textContent = muted ? 'Unmute' : 'Mute';
-        status.textContent = `${id} ${muted ? 'muted' : 'live'}`;
-      });
-    });
-  };
-
-  mountDemos('[data-hl-mixer]', setup);
+const mixer = createAudioMixer({masterVolume: ${Number(master.value)}});
+const {audioContext} = mixer; // members share the mixer's context
+mixer.add({id: 'piano', player: new AudioClipPlayer(clip, {audioContext}), volume: ${volume('piano')}});
+mixer.add({id: 'double', player: new AudioClipPlayer(clip, {audioContext}), volume: ${volume('double')}});
+${mute.checked ? "mixer.mute('double');\n" : ''}${solo.value ? `mixer.solo('${solo.value}');\n` : ''}// In a play gesture: await mixer.play();
+// On cleanup: mixer.dispose(); then dispose each player you created.`);
+    };
+    for (const input of [...volumes, mute, solo, master]) scope.listen(input, 'change', apply);
+    apply();
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    for (const id of ['piano', 'double']) {
+      // Members play on the mixer's context, so the mix starts aligned.
+      const player = new AudioClipPlayer(clip, {audioContext: mixer.audioContext});
+      scope.add(() => player.dispose());
+      mixer.add({id, player, volume: 1});
+    }
+    ready = true;
+    apply();
+    transport.paint();
+  });
 </script>

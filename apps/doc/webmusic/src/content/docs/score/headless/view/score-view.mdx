@@ -4,8 +4,9 @@ description: 'A code-only view model over a Score: which notes are visible, whic
 sidebar:
   order: 1
 ---
-
 import ScoreWindowPlayground from '../../../../../components/headless/ScoreWindowPlayground.astro';
+
+<ScoreWindowPlayground />
 
 `createScoreView(scoreOrEditor, options?)` is the state a score view needs, without
 the view. It flattens the `Score` into a note sequence once, then answers two
@@ -24,8 +25,6 @@ its snapshots, active note set and subscriptions. There is no audio, rendering s
 view model's active state and listeners. Caller-installed player/input
 bindings must be detached separately. A binding supplied through `options.playback`
 is owned by the view and is detached by `dispose()`; the player remains borrowed.
-
-<ScoreWindowPlayground />
 
 ## Import
 
@@ -289,16 +288,9 @@ are described by the [View API](/score/api/view/).
 
 ## Related
 
-**Composed by.** [`<score-view>`](/score/element/view/score-view/) — Score /
-View, which pairs it with the `/render` adapters and a
-[`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) surface.
-[`<score-grid-view>`](/score/element/view/score-grid-view/) composes
-`createScoreViewEditing` with `mountScoreGrid`.
-
-[createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) handles
-live pitches that have no score onset.
-
-[createScoreMapView](/score/headless/view/score-map-view/) follows replacement
-scores and delegates navigation; this model’s `seek()` updates local state.
-[createPitchView](/score/headless/view/pitch-view/) adds playback attachment to
-score-independent held-pitch state.
+- [`<score-view>`](/score/element/view/score-view/) — one score, three views.
+- [`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) — generic render hosts, native scroll-region focus, and surface-slider interaction.
+- [`<score-grid-view>`](/score/element/view/score-grid-view/) — a DAW-style piano-roll grid that follows a player and, with a borrowed editor, edits notes from a switchable toolbar.
+- [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) — held-pitch state with optional playback attachment for application-owned keyboard, staff and fretboard views.
+- [createScoreMapView](/score/headless/view/score-map-view/) — whole-score map state and quarter-note navigation with optional borrowed playback.
+- [createPitchView](/score/headless/view/pitch-view/) — held-pitch state with optional playback attachment for application-owned keyboard, staff and fretboard views.

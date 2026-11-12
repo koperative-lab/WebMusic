@@ -4,8 +4,9 @@ description: 'Held-pitch state with optional playback attachment for application
 sidebar:
   order: 4
 ---
-
 import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+<PlaybackFollowersPlayground object="pitch-view" />
 
 `createPitchView(options?)` maintains current MIDI pitches, either from manual
 note events or a borrowed playback source. Its state can drive a keyboard,
@@ -16,8 +17,6 @@ It composes the counted-note behavior of
 [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) with
 source attachment and cleanup. [`<score-pitch-view>`](/score/element/view/score-pitch-view/)
 uses this model behind its browser adapter and UIKit presenter.
-
-<PlaybackFollowersPlayground object="pitch-view" />
 
 ## Import
 
@@ -158,7 +157,6 @@ safe integer in 0…127. Notes are reference-counted: `noteOn` twice then
 attack, and filter keyboard auto-repeat in the input adapter if it should not
 count as another voice.
 
-
 **Construction** — `createActiveNoteTracker()`, no options.
 
 **Commands**
@@ -181,7 +179,6 @@ count as another voice.
 | Member | Kind | Description |
 | --- | --- | --- |
 | `subscribe(listener)` | subscription | Called synchronously with new state after every command, with no immediate initial callback. Returns an unsubscribe function. |
-
 
 The source contract is `createActiveNoteTracker`, `ActiveNoteTracker`,
 `ActiveNoteState` and `ActiveNoteListener` at
@@ -209,9 +206,6 @@ analysis to note input.
 
 ## Related
 
-[Current-pitch projections](/score/api/view/#current-pitch-projections) supply
-written staff marks and exact fret positions from this state; those helpers do
-not infer chords, choose fingerings or own state.
-[UIKit pitch presenters](/uikit/views-analysis/pitch/) own size, appearance and
-interaction. [createScoreView](/score/headless/view/score-view/) owns a score’s
-note sequence and timeline rather than current-pitch input alone.
+- [Current-pitch projections](/score/api/view/#current-pitch-projections) — score visualization and document editing.
+- [UIKit pitch presenters](/uikit/views-analysis/pitch/) — live keyboard, staff and fretboard read-outs that press, spell and slide with the pitches a caller hands them.
+- [createScoreView](/score/headless/view/score-view/) — a code-only view model over a Score.

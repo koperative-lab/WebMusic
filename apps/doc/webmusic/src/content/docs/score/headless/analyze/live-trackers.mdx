@@ -4,8 +4,9 @@ description: 'createLiveChordTracker and createLiveKeyTracker: name the chord so
 sidebar:
   order: 3
 ---
-
 import LiveTrackersPlayground from '../../../../../components/headless/LiveTrackersPlayground.astro';
+
+<LiveTrackersPlayground />
 
 Two trackers that analyse a **performance** rather than a piece. Neither takes
 a `Score`: they accumulate `noteOn` events as they arrive, so the same code
@@ -17,8 +18,6 @@ choosing between them is choosing what to ask, not which object to learn.
 They own their accumulated musical state but create no player, clock or subscription.
 Both are push-only: the application feeds note events and owns any source listeners.
 Release those listeners at teardown; the trackers have no disposal method.
-
-<LiveTrackersPlayground />
 
 ## Import
 
@@ -165,10 +164,6 @@ duration, velocity or recentness.
 
 ## Related
 
-**Composed by.** [`<score-chord-analysis mode="live">`](/score/element/analyze/score-chord-analysis/)
-uses the chord tracker for sounding-note state. Key diagnostics and retained
-history are available to application-owned code through the APIs above.
-
-[createAnalysisSession](/score/headless/analyze/analysis-session/) works on
-an immutable score. [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker)
-tracks held pitches without naming chords.
+- [`<score-chord-analysis mode="live">`](/score/element/analyze/score-chord-analysis/) — inspect metrical score pitch collections, simultaneous chords or held live notes.
+- [createAnalysisSession](/score/headless/analyze/analysis-session/) — an analysis session over an immutable score, reusing identity-keyed caches across edits.
+- [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) — held-pitch state with optional playback attachment for application-owned keyboard, staff and fretboard views.

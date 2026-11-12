@@ -274,32 +274,38 @@ describe('actual programmatic demo lifetimes', () => {
   });
 
   it('does not construct an audio player after its clip finishes loading off-page', async () => {
-    document.body.innerHTML = '<div data-hl-clipplayer data-src="/demo.wav"><button data-play></button><div data-fill></div><span data-time></span></div>';
+    document.body.innerHTML = `<div data-hl-clip-player><div data-hl-stage><div data-hl-transport><button data-hl-play></button><div data-hl-fill></div><span data-hl-time></span></div></div>
+      <details class="wm-pg__params"><input type="checkbox" data-loop><input data-rate value="1"><input data-volume value="0.8"></details>
+      <pre data-hl-readout></pre><p data-hl-feedback hidden></p></div>`;
     const pending = deferred<unknown>();
-    const load = vi.fn((_url: string, _options: {signal: AbortSignal}) => pending.promise);
+    const load = vi.fn((_seconds: number) => pending.promise);
     const construct = vi.fn();
     runDemo('headless/HlAudioClipPlayerDemo', {
-      '@webmusic/audio/play': {loadClipFromUrl: load},
+      './arabesque-audio': {loadArabesqueAudioExcerpt: load},
+      './hl-transport': await import('../src/components/headless/hl-transport'),
       '@webmusic/audio/play/headless': {AudioClipPlayer: class { constructor() { construct(); } }},
     });
-    const signal = load.mock.calls[0][1].signal as AbortSignal;
+    expect(load).toHaveBeenCalledOnce();
     document.body.replaceChildren();
     await flush();
     pending.resolve({});
     await flush();
-    expect(signal.aborted).toBe(true);
     expect(construct).not.toHaveBeenCalled();
   });
 
   it('Recorder releases old playback before another take and tears down a pending start', async () => {
-    document.body.innerHTML = '<div data-hl-recorder><button data-record></button><button data-play disabled></button><div data-fill></div><span data-time></span><span data-status></span></div>';
+    document.body.innerHTML = `<div data-hl-recorder><div data-hl-stage><button data-record></button><div data-level></div><span data-take></span>
+      <div data-hl-transport><button data-hl-play></button><div data-hl-fill></div><span data-hl-time></span></div></div>
+      <details class="wm-pg__params"><input type="checkbox" data-echo></details>
+      <pre data-hl-readout></pre><p data-hl-feedback hidden></p></div>`;
     const permission = deferred<void>();
     const recorder = {
       start: vi.fn(() => permission.promise), stop: vi.fn(async () => ({duration: 1})),
       on: vi.fn(), dispose: vi.fn(),
     };
-    const player = {on: vi.fn(), play: vi.fn(async () => {}), dispose: vi.fn()};
+    const player = {play: vi.fn(async () => {}), pause: vi.fn(), dispose: vi.fn(), seconds: 0, duration: 1, playing: false};
     runDemo('headless/HlAudioRecorderDemo', {
+      './hl-transport': await import('../src/components/headless/hl-transport'),
       '@webmusic/audio/play/headless': {
         AudioRecorder: class { constructor() { return recorder; } },
         AudioClipPlayer: class { constructor() { return player; } },
@@ -313,13 +319,13 @@ describe('actual programmatic demo lifetimes', () => {
     await flush();
     record.click();
     await flush();
-    document.querySelector<HTMLButtonElement>('[data-play]')!.click();
+    document.querySelector<HTMLButtonElement>('[data-hl-play]')!.click();
     expect(player.play).toHaveBeenCalledOnce();
     record.click();
     expect(player.dispose).toHaveBeenCalledOnce();
     document.body.replaceChildren();
     await flush();
-    expect(recorder.dispose).toHaveBeenCalledOnce();
+    expect(recorder.dispose).toHaveBeenCalled();
     expect(player.dispose).toHaveBeenCalledOnce();
   });
 

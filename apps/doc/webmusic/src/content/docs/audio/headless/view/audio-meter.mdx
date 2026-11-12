@@ -4,6 +4,9 @@ description: 'Read live level, spectrum, float window and stereo frames from a b
 sidebar:
   order: 6
 ---
+import HlAudioMeterControllerDemo from '../../../../../components/headless/HlAudioMeterControllerDemo.astro';
+
+<HlAudioMeterControllerDemo />
 
 `AudioMeterController` remains in the **View Headless** entry: it provides
 measurements for a caller-owned presentation loop and owns no playback state,
@@ -38,7 +41,8 @@ The meter controller and display are not modules. The controller borrows an
 `output` are plain `AudioNode`s, not Kernel ports. To analyse a module, tap its audio output: `port.tap(analyser)` on an `AudioOutputPort` adds a leased branch without changing the audible route. `<audio-meter>` does
 this for the module named by `input` or assigned to `.inputModule`.
 
-## API
+<details class="component-section">
+<summary>API</summary>
 
 ### Options and state
 
@@ -161,6 +165,8 @@ Import the controller, the display and the pure helpers from
 removed so Play does not depend on View. The Element's Analyze catalog
 placement does not move these Headless exports or rename the tag; `view/element`
 and `view/auto` retain compatibility registration.
+
+</details>
 
 ## Related
 

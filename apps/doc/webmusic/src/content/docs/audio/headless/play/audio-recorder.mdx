@@ -4,6 +4,9 @@ description: 'Microphone capture into an AudioClip, with a live level, a device 
 sidebar:
   order: 5
 ---
+import HlAudioRecorderDemo from '../../../../../components/headless/HlAudioRecorderDemo.astro';
+
+<HlAudioRecorderDemo />
 
 `AudioRecorder` captures from an input device and hands back an `AudioClip` —
 the same immutable type every other object in the family consumes, so a take
@@ -161,4 +164,6 @@ fields into public API.
 
 ## Related
 
-[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Export API](/audio/api/play/) · [Live projection](/audio/headless/view/live-projection/)
+- [AudioClipPlayer](/audio/headless/play/audio-clip-player/) — single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.
+- [Export API](/audio/api/play/) — audio playback and I/O.
+- [Live projection](/audio/headless/view/live-projection/) — caller-paced analyser projection and fixed-capacity timestamped column storage, without a renderer or scheduler.

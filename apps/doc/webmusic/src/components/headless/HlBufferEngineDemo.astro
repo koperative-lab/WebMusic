@@ -1,0 +1,65 @@
+---
+// BufferEngine, the low-level resident transport, on a context the demo owns.
+// Parameters call the engine's own setters; the demo closes its context.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="BufferEngine"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-buffer-engine': true}}
+>
+  <HeadlessTransport />
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">rate</span><input class="wm-pg__input" type="number" data-rate value="1" min="0.25" max="4" step="0.25" aria-label="Playback rate" /><span class="wm-pg__note">setRate(rate) on the source node.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">loop</span><input type="checkbox" data-loop aria-label="Loop" /><span class="wm-pg__note">setLoop(loop): sample-accurate loop of the whole buffer.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {BufferEngine} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-buffer-engine]', async (root, scope) => {
+    const rate = root.querySelector<HTMLInputElement>('[data-rate]')!;
+    const loop = root.querySelector<HTMLInputElement>('[data-loop]')!;
+    let engine: BufferEngine | undefined = undefined;
+    let context: AudioContext | undefined = undefined;
+    // The engine borrows the context: dispose it first, then close the context it was given.
+    scope.add(() => { engine?.dispose(); void context?.close(); });
+    const transport = bindTransport(root, scope, () => engine && {
+      play: async () => { await context!.resume(); await engine!.play(engine!.currentTime, context!.currentTime + 0.06); },
+      pause: () => engine!.pause(),
+      get seconds() { return engine!.currentTime; },
+      get duration() { return engine!.duration; },
+      get playing() { return engine!.playing; },
+    });
+    const apply = (): void => {
+      engine?.setRate(Number(rate.value) || 1);
+      engine?.setLoop(loop.checked);
+      programmaticCode(root, `import {BufferEngine} from '@webmusic/audio/play/headless';
+
+// The context is the caller's; the clip holds decoded PCM.
+const engine = new BufferEngine(context, clip);
+engine.output.connect(context.destination);
+engine.setRate(${Number(rate.value) || 1});
+engine.setLoop(${loop.checked});
+engine.prepare();
+// In a play gesture: await engine.play(0, context.currentTime + 0.06);
+// On cleanup: engine.dispose(); then close the context you own.`);
+    };
+    for (const input of [rate, loop]) scope.listen(input, 'change', apply);
+    apply();
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    context = new AudioContext();
+    engine = new BufferEngine(context, clip);
+    engine.output.connect(context.destination);
+    engine.prepare();
+    apply();
+    transport.paint();
+  });
+</script>

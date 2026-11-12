@@ -78,9 +78,9 @@ sidebar:
 
 import ScorePlayerPlayground from '../../../../../components/headless/ScorePlayerPlayground.astro';
 
-Opening prose.
-
 <ScorePlayerPlayground />
+
+Opening prose.
 
 ## Import
 
@@ -97,13 +97,13 @@ await player.play();
 const dispose = () => player.dispose();
 ```
 
-## Ownership
-
-Object-specific ownership and lifecycle behavior.
-
 ## Ports and composition
 
 Module handle, ports and Session registration.
+
+## Ownership
+
+Object-specific ownership and lifecycle behavior.
 
 <details class="component-section">
 <summary>API</summary>
@@ -114,13 +114,16 @@ Construction, Commands, State, Events, Lifecycle, Helpers.
 
 ## Related
 
-[`<score-player>`](/score/element/play/score-player/)
+- [`<score-player>`](/score/element/play/score-player/) — the Web Component built on it.
 ````
 
-Order: introduction → main demo → Import → Ownership → Ports and composition →
-optional topics → API → Related.
-There is no Styling. Even a complete working demo does not replace Import and
-API reference content.
+Order: main demo → introduction → Import → Ports and composition → optional
+topics (Ownership among them) → API → Related — the Web Component page shape
+without Styling, so both kinds of page read the same way. Every Score, Audio
+and Bridge Headless page has all of them except the optional topics, in this
+order: `npm run check:docs` fails a page that departs from it
+(`headlessShapeProblems` in `scripts/element-docs-policy.mjs`). Even a complete
+working demo does not replace Import and API reference content.
 
 ## Section responsibilities
 
@@ -132,7 +135,7 @@ promotional subtitle. The capability directory supplies context. Object order is
 dense from 1, and a capability group has no Overview leaf: the sidebar expands
 straight to the objects, and the family inventory holds the whole list.
 
-In 1–3 short paragraphs, explain what the object does, construction inputs, what
+After the main demo, in 1–3 short prose paragraphs, explain what the object does, construction inputs, what
 it owns or borrows, and how to choose its neighbors. For example, `ScorePlayer`
 advances its clock, `InteractivePlayer` accepts caller-driven progress, and
 `PlayerController` wraps a state interface. Identify and link related Elements
@@ -178,6 +181,10 @@ Copy / Reset
   automatically.
 - Release subscriptions, DOM listeners, and objects at reconstruction and
   navigation, disposing only resources owned by the demo.
+
+Every page's main demo renders `HeadlessDemoFrame`. Audio demos that drive a
+transport-shaped object share its play row: `headless/HeadlessTransport.astro`
+with `bindTransport` from `headless/hl-transport.ts`.
 
 Use one main demo. Add a topic example only for composition the main controls
 cannot express, such as binding a presenter or driving the object from a
@@ -253,7 +260,8 @@ above the table. Verify against source rather than copying a capability API page
 
 ### Related
 
-Identify Elements, presenters, or Headless collaborators that actually use the
+The last section: a bullet list, one link per item followed by an em dash and
+what that page adds. Identify Elements, presenters, or Headless collaborators that actually use the
 object, and link neighboring capabilities needed to compose the workflow.
 Distinguish consumers from alternatives; a pure helper need not invent an
 Element consumer. Ordinary links and a future generated section have the same

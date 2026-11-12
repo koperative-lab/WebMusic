@@ -1,102 +1,65 @@
 ---
-// Headless demo: an Effect chain inserted into AudioClipPlayer's post-processing
-// bus (source → gain → panner → [effect] → analyser → destination). The `effect`
-// is a CONSTRUCTOR-ONLY option, so switching presets rebuilds the player —
-// carrying over the play state — using the factories from @webmusic/audio/play/headless.
-import LiveDemoCanvas from '../LiveDemoCanvas.astro';
-
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+// Effect builders described as data and wired by a player: Parameters choose
+// the chain, and setEffect() swaps it on the live AudioClipPlayer.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
 ---
-
-<div class="wui-panel wui-panel--flow not-content">
-  <div class="wui-panel__title">
-    <span>@webmusic/audio/play/headless</span>
-    <strong>Effect chain</strong>
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="Effect"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-effects': true}}
+>
+  <HeadlessTransport />
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">chain</span><select class="wui-select" data-chain aria-label="Effect chain"><option value="dry">dry (undefined)</option><option value="filter" selected>filter</option><option value="delay">delay</option><option value="filter-delay">filter → delay</option><option value="compressor">compressor</option></select><span class="wm-pg__note">The Effect passed to player.setEffect(effect); a chain runs in order.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">filter frequency</span><input class="wm-pg__input" type="number" data-frequency value="800" min="40" max="18000" step="10" aria-label="Filter frequency in hertz" /><span class="wm-pg__note">Low-pass filter cutoff, in Hz.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">delay seconds</span><input class="wm-pg__input" type="number" data-delay value="0.25" min="0.01" max="2" step="0.01" aria-label="Delay time in seconds" /><span class="wm-pg__note">Delay time in seconds, with feedback 0.35 and wet 0.4.</span></div>
   </div>
-  <LiveDemoCanvas size="compact" label="Audio effect chain">
-    <div class="wui-row" data-hl-effects data-src={SRC}>
-      <button class="wui-btn" data-play type="button">▶ Play</button>
-      <div class="wui-field">
-        <label class="wui-label" for="hl-effects-select">Effect</label>
-        <select class="wui-select" data-variant="ghost" data-effect id="hl-effects-select">
-          <option value="dry">Dry</option>
-          <option value="lowpass">Lowpass</option>
-          <option value="delay">Delay</option>
-        </select>
-      </div>
-      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
-      <span class="wui-readout" data-time>0.0s</span>
-    </div>
-  </LiveDemoCanvas>
-</div>
+</HeadlessDemoFrame>
 
 <script>
-  import {mountDemos, type DemoScope} from '../demo-lifecycle';
-  import { loadClipFromUrl } from '@webmusic/audio/play';
-  import { AudioClipPlayer, chainEffects, delay, filter } from '@webmusic/audio/play/headless';
-  import type { Effect } from '@webmusic/audio/play/headless';
-  import type { AudioClip } from '@webmusic/audio';
+  import {AudioClipPlayer, chainEffects, compressor, delay, filter, type Effect} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
 
-  const buildEffect = (kind: string): Effect | undefined => {
-    if (kind === 'lowpass') return filter({ type: 'lowpass', frequency: 800 });
-    if (kind === 'delay') return chainEffects(delay({ delaySeconds: 0.25, feedback: 0.35, wet: 0.4 }));
-    return undefined; // Dry
-  };
+  mountProgrammaticDemo('[data-hl-effects]', async (root, scope) => {
+    const chain = root.querySelector<HTMLSelectElement>('[data-chain]')!;
+    const frequency = root.querySelector<HTMLInputElement>('[data-frequency]')!;
+    const delaySeconds = root.querySelector<HTMLInputElement>('[data-delay]')!;
+    let player: AudioClipPlayer | undefined = undefined;
+    const transport = bindTransport(root, scope, () => player);
+    const build = (): {effect: Effect | undefined; code: string} => {
+      const hz = Number(frequency.value) || 800;
+      const seconds = Number(delaySeconds.value) || 0.25;
+      const lowpass = `filter({type: 'lowpass', frequency: ${hz}})`;
+      const echo = `delay({delaySeconds: ${seconds}, feedback: 0.35, wet: 0.4})`;
+      switch (chain.value) {
+        case 'filter': return {effect: filter({type: 'lowpass', frequency: hz}), code: lowpass};
+        case 'delay': return {effect: delay({delaySeconds: seconds, feedback: 0.35, wet: 0.4}), code: echo};
+        case 'filter-delay': return {effect: chainEffects(filter({type: 'lowpass', frequency: hz}), delay({delaySeconds: seconds, feedback: 0.35, wet: 0.4})), code: `chainEffects(${lowpass}, ${echo})`};
+        case 'compressor': return {effect: compressor({threshold: -24, ratio: 4}), code: 'compressor({threshold: -24, ratio: 4})'};
+        default: return {effect: undefined, code: 'undefined'};
+      }
+    };
+    const apply = (): void => {
+      const {effect, code} = build();
+      player?.setEffect(effect);
+      programmaticCode(root, `import {AudioClipPlayer, chainEffects, compressor, delay, filter} from '@webmusic/audio/play/headless';
 
-  const setup = async (root: HTMLElement, scope: DemoScope) => {
-    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
-    const select = root.querySelector<HTMLSelectElement>('[data-effect]')!;
-    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
-    const time = root.querySelector<HTMLElement>('[data-time]')!;
-
-    const clip: AudioClip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+const player = new AudioClipPlayer(clip);
+player.setEffect(${code});
+// In a play gesture: await player.play();
+// On cleanup: player.dispose();`);
+    };
+    for (const input of [chain, frequency, delaySeconds]) scope.listen(input, 'change', apply);
+    apply();
+    const clip = await loadArabesqueAudioExcerpt(30);
     if (!scope.active) return;
-    let player: AudioClipPlayer;
+    player = new AudioClipPlayer(clip);
     scope.add(() => player?.dispose());
-    let playing = false;
-
-    // Build (or rebuild) the player with the chosen effect, restoring transport
-    // state. `effect` is a constructor option, so a swap means a fresh player.
-    const buildPlayer = (kind: string) => {
-      const effect = buildEffect(kind);
-      // Timer-based cursor (vs default rAF) so timeupdate keeps firing when the
-      // tab is backgrounded.
-      const next = new AudioClipPlayer(clip, { cursorIntervalMs: 100, effect });
-      next.on('timeupdate', ({ seconds, progress }) => {
-        fill.style.width = `${Math.min(100, progress * 100)}%`;
-        time.textContent = `${seconds.toFixed(1)}s`;
-      });
-      next.on('end', () => { playing = false; btn.textContent = '▶ Play'; });
-      return next;
-    };
-
-    player = buildPlayer(select.value);
-
-    let playGeneration = 0;
-    const startPlayer = () => {
-      const current = player;
-      const request = ++playGeneration;
-      scope.run(current.play(), () => {
-        if (current !== player || request !== playGeneration) return;
-        playing = false;
-        btn.textContent = '▶ Play';
-      });
-    };
-
-
-    scope.listen(btn, 'click', () => {
-      if (playing) { ++playGeneration; player.pause(); btn.textContent = '▶ Play'; }
-      else { startPlayer(); btn.textContent = '⏸ Pause'; }
-      playing = !playing;
-    });
-
-    scope.listen(select, 'change', () => {
-      const wasPlaying = playing;
-      player.dispose();
-      player = buildPlayer(select.value);
-      if (wasPlaying) { startPlayer(); }
-    });
-  };
-
-  mountDemos('[data-hl-effects]', setup);
+    apply();
+    transport.paint();
+  });
 </script>

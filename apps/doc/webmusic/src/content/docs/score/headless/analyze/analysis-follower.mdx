@@ -4,8 +4,9 @@ description: 'Analysis, current position and held-note state borrowed from a pla
 sidebar:
   order: 2
 ---
-
 import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+<PlaybackFollowersPlayground object="analysis-follower" />
 
 `createAnalysisFollower(options?)` keeps a score analysis and its playback
 position together. It borrows a `ScorePlaybackSource`, owns its subscription and
@@ -15,8 +16,6 @@ It creates no player, audio context, timer, file request or DOM.
 Use [createAnalysisSession](/score/headless/analyze/analysis-session/) for
 caller-driven score edits alone. Use this follower when custom UI also needs
 source replacement, readiness, active notes and navigation.
-
-<PlaybackFollowersPlayground object="analysis-follower" />
 
 ## Import
 
@@ -44,6 +43,15 @@ const dispose = () => {
 For standalone inspection, construct with `{score}` and no playback source.
 Seeks then move only the local cursor; no sound is started.
 
+## Ports and composition
+
+The follower is an analysis companion, not a module: it exposes no
+`ModuleHandle` or ports and never registers with a Session. Its `playback` input
+is the payload of a Score module's `source` port (`webmusic.score`), the same
+`ScorePlaybackSource` as `player.playback`, and it navigates only through that
+source's `seekNominal`. The analysis Elements resolve the same source from their
+`input` or the nearest provider.
+
 ## Data and time ownership
 
 An explicit `score` wins over borrowed data. `setScore(undefined)` restores
@@ -60,15 +68,6 @@ of the same MIDI pitch. `activeMidis` is the unique ascending pitch set.
 same score’s tempo map. The follower reads snapshots without predicting frames;
 use [createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) separately
 if presentation needs interpolation.
-
-## Ports and composition
-
-The follower is an analysis companion, not a module: it exposes no
-`ModuleHandle` or ports and never registers with a Session. Its `playback` input
-is the payload of a Score module's `source` port (`webmusic.score`), the same
-`ScorePlaybackSource` as `player.playback`, and it navigates only through that
-source's `seekNominal`. The analysis Elements resolve the same source from their
-`input` or the nearest provider.
 
 ## Navigation outcomes
 
@@ -184,7 +183,6 @@ seek a player. Invoke the owner’s seek command separately, or use
 [createAnalysisFollower](/score/headless/analyze/analysis-follower/) for an
 explicit navigation outcome.
 
-
 **Construction** — `createTransportClock(options?: TransportClockOptions): TransportClock`
 
 | Member | Kind | Default | Description |
@@ -228,7 +226,6 @@ unused; release application-owned input/frame subscriptions yourself. Options
 are fixed at construction. The public types are `TransportClock`,
 `TransportClockOptions`, `TransportSample` and `TransportReading`.
 
-
 #### Clock Related
 
 [Analyze lanes](/score/element/#analyze) use this predictor for display motion.
@@ -239,9 +236,7 @@ player’s authoritative state; [Kernel](/kernel/) owns neutral transport contra
 
 ## Related
 
-[Analyze Web Components](/score/element/#analyze) adapt shared nonvisual
-following behavior to their DOM inputs and presenters.
-[Live trackers](/score/headless/analyze/live-trackers/) accept raw note events;
-[projections](/score/api/analyze/#the-projections) turn analysis into plain data
-for custom surfaces. [createScoreMapView](/score/headless/view/score-map-view/)
-provides score-map navigation without analysis.
+- [Analyze Web Components](/score/element/#analyze) — every drop-in Score element by capability.
+- [Live trackers](/score/headless/analyze/live-trackers/) — createLiveChordTracker and createLiveKeyTracker.
+- [projections](/score/api/analyze/#the-projections) — score analysis.
+- [createScoreMapView](/score/headless/view/score-map-view/) — whole-score map state and quarter-note navigation with optional borrowed playback.

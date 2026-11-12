@@ -4,6 +4,9 @@ description: 'A memoized analysis over a clip that survives edits: sample-local 
 sidebar:
   order: 1
 ---
+import HlAudioAnalysisSessionDemo from '../../../../../components/headless/HlAudioAnalysisSessionDemo.astro';
+
+<HlAudioAnalysisSessionDemo />
 
 `createAudioAnalysisSession(clip, options?)` remembers analysis results across
 `analyze()` and `update(editedClip)`. Updates compare channel samples, reuse
@@ -163,4 +166,6 @@ protocol.
 
 ## Related
 
-[Analyze API and workers](/audio/api/analyze/) · [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) · [View models](/audio/headless/view/view-models/)
+- [Analyze API and workers](/audio/api/analyze/) — audio analysis.
+- [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) — sample a borrowed AnalyserNode for level, spectrum or time-domain frames, and derive approximate live transient cues.
+- [View models](/audio/headless/view/view-models/) — project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.

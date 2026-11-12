@@ -1,0 +1,86 @@
+---
+// AudioTimeline following an AudioClipPlayer: zoom, viewport and playhead
+// geometry with nothing drawn. The bar shows the visible window inside the
+// clip so its numbers have a shape; Parameters call the timeline's setters.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/view/headless"
+  name="AudioTimeline"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-timeline': true}}
+>
+  <HeadlessTransport />
+  <div class="hl-window" aria-hidden="true"><div class="hl-window__visible" data-window></div><div class="hl-window__playhead" data-playhead></div></div>
+  <div class="wui-row"><span class="wui-readout" data-range>—</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">pixelsPerSecond</span><input class="wm-pg__input" type="number" data-zoom value="100" min="5" max="2000" step="5" aria-label="Pixels per second" /><span class="wm-pg__note">setZoom(pixelsPerSecond): anchored at the playhead, it does not jump.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">viewportWidth</span><input class="wm-pg__input" type="number" data-viewport value="800" min="100" max="4000" step="50" aria-label="Viewport width in pixels" /><span class="wm-pg__note">setViewport(width) in pixels.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">followPlayhead</span><input type="checkbox" data-follow checked aria-label="Follow the playhead" /><span class="wm-pg__note">bindPlayerToAudioTimeline option; recreates the binding.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<style>
+  .hl-window { position: relative; height: 1.25rem; margin-top: .5rem; border: 1px solid var(--wui-line-mid); background: var(--wui-surface); }
+  .hl-window__visible { position: absolute; top: 0; bottom: 0; background: var(--wui-ink); opacity: .18; }
+  .hl-window__playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--wui-ink); }
+</style>
+
+<script>
+  import {AudioClipPlayer} from '@webmusic/audio/play/headless';
+  import {AudioTimeline, bindPlayerToAudioTimeline, type AudioTimelineBinding} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-timeline]', async (root, scope) => {
+    const zoom = root.querySelector<HTMLInputElement>('[data-zoom]')!;
+    const viewport = root.querySelector<HTMLInputElement>('[data-viewport]')!;
+    const follow = root.querySelector<HTMLInputElement>('[data-follow]')!;
+    const windowBar = root.querySelector<HTMLElement>('[data-window]')!;
+    const playhead = root.querySelector<HTMLElement>('[data-playhead]')!;
+    const range = root.querySelector<HTMLElement>('[data-range]')!;
+    let player: AudioClipPlayer | undefined = undefined;
+    let timeline: AudioTimeline | undefined = undefined;
+    let binding: AudioTimelineBinding | undefined;
+    scope.add(() => { binding?.unsubscribe(); player?.dispose(); });
+    const transport = bindTransport(root, scope, () => player);
+    const paint = (): void => {
+      if (!timeline) return;
+      const {durationSeconds, playheadSeconds} = timeline.snapshot;
+      const {startSeconds, endSeconds} = timeline.visibleRange();
+      const share = (seconds: number) => `${durationSeconds ? Math.max(0, Math.min(100, (seconds / durationSeconds) * 100)) : 0}%`;
+      windowBar.style.left = share(startSeconds);
+      windowBar.style.width = `calc(${share(endSeconds)} - ${share(startSeconds)})`;
+      playhead.style.left = share(playheadSeconds);
+      range.textContent = `visible ${startSeconds.toFixed(2)}–${endSeconds.toFixed(2)} s · playhead ${playheadSeconds.toFixed(2)} s`;
+    };
+    const apply = (): void => {
+      if (timeline && player) {
+        timeline.setViewport(Number(viewport.value) || 800);
+        timeline.setZoom(Number(zoom.value) || 100);
+        binding?.unsubscribe();
+        binding = bindPlayerToAudioTimeline(player, timeline, {followPlayhead: follow.checked});
+      }
+      programmaticCode(root, `import {AudioTimeline, bindPlayerToAudioTimeline} from '@webmusic/audio/view/headless';
+
+const timeline = new AudioTimeline({durationSeconds: clip.duration, viewportWidth: ${Number(viewport.value) || 800}});
+timeline.setZoom(${Number(zoom.value) || 100});
+const binding = bindPlayerToAudioTimeline(player, timeline, {followPlayhead: ${follow.checked}});
+const {startSeconds, endSeconds} = timeline.visibleRange();
+// On cleanup: binding.unsubscribe();`);
+      paint();
+    };
+    for (const input of [zoom, viewport, follow]) scope.listen(input, 'change', apply);
+    apply();
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    player = new AudioClipPlayer(clip);
+    timeline = new AudioTimeline({durationSeconds: clip.duration, viewportWidth: Number(viewport.value) || 800});
+    apply();
+    transport.paint();
+    const timer = window.setInterval(paint, 100);
+    scope.add(() => window.clearInterval(timer));
+  });
+</script>

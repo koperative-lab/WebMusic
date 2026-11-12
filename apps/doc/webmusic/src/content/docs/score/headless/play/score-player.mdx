@@ -4,8 +4,9 @@ description: 'Play a Score with an autonomous clock or a borrowed Session schedu
 sidebar:
   order: 1
 ---
-
 import ScorePlayerPlayground from '../../../../../components/headless/ScorePlayerPlayground.astro';
+
+<ScorePlayerPlayground />
 
 `ScorePlayer` schedules a Score through a timbre and emits `cursor` / `end`
 events. Standalone playback owns its clock; a module can instead borrow the
@@ -15,19 +16,6 @@ For a one-call code action, `await playScore(score, options)` creates, starts
 and returns that same controllable player; `playScoreFromUrl()` also performs
 the load. Keep the returned player so you can pause, seek and eventually
 `dispose()` it.
-
-`play()` prepares an async `Sound` before it schedules the first note;
-`preload()` is available when you want that warm-up earlier. A supplied synth is
-borrowed by default, so `dispose()` invokes only a route cleanup returned by
-`connect()` and never its global `disconnect()` / `dispose()` unless you choose
-`synthOwnership: 'owned'`.
-
-An application that already owns a Tone.js instrument plays it through
-`Sound.from(toneInstrument)`; the Session, not Tone's Transport, owns transport
-time (DEC-068).
-
-
-<ScorePlayerPlayground />
 
 ## Import
 
@@ -51,6 +39,112 @@ player.dispose();
 `ScorePlayer` class and these exported types in
 `@webmusic/score/play/headless`; see the [Play API](/score/api/play/) for the
 capability's other entry points.
+
+## Ports and composition
+
+`ScorePlayer` is the engine, not a module. Its `ModuleHandle` is
+`new ScorePlayerModule(score, {context, ...})`; `<score-player>`'s `.module`
+forwards to one. The module receives its `ModuleContext` explicitly and registers
+in `context.registry`; when the context carries a Session, it registers the engine
+once as a participant on `score-nominal-seconds`. The composition root creates
+that context and owns the Session, for example with
+[`createProviderScope`](/kernel/api/#racks-provider-scopes-and-sinks); a module
+never creates one.
+
+| Family | Port | Direction | Present |
+| --- | --- | --- | --- |
+| audio | `main` | output | After `prepare()` routes it through the scope |
+| note | `notes` | input | Always |
+| source | `source` (`webmusic.score`) | output | Always; its value is `player.playback` |
+| transport | `transport` | output | When the context lends the Session's port |
+| control | `params` | input | When the synth exposes parameters |
+
+```ts
+import {createProviderScope} from '@webmusic/kernel/module';
+import {loadScoreFromUrl} from '@webmusic/score/io';
+import {ScorePlayerModule} from '@webmusic/score/play/headless';
+
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
+const scope = createProviderScope({id: 'arabesque', parent: undefined});
+const module = new ScorePlayerModule(score, {context: scope.context});
+await scope.session.play(); // from a user gesture: prepares the module, then starts
+
+// Teardown: the module first, then the Session and audio environment.
+module.dispose();
+scope.dispose();
+```
+
+`ScorePlayerModule` wraps one real `ScorePlayer` in a `ModuleContext`. Construct
+it with `(score, {context, id?, player?, offsetSeconds?, positionScale?, ...playerOptions})`; an explicit player
+is borrowed, otherwise the module owns the engine it creates. Its local axis is
+nominal Score seconds. The context's Session registers that engine identity once,
+prepares it before attaching the shared scheduling binding, and activates audio
+only for explicit playback. Offset defaults 0 and positive position scale 1.
+
+| Member | Contract |
+| --- | --- |
+| `player` | Actual Score engine; module adapters command it directly, avoiding Element delegation recursion. |
+| `params` | Borrow the engine's available instrument `ParamSurface`; the same handles are exposed by `ScorePlayer.params`. |
+| `capabilities.get(SCORE_NOTE_INPUT)` | Borrow the module's live-note target. Preparation resumes audio for an actual input gesture, without starting the score or Session transport. |
+| `prepare()` | Explicitly prepare the shared audio environment/engine and admit its output once. |
+| `inserts` | Prepared live `InsertChain`, otherwise undefined. |
+| `getPort('main')` / `getPort('output')` | Prepared `AudioOutputPort`, otherwise undefined. |
+| `ports()` | Audio `main` once prepared, note input `notes`, source `source`, the scope's borrowed `transport`, and control `params` when the synth has parameters. |
+| `notes` | `NoteInputPort`: each connected producer's occurrences reach their own voices; releasing the connection cancels only those. Velocity 0–1 maps to MIDI 1–127. |
+| `source` | `SourcePublisher` with schema `webmusic.score` publishing the player's `playback` source. |
+| `retarget(context)` | Follow a republished scope in place: a destination-only change re-routes the prepared output and keeps the engine, Session membership and voices; returns `false` when the change needs a rebind. |
+| `setDocumentSource(source)` | Play a borrowed document in place of the constructed score; the engine and clock stay. |
+| `replaceScore(score)` | `Promise<void>`: stop the Session (when present), play another score on the same engine from 0 and refresh the participant, so the Session reads the new duration. |
+| `replaceSynth(synth)` | Swap the instrument in place and republish the control port; `false` (nothing changed) when the Session timing class would change. |
+| `subscribe(listener)` | Observe capability readiness/replacement; discovery itself allocates nothing. |
+| `dispose()` | Release registration, participant, route and ports; dispose only an engine the module created. |
+
+The Session participant reports `ScorePlayer.sessionTiming`: `shared-anchor`
+when the synth schedules and cancels attacks on the audio clock (the default
+oscillator does), otherwise `callback`.
+
+### Note sources and sinks
+
+`new MidiNoteSource(input, {id?, channel?})` turns a Web MIDI input's note-on and
+note-off messages into occurrences on its `notes` output port (axis
+`performance-seconds`, from the message time stamp); a repeated note-on closes
+the earlier occurrence first, and `dispose()` cancels held notes and restores the
+input's previous handler. `new MidiNoteSink(output, {id?, channel?})` sends the
+events connected to its `notes` input port to a Web MIDI output and releases held
+notes on disposal; device timing stays external to any Session.
+`recordNoteOutput(recorder, notes)` captures a note output into a
+`ScoreRecorderSession` take and returns a lease that stops capturing.
+
+```ts
+import {MidiNoteSource, type MidiInputLike, type ScorePlayerModule} from '@webmusic/score/play/headless';
+
+declare const input: MidiInputLike; // a Web MIDI input from requestMIDIAccess()
+declare const module: ScorePlayerModule; // already in a ModuleContext
+
+const keys = new MidiNoteSource(input);
+const lease = module.notes.connect(keys.notes);
+// Teardown: lease.release(); keys.dispose();
+```
+
+The native `ScorePlayer` additionally exposes `preparedContext`, `inserts`,
+`audioOutput`, its `effect` recipe and `setEffect(effect)`. `configureAudio(context)`
+configures its shared environment before preparation; `setDestination(null)`
+removes the default audible route. A legacy effect is the chain's compatibility
+slot, preserving separately declared inserts. Read
+[the shared contracts](/kernel/api/#module--webmusickernelmodule) before taking
+ownership of routing or parameter resources.
+
+## Preparing and borrowing the sound
+
+`play()` prepares an async `Sound` before it schedules the first note;
+`preload()` is available when you want that warm-up earlier. A supplied synth is
+borrowed by default, so `dispose()` invokes only a route cleanup returned by
+`connect()` and never its global `disconnect()` / `dispose()` unless you choose
+`synthOwnership: 'owned'`.
+
+An application that already owns a Tone.js instrument plays it through
+`Sound.from(toneInstrument)`; the Session, not Tone's Transport, owns transport
+time (DEC-068).
 
 ## Borrow data and playback state
 
@@ -171,100 +265,6 @@ and scheduled retiming; other backends cancel/retrigger at the new anchor. A tim
 stall beyond lookahead can miss deadlines, and this contract does not measure
 output-device latency or guarantee acoustic alignment.
 
-## Ports and composition
-
-`ScorePlayer` is the engine, not a module. Its `ModuleHandle` is
-`new ScorePlayerModule(score, {context, ...})`; `<score-player>`'s `.module`
-forwards to one. The module receives its `ModuleContext` explicitly and registers
-in `context.registry`; when the context carries a Session, it registers the engine
-once as a participant on `score-nominal-seconds`. The composition root creates
-that context and owns the Session, for example with
-[`createProviderScope`](/kernel/api/#racks-provider-scopes-and-sinks); a module
-never creates one.
-
-| Family | Port | Direction | Present |
-| --- | --- | --- | --- |
-| audio | `main` | output | After `prepare()` routes it through the scope |
-| note | `notes` | input | Always |
-| source | `source` (`webmusic.score`) | output | Always; its value is `player.playback` |
-| transport | `transport` | output | When the context lends the Session's port |
-| control | `params` | input | When the synth exposes parameters |
-
-```ts
-import {createProviderScope} from '@webmusic/kernel/module';
-import {loadScoreFromUrl} from '@webmusic/score/io';
-import {ScorePlayerModule} from '@webmusic/score/play/headless';
-
-const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
-const scope = createProviderScope({id: 'arabesque', parent: undefined});
-const module = new ScorePlayerModule(score, {context: scope.context});
-await scope.session.play(); // from a user gesture: prepares the module, then starts
-
-// Teardown: the module first, then the Session and audio environment.
-module.dispose();
-scope.dispose();
-```
-
-`ScorePlayerModule` wraps one real `ScorePlayer` in a `ModuleContext`. Construct
-it with `(score, {context, id?, player?, offsetSeconds?, positionScale?, ...playerOptions})`; an explicit player
-is borrowed, otherwise the module owns the engine it creates. Its local axis is
-nominal Score seconds. The context's Session registers that engine identity once,
-prepares it before attaching the shared scheduling binding, and activates audio
-only for explicit playback. Offset defaults 0 and positive position scale 1.
-
-| Member | Contract |
-| --- | --- |
-| `player` | Actual Score engine; module adapters command it directly, avoiding Element delegation recursion. |
-| `params` | Borrow the engine's available instrument `ParamSurface`; the same handles are exposed by `ScorePlayer.params`. |
-| `capabilities.get(SCORE_NOTE_INPUT)` | Borrow the module's live-note target. Preparation resumes audio for an actual input gesture, without starting the score or Session transport. |
-| `prepare()` | Explicitly prepare the shared audio environment/engine and admit its output once. |
-| `inserts` | Prepared live `InsertChain`, otherwise undefined. |
-| `getPort('main')` / `getPort('output')` | Prepared `AudioOutputPort`, otherwise undefined. |
-| `ports()` | Audio `main` once prepared, note input `notes`, source `source`, the scope's borrowed `transport`, and control `params` when the synth has parameters. |
-| `notes` | `NoteInputPort`: each connected producer's occurrences reach their own voices; releasing the connection cancels only those. Velocity 0–1 maps to MIDI 1–127. |
-| `source` | `SourcePublisher` with schema `webmusic.score` publishing the player's `playback` source. |
-| `retarget(context)` | Follow a republished scope in place: a destination-only change re-routes the prepared output and keeps the engine, Session membership and voices; returns `false` when the change needs a rebind. |
-| `setDocumentSource(source)` | Play a borrowed document in place of the constructed score; the engine and clock stay. |
-| `replaceScore(score)` | `Promise<void>`: stop the Session (when present), play another score on the same engine from 0 and refresh the participant, so the Session reads the new duration. |
-| `replaceSynth(synth)` | Swap the instrument in place and republish the control port; `false` (nothing changed) when the Session timing class would change. |
-| `subscribe(listener)` | Observe capability readiness/replacement; discovery itself allocates nothing. |
-| `dispose()` | Release registration, participant, route and ports; dispose only an engine the module created. |
-
-The Session participant reports `ScorePlayer.sessionTiming`: `shared-anchor`
-when the synth schedules and cancels attacks on the audio clock (the default
-oscillator does), otherwise `callback`.
-
-### Note sources and sinks
-
-`new MidiNoteSource(input, {id?, channel?})` turns a Web MIDI input's note-on and
-note-off messages into occurrences on its `notes` output port (axis
-`performance-seconds`, from the message time stamp); a repeated note-on closes
-the earlier occurrence first, and `dispose()` cancels held notes and restores the
-input's previous handler. `new MidiNoteSink(output, {id?, channel?})` sends the
-events connected to its `notes` input port to a Web MIDI output and releases held
-notes on disposal; device timing stays external to any Session.
-`recordNoteOutput(recorder, notes)` captures a note output into a
-`ScoreRecorderSession` take and returns a lease that stops capturing.
-
-```ts
-import {MidiNoteSource, type MidiInputLike, type ScorePlayerModule} from '@webmusic/score/play/headless';
-
-declare const input: MidiInputLike; // a Web MIDI input from requestMIDIAccess()
-declare const module: ScorePlayerModule; // already in a ModuleContext
-
-const keys = new MidiNoteSource(input);
-const lease = module.notes.connect(keys.notes);
-// Teardown: lease.release(); keys.dispose();
-```
-
-The native `ScorePlayer` additionally exposes `preparedContext`, `inserts`,
-`audioOutput`, its `effect` recipe and `setEffect(effect)`. `configureAudio(context)`
-configures its shared environment before preparation; `setDestination(null)`
-removes the default audible route. A legacy effect is the chain's compatibility
-slot, preserving separately declared inserts. Read
-[the shared contracts](/kernel/api/#module--webmusickernelmodule) before taking
-ownership of routing or parameter resources.
-
 ## Live note occurrences
 
 `noteOnOccurrence({id, midi, velocity})` and `noteOffOccurrence(id)` play a held
@@ -293,7 +293,6 @@ The [note-input Element](/score/element/play/score-note-input/) resolves this
 capability through context or an explicit module target. Unmounting one input
 releases only that input's notes; disposing the owning player releases all its
 remaining live voices.
-
 
 <details class="component-section">
 <summary>API</summary>

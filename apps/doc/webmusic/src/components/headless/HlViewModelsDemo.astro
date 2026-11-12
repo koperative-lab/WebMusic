@@ -1,0 +1,76 @@
+---
+// WaveformViewModel projecting the opening of Arabesque No. 1 through its
+// timeline into one column per visible pixel. The canvas draws exactly the
+// columns it returns; Parameters move the timeline.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/view/headless"
+  name="createWaveformViewModel"
+  code={`// Loading Arabesque No. 1…`}
+  rootAttrs={{'data-hl-view-models': true}}
+>
+  <canvas class="hl-columns" data-canvas width="800" height="96" aria-label="Visible waveform columns"></canvas>
+  <div class="wui-row"><span class="wui-readout" data-summary>—</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">pixelsPerSecond</span><input class="wm-pg__input" type="number" data-zoom value="40" min="5" max="2000" step="5" aria-label="Pixels per second" /><span class="wm-pg__note">timeline.setZoom(pixelsPerSecond).</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">offsetPixels</span><input class="wm-pg__input" type="number" data-offset value="0" min="0" step="50" aria-label="Offset in pixels" /><span class="wm-pg__note">timeline.setOffset(pixels): the first visible pixel.</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">mergeChannels</span><input type="checkbox" data-merge aria-label="Merge channels" /><span class="wm-pg__note">One peak per column instead of one per channel; recreates the model.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<style>
+  .hl-columns { display: block; width: 100%; height: 96px; border: 1px solid var(--wui-line-mid); background: var(--wui-surface); }
+</style>
+
+<script>
+  import type {AudioClip} from '@webmusic/audio';
+  import {computeClipPeaks, createWaveformViewModel} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo, programmaticCode} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+
+  mountProgrammaticDemo('[data-hl-view-models]', async (root, scope) => {
+    const zoom = root.querySelector<HTMLInputElement>('[data-zoom]')!;
+    const offset = root.querySelector<HTMLInputElement>('[data-offset]')!;
+    const merge = root.querySelector<HTMLInputElement>('[data-merge]')!;
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-canvas]')!;
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    let clip: AudioClip | undefined = undefined;
+    const apply = (): void => {
+      const pps = Number(zoom.value) || 40;
+      const pixels = Math.max(0, Number(offset.value) || 0);
+      programmaticCode(root, `import {computeClipPeaks, createWaveformViewModel} from '@webmusic/audio/view/headless';
+
+const peaks = computeClipPeaks(clip);
+const waveform = createWaveformViewModel(peaks, {durationSeconds: clip.duration, mergeChannels: ${merge.checked}});
+waveform.timeline.setViewport(${canvas.width});
+waveform.timeline.setZoom(${pps});
+waveform.timeline.setOffset(${pixels});
+const columns = waveform.columns(); // one per visible pixel`);
+      if (!clip) return;
+      const peaks = computeClipPeaks(clip);
+      if (!peaks) { summary.textContent = 'no decoded samples'; return; }
+      const waveform = createWaveformViewModel(peaks, {durationSeconds: clip.duration, mergeChannels: merge.checked});
+      waveform.timeline.setViewport(canvas.width);
+      waveform.timeline.setZoom(pps);
+      waveform.timeline.setOffset(pixels);
+      const columns = waveform.columns();
+      const {startSeconds, endSeconds} = waveform.timeline.visibleRange();
+      summary.textContent = `${columns.length} columns · ${startSeconds.toFixed(2)}–${endSeconds.toFixed(2)} s · ${columns[0]?.peaks.length ?? 0} peak(s) per column`;
+      const context = canvas.getContext('2d')!;
+      const {height} = canvas;
+      context.clearRect(0, 0, canvas.width, height);
+      context.fillStyle = getComputedStyle(canvas).color || '#444';
+      for (const column of columns) {
+        const peak = column.peaks[0];
+        if (!peak) continue;
+        context.fillRect(column.x, (1 - peak.max) * height / 2, 1, Math.max(1, (peak.max - peak.min) * height / 2));
+      }
+    };
+    for (const input of [zoom, offset, merge]) scope.listen(input, 'change', apply);
+    apply();
+    clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    apply();
+  });
+</script>

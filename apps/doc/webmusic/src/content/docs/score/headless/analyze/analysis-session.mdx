@@ -4,8 +4,9 @@ description: 'An analysis session over an immutable score, reusing identity-keye
 sidebar:
   order: 1
 ---
-
 import AnalysisSessionPlayground from '../../../../../components/headless/AnalysisSessionPlayground.astro';
+
+<AnalysisSessionPlayground />
 
 `createAnalysisSession(score, options?)` holds one analysis and keeps it
 current as the score changes. `update(next)` reuses identity-keyed analysis
@@ -26,8 +27,6 @@ the caches are keyed on the immutable parts themselves, so an edited part
 arrives with empty caches and an untouched one keeps its analysis.
 There is no playback clock, event subscription or automatic edit listener;
 the caller supplies each new immutable score through `update()`.
-
-<AnalysisSessionPlayground />
 
 ## Import
 
@@ -136,10 +135,8 @@ try {
 }
 ```
 
-
 The same client is also exported by `@webmusic/score/analyze/worker-client`.
 Its promise resolves with an analysis result, not with playback completion.
-
 
 The source contract is `AnalysisWorkerClient`, `AnalysisWorkerFactory`,
 `AnalysisWorkerLike` and `AnalysisWorkerEventLike`, re-exported from the
@@ -198,8 +195,6 @@ No worker method emits a UI or playback event. Handle request failures through
 the returned promises. `retryable` describes a remote operation failure; it
 does not promise that a separately failed/terminated client can be reused.
 
-
-
 #### Worker Transfer and cancellation
 
 Each request serializes the complete `Score` through `toJSON()` and the worker
@@ -222,15 +217,6 @@ combines synchronous analysis with borrowed playback state.
 
 ## Related
 
-**Composed by.** The score-based [live Analyze components](/score/element/#analyze).
-Its motif data also remains available to application-owned views without a dedicated Element.
-
-**Related.** Whole-score summaries, histograms and rhythmic-vocabulary reports
-use the [report workflow](/score/api/analyze/#reports). They are not
-fields on `AnalysisSession.result`.
-
-[Live trackers](/score/headless/analyze/live-trackers/) analyze note events
-without a score; [createScoreReport](/score/api/analyze/#reports)
-formats a one-shot card. Source symbols for the synchronous API are
-`createAnalysisSession`, `AnalysisSession`, `AnalysisSessionOptions` and
-`AnalysisResult` at `@webmusic/score/analyze/headless`.
+- [live Analyze components](/score/element/#analyze) — every drop-in Score element by capability.
+- [report workflow](/score/api/analyze/#reports) — score analysis.
+- [Live trackers](/score/headless/analyze/live-trackers/) — createLiveChordTracker and createLiveKeyTracker.
