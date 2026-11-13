@@ -57,12 +57,12 @@ waveform View gains optional editing interaction. Applications load or create th
 Headless API and lend it to those Elements; there is no document Element.
 The [editing design](design/EDIT-COMPONENTS.md) specifies this contract;
 [STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, editor loading and piano-roll
-interaction are documented in the [Score View API](../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [Score grid View](../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx).
+interaction are documented in the [Score View API](../doc/src/content/docs/score/api/view.mdx)
+and [Score grid View](../doc/src/content/docs/score/element/view/score-grid-view.mdx).
 Audio sequence editing, local processing and WAV export are documented in
-the [Audio View API](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
-[Audio Play export](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and
-[Audio View](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
+the [Audio View API](../doc/src/content/docs/audio/api/view.mdx),
+[Audio Play export](../doc/src/content/docs/audio/api/play.mdx) and
+[Audio View](../doc/src/content/docs/audio/element/view/audio-view.mdx).
 Staff and notation editing are not part of the current contract (DEC-058).
 
 ## One session's time and data
@@ -108,11 +108,11 @@ Current integration references are organized by the resource being connected:
 
 | Resource | Contract to start with |
 |---|---|
-| Symbolic formats and score import/export | [Score I/O](../apps/doc/webmusic/src/content/docs/score/api/io.mdx) |
-| Timbres, effects, and musical input | [Score playback](../apps/doc/webmusic/src/content/docs/score/api/play.mdx) and its Headless/driver links |
-| Audio files, decoding, playback, and capture | [Audio playback](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and its Headless links |
-| Analysis engines and transcription | [Audio analysis](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) |
-| Custom visuals and controls | [UI contracts](../packages/ui/README.md), [Score views](../apps/doc/webmusic/src/content/docs/score/api/view.mdx), and [Audio views](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) |
+| Symbolic formats and score import/export | [Score I/O](../doc/src/content/docs/score/api/io.mdx) |
+| Timbres, effects, and musical input | [Score playback](../doc/src/content/docs/score/api/play.mdx) and its Headless/driver links |
+| Audio files, decoding, playback, and capture | [Audio playback](../doc/src/content/docs/audio/api/play.mdx) and its Headless links |
+| Analysis engines and transcription | [Audio analysis](../doc/src/content/docs/audio/api/analyze.mdx) |
+| Custom visuals and controls | [UI contracts](../packages/ui/README.md), [Score views](../doc/src/content/docs/score/api/view.mdx), and [Audio views](../doc/src/content/docs/audio/api/view.mdx) |
 | Coordination and cross-domain conversion | [Bridge](../bridges/score-audio/README.md) |
 
 Those references and manifests own the supported entries and dependency details.

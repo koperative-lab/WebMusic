@@ -27,7 +27,7 @@ and the [modular contract](../../design/MODULAR-COMPOSITION.md) through opt-in
 | 7 | Nested Score/Audio players, original Score RackPart declarations, shared effect declarations, attached panels and neutral analyser taps. |
 | 8 | Public reference/catalog integration and a runnable mixed-domain composition; combined verification is recorded below. |
 
-The [public guide](../../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+The [public guide](../../../doc/src/content/docs/bridge/modular-composition.mdx)
 contains a source-free root, Rack, Score and Audio sources, a RackPart declaration,
 two master effects, two panels borrowing one effect and an analyser tap.
 Source-local, channel and master inserts remain distinct processing stages.

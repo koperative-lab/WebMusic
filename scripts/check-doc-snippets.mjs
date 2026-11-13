@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = join(ROOT, 'apps/doc/webmusic/src/content/docs');
+const DOCS = join(ROOT, 'doc/src/content/docs');
 const LANGUAGES = new Map([
   ['ts', 'ts'], ['typescript', 'ts'], ['tsx', 'tsx'],
   ['js', 'js'], ['javascript', 'js'], ['jsx', 'jsx'],

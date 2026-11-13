@@ -14,7 +14,7 @@ const requestedVersion = process.argv.slice(2).find((argument) => !argument.star
 const packageDirs = packageDirectories.map((dir) => path.join(root, ...dir.split('/')));
 const manifestPaths = [
   ...packageDirs.map((directory) => path.join(directory, 'package.json')),
-  path.join(root, 'apps', 'doc', 'webmusic', 'package.json'),
+  path.join(root, 'doc', 'package.json'),
 ];
 const manifests = await Promise.all(manifestPaths.map(async (manifestPath) => ({
   manifestPath,

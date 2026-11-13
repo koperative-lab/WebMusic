@@ -8,9 +8,9 @@ DEC-036's Audio Element inventory without changing its static API/Headless
 ownership rule; DEC-051 replaces the meter's two-mode presenter with seven
 type-selected displays and two themes.
 Source and public entries: [Audio Analyze](../../packages/audio/src/analyze/),
-[Element inventory](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze),
-[API](../../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and
-[Headless](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx#analyze).
+[Element inventory](../../doc/src/content/docs/audio/element/index.mdx#analyze),
+[API](../../doc/src/content/docs/audio/api/analyze.mdx) and
+[Headless](../../doc/src/content/docs/audio/headless/index.mdx#analyze).
 
 ## Task and boundary
 
@@ -47,8 +47,8 @@ Elements. DEC-037 removes the interim tuner without removing pitch analysis.
 Their nonvisual algorithms, Worker client, sessions and realtime analyzer
 remain available. Whole-clip key, tempo, loudness, summaries, chroma, pitch
 tracks and event distributions belong in the
-[Analyze API](../../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx),
-the [Headless objects](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx#analyze)
+[Analyze API](../../doc/src/content/docs/audio/api/analyze.mdx),
+the [Headless objects](../../doc/src/content/docs/audio/headless/index.mdx#analyze)
 and application-owned UI.
 
 ## Composition and evidence

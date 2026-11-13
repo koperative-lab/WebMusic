@@ -364,7 +364,7 @@ editing. Each record owns the checks, measurements and limitations of its
 stated baseline. Their contracts are
 [DEC-063](../DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority)
 and DEC-064, with [Modular composition](../design/MODULAR-COMPOSITION.md); current public usage
-is in the [runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx).
+is in the [runnable guide](../../doc/src/content/docs/bridge/modular-composition.mdx).
 The [2026-10-16 review follow-up](../audits/2026-10-16/MODULAR-REVIEW-FIXES.md)
 repairs 20 independently reproduced mixing, lifecycle, scheduling, control,
 project transaction and focus defects. Its verification record supersedes any

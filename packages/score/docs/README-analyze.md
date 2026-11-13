@@ -6,7 +6,7 @@
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current analyze API reference](../../../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx); [Current analyze Web Components](../../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze); [Current analyze Headless reference](../../../apps/doc/webmusic/src/content/docs/score/headless/index.mdx#analyze).
+> Current references: [Current analyze API reference](../../../doc/src/content/docs/score/api/analyze.mdx); [Current analyze Web Components](../../../doc/src/content/docs/score/element/index.mdx#analyze); [Current analyze Headless reference](../../../doc/src/content/docs/score/headless/index.mdx#analyze).
 > See the [archive index](README.md) for scope, the
 > [contribution guide](../../../CONTRIBUTING.md) for setup and validation, and
 > [Score architecture](../ARCHITECTURE.md) for current package boundaries.
@@ -209,7 +209,7 @@ function takes an optional custom tag name.
 ## Documentation
 
 Full API docs live in the monorepo's documentation site
-([`apps/doc/webmusic-score`](../../../apps/doc/webmusic-score), `npm run docs:dev:score`) — see the **Analyze API**
+([`apps/doc/webmusic-score`](../../../doc-score), `npm run docs:dev:score`) — see the **Analyze API**
 page.
 
 ## License

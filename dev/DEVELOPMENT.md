@@ -93,8 +93,8 @@ later:
    a test that only runs locally does not count.
 3. **Manual acceptance checks** for what only a person can judge — sound,
    timing by ear, real devices, background tabs, touch, screen readers. Add or
-   update the check in the [manual acceptance runner](../apps/test/README.md):
-   an English entry in `apps/test/src/checks.ts` with steps and expected
+   update the check in the [private manual acceptance runner](#private-manual-acceptance-runner):
+   an English entry in `WebMusic-studio/apps/test/src/checks.ts` with steps and expected
    results, and a live canvas built from the packages' own Elements and
    Headless objects with Arabesque No. 1. Before handing off, mount the changed
    checks yourself in a browser against the built packages and fix what you
@@ -138,7 +138,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
-| `npm run check:demo-music` | After package builds, verify that the owner-maintained `apps/doc/webmusic/public/` folder matches the owner's pin `apps/doc/webmusic/public.sha256` file for file and byte for byte, and that every media reference in the documentation and manual-test (`apps/test/src`) source is one of its four Arabesque No. 1 files. It only reads the folder. After changing the folder themselves, the owner reviews `node scripts/check-demo-music.mjs --print-pin` and commits its output as the new pin. Included in source checks and both site build commands. |
+| `npm run check:demo-music` | After package builds, verify that the owner-maintained `doc/public/` folder matches the owner's pin `doc/public.sha256` file for file and byte for byte, and that every media reference in the documentation source is one of its four Arabesque No. 1 files. It only reads the folder. After changing the folder themselves, the owner reviews `node scripts/check-demo-music.mjs --print-pin` and commits its output as the new pin. Included in source checks and both site build commands; the private runner validates its own media references. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |
@@ -147,14 +147,38 @@ helps select commands; it does not define another execution chain.
 | `npm run check:dev-server` | Test startup reuse, explicit restart, build failure, and concurrent starts. |
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
-| `npm run test:manual` | Build packages and serve the [manual acceptance runner](../apps/test/README.md) at <http://localhost:4331> for device, listening and accessibility checks; it is separate from the documentation site and shows the version, commit and working tree under test. |
-| `npm run check:acceptance` | Build the manual acceptance runner, so CI catches a check whose canvas no longer compiles. Included in source checks. |
 | `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
 | `npm run audit:production` | Run the production dependency audit manually; it is outside `npm run check`. |
 | `npm run audit:dependencies` | Audit all dependencies, including development tools; CI runs this outside `npm run check`. |
 | `npm run check:external-install` | Pack and install packages into a fresh non-workspace consumer, then check imports and declarations; requires built outputs and network access. |
 | `npm run release:prepare -- <x.y.z>` | Prepare a shared release version; follow [RELEASING.md](release/RELEASING.md) and refresh the lockfile. |
+
+### Private manual acceptance runner
+
+The runner is the `webmusic-test` workspace at `apps/test/` in the separate
+closed-source `WebMusic-studio` repository. Website, Library and Studio are
+private applications there as well; `doc/` is the public repository's only
+application (DEC-072). Its `apps/test/README.md` owns the runner's setup and
+check inventory.
+
+Build the exact public package revision with `npm run build` here. In the
+private checkout, configure `webmusic` to point at that public checkout with
+`npm run setup`, then select `npm run use:linked` or the packed-package workflow
+documented there. Run these commands from the private repository root:
+
+```bash
+npm run check:acceptance  # compile the manual runner
+npm run dev:test          # serve it at http://localhost:4331
+```
+
+`npm run test:manual` is an alias for `dev:test`; `npm run check` checks all
+private application workspaces. These are private-repository commands, not
+public npm scripts. Keep the public package build stable while the runner
+uses it. Confirm the public version, commit and working-tree identity shown
+by the runner before the owner tests. The public CI does not build or import
+private application source; the manual acceptance and release gates above
+still apply to the exact public revision under test.
 
 ### Documentation server lifecycle
 
@@ -178,7 +202,7 @@ start also recovers an ordinary stale lock whose owner process has exited.
 
 If cleanup cannot be verified, startup fails with
 `ERR_DEV_PROCESS_GROUP_CLEANUP` and retains
-`apps/doc/webmusic/.astro/webmusic-dev-start/cleanup-failed.json`. The record
+`doc/.astro/webmusic-dev-start/cleanup-failed.json`. The record
 names the process group and preserves the original command failure; subsequent
 starts remain blocked. For operator recovery, inspect that record and verify
 that the recorded build group and its descendants have stopped before manually

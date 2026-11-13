@@ -23,7 +23,7 @@ did not cover these additional boundaries.
 | Successful serialization produces text its parser rejects | Check encoded text after escaping/indentation against the parser's bound and throw before returning oversized output. Project tests cover escaped and indented data plus valid compact roundtrips. |
 | Explicit meter player selector stops following targets in module scope | Use the same binding precedence for observation and resolution. [Meter tests](../../../packages/audio/test/view/audio-meter-element.test.ts) cover late insertion, replacement and removal. |
 | Editor snapshot failure leaves controls busy and masks the error | Separate command outcome from refresh outcome and restore DOM interactivity using the last valid view. [Editor tests](../../../packages/ui/test/patch-editor.test.ts) cover successful/rejected commands and focus movement. |
-| Initial Open button remains active and overwrites a ready project | Honor its hidden state, disable it after initialization and guard its handler; explicit Reset remains available. [Demo tests](../../../apps/doc/webmusic/test/modular-project-demo-client.test.ts) and styled-browser probes cover the distinction. |
+| Initial Open button remains active and overwrites a ready project | Honor its hidden state, disable it after initialization and guard its handler; explicit Reset remains available. [Demo tests](../../../doc/test/modular-project-demo-client.test.ts) and styled-browser probes cover the distinction. |
 | Cross-review: lazy channel admission publishes before member ownership | Commit the channel and member lease before notifications, protecting removal, disposal and same-ID replacement. Mixer routing tests retain the failing reproduction and ownership assertions. |
 
 The shared package version and internal peer floor are prepared as `0.3.0` /
@@ -73,6 +73,6 @@ stated samples or windows, rather than every rendered frame.
 Publication still requires a clean reviewed release commit, the same commit's
 CI results, publisher authentication, registry installation verification and an
 accurate release receipt. Website deployment additionally requires resolving
-the eight public media assets in [ASSETS](../../../apps/doc/webmusic/ASSETS.md).
+the eight public media assets in [ASSETS](../../../doc/ASSETS.md).
 These files are not part of the npm tarballs. No new media rights are inferred
 from this code repair.

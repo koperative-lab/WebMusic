@@ -124,7 +124,7 @@ instructions.
   observations; these cases are acceptance prompts, not claims of passing runs.
 - Keep copyable project instructions in their public documentation page.
 
-See the [Agent Toolkit documentation source](../apps/doc/webmusic/src/content/docs/agent-toolkit/index.mdx)
+See the [Agent Toolkit documentation source](../doc/src/content/docs/agent-toolkit/index.mdx)
 for the corresponding user-facing guide.
 
 ## Audio and Bridge additions

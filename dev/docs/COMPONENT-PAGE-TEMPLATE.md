@@ -1,7 +1,7 @@
 # Web Component page template
 
 This is the authoring contract for pages under
-`apps/doc/webmusic/src/content/docs/{score,audio}/element/<capability>/`,
+`doc/src/content/docs/{score,audio}/element/<capability>/`,
 including behavior-only declarations such as `score-rack-part`.
 It does not replace product component design: establish a new component's
 purpose, layer boundaries, and composition through
@@ -34,7 +34,7 @@ in its main demo. Do not split pages or stack near-identical demos by mode.
 
 ## Page and supporting files
 
-Here, `src/` paths are relative to `apps/doc/webmusic/`.
+Here, `src/` paths are relative to `doc/`.
 
 | File | Responsibility |
 |---|---|

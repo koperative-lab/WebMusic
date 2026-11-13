@@ -26,11 +26,11 @@ automatically approved backlog item.
 On 2026-09-08, [DEC-013](../DECISIONS.md#dec-013--live-analyze-elements-and-headless-score-reports)
 removed the summary, histogram and rhythmic-vocabulary Elements from this branch.
 Their data functions remain available through the
-[report workflow](../../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+[report workflow](../../doc/src/content/docs/score/api/analyze.mdx#reports).
 Later that day, [DEC-014](../DECISIONS.md#dec-014--five-task-specific-analyze-elements)
 further narrowed the Element collection to five performance/practice tasks,
 retiring diagnostic wrappers and generic aliases. The
-[Analyze inventory](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+[Analyze inventory](../../doc/src/content/docs/score/element/index.mdx#analyze)
 owns the current inventory, later narrowed by DEC-043 to two chord surfaces.
 The earlier delivery notes below remain historical evidence.
 

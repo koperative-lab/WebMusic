@@ -15,7 +15,7 @@ UIKit presenter entry. `rack-part` is a nonvisual declaration. Algorithms,
 transport/resource ownership and the previously recorded transposing-instrument
 analysis limitation are outside this presentation change.
 
-The public owners are the [Score element theming guide](../../../apps/doc/webmusic/src/content/docs/score/element/index.mdx),
+The public owners are the [Score element theming guide](../../../doc/src/content/docs/score/element/index.mdx),
 the individual element pages, and [UIKit styling](../../../packages/ui/README.md).
 This dated report records verification, not a second theme specification.
 

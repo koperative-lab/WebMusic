@@ -92,5 +92,6 @@ indexes all repository Markdown/MDX files, including historical material.
 | Presentation | [UI README](../packages/ui/README.md) |
 | Neutral infrastructure | [Platform ledger](../platform/README.md), [Kernel README](../platform/kernel/README.md) and [shared-clock design](../platform/shared-clock-injection.md) |
 | Cross-domain coordination | [Bridge contracts](../bridges/README.md) and [Bridge README](../bridges/score-audio/README.md) |
-| Public documentation and demos | [Apps README](../apps/README.md) and [site sources](../apps/doc/webmusic/src/content/docs/index.mdx) |
+| Public documentation and demos | [Doc README](../doc/README.md) and [site sources](../doc/src/content/docs/index.mdx) |
+| Private applications and manual device acceptance | [Application boundary](ARCHITECTURE.md#packages-and-deployment-boundaries) and [private runner workflow](DEVELOPMENT.md#private-manual-acceptance-runner) |
 | Historical release implementation | [Release pipeline archive](../scripts/release-pipeline/README.md) |

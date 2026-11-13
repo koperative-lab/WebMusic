@@ -42,9 +42,19 @@ boundary is not necessarily a separate npm package.
 | `packages/score` | `@webmusic/score`: immutable Score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views and React composition. |
 | `packages/audio` | `@webmusic/audio`: AudioClip, decoding, playback, recording, analysis, views and React composition; format support depends on the selected decoder. |
 | `bridges/score-audio` | `@webmusic/bridge`: Score/Audio synchronization, rendering and model conversion. |
-| `apps/doc/webmusic` | Astro documentation app with its own page shell (`src/site/`, DEC-070); content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
-| `apps/doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
+| `doc` | Astro documentation app with its own page shell (`src/site/`, DEC-070); content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
+| `doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
 | `scripts/` | Package, source, component, documentation and release-manifest checks; `release-pipeline/` preserves historical release machinery. |
+
+Under DEC-072, `doc/` is the only application in this public repository.
+Website, Library, Studio and Test (the manual acceptance runner) belong to the
+separate closed-source `WebMusic-studio` repository. Private applications use
+public package exports; they may read documentation catalogs, references and
+approved media through their configured link to this checkout. The public
+repository does not import private application source or include its workspaces
+in the public build, TypeScript solution, lockfile or CI. Package unit tests and
+documentation tests stay with their public owners. Manual device acceptance
+retains its release gate and runs from the private repository.
 
 The following table lists **workspace edges only**. Third-party dependencies are
 specified by each package manifest.

@@ -230,5 +230,5 @@ DEC-056; their Headless/API/render helpers remain available.
 - Verify all types at narrow and wide widths, two simultaneous instances,
   keyboard interaction and type switching.
 
-Owning references: [View overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view),
+Owning references: [View overview](../../doc/src/content/docs/score/element/index.mdx#view),
 [player binding](PLAYER-BINDING.md), and [component design template](COMPONENT-DESIGN.md).

@@ -2,7 +2,9 @@
 
 This document owns the documentation site's structure and page responsibilities:
 URLs, navigation, redirects, orientation pages, and the boundary between page
-kinds. The application lives in `apps/doc/webmusic/`.
+kinds. The application lives in `doc/`, the public repository's only application
+under DEC-072. The project Website, Library, Studio and manual acceptance runner
+are maintained separately in the closed-source `WebMusic-studio` repository.
 
 [PRODUCT.md](../PRODUCT.md) owns product identity and supported ways of using
 WebMusic. [DESIGN-PRINCIPLES.md](../DESIGN-PRINCIPLES.md),
@@ -128,7 +130,7 @@ redirects follow that classification. Panel, Stage, Status and Workbench belong
 to Layout and feedback; Track list belongs to Transport and navigation. Audio
 consumers extend composition references within these existing groups.
 
-`UI_PRESENTER_CLASSES` in `apps/doc/shared/ui-presenter-catalog.ts` owns display
+`UI_PRESENTER_CLASSES` in `doc/shared/ui-presenter-catalog.ts` owns display
 labels. The architecture classification policy constrains presenter membership;
 checks reconcile those declarations with published entries and pages.
 `astro.config.mjs` mirrors category labels for navigation. Do not silently
@@ -296,7 +298,7 @@ domain capability has no Overview leaf, and neither does a UI presenter class.
 ### Site shell
 
 DEC-070: Astro compiles the pages; the site owns its page in
-`apps/doc/webmusic/src/site/`, following [Visual design](../design/VISUAL-DESIGN.md)
+`doc/src/site/`, following [Visual design](../design/VISUAL-DESIGN.md)
 and the acceptance runner's chrome. Light only.
 
 | Part | Behaviour |

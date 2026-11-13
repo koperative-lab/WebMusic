@@ -23,11 +23,11 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
 import {elementDocProblems, headlessShapeProblems} from './element-docs-policy.mjs';
 import {requiredFeatureLayers} from './package-policy.mjs';
-import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
-import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
+import {declaredAgentContextPaths} from '../doc/scripts/agent-context.mjs';
+import {audioBridgeContext} from '../doc/scripts/agent-context-audio-bridge.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = 'apps/doc/webmusic/src/content/docs';
+const DOCS = 'doc/src/content/docs';
 const failures = [];
 const notes = [];
 
@@ -147,7 +147,7 @@ async function checkParams(sources) {
     .filter(([, layers]) => layers.element).map(([capability]) => `${family}-${capability}`));
   const catalog = {};
   for (const group of groups) {
-    const module = await load(`apps/doc/webmusic/src/lib/params/${group}.ts`);
+    const module = await load(`doc/src/lib/params/${group}.ts`);
     Object.assign(catalog, Object.values(module)[0]);
   }
 
@@ -183,8 +183,8 @@ async function checkParams(sources) {
 // ---------------------------------------------------------------------------
 
 async function checkCatalogs(pages, paramsCatalog) {
-  const {UI_COMPOSITION_CATALOG} = await load('apps/doc/shared/ui-catalog.ts');
-  const {UI_PRESENTER_CATALOG, UI_PRESENTER_CLASSES} = await load('apps/doc/shared/ui-presenter-catalog.ts');
+  const {UI_COMPOSITION_CATALOG} = await load('doc/shared/ui-catalog.ts');
+  const {UI_PRESENTER_CATALOG, UI_PRESENTER_CLASSES} = await load('doc/shared/ui-presenter-catalog.ts');
 
   const tags = new Set(UI_COMPOSITION_CATALOG.map((entry) => entry.tag));
   for (const entry of UI_COMPOSITION_CATALOG) {
@@ -252,7 +252,7 @@ function checkElementPages(files, paramsCatalog) {
  * the drawing the element actually shows.
  */
 async function checkTypeSwitches(catalog) {
-  const {defaultType} = await load('apps/doc/webmusic/src/components/element-demo-types.ts');
+  const {defaultType} = await load('doc/src/components/element-demo-types.ts');
   for (const [tag, spec] of Object.entries(catalog)) {
     const switches = spec.params.filter((param) => param.switch);
     if (switches.length > 1) fail('params', `<${tag}> marks ${switches.length} switch attributes; at most one`);
@@ -359,7 +359,7 @@ function checkCapabilityGroups(files) {
 
 /** The UI Kit class labels have one source; the navigation lists its groups from it. */
 async function checkUiKitLabels() {
-  const navigation = read('apps/doc/webmusic/src/site/navigation.ts');
+  const navigation = read('doc/src/site/navigation.ts');
   const start = navigation.indexOf("group('UI Kit'");
   const group = navigation.slice(start, navigation.indexOf("group('Kernel'", start));
   if (start < 0 || !/UI_PRESENTER_CLASSES\.map\(\(entry\) => group\(entry\.label, \[directory\(`uikit\/\$\{entry\.slug\}`\)\]/.test(group)) {
@@ -585,7 +585,7 @@ function collectPages(files) {
 }
 
 function astroRedirects() {
-  const config = read('apps/doc/webmusic/astro.config.mjs');
+  const config = read('doc/astro.config.mjs');
   const block = /redirects:\s*\{([\s\S]*?)\n {2}\},/.exec(config);
   const map = new Map();
   for (const line of block?.[1].split('\n') ?? []) {
@@ -617,7 +617,7 @@ function publicAssets() {
       else assets.add(`/${prefix}${encodeURIComponent(name)}`);
     }
   };
-  scan('apps/doc/webmusic/public', '');
+  scan('doc/public', '');
   return assets;
 }
 
@@ -659,7 +659,7 @@ function checkLinks(files, pages, redirects, assets) {
 // 9. The docs site's own component kit must not squat on @webmusic/ui's class
 //    names.
 //
-//    apps/doc/shared/ui.css loads globally on every page, and the elements the
+//    doc/shared/ui.css loads globally on every page, and the elements the
 //    docs demo mount kit presenters into the LIGHT DOM — so a docs rule sharing
 //    a name with a kit class silently restyles the shipped component it is
 //    supposed to be demonstrating, with the winner decided by document order.
@@ -685,7 +685,7 @@ function checkDocsCssNamespace() {
     for (const match of source.matchAll(/["'`](wui-[a-z0-9-]+(?:__[a-z0-9-]+)?)/g)) kit.add(match[1]);
     for (const match of source.matchAll(/\.(wui-[a-z0-9-]+(?:__[a-z0-9-]+)?)/g)) kit.add(match[1]);
   }
-  const stylesheet = 'apps/doc/shared/ui.css';
+  const stylesheet = 'doc/shared/ui.css';
   const declared = new Set(
     [...read(stylesheet).matchAll(/\.(wui-[a-z0-9_-]+)/g)].map((match) => match[1]),
   );
@@ -758,18 +758,18 @@ checkElementPages(files, paramsCatalog);
 for (const message of elementDocProblems({
   pages: files.filter((file) => /\/(?:score|audio)\/element\//.test(file)).map((file) => ({file, source: read(file)})),
   readFile: read,
-  frameFile: 'apps/doc/webmusic/src/components/ElementDemo.astro',
+  frameFile: 'doc/src/components/ElementDemo.astro',
 })) fail('page', message);
 await checkTypeSwitches(paramsCatalog);
 for (const message of headlessShapeProblems({
   pages: files.filter((file) => /\/(?:score|audio|bridge)\/headless\//.test(file)).map((file) => ({file, source: read(file)})),
   readFile: read,
-  frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
+  frameFile: 'doc/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
 for (const message of headlessDocProblems({
   pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file.startsWith(`${DOCS}/audio/headless/`)).map((file) => ({file, source: read(file)})),
   readFile: read,
-  frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
+  frameFile: 'doc/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
 checkLiveDemoCanvases(files);
 checkTitles(files);

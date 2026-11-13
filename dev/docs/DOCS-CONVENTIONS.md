@@ -53,7 +53,7 @@ are also outside the site's snippet scan.
 ## `check:docs`: static page and catalog checks
 
 Implementation: [scripts/check-docs.mjs](../../scripts/check-docs.mjs). Page scanning
-covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
+covers `.md` and `.mdx` under `doc/src/content/docs/`.
 
 | Check | What it verifies | What it does not establish |
 |---|---|---|
@@ -66,7 +66,7 @@ covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
 | `plan`: Headless | Recognizable value exports from the six Score/Audio `/headless` barrels occur as backticked names in the family `headless/index.mdx` read together with that capability's object pages; relative `export *` is followed, and a failure names the capability and its barrel | Types, unique ownership, whether the inventory rather than one leaf names an export, whether a name appears in its own capability's section, whether a name is linked to an explanation, or Bridge's root exports |
 | Headless leaf shape | Every Score and Audio Headless leaf renders the shared `HeadlessDemoFrame` (one live canvas; no Parameters, code readout, Copy/Reset or separate State/Events panels) and has dense sidebar orders (`scripts/headless-docs-policy.mjs`). Every Score, Audio and Bridge Headless page has the Web Component page shape without Styling: main demo first, a one-to-three-paragraph prose introduction, `## Import`, `## Ports and composition`, topics, one API `<details>`, and a last `## Related` bullet list (`headlessShapeProblems`) | Source shape does not prove running interactions; Bridge has no dense-order check |
 | `live-demo` | Rendered Astro imports named with a Demo/Playground/Showcase/Sandbox suffix have a recursive import path to `LiveDemoCanvas.astro` | Browser rendering or successful mounting; this is static import reachability |
-| `docs-css` | `wui-*` classes in shared `apps/doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
+| `docs-css` | `wui-*` classes in shared `doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
 | `css-variable` | Backticked non-`--wm-*` variables in site pages have a recognizable read, write, or declaration somewhere in Score/Audio/UI source | Whether the variable affects this particular component or demo |
 | `link` | Markdown `](/...)` links resolve to a page or a public file directly; `](#...)` resolves against the current page, with fragments checked against collected anchors. A link that resolves only through a parsed redirect FAILS, naming the destination, because the redirect is for a bookmark and drops the fragment | Relative links, HTML hrefs, dynamic links, external URLs, redirects declared outside the parsed `redirects:` block, or whether a redirect target is itself sensible |
 
@@ -282,7 +282,7 @@ above.
 ### Demo resource lifetime
 
 In this checkout, standalone programmatic/Headless demos and the API sandbox
-bootstrap use `mountDemos` in the [demo components](../../apps/doc/webmusic/src/components/).
+bootstrap use `mountDemos` in the [demo components](../../doc/src/components/).
 Register
 cleanup as resources are acquired, bind controls through the scope, and check
 `scope.active` after asynchronous preparation before starting sound or changing
@@ -290,10 +290,10 @@ UI. The scope releases on removal, Astro navigation and page hide; a late
 resource registered after cancellation is released immediately. A demo owns
 what it creates, unless its API explicitly transfers that ownership.
 
-The [Headless controller](../../apps/doc/webmusic/src/lib/headless-playground-client.ts)
+The [Headless controller](../../doc/src/lib/headless-playground-client.ts)
 invalidates pending factories on replacement/removal and releases subscriptions
 and the owned instance even when another cleanup fails. Its state display uses
-the object's events. The [API editor client](../../apps/doc/webmusic/src/components/api-sandbox-client.ts)
+the object's events. The [API editor client](../../doc/src/components/api-sandbox-client.ts)
 retains and unmounts its React root; preview stays opt-in and dependency keys
 must name npm packages, not import subpaths. Lifecycle regressions run in the
 documentation workspace tests; they do not establish real device behavior.
@@ -314,7 +314,7 @@ what happens on failure.
 ### Demo assets
 
 Every musical demo and copyable example uses Claude Debussy's Arabesque No. 1
-from the owner-maintained `apps/doc/webmusic/public/` folder, as fixed by
+from the owner-maintained `doc/public/` folder, as fixed by
 [AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only) and DEC-066. Do not
 change that folder or substitute generated notes, fixtures or other media; use a
 passage of the piece when a demo needs less. The format choices below are
@@ -334,15 +334,15 @@ control requires extra data such as audiowaveform JSON for `peaks-src`, supply
 that data or explain why the control cannot work in this example.
 In browser URLs percent-encode the space as `%20`, and use
 `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve. The
-[asset inventory](../../apps/doc/webmusic/ASSETS.md) records what is known about
+[asset inventory](../../doc/ASSETS.md) records what is known about
 each file. `npm run check:demo-music` rejects any other media reference and any
 change to the folder that the owner's pin does not record.
 
 ### Demo file ownership
 
 ```text
-apps/doc/shared/                  catalogs and shared documentation styles
-apps/doc/webmusic/src/
+doc/shared/                  catalogs and shared documentation styles
+doc/src/
   content/docs/                   page prose
   lib/params/                     element attribute catalogs
   lib/headless-params/            implemented Headless panel catalogs

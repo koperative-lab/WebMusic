@@ -7,7 +7,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
-const documentationRoot = path.join(repositoryRoot, 'apps/doc/webmusic');
+const documentationRoot = path.join(repositoryRoot, 'doc');
 
 export function startCommand(command, args, {cwd, quiet = false, processGroup = false, cleanupTimeoutMs = 5000} = {}) {
   if (!Number.isFinite(cleanupTimeoutMs) || cleanupTimeoutMs < 0) throw new RangeError('cleanupTimeoutMs must be finite and nonnegative.');

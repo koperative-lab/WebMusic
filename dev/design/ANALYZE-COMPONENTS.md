@@ -12,7 +12,7 @@ DEC-017, DEC-034, DEC-038 through DEC-043, DEC-045, DEC-047 and DEC-048.
 Source and types: [Analyze barrel](../../packages/score/src/analyze/element/index.ts),
 [shared composition](../../packages/score/src/analyze/element/internal/analysis-component.ts),
 [Headless projection](../../packages/score/src/analyze/headless/basic-inspection.ts).
-Owning references and demos: [Analyze inventory](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze).
+Owning references and demos: [Analyze inventory](../../doc/src/content/docs/score/element/index.mdx#analyze).
 
 ## User task and boundary
 

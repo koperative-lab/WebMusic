@@ -17,6 +17,10 @@ an earlier published release; source integration of Audio and Bridge does not
 establish npm availability. Current gaps and verification belong in
 [implementation status](dev/STATUS.md).
 
+The public repository contains the toolkit and its [Doc application](doc/README.md).
+Website, Library, Studio and the manual acceptance runner are maintained in the
+separate closed-source `WebMusic-studio` repository.
+
 ## Packages
 
 | Package | Responsibility |
@@ -40,11 +44,11 @@ ship here. [Product definition](dev/PRODUCT.md) explains the intended scope.
 
 ## Use the toolkit
 
-The [documentation site sources](apps/doc/webmusic/src/content/docs/index.mdx)
+The [documentation site sources](doc/src/content/docs/index.mdx)
 cover both families and all integration choices. Start with
-[Quick Start](apps/doc/webmusic/src/content/docs/quick-start.mdx), then
-[Score](apps/doc/webmusic/src/content/docs/score/index.mdx) or
-[Audio](apps/doc/webmusic/src/content/docs/audio/index.mdx).
+[Quick Start](doc/src/content/docs/quick-start.mdx), then
+[Score](doc/src/content/docs/score/index.mdx) or
+[Audio](doc/src/content/docs/audio/index.mdx).
 The [component index](dev/COMPONENTS.md) links every reviewed tag, presenter,
 Headless reference owner, and manifest entry.
 
@@ -64,7 +68,7 @@ npm run dev
 
 The dev command builds the packages and starts the unified documentation site
 at http://localhost:4321. Each Git worktree needs its own `npm ci`; a sibling
-checkout's dependencies do not install build tools here. [apps/README.md](apps/README.md)
+checkout's dependencies do not install build tools here. [doc/README.md](doc/README.md)
 explains documentation development and debugging.
 
 ~~~bash

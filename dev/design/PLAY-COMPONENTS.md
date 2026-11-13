@@ -6,7 +6,7 @@ Status: existing Play surfaces implemented, including responsive presenter chang
 Layer and public entry: Score Play Headless, Elements and UI bindings.
 Related decisions: DEC-016, DEC-045 and DEC-053.
 Source and public types: [Play source](../../packages/score/src/play/).
-Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
+Owning reference and demos: [Play Elements](../../doc/src/content/docs/score/element/index.mdx#play).
 
 DEC-063 introduced [modular composition](MODULAR-COMPOSITION.md): nested
 players, shared effect instances and Session membership. DEC-068 makes it the

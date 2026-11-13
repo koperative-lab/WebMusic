@@ -1,8 +1,33 @@
 import assert from 'node:assert/strict';
+import {mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import {test} from 'node:test';
-import {comparePin, findViolations, parsePin, PIECE} from './check-demo-music.mjs';
+import {comparePin, demoSourceFiles, findViolations, parsePin, PIECE} from './check-demo-music.mjs';
 
 const present = new Set(['midi/Arabesque No.1.mid', 'mxl/Arabesque No.1.mxl', 'wav/Arabesque No.1.wav', 'mp3/Arabesque No.1.mp3']);
+
+test('checks new and moved source without depending on the Git index', (t) => {
+  const repository = mkdtempSync(path.join(tmpdir(), 'webmusic-demo-scan-'));
+  t.after(() => rmSync(repository, {recursive: true, force: true}));
+  const files = {
+    'doc/src/content/demo.mdx': 'midi/Other.mid',
+    'doc/shared/ui.ts': 'midi/Arabesque%20No.1.mid',
+    'doc/src/node_modules/fixture.ts': '',
+    'doc/src/dist/generated.js': '',
+    'doc/src/.cache/generated.ts': '',
+    'doc/src/media.mid': '',
+  };
+  for (const [file, body] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(repository, file)), {recursive: true});
+    writeFileSync(path.join(repository, file), body);
+  }
+  symlinkSync(path.join(repository, 'doc/src'), path.join(repository, 'doc/shared/linked'));
+  const sources = demoSourceFiles(repository);
+  assert.deepEqual(sources, ['doc/shared/ui.ts', 'doc/src/content/demo.mdx']);
+  assert.match(sources.flatMap((file) => findViolations(files[file], file, present)).join('\n'), /Other\.mid is not Arabesque/);
+  assert.throws(() => demoSourceFiles(repository, ['missing/src']), /ENOENT/);
+});
 
 test('accepts every Arabesque No. 1 format, encoded or literal', () => {
   const text = [

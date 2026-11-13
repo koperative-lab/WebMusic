@@ -39,7 +39,7 @@ accepted design; [STATUS](../STATUS.md), EDIT-01, owns current delivery and gaps
   Audio Edit and staff-input editing remain later phases.
 
 The integrated demo is on the
-[Score View reference](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
+[Score View reference](../../doc/src/content/docs/score/element/view/score-view.mdx),
 under “Piano-roll editing.” Its generated eight-note
 MIDI fixture `midi/Editing.mid` (removed on 2026-11-05) uses 120 quarter
 notes per minute. One declaration supplies a native player, editable piano roll
@@ -80,7 +80,7 @@ cover binding ownership, conflicts, late targets and lifecycle behavior.
 [Editing tests](../../packages/score/test/view/editing.test.ts) and
 [player/view integration tests](../../packages/score/test/view/editor-player-integration.test.ts)
 cover gestures, commands, cancellation, revision gating and retained passive modes.
-[Demo workflow tests](../../apps/doc/webmusic/test/score-editing-demo.test.ts)
+[Demo workflow tests](../../doc/test/score-editing-demo.test.ts)
 cover load races, replacement, cleanup and export checkpoint ownership.
 
 ### Full-gate failure

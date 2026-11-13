@@ -5,7 +5,7 @@ composition model (MOD-15, rounds 1–20 on `modular-redesign`). Its first secti
 records what automated and scripted browser checks already established. The
 manual checks cover what only a person with ears, real devices and assistive
 technology can accept. They run in the
-[manual acceptance runner](../../apps/test/README.md), outside the documentation
+[manual acceptance runner](https://github.com/koperative-lab/WebMusic/blob/1caee60b39988d3d39d567b12c0e652a295dd6e2/apps/test/README.md), outside the documentation
 site; its catalog (`apps/test/src/checks.ts`) is the single list of checks.
 [STATUS](../STATUS.md) owns the remaining gap; this file keeps the dated evidence.
 

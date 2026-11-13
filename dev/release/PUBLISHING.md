@@ -81,10 +81,10 @@ npm run check:external-install
 ```
 
 `check` builds the packages and checks their source, tests, export maps,
-licenses, original demo assets, the manual acceptance runner build and release
+licenses, original demo assets and release
 metadata. `docs:build` verifies the
 public asset inventory and validates the documentation build. Review changed
-media against the [asset provenance and regeneration rules](../../apps/doc/webmusic/ASSETS.md);
+media against the [asset provenance and regeneration rules](../../doc/ASSETS.md);
 changing manifest hashes alone does not approve replacement files.
 Repeat the production audit and external install against the release
 checkout. CI also runs external-install and a full dependency audit; the separate
@@ -107,8 +107,10 @@ access. Add `-- --keep` to retain its temporary project for diagnosis.
 
 ### Gate 3: the owner's manual acceptance
 
-The owner runs the [manual acceptance runner](../../apps/test/README.md) on the
-commit (`npm run test:manual`), confirms on its first page that the build shows
+The owner runs the [private manual acceptance runner](../DEVELOPMENT.md#private-manual-acceptance-runner)
+against the public commit. In `WebMusic-studio`, compile it with
+`npm run check:acceptance` and start it with `npm run dev:test` (also available
+as `npm run test:manual`). The owner confirms on its first page that the build shows
 that version, commit and a clean working tree, and works through the checks on
 the minimum environments named in the current device acceptance record. What
 fails goes back to the agent in the conversation and is fixed as a new round —

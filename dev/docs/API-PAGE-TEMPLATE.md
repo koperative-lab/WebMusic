@@ -45,7 +45,7 @@ do not mix different barrels into a purported root export list.
 
 ## Page and example carriers
 
-Here, `src/` paths are relative to `apps/doc/webmusic/`.
+Here, `src/` paths are relative to `doc/`.
 
 | File | Responsibility |
 |---|---|

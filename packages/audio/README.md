@@ -52,10 +52,10 @@ render, and analyze the same immutable object — or ship it to a Worker.
 
 Current usage and reference pages are maintained in the documentation site:
 
-- [Getting started](../../apps/doc/webmusic/src/content/docs/audio/index.mdx)
-- [Web Components](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx)
-- [Headless](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx)
-- [API entries](../../apps/doc/webmusic/src/content/docs/audio/api/index.mdx)
+- [Getting started](../../doc/src/content/docs/audio/index.mdx)
+- [Web Components](../../doc/src/content/docs/audio/element/index.mdx)
+- [Headless](../../doc/src/content/docs/audio/headless/index.mdx)
+- [API entries](../../doc/src/content/docs/audio/api/index.mdx)
 
 [Historical package notes](docs/README.md) retain earlier technical material;
 they are not the current runnable reference. For development, start at the
@@ -185,8 +185,8 @@ visible ranges without rendering a complete sequence for every commit.
 `loadAudioClipEditor(url)` loads a file into a new editor that the application
 owns; assign it to `<audio-player>` and `<audio-clip-view editable>` (and any
 read-only `<audio-view>`) through `.editor` and dispose it when done. See the
-[View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) and the
-[clip editor](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
+[View API](../../doc/src/content/docs/audio/api/view.mdx) and the
+[clip editor](../../doc/src/content/docs/audio/element/view/audio-clip-view.mdx).
 
 ### Four layers, one direction
 

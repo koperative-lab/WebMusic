@@ -133,7 +133,7 @@ does not fabricate an aggregate audio output.
 
 The [modular composition contract](../../dev/design/MODULAR-COMPOSITION.md)
 defines the ownership, routing and migration invariants. Concrete public
-signatures belong in the [Kernel API reference](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx);
+signatures belong in the [Kernel API reference](../../doc/src/content/docs/kernel/api.mdx);
 [STATUS](../../dev/STATUS.md) distinguishes delivered integration from the
 remaining sound, modulation and precision work.
 
@@ -363,7 +363,7 @@ settlement, background reconciliation and errors. Existing controls remain
 migration surfaces. Strict dispatch checks observable failures and distinguishes
 superseded commands; the engines cancel and re-arm through their existing methods,
 retaining their private clocks. See the complete
-[command contract](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx).
+[command contract](../../doc/src/content/docs/kernel/api.mdx).
 
 `FollowerOptions.positionScale` adds a positive constant local-axis scale to the
 offset, applied to both positions and rates. Optional `loop` metadata maps into

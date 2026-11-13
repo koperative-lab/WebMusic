@@ -231,7 +231,7 @@ Old report URLs redirect to the Headless workflow. Tag-owned live demos continue
 to contain only their player and current component, configured by Parameters.
 
 **Owner:** [Analyze component design](design/ANALYZE-COMPONENTS.md) and the
-[Score report reference](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+[Score report reference](../doc/src/content/docs/score/api/analyze.mdx#reports).
 
 **Verification implications:** retired tags are absent from exports,
 registration, catalogs and navigation; retained live evidence updates from note
@@ -279,7 +279,7 @@ There is no note-only key-diagnostic Element; custom callers can use
 tag. Old URLs redirect to the appropriate retained or Headless/API reference.
 
 **Owner:** [Analyze component design](design/ANALYZE-COMPONENTS.md) and the
-[Analyze Element reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze).
+[Analyze Element reference](../doc/src/content/docs/score/element/index.mdx#analyze).
 
 **Verification implications:** assert exactly five registrations and public
 classes, preserve underlying Headless/API capabilities, migrate shared lifecycle
@@ -336,7 +336,7 @@ explicit render entry retains its independent fallback and has no static UI
 dependency. Source and owning references define the port and styling options.
 
 **Owner:** [View component families](design/VIEW-COMPONENTS.md) and the
-[View reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view).
+[View reference](../doc/src/content/docs/score/element/index.mdx#view).
 
 **Verification implications:** exact registrations/exports; source and note
 identity across type switches; no duplicate borrowed subscriptions; cheap
@@ -385,7 +385,7 @@ behavior is historical evidence, not the integrated public contract.
 **2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the roles remain as module roles — `score-player` is a Source and, when outermost, the Session provider; `score-rack-control` a Rack; `score-rack-part` a Source; `score-note-input` a note Source; `score-recorder` a note sink producing a source; `score-synth-panel` a control view or processor. Rack member-axis seek becomes Session-seconds seek on the Session provider.
 
 **Owner:** [Play component design](design/PLAY-COMPONENTS.md) and the
-[Play Element reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
+[Play Element reference](../doc/src/content/docs/score/element/index.mdx#play).
 
 **Verification implications:** exercise actual engine failures, source/descriptor
 replacement, callback reentrancy, suspended audio clocks and external connection
@@ -730,7 +730,7 @@ cancellation/replacement paths release capture and pending presentation work.
 Main's first-release package scope is unchanged.
 
 **Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), AudioView's public
-reference and the [Stage presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/stage.mdx).
+reference and the [Stage presenter](../doc/src/content/docs/uikit/layout-feedback/stage.mdx).
 
 **Verification implications:** exercise defaults, both directions, final release,
 clamps/loops, coalescing, pointer ownership, follow, annotation, mode/source/zoom
@@ -1069,7 +1069,7 @@ demo composition still applies, but its hidden-runner Audio clause is superseded
 DEC-013/014 retain their Score-specific inventory and are not rewritten.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md) and the
-public [Audio Analyze API](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx)
+public [Audio Analyze API](../doc/src/content/docs/audio/api/analyze.mdx)
 and Element references.
 
 **Verification implications:** exact registration/export inventory, no hidden
@@ -1118,7 +1118,7 @@ when they need performance markers. DEC-033's one-player, one-component demo
 composition still applies, without a hidden runner.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md), the
-[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+[Audio Analyze Element inventory](../doc/src/content/docs/audio/element/index.mdx#analyze)
 and the owning tag references.
 
 **Verification implications:** exact public tag inventory, independent tools
@@ -1182,7 +1182,7 @@ all five tools.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
 [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+[Audio Analyze Element inventory](../doc/src/content/docs/audio/element/index.mdx#analyze)
 and each owning tag reference.
 
 **Verification implications:** assert an exact five-tag Analyze inventory and
@@ -1249,7 +1249,7 @@ whether written or sounding notes are analyzed, especially for transposing
 parts. Retiring a default Element does not remove its code-only analysis.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and each owning Element/API reference.
 
 **Verification implications:** assert the exact five public tags and retired
@@ -1351,7 +1351,7 @@ beneath a lane still applies. Existing callers of retired tags migrate to the
 new tools or compose the retained code-only algorithms themselves.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the owning Element/API references.
 
 **Verification implications:** assert exactly four registered Analyze tags
@@ -1396,7 +1396,7 @@ transitions. Applications needing to choose or compare an alternate reading
 use the available nonvisual analysis data and own that interaction.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the four
-owning [Score Analyze Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+owning [Score Analyze Element pages](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the corresponding Score/UI presenters.
 
 **Verification implications:** inspect normal and narrow live demos for no
@@ -1491,7 +1491,7 @@ tests remain independently verifiable. The research branch is local until
 explicitly published; it is not a second active checkout.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the owning API/Headless references.
 
 **Verification implications:** assert the exact two-tag registration and no
@@ -1529,7 +1529,7 @@ The late-binding gap formerly tracked as AUDIO-VIEW-01 for Minimap and
 RegionList no longer applies to the supported Element inventory.
 
 **Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[Audio Web Component inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#view),
+[Audio Web Component inventory](../doc/src/content/docs/audio/element/index.mdx#view),
 and the Audio View source and export policy.
 
 **Verification implications:** assert the exact current View tag set and the
@@ -1580,7 +1580,7 @@ change to `main`.
 **Owner:** [Score Play](design/PLAY-COMPONENTS.md),
 [Score Analyze](design/ANALYZE-COMPONENTS.md),
 [Score View](design/VIEW-COMPONENTS.md), and the
-[Score Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx).
+[Score Element inventory](../doc/src/content/docs/score/element/index.mdx).
 
 **Verification implications:** assert exact default registrations for Play,
 Analyze, View, auto/global and the public demo entry; assert old tags do not
@@ -1675,8 +1675,8 @@ component. API/Headless retain detailed data and specialist algorithms; the
 research branch is not merged as part of this work.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), owning
-[Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
-and [Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx).
+[Element pages](../doc/src/content/docs/score/element/index.mdx#analyze)
+and [Analyze API](../doc/src/content/docs/score/api/analyze.mdx).
 
 **Verification implications:** assert the exact tag/export/catalog inventory;
 cover C–F♯ versus C–G♭, transposing parts, explicit-key chord inversions, all
@@ -1745,9 +1745,9 @@ Those are demo display settings, not musical grouping rules. Detailed inspection
 evidence remains available independently of presentation.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
-[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), the
-[four Element references](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
-and the [Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+[Analyze API](../doc/src/content/docs/score/api/analyze.mdx), the
+[four Element references](../doc/src/content/docs/score/element/index.mdx#analyze)
+and the [Harmony presenter reference](../doc/src/content/docs/uikit/views-analysis/harmony.mdx).
 
 **Verification implications:** preserve simultaneous-default regressions and
 test metrical collection of arpeggios, sustained overlaps, passing tones,
@@ -1859,11 +1859,11 @@ throwing for a conventional meter. Browser evidence for long chord windows is
 recorded in STATUS when the correction is verified on the site.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
-[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx),
-the [chord](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
-and [rhythm](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
+[Analyze API](../doc/src/content/docs/score/api/analyze.mdx),
+the [chord](../doc/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
+and [rhythm](../doc/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
 Element references and the
-[Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+[Harmony presenter reference](../doc/src/content/docs/uikit/views-analysis/harmony.mdx).
 
 **Verification implications:** cover mixed 4/4, 5/8 and 7/8 scores with one
 and several lists, equal-sum rejection, a conventional meter replaced by a
@@ -1907,7 +1907,7 @@ into scrolling to preserve pitch-column alignment. Out-of-range sounding notes
 remain available in `.active`; fitting does not infer or expand the range.
 
 **Owner:** [View families](design/VIEW-COMPONENTS.md) and the
-[PitchView reference](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx).
+[PitchView reference](../doc/src/content/docs/score/element/view/score-pitch-view.mdx).
 
 **Verification implications:** test default endpoints, scroll and legacy
 precedence, preserved notes/subscriptions, cleanup, focus and offset resets,
@@ -1980,8 +1980,8 @@ for type, theme and the display attributes.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
 [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[meter reference](../apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-meter.mdx)
-and the [metering Headless page](../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx).
+[meter reference](../doc/src/content/docs/audio/element/analyze/audio-meter.mdx)
+and the [metering Headless page](../doc/src/content/docs/audio/headless/view/audio-meter.mdx).
 
 **Verification implications:** assert the seven types and two themes, the
 legacy `mode` mapping, type changes that keep the graph and stage, the stereo
@@ -2033,8 +2033,8 @@ another mode. Source discovery and replacement must refresh feedback even before
 playback, without retaining subscriptions to superseded owners.
 
 **Owner:** [Design principles](DESIGN-PRINCIPLES.md),
-[Status presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx),
-[Workbench](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/workbench.mdx),
+[Status presenter](../doc/src/content/docs/uikit/layout-feedback/status.mdx),
+[Workbench](../doc/src/content/docs/uikit/layout-feedback/workbench.mdx),
 and the affected Element references.
 
 **Verification implications:** loading/waiting/ready/error transitions, source replacement,
@@ -2570,9 +2570,9 @@ cannot follow rubato or edits after its anchor; dynamic grids remain open. The
 `TransportGroup` still coordinates positions, not beats; beat-synchronous
 group commands are a later step.
 
-**Owner:** [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx),
+**Owner:** [Kernel API](../doc/src/content/docs/kernel/api.mdx),
 [Audio clip editing](design/EDIT-COMPONENTS.md#audio-clip-editing) and the
-[clip View reference](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
+[clip View reference](../doc/src/content/docs/audio/element/view/audio-clip-view.mdx).
 
 **Verification implications:** grid math, the operation and anchor mapping,
 in-place revision application, the Grid Edit tools, tap tempo, snap, quantize
@@ -2779,7 +2779,7 @@ Audio state but recreates Score engines and Rack channel state.
 **2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the classification applies to every module, including Score (MOD-13). Sound, source-data and parameter changes also edit a module in place; only a scope change rebinds.
 
 **Owner:** [Modular composition](design/MODULAR-COMPOSITION.md), the
-[Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) and the Audio
+[Kernel API](../doc/src/content/docs/kernel/api.mdx) and the Audio
 player/mixer Element references; [Status](STATUS.md) owns MOD-13.
 
 **Verification implications:** unit tests cover classification, routing leases,
@@ -2866,9 +2866,9 @@ keyboard geometry through its existing presenter. The Arabesque composition
 demo uses one player and independently mounted keyboards at opposite edges.
 
 **Owner:** [View families](design/VIEW-COMPONENTS.md),
-[ScoreView](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
-[PitchView](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx)
-and [UIKit pitch](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/pitch.mdx).
+[ScoreView](../doc/src/content/docs/score/element/view/score-view.mdx),
+[PitchView](../doc/src/content/docs/score/element/view/score-pitch-view.mdx)
+and [UIKit pitch](../doc/src/content/docs/uikit/views-analysis/pitch.mdx).
 
 **Verification implications:** all four directions, default and invalid values,
 property/attribute precedence, unchanged bindings and source identity, exact
@@ -3170,6 +3170,54 @@ Headless parameter catalog (`src/lib/headless-params`) stays as data.
 policy and its unit tests; every Element page renders its demo without a
 Parameters strip, and every Headless frame has none (`headless-docs-policy`);
 the changed demos and type switches are checked in a browser.
+
+## DEC-072 — Keep Doc public and all other applications private
+
+**Date / status:** 2026-11-12; accepted by the repository owner.
+
+**Problem:** the public toolkit still carried an application hierarchy and the
+manual acceptance runner after the component Library had moved to the private
+repository. Website and Studio now belong to that private application suite;
+their ownership should be clear in the source layout and verification commands.
+
+**Decision:** `doc/` is the public repository's only application. The Astro
+documentation workspace moves from `apps/doc/webmusic/` to `doc/`, and its
+shared catalogs and UI assets move from `apps/doc/shared/` to `doc/shared/`.
+Website, Library, Studio and Test (the manual acceptance runner) belong to the
+separate closed-source `WebMusic-studio` repository under `apps/`. The public
+repository retains package source, package tests, documentation source and
+documentation tests. The public workspace, build, typecheck, lockfile, scripts
+and CI must not depend on private application source.
+
+Private applications consume built public package entries and may read the
+documentation catalogs, references and approved media through their configured
+public-checkout link. Moving the documentation directory preserves every
+owner-maintained media file and `public.sha256` byte for byte; the Arabesque-only
+and read-only policy in AGENTS remains unchanged at its new `doc/public/` path.
+Public documentation URLs and npm package contracts do not change.
+
+**Alternatives considered:** retaining an otherwise empty public `apps/`
+hierarchy, which obscures the single public application's location; leaving
+Test public, which splits application ownership across repositories.
+
+**Consequences:** Doc has its own local documentation navigation; the private
+Website owns the project hub. The runner's source and application checks move
+to the private repository, while the owner's manual acceptance remains a gate
+for the exact public version and commit. Public CI continues to verify the
+public packages and documentation; private application checks run separately.
+Maintained links and generated inventories follow the new paths. Dated records
+retain their original prose, commands and evidence, with navigation links
+repaired where needed.
+
+**Owner:** [Architecture](ARCHITECTURE.md#packages-and-deployment-boundaries),
+[Doc application](../doc/README.md) and
+[private runner workflow](DEVELOPMENT.md#private-manual-acceptance-runner).
+
+**Verification:** regenerate documentation inventories; run public source and
+package checks and the Doc build; verify the moved asset inventory against its
+unchanged pin. Run the private application checks and runner build, then inspect
+Doc, Website, Library, Studio and Test through their actual development entries.
+Application build success does not establish audible or device acceptance.
 
 ## Recording the next decision
 

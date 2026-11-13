@@ -29,7 +29,7 @@ Headless applications and custom UI must have the same composition capabilities.
 
 This contract fixes semantics for the modular redesign. `ModuleContext`,
 `InsertChain`, `SessionTransport` and the opt-in attributes below are implemented
-public surfaces. The [Kernel API](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx)
+public surfaces. The [Kernel API](../../doc/src/content/docs/kernel/api.mdx)
 and domain references own concrete signatures and defaults. Shared-anchor
 scheduling and project restoration follow DEC-064; their backend limits remain
 explicit. [Player binding](PLAYER-BINDING.md) retains
@@ -337,7 +337,7 @@ immediate retirement/reuse behavior.
 The first delivery enabled this composition through `composition="modules"`;
 DEC-068 retired that attribute and the legacy descendant-Rack selection path, so
 the markup below composes without it. Configure scope before connecting
-Elements. The [runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+Elements. The [runnable guide](../../doc/src/content/docs/bridge/modular-composition.mdx)
 provides a complete demonstration.
 
 ```html

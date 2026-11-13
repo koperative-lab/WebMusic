@@ -5,11 +5,11 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {packageDirectories, requiredFeatureLayers} from './package-policy.mjs';
 import {elementCompositionPolicy} from './element-composition-policy.mjs';
-import {UI_COMPOSITION_CATALOG} from '../apps/doc/shared/ui-catalog.ts';
-import {UI_PRESENTER_CATALOG} from '../apps/doc/shared/ui-presenter-catalog.ts';
+import {UI_COMPOSITION_CATALOG} from '../doc/shared/ui-catalog.ts';
+import {UI_PRESENTER_CATALOG} from '../doc/shared/ui-presenter-catalog.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = 'apps/doc/webmusic/src/content/docs';
+const DOCS = 'doc/src/content/docs';
 const OUTPUTS = ['dev/COMPONENTS.md', 'dev/DOCUMENTATION-MAP.md', 'dev/DECISION-INDEX.md'];
 const read = (file) => readFileSync(path.join(ROOT, file), 'utf8');
 const exists = (file) => existsSync(path.join(ROOT, file));
@@ -92,7 +92,7 @@ async function componentIndex(files) {
   for (const family of ['score', 'audio']) {
     for (const [capability, layers] of Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})) {
       if (!layers.element) continue;
-      const file = path.join(ROOT, `apps/doc/webmusic/src/lib/params/${family}-${capability}.ts`);
+      const file = path.join(ROOT, `doc/src/lib/params/${family}-${capability}.ts`);
       const module = await import(pathToFileURL(file).href);
       Object.assign(params, Object.values(module)[0]);
     }
@@ -124,7 +124,7 @@ async function componentIndex(files) {
           `- Attribute controls: ${list(spec.params.map((p) => p.name))}`,
           `- Properties and methods: ${list((spec.properties ?? []).map((p) => p.name))}`,
           `- Events: ${list((spec.events ?? []).map((p) => p.name))}`,
-          `- ${pageLink(output, entry.href, 'Owning workflow and contract')} · ${link(output, policy.source, 'Element source')} · ${link(output, `apps/doc/webmusic/src/lib/params/${family.toLowerCase()}-${capability.toLowerCase()}.ts`, 'Parameter catalog')}`, '');
+          `- ${pageLink(output, entry.href, 'Owning workflow and contract')} · ${link(output, policy.source, 'Element source')} · ${link(output, `doc/src/lib/params/${family.toLowerCase()}-${capability.toLowerCase()}.ts`, 'Parameter catalog')}`, '');
       }
     }
   }
@@ -180,7 +180,7 @@ function role(file) {
   if (file === 'SECURITY.md') return 'Security reporting process and supported-version policy';
   if (file === 'CHANGELOG.md') return 'Release notes; Unreleased does not establish publication';
   if (/TEMPLATE\.md$/.test(file)) return 'Current public-page authoring contract';
-  if (file === 'dev/DEVELOPMENT.md' || /(?:PUBLISHING|RELEASING)\.md$/.test(file) || file === 'apps/README.md') return 'Current contributor / operational reference';
+  if (file === 'dev/DEVELOPMENT.md' || /(?:PUBLISHING|RELEASING)\.md$/.test(file) || file === 'doc/README.md') return 'Current contributor / operational reference';
   if (file.startsWith('dev/') || /ARCHITECTURE\.md$/.test(file) || file.startsWith('platform/') && !file.startsWith('platform/kernel/')) return 'Current design / technical contract; proposals explicitly marked inside';
   return 'Package usage and technical reference';
 }
@@ -237,7 +237,7 @@ const DECISION_TOPICS = [
   ['Score components', [12, 13, 14, 15, 16, 19, 24, 32, 34, 38, 39, 40, 41, 42, 43, 47, 48, 49, 50, 54, 56, 67]],
   ['Audio components', [25, 26, 27, 28, 29, 30, 31, 35, 36, 37, 44, 51, 62]],
   ['Visual language and UI Kit', [23, 52, 59]],
-  ['Documentation and demos', [10, 20, 22, 33, 66, 70, 71]],
+  ['Documentation and demos', [10, 20, 22, 33, 66, 70, 71, 72]],
   ['Packaging and release scope', [21, 45, 46]],
 ];
 const decisionId = (number) => `DEC-${String(number).padStart(3, '0')}`;

@@ -29,14 +29,14 @@ Source reuse starts with [ScoreEditSession](../../packages/score/src/core/model/
 [Score](PLAY-COMPONENTS.md) / [Audio](AUDIO-PLAY-COMPONENTS.md) players.
 Public references and demos ship with the corresponding implementation, using
 the [documentation templates](../docs/README.md).
-The Score surface is documented in the [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+The Score surface is documented in the [View API](../../doc/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](../../doc/src/content/docs/score/headless/view/score-editor.mdx)
 references. Score bindings are described by the
-[native player](../../apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx)
-and the [grid View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx).
-Audio public contracts are documented in the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
-[AudioClipEditor](../../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
-and the [Play export API](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx).
+[native player](../../doc/src/content/docs/score/headless/play/score-player.mdx)
+and the [grid View](../../doc/src/content/docs/score/element/view/score-grid-view.mdx).
+Audio public contracts are documented in the [View API](../../doc/src/content/docs/audio/api/view.mdx),
+[AudioClipEditor](../../doc/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
+and the [Play export API](../../doc/src/content/docs/audio/api/play.mdx).
 ## User task and boundary
 
 The first Score workflow imports MIDI, edits authored notes in a piano roll,

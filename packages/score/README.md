@@ -49,10 +49,10 @@ analyze the same immutable object — or ship it to a Worker.
 
 Current usage and reference pages are maintained in the documentation site:
 
-- [Getting started](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/index.mdx)
-- [Web Components](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/element/index.mdx)
-- [Headless](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/index.mdx)
-- [API entries](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/index.mdx)
+- [Getting started](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/index.mdx)
+- [Web Components](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/element/index.mdx)
+- [Headless](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/index.mdx)
+- [API entries](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/index.mdx)
 
 [Historical package notes](https://github.com/koperative-lab/WebMusic/blob/main/packages/score/docs/README.md) retain earlier technical material;
 they are not the current runnable reference. For development, start at the
@@ -286,8 +286,8 @@ edit velocity in a lane, snap and zoom. Its `tools` attribute chooses which of
 those features exist. `<score-view>` is read-only and draws the editor's content.
 Playback applies revisions while paused and requires
 an explicit later Play action. See the
-[View API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+[View API](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/score-editor.mdx)
 for complete commands, failures and ownership.
 
 ## Views (`@webmusic/score/view`)
@@ -313,12 +313,12 @@ const viz = renderPianoRollVisualizer(score, svg, {pixelsPerSecond: 30, noteHeig
 viz.redraw(sequence.notes[0]); // highlight one currently-sounding note
 ```
 
-For application-owned navigation, [createScoreMapView](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-map-view.mdx)
+For application-owned navigation, [createScoreMapView](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/score-map-view.mdx)
 borrows a playback source and delegates quarter-note seeks with explicit command
-outcomes. [createPitchView](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/pitch-view.mdx)
+outcomes. [createPitchView](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/pitch-view.mdx)
 maintains held pitches for any representation; `currentStaffMarks` and
 `currentFretMarks` from `@webmusic/score/view` provide pure readout data.
-[createAnalysisFollower](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/analyze/analysis-follower.mdx)
+[createAnalysisFollower](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/analyze/analysis-follower.mdx)
 combines that source's score, position and activity with an analysis session.
 These objects release only their own subscriptions and never own playback.
 
@@ -672,7 +672,7 @@ const issues = voiceLeading(score);              // large leaps, parallel fifths
 `createAnalysisSession`, `createLiveChordTracker`, `createLiveKeyTracker`.
 The pure `createScoreReport` helper returns formatted summary rows. Whole-score
 summary, distribution and rhythm reports use these code-only inputs rather than
-Element wrappers; see the [report workflow](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+Element wrappers; see the [report workflow](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/analyze.mdx#reports).
 
 Heavy analysis moves off the main thread with the Worker trio:
 
@@ -717,13 +717,13 @@ playback graph.
 The four tags inspect chord structure (score or live mode), spelled intervals,
 notes against an explicit tonic/scale, and written placement within grouped
 meter. They do not guess a key or judge harmonic function. The
-[Analyze overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+[Analyze overview](../../doc/src/content/docs/score/element/index.mdx#analyze)
 selects and documents them. Each live demo contains its player and the current
 tag, with external Parameters.
 
 Specialist Roman/voice-leading views and retained chord updates remain
 application-owned compositions using the API and
-[Headless trackers and projections](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/analyze/live-trackers.mdx).
+[Headless trackers and projections](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/analyze/live-trackers.mdx).
 Motif search remains an API/Headless result. Choose a fixed musical surface for
 live display; disconnecting it releases its resources and leaves playback with
 its owner.

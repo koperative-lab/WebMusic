@@ -30,9 +30,9 @@ has not been edited and has no new fields. The new optional
 `NoteData.velocityOverride` preserves authored velocity without creating
 absolute performed timing. Effective velocity is
 `velocityOverride ?? performed?.velocity ?? 80`. The
-[Score Core reference](../../apps/doc/webmusic/src/content/docs/score/api/index.mdx)
+[Score Core reference](../../doc/src/content/docs/score/api/index.mdx)
 owns serialization and field validation; the
-[Score View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
+[Score View API](../../doc/src/content/docs/score/api/view.mdx)
 explains when timing edits clear performed timing.
 
 Upgrade every reader of shared persisted Score JSON before allowing new
@@ -64,8 +64,8 @@ They now alias the Core `AudioPlaybackSourceSnapshot` discriminated union:
 The Headless `sourcechange` event and Element `webaudio:sourcechange` event
 carry this shape. `revision` counts source publications; `documentRevision`
 identifies committed sequence content. See the
-[Headless player](../../apps/doc/webmusic/src/content/docs/audio/headless/play/audio-player.mdx)
-and [Element player](../../apps/doc/webmusic/src/content/docs/audio/element/play/audio-player.mdx)
+[Headless player](../../doc/src/content/docs/audio/headless/play/audio-player.mdx)
+and [Element player](../../doc/src/content/docs/audio/element/play/audio-player.mdx)
 for initial snapshots and playback readiness.
 
 Existing listeners that read `detail.clip` still compile, but a missing clip
@@ -101,7 +101,7 @@ export function sourceDuration(source: AudioPlayerSourceDetail): number {
 For a real player, forward its `.source` snapshot instead of rebuilding one
 from `.clip`. This preserves sequence identity and its borrowed asset reader.
 The snapshot does not itself retain PCM for asynchronous work; follow the
-[asset lease contract](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx).
+[asset lease contract](../../doc/src/content/docs/audio/api/view.mdx).
 
 Because these exported types are now unions, an application interface cannot
 `extend AudioPlayerSourceDetail`. Use a type intersection for additional
@@ -177,9 +177,9 @@ built tarballs or workspace entries.
 
 There is no dedicated editing React wrapper. The package root remains Core; it
 does not re-export the editor implementation. Use the owning
-[Score View](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx),
-[Audio View](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) and
-[Audio Play](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx)
+[Score View](../../doc/src/content/docs/score/api/view.mdx),
+[Audio View](../../doc/src/content/docs/audio/api/view.mdx) and
+[Audio Play](../../doc/src/content/docs/audio/api/play.mdx)
 references for imports, environments and dependencies. Pre-release builds of
 this branch briefly published separate `/edit`, `/edit/headless`,
 `/edit/element` and `/edit/auto` subpaths; DEC-055 removed them before any
@@ -222,6 +222,6 @@ and receipts as their original baselines.
 
 Publishing the npm packages does not deploy the documentation site. Website
 deployment additionally requires review of its
-[public asset inventory](../../apps/doc/webmusic/ASSETS.md). Site media are
+[public asset inventory](../../doc/ASSETS.md). Site media are
 excluded from the npm package contents; the two delivery decisions remain
 separate.

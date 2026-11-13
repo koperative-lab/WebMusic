@@ -15,9 +15,9 @@ and conventions, then choose the template for the page being changed.
 
 For a behavioral or component change, first use the [design contracts](../design/README.md)
 and inspect source, exported types and tests. Public page source remains in
-[the docs app](../../apps/doc/webmusic/src/content/docs/); demo infrastructure is
+[the docs app](../../doc/src/content/docs/); demo infrastructure is
 mapped in [Conventions](DOCS-CONVENTIONS.md#demo-file-ownership) and
-[the apps handbook](../../apps/README.md).
+[the documentation app handbook](../../doc/README.md).
 
 [COMPONENTS](../COMPONENTS.md) and [DOCUMENTATION-MAP](../DOCUMENTATION-MAP.md)
 are generated discovery tools. After adding or moving a document, update its

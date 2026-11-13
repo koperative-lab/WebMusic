@@ -4,7 +4,7 @@ This document defines Score's internal responsibilities, time axes, ownership an
 extension boundaries. The [README](README.md) is the package usage guide.
 The [contribution guide](../../CONTRIBUTING.md) owns setup and validation;
 [platform contracts](../../platform/README.md) and the [UI Kit](../ui/README.md)
-own their respective shared boundaries. The [public component reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx)
+own their respective shared boundaries. The [public component reference](../../doc/src/content/docs/score/element/index.mdx)
 links to each Element's behavior and composition contract.
 
 ---
@@ -363,7 +363,7 @@ supports a native Score, a borrowed Rack or a borrowed Headless
 `PlayerController`; built-in facades share seek/readback without adding a clock.
 Borrowed controllers retain their rate and are not disposed on unmount.
 Input layout and Synth sections configure a role without multiplying tags.
-The [Play element reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play)
+The [Play element reference](../../doc/src/content/docs/score/element/index.mdx#play)
 and composition policy define the supported roles.
 
 `WebMusicElement` provides a generation-guarded connected lifetime: a fresh
@@ -487,7 +487,7 @@ Native playback applies document revisions through Core ports while retaining
 its scheduler and clock. The application owns the editor; existing
 View adds written-quarter piano-roll gestures and exact-value alternatives.
 These implement P2 in the [current editing roadmap](../../dev/design/EDIT-COMPONENTS.md#implementation-and-reference-delivery).
-The [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) owns
+The [View API](../../doc/src/content/docs/score/api/view.mdx) owns
 the implemented public contract; [STATUS](../../dev/STATUS.md), EDIT-01, owns
 current verification.
 
@@ -498,7 +498,7 @@ transport alternative, technical `/render` and `/drivers` entries, and explicit
 by claims of universal bundle size.
 
 Same-instance session-clock injection and cross-boundary loop scheduling require
-the protocol described above. The [public component reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx)
+the protocol described above. The [public component reference](../../doc/src/content/docs/score/element/index.mdx)
 and package export map identify delivered surfaces. Keep architectural rationale
 with the owning contract and describe unverified behavior in change reviews.
 
@@ -527,6 +527,6 @@ Element helper; it does not move musical models into Kernel.
 
 Native observations use nominal position independent of playback rate, resolved
 Score identity, source revisions and sounding occurrence IDs. Optional nominal
-seek commands report failure. The owning [public model reference](../../apps/doc/webmusic/src/content/docs/score/api/index.mdx)
-and [Headless reference](../../apps/doc/webmusic/src/content/docs/score/headless/index.mdx)
+seek commands report failure. The owning [public model reference](../../doc/src/content/docs/score/api/index.mdx)
+and [Headless reference](../../doc/src/content/docs/score/headless/index.mdx)
 define members and composition.

@@ -556,8 +556,8 @@ verification workflow.
 
 MIT
 
-[docs]: ../../apps/doc/webmusic/src/content/docs/uikit/index.mdx
-[docs-presenters]: ../../apps/doc/webmusic/src/content/docs/uikit/catalog.mdx
+[docs]: ../../doc/src/content/docs/uikit/index.mdx
+[docs-presenters]: ../../doc/src/content/docs/uikit/catalog.mdx
 
 For source contributions and release verification, see the
 [contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

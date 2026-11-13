@@ -42,9 +42,9 @@ the application.
 Native participants consume mapped read-only Session anchors with invalidation
 epochs and future loop segments. Backend lookahead, media fallback, effect tails
 and device latency retain explicit limits. The
-[public factory reference](../../apps/doc/webmusic/src/content/docs/bridge/api.mdx)
+[public factory reference](../../doc/src/content/docs/bridge/api.mdx)
 owns exact IDs, configuration and ports; the
-[runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+[runnable guide](../../doc/src/content/docs/bridge/modular-composition.mdx)
 shows save/load, missing-plugin recovery and keyboard-accessible patch editing.
 
 ## Conversion
