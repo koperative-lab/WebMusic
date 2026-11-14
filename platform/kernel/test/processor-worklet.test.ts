@@ -162,7 +162,8 @@ describe('defineProcessor note queue', () => {
       scope.currentFrame = frame;
       return instance.process([], [[new Float32Array(128)]], {});
     };
-    return {seen, posted, note, render, scope};
+    const flush = (epoch: number) => instance.port.onmessage!({data: {type: 'flush', epoch}});
+    return {seen, posted, note, render, flush, scope};
   }
 
   it('requires note() when the definition declares note input', () => {
@@ -269,16 +270,42 @@ describe('defineProcessor note queue', () => {
     expect(seen.map(event => `${event.gate}${event.occurrence}`)).toEqual(['on1']);
   });
 
-  it('withdraws unsounded onsets of an older epoch but keeps every release', () => {
+  it('never compares epochs across sources: a live gesture still plays after a scheduler advanced', () => {
     const {seen, note, render} = instrument();
-    note('on', 1, 0, 0);
+    note('on', 1, 10, 7);
+    note('on', 2, -1, 0);
     render(0);
-    note('on', 2, 300, 0);
-    note('off', 1, 310, 0);
-    note('on', 3, 320, 1);
-    note('on', 4, 330, 0);
+    expect(seen.map(event => `${event.gate}${event.occurrence}/${event.epoch}`)).toEqual(['on2/0', 'on1/7']);
+  });
+
+  it('flushes queued scheduled onsets and cancels sounding scheduled notes, keeping live gestures', () => {
+    const {seen, note, render, flush} = instrument();
+    note('on', 1, 0);
+    note('on', 2, -1);
+    render(0);
+    note('on', 3, 300);
+    note('off', 1, 310);
+    flush(1);
+    note('on', 4, 320, 1);
+    render(128);
     render(256);
-    expect(seen.map(event => `${event.gate}${event.occurrence}/${event.epoch}`)).toEqual(['on1/0', 'off1/0', 'on3/1']);
+    expect(seen.map(event => `${event.gate}${event.occurrence}@${event.frame}+${event.frameOffset}`)).toEqual([
+      'on2@0+0', 'on1@0+0', 'cancel1@128+0', 'on4@256+64',
+    ]);
+    note('off', 2, -1);
+    render(384);
+    expect(seen.at(-1)).toMatchObject({gate: 'off', occurrence: 2});
+  });
+
+  it('cancels a flushed note once, even when its release was already queued', () => {
+    const {seen, note, render, flush} = instrument();
+    note('on', 1, 0);
+    render(0);
+    note('off', 1, 500);
+    flush(1);
+    render(128);
+    render(512);
+    expect(seen.map(event => `${event.gate}${event.occurrence}`)).toEqual(['on1', 'cancel1']);
   });
 
   it('ignores note messages when the definition has no note input', () => {
@@ -298,5 +325,69 @@ describe('defineProcessor note queue', () => {
     instance.port.onmessage!({data: {type: 'note', gate: 'on', occurrence: 1, midi: 60, cents: 0, velocity: 1, frame: 0, epoch: 0}});
     expect(instance.process([], [[new Float32Array(128)]], {})).toBe(false);
     expect(posted).toEqual([{type: 'error', message: 'voice overflow'}]);
+  });
+});
+
+describe('defineProcessor transport', () => {
+  const follower: ProcessorDefinition = {id: 'test.follower', version: '1.0.0', transport: true};
+
+  function follow() {
+    const {scope, registered} = fakeScope();
+    const seen: {playing: boolean; position: number; epoch: number}[] = [];
+    defineProcessor(follower, {create: () => null, process(_state, block) {
+      const transport = block.transport!;
+      seen.push({playing: transport.playing, position: Number(transport.position.toFixed(6)), epoch: transport.epoch});
+    }}, scope);
+    const instance = new (registered.get('test.follower@1.0.0')!)();
+    const anchor = (fields: Record<string, unknown>) => instance.port.onmessage!({data: {
+      type: 'transport', originFrame: 0, originSeconds: 0, rate: 1, running: true, loop: null, epoch: 1, ...fields,
+    }});
+    const render = (frame: number) => { scope.currentFrame = frame; instance.process([], [[new Float32Array(128)]], {}); };
+    return {seen, anchor, render};
+  }
+
+  it('reports a stopped transport until the first anchor', () => {
+    const {seen, render} = follow();
+    render(0);
+    expect(seen).toEqual([{playing: false, position: 0, epoch: 0}]);
+  });
+
+  it('holds before a scheduled origin, then advances at the anchor rate', () => {
+    const {seen, anchor, render} = follow();
+    anchor({originFrame: 48000, originSeconds: 10, rate: 2});
+    render(24000);
+    render(48000);
+    render(72000);
+    expect(seen).toEqual([
+      {playing: false, position: 10, epoch: 1},
+      {playing: true, position: 10, epoch: 1},
+      {playing: true, position: 11, epoch: 1},
+    ]);
+  });
+
+  it('folds the position into the loop', () => {
+    const {seen, anchor, render} = follow();
+    anchor({originFrame: 0, originSeconds: 0, loop: {startSeconds: 1, endSeconds: 3}});
+    render(48000 * 2.5);
+    render(48000 * 3.5);
+    render(48000 * 0.5);
+    expect(seen.map(entry => entry.position)).toEqual([2.5, 1.5, 0.5]);
+  });
+
+  it('holds the position while paused', () => {
+    const {seen, anchor, render} = follow();
+    anchor({running: false, originSeconds: 4, epoch: 3});
+    render(96000);
+    expect(seen).toEqual([{playing: false, position: 4, epoch: 3}]);
+  });
+
+  it('leaves block.transport undefined without the transport declaration', () => {
+    const {scope, registered} = fakeScope();
+    let seen: unknown = 'unset';
+    defineProcessor(definition, {...gain, process(_state, block) { seen = block.transport; }}, scope);
+    const instance = new (registered.get('test.gain@1.0.0')!)();
+    instance.port.onmessage!({data: {type: 'transport', originFrame: 0, originSeconds: 5, rate: 1, running: true, loop: null, epoch: 1}});
+    instance.process(quantum(), quantum(), {gain: new Float32Array([1])});
+    expect(seen).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 # Processor modules: authored DSP
 
 Status: accepted direction, in delivery ([DEC-073](../DECISIONS.md#dec-073--authored-dsp-is-a-kernel-processor-module-contract)).
-Steps 0–3 below are implemented; later steps are targets, not current API.
+Steps 0–4 below are implemented; later steps are targets, not current API.
 Layer and public entry: Kernel `/processor` (main thread) and
 `/processor-worklet` (audio thread); domain adapters stay in Score and Audio.
 Source: [platform/kernel/src/processor/](../../platform/kernel/src/processor/).
@@ -124,7 +124,7 @@ The module's note bridge (`ProcessorNoteBridge` in
 |---|---|
 | The kit calls `note()` with a frame offset before `process`, rather than splitting the block | Splitting would need per-segment views of every buffer; an offset lets the author start a voice mid-block with no allocation |
 | All queue allocation happens on message arrival; dispatch only advances an index and updates a `Set` | `process` stays allocation-free apart from the `Set`'s own growth |
-| A newer epoch withdraws older queued onsets but keeps every release | Dropping a release could leave a note hanging |
+| ~~A newer epoch withdraws older queued onsets~~ — replaced in step 4 by an explicit Session flush | Comparing epochs across sources silenced live gestures once a scheduler advanced |
 | A release that names an earlier time than its onset takes the onset's frame | The author never sees an `off` before its `on` |
 | Live `performance-seconds` gestures post with an immediate frame | They have no scheduled time; playing them at the next block is not lateness |
 | A late `cancel` is not counted | Releasing a producer cancels its held notes with their past onset times; that is "stop now", not a scheduling failure (found in the live browser check) |
@@ -154,6 +154,46 @@ with a polyphonic sine "note-probe" instrument written with the public kit):
 Not established: background-tab timing (part of manual check I5), other
 browsers and devices, and audible quality.
 
+## Step 4 as built
+
+`followSession` in [module.ts](../../platform/kernel/src/processor/module.ts),
+the kit's `flush` and `block.transport` in
+[worklet.ts](../../platform/kernel/src/processor/worklet.ts), and the
+`flush` message in [protocol.ts](../../platform/kernel/src/processor/protocol.ts).
+
+| Choice | Reason |
+|---|---|
+| A processor borrows the Session's scheduling binding instead of registering as a participant (changed from the plan) | A participant declares a content duration; an instrument has none, and registering it would make the Session's end unknown. Session-relative automation and `SessionLFO` already borrow the binding the same way |
+| Invalidation is an explicit `flush` from the module, not an epoch comparison in the kit (changed from step 3) | Epochs belong to each producer. Comparing them across sources would silence a live keyboard (epoch 0) once a scheduler advanced its epoch |
+| Flush withdraws queued *scheduled* onsets and cancels sounding scheduled notes; immediate gestures continue | A seek must not cut a note the player is holding on a keyboard |
+| No epoch filtering on the main thread either | It would silently drop notes from a scheduler that does not follow the Session; a Session-aware scheduler stops emitting inside the same synchronous invalidation, and anything already posted is flushed |
+| Released notes keep their release tail through a flush | A tail is the author's sound design, not a stale note; the reference probe's 80 ms release fades out after a pause and then reads exactly zero |
+| `block.transport` is derived per block from the last anchor, folded into the loop | One message per anchor; no per-block traffic |
+| Effects still reject `transport` and `noteInput` | An insert has no Session or note path; the error points to `createProcessorModule` |
+
+Browser evidence (2026-11-14, in-app Chromium, private runner checks I6–I7,
+with a Session-aware lookahead scheduler and a "session-probe" instrument
+written with the public kit):
+
+- **DSP-A5 offline (I6):** 10 s of a Session with a seek at 3 s, a pause at
+  5 s and a 22–24 s loop from 6 s. 56 scheduled onsets heard on their exact
+  frame, 0 missing, 0 stray. Of the onsets queued when a schedule was
+  invalidated, 0 of 4 were heard: a small sample. While paused, the
+  output reached 0.0059 in the first 10 ms (release tails of notes already
+  ended) and exactly 0 after 100 ms. Two loop passes were scheduled.
+- **Transport:** 33 processor position reports matched the Session anchor
+  current at their frame to 0.000 ms, including loop passes.
+- **Live (I7):** play, pause, resume, seek +10 s, a 4 s loop and leaving it:
+  0 late notes, and the processor followed the Session to 0.00 ms.
+
+Observed outside DSP-01: leaving a loop resumes the Session at its unwrapped
+position (about 30 s after ten seconds in a 16–20 s loop), not where the loop
+was. The processor follows that correctly; whether the Session should behave
+so is an existing `SessionTransport` contract question.
+
+Not established: background-tab timing, other browsers and devices, and
+audible quality.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -167,7 +207,7 @@ build in order; none starts a later one's surface early.
 | 1 — done | Audio-only processor module | `createProcessorModule(context, definition, options)`: `AudioWorkletNode`, audio input/output ports, a `ParamSurface` bound to the node's `AudioParam`s, readiness, error reports, disposal; declared latency published on its ports | DSP-A6, A7, A9 |
 | 2 — done | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
 | 3 — done | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
-| 4 | Transport and Session membership | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
+| 4 — done | Transport and Session following | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
 | 5 | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
 | 6 | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
 | 7 | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |

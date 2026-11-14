@@ -1180,8 +1180,17 @@ admission or default destination unless `route: 'none'`. Parameters declared
 write the `AudioParam` directly. The module registers in the scope's registry,
 reports `ready`, `error` (the processor failed and is silent; routes stay) or
 `detached`, and `dispose()` releases its node, ports, handles, route and
-registration without closing the context. Definitions that request transport
-are rejected for now.
+registration without closing the context.
+
+In a scope with a Session, a module whose definition declares note input or
+`transport` borrows the Session's scheduling binding (`session: 'none'` opts
+out). It is not a Session participant: it owns no content with a duration.
+When the Session invalidates its schedule — seek, pause, stop, loop or rate
+change — queued scheduled notes are withdrawn and sounding ones cancelled,
+while live gestures continue; a scheduler following the same binding then
+schedules the new pass. A `transport` definition receives every anchor, so the
+processor reads the Session position in `block.transport`. The Session must
+use the module's audio context as its reference clock.
 
 A definition with `noteInput: true` gives the module a `notes` input port
 (`module.notes`). Connect any note producer to it, or call `accept()` directly.
@@ -1293,9 +1302,15 @@ A definition with `noteInput` needs a `note(state, event)` callback. The kit
 keeps the incoming changes sorted by frame and calls `note` for each change
 in the coming block, in time order, just before `process`; `event.frameOffset`
 says where in that block it applies, so a voice can start mid-block. `cancel`
-means stop at once. A newer `epoch` withdraws older onsets that have not
-sounded, a cancel before its onset withdraws the note entirely, and a release
-never moves ahead of its own onset. The event object is reused.
+means stop at once. a cancel before its onset withdraws the note entirely, a release never moves
+ahead of its own onset, and epochs are passed through but never compared across
+sources. When the module's Session invalidates its schedule, the kit withdraws
+queued scheduled onsets and cancels sounding scheduled notes; immediate live
+gestures are untouched. The event object is reused.
+
+With `transport: true`, `block.transport` gives `playing`, `position` (Session
+seconds at the block's first frame, folded into the loop), `rate`, `loop` and
+`epoch`. It reads stopped until the module receives a Session anchor.
 
 ```ts
 import {defineProcessor} from '@webmusic/kernel/processor-worklet';

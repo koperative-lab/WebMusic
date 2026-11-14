@@ -3,6 +3,7 @@ import {checkModuleConformance} from '../src/module/conformance';
 import {ModuleAudioEnvironment, ModuleContext} from '../src/module/context';
 import {createConnectionLease} from '../src/module/lease';
 import {NoteOutputPort, type NoteEvent} from '../src/module/note-port';
+import {SessionTransport} from '../src/session';
 import {
   createProcessorModule, isProcessorPrepared, prepareProcessor, PROCESSOR_PROTOCOL_VERSION,
   ProcessorUnavailableError, type ProcessorDefinition, type ProcessorNodeFactory,
@@ -301,7 +302,7 @@ describe('createProcessorModule', () => {
 
   it('rejects requests it cannot honour before creating anything', async () => {
     const {context, createNode} = await setup();
-    expect(() => createProcessorModule(context, {...gain, transport: true}, {id: 'fx', createNode})).toThrow(/transport/);
+    expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, session: 'shared' as never})).toThrow(/session mode/);
     expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, params: {missing: 1}})).toThrow(/no parameter missing/);
     expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, params: {gain: 5}})).toThrow(RangeError);
     expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, route: 'auto' as never})).toThrow(/route/);
@@ -441,6 +442,95 @@ describe('createProcessorModule', () => {
         return {module, dispose: () => module.dispose()};
       });
       expect(report.failures).toEqual([]);
+    });
+  });
+
+  describe('Session', () => {
+    const follower: ProcessorDefinition = {id: 'test.follower', version: '1.0.0', noteInput: true, transport: true};
+    type Posted = {type: string; gate?: string; occurrence?: number; running?: boolean; originFrame?: number; originSeconds?: number; epoch?: number};
+
+    async function inSession(definition: ProcessorDefinition = follower) {
+      const world = await setup(definition);
+      const session = new SessionTransport(() => world.audio.currentTime, {leadInSeconds: 0, driftCheckIntervalMs: 0, tick: {createWorker: () => null}});
+      const scope = world.context.derive({id: 'session', session});
+      return {...world, session, scope};
+    }
+    const posted = (node: {posted: unknown[]}) => node.posted as Posted[];
+    const note = (gate: NoteEvent['gate'], occurrenceId: string, axis: string, time = 2): NoteEvent => ({
+      occurrenceId, sourceId: 'src', pitch: {midi: 60}, velocity: 1, gate, axis, time, epoch: 0,
+    });
+
+    it('copies the current anchor at once, then every new anchor, to the audio thread', async () => {
+      const {audio, session, scope, createNode, nodes} = await inSession();
+      createProcessorModule(scope, follower, {id: 'p', createNode});
+      expect(posted(nodes[0])).toEqual([expect.objectContaining({type: 'transport', running: false, originSeconds: 0})]);
+      audio.currentTime = 2;
+      await session.play();
+      expect(posted(nodes[0]).at(-1)).toMatchObject({type: 'transport', running: true, originFrame: 96000, originSeconds: 0});
+      audio.currentTime = 3;
+      await session.seek(10);
+      expect(posted(nodes[0]).at(-1)).toMatchObject({type: 'transport', running: true, originFrame: 144000, originSeconds: 10});
+      audio.currentTime = 4;
+      await session.pause();
+      expect(posted(nodes[0]).at(-1)).toMatchObject({type: 'transport', running: false, originSeconds: 11});
+      session.dispose();
+    });
+
+    it('flushes on invalidation and forgets scheduled notes, but keeps live gestures', async () => {
+      const {audio, session, scope, createNode, nodes} = await inSession();
+      const module = createProcessorModule(scope, follower, {id: 'p', createNode});
+      await session.play();
+      module.notes!.accept(note('on', 'scheduled', 'audio-context-seconds'));
+      module.notes!.accept(note('on', 'live', 'performance-seconds'));
+      const before = posted(nodes[0]).length;
+      audio.currentTime = 2.5;
+      await session.seek(4);
+      const since = posted(nodes[0]).slice(before);
+      expect(since.filter(message => message.type === 'flush')).toHaveLength(1);
+      expect(since.findIndex(message => message.type === 'flush')).toBeLessThan(since.findIndex(message => message.type === 'transport' && message.running));
+      const count = posted(nodes[0]).length;
+      module.notes!.accept(note('off', 'scheduled', 'audio-context-seconds', 3));
+      expect(posted(nodes[0])).toHaveLength(count);
+      module.notes!.accept(note('off', 'live', 'performance-seconds', 3));
+      expect(posted(nodes[0]).at(-1)).toMatchObject({type: 'note', gate: 'off', occurrence: 2});
+      session.dispose();
+    });
+
+    it('only sends transport anchors to a transport definition, and flushes only with note input', async () => {
+      const {session, scope, createNode, nodes} = await inSession({id: 'test.keys', version: '1.0.0', noteInput: true});
+      createProcessorModule(scope, {id: 'test.keys', version: '1.0.0', noteInput: true}, {id: 'k', createNode});
+      await session.play();
+      await session.seek(2);
+      expect(posted(nodes[0]).map(message => message.type)).not.toContain('transport');
+      expect(posted(nodes[0]).map(message => message.type)).toContain('flush');
+      session.dispose();
+    });
+
+    it('ignores the Session with session: none and when nothing needs it', async () => {
+      const {session, scope, createNode, nodes} = await inSession();
+      createProcessorModule(scope, follower, {id: 'p', createNode, session: 'none'});
+      await session.play();
+      await session.seek(2);
+      expect(nodes[0].posted).toEqual([]);
+      session.dispose();
+    });
+
+    it('stops following the Session when disposed', async () => {
+      const {session, scope, createNode, nodes} = await inSession();
+      const module = createProcessorModule(scope, follower, {id: 'p', createNode});
+      module.dispose();
+      const count = nodes[0].posted.length;
+      await session.play();
+      await session.seek(5);
+      expect(nodes[0].posted).toHaveLength(count);
+      session.dispose();
+    });
+
+    it('creates a transport processor without a Session; it simply reads stopped', async () => {
+      const {context, createNode, nodes} = await setup(follower);
+      const module = createProcessorModule(context, follower, {id: 'p', createNode});
+      expect(module.state).toBe('ready');
+      expect(nodes[0].posted).toEqual([]);
     });
   });
 });

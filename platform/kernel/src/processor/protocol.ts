@@ -47,7 +47,7 @@ export interface ProcessorNoteMessage {
 /** A Session anchor copied to the audio thread. The processor cannot write it. */
 export interface ProcessorTransportMessage {
   readonly type: 'transport';
-  /** Absolute frame at which `originSeconds` holds. */
+  /** Absolute frame at which the Session position is `originSeconds`; before it the position holds. */
   readonly originFrame: number;
   /** Session seconds at `originFrame`. */
   readonly originSeconds: number;
@@ -57,8 +57,18 @@ export interface ProcessorTransportMessage {
   readonly epoch: number;
 }
 
+/**
+ * The Session invalidated its schedule (seek, pause, stop, loop or rate
+ * change): withdraw every queued scheduled onset and cancel every sounding
+ * scheduled note. Live gestures (immediate frame) are untouched.
+ */
+export interface ProcessorFlushMessage {
+  readonly type: 'flush';
+  readonly epoch: number;
+}
+
 /** Everything the main thread can post to a processor. */
-export type ProcessorMessage = ProcessorConfigMessage | ProcessorNoteMessage | ProcessorTransportMessage;
+export type ProcessorMessage = ProcessorConfigMessage | ProcessorNoteMessage | ProcessorTransportMessage | ProcessorFlushMessage;
 
 /** The processor threw; Web Audio has stopped calling it. Sent once. */
 export interface ProcessorErrorReport {

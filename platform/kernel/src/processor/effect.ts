@@ -36,8 +36,8 @@ export function processorEffect(
 ): Effect {
   const resolved = resolveProcessorDefinition(definition);
   if (resolved.audioInputs.length === 0) throw new TypeError(`Processor ${resolved.name} has no audio input, so it cannot be an insert effect.`);
-  if (resolved.noteInput) throw new TypeError(`Processor ${resolved.name} requests note input, which processor effects do not support yet.`);
-  if (resolved.transport) throw new TypeError(`Processor ${resolved.name} requests transport, which processor effects do not support yet.`);
+  if (resolved.noteInput) throw new TypeError(`Processor ${resolved.name} requests note input, which an insert cannot carry; use createProcessorModule.`);
+  if (resolved.transport) throw new TypeError(`Processor ${resolved.name} requests transport, which an insert cannot carry; use createProcessorModule.`);
   // State modulation explicitly: the chain would otherwise infer `control-rate`
   // from a k-rate AudioParam and accept modulation the definition did not declare.
   const parameterDescriptors = Object.freeze(Object.fromEntries(resolved.params.map(({id, ...descriptor}) =>

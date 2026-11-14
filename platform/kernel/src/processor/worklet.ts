@@ -5,6 +5,7 @@ import {
 import {
   PROCESSOR_IMMEDIATE_FRAME, PROCESSOR_PROTOCOL_VERSION,
   type ProcessorMessage, type ProcessorNodeOptions, type ProcessorNoteMessage, type ProcessorReport,
+  type ProcessorTransportMessage,
 } from './protocol';
 
 // Audio-thread authoring kit. An author's worklet file imports this entry and
@@ -30,6 +31,23 @@ export interface ProcessorBlock {
   /** Absolute frame of the block's first sample; `frame / sampleRate` is audio reference time. */
   frame: number;
   sampleRate: number;
+  /** The Session transport at the block's first frame, when the definition declares `transport`. */
+  transport?: ProcessorTransport;
+}
+
+/**
+ * The Session transport as the audio thread sees it, derived each block from
+ * the last anchor the module posted. Reused between calls; read-only.
+ */
+export interface ProcessorTransport {
+  /** False while paused, stopped, invalidated or before a scheduled start. */
+  playing: boolean;
+  /** Session seconds at the block's first frame, folded into the loop when one is set. */
+  position: number;
+  rate: number;
+  loop: Readonly<{startSeconds: number; endSeconds: number}> | null;
+  /** The Session's scheduling epoch; it changes whenever earlier timing became invalid. */
+  epoch: number;
 }
 
 /**
@@ -108,24 +126,32 @@ const QUANTUM = 128;
 class NoteQueue {
   #events: ProcessorNoteMessage[] = [];
   #head = 0;
-  /** The newest scheduling epoch seen; older `on` changes are stale. */
-  #epoch = 0;
 
-  /** Admit one change. Returns false when it is stale or ends nothing. */
+  #compact(): void {
+    if (this.#head === 0) return;
+    this.#events.splice(0, this.#head);
+    this.#head = 0;
+  }
+
+  /**
+   * Withdraw every scheduled change still queued, and queue an immediate
+   * cancel for each sounding scheduled occurrence. Immediate gestures stay.
+   */
+  flush(scheduled: Set<number>, epoch: number): void {
+    this.#compact();
+    const withdrawn = new Set<number>();
+    for (const event of this.#events) if (event.gate === 'on' && event.frame !== PROCESSOR_IMMEDIATE_FRAME) withdrawn.add(event.occurrence);
+    this.#events = this.#events.filter(event => !withdrawn.has(event.occurrence) && !scheduled.has(event.occurrence));
+    for (const occurrence of scheduled) {
+      this.#events.unshift({type: 'note', gate: 'cancel', occurrence, midi: 0, cents: 0, velocity: 0, frame: PROCESSOR_IMMEDIATE_FRAME, epoch});
+    }
+    scheduled.clear();
+  }
+
+  /** Admit one change. Returns false when it ends nothing. */
   admit(message: ProcessorNoteMessage, active: ReadonlySet<number>): boolean {
-    if (this.#head > 0) {
-      this.#events.splice(0, this.#head);
-      this.#head = 0;
-    }
-    if (message.epoch > this.#epoch) {
-      this.#epoch = message.epoch;
-      // Withdraw onsets from older epochs that have not sounded. Releases stay:
-      // they only end notes, and a released note must not hang.
-      this.#events = this.#events.filter(event => event.gate !== 'on' || event.epoch >= message.epoch);
-    }
-    if (message.gate === 'on') {
-      if (message.epoch < this.#epoch) return false;
-    } else if (message.gate === 'cancel' && !active.has(message.occurrence)) {
+    this.#compact();
+    if (message.gate === 'cancel' && !active.has(message.occurrence)) {
       // Cancelled before its onset: withdraw it entirely, so it never sounds.
       this.#events = this.#events.filter(event => event.occurrence !== message.occurrence);
       return false;
@@ -168,8 +194,11 @@ class NoteQueue {
  * its frame offset. A change that arrives after its frame plays at the start
  * of the next block and is counted (a late `cancel` is not counted: it means
  * stop now); the counts reach the main thread at most
- * four times a second. A newer epoch withdraws older onsets that have not
- * sounded; `cancel` before an onset withdraws that note entirely.
+ * four times a second. `cancel` before an onset withdraws that note entirely.
+ * When the module's Session invalidates its schedule, the kit withdraws every
+ * queued scheduled onset and cancels every sounding scheduled note; live
+ * gestures continue. With `transport`, `block.transport` gives the Session
+ * position at each block's first frame.
  */
 export function defineProcessor<State>(
   definition: ProcessorDefinition | ResolvedProcessorDefinition,
@@ -194,6 +223,10 @@ export function defineProcessor<State>(
     readonly #block: ProcessorBlock = {inputs: [], outputs: [], params: {}, frame: 0, sampleRate: scope.sampleRate};
     readonly #notes = new NoteQueue();
     readonly #active = new Set<number>();
+    /** Sounding occurrences that came from a schedule rather than a live gesture. */
+    readonly #scheduled = new Set<number>();
+    #anchor: ProcessorTransportMessage | undefined;
+    readonly #transport: ProcessorTransport = {playing: false, position: 0, rate: 1, loop: null, epoch: 0};
     readonly #event: ProcessorNoteEvent = {gate: 'on', occurrence: 0, midi: 0, cents: 0, velocity: 0, frameOffset: 0, epoch: 0};
     #late = 0;
     #lateReported = -Infinity;
@@ -218,6 +251,10 @@ export function defineProcessor<State>(
         if (this.#failed || !message) return;
         if (message.type === 'note') {
           if (resolved.noteInput) this.#notes.admit(message, this.#active);
+        } else if (message.type === 'flush') {
+          if (resolved.noteInput) this.#notes.flush(this.#scheduled, message.epoch);
+        } else if (message.type === 'transport') {
+          if (resolved.transport) this.#anchor = message;
         } else if (message.type === 'config' && implementation.message) {
           try { implementation.message(this.#state as State, message.data); } catch (error) { this.#fail(error); }
         }
@@ -231,6 +268,7 @@ export function defineProcessor<State>(
       block.outputs = outputs;
       block.params = parameters;
       block.frame = scope.currentFrame;
+      if (resolved.transport) block.transport = this.#readTransport(block.frame);
       try {
         if (resolved.noteInput) this.#dispatch(block.frame, outputs[0]?.[0]?.length ?? QUANTUM);
         implementation.process(this.#state as State, block);
@@ -248,7 +286,11 @@ export function defineProcessor<State>(
         if (message.gate === 'on') {
           if (this.#active.has(message.occurrence)) continue;
           this.#active.add(message.occurrence);
-        } else if (!this.#active.delete(message.occurrence)) continue;
+          if (message.frame !== PROCESSOR_IMMEDIATE_FRAME) this.#scheduled.add(message.occurrence);
+        } else {
+          if (!this.#active.delete(message.occurrence)) continue;
+          this.#scheduled.delete(message.occurrence);
+        }
         if (message.frame === PROCESSOR_IMMEDIATE_FRAME) event.frameOffset = 0;
         else if (message.frame < frame) {
           event.frameOffset = 0;
@@ -270,6 +312,24 @@ export function defineProcessor<State>(
         this.#late = 0;
         this.#lateReported = frame;
       }
+    }
+
+    #readTransport(frame: number): ProcessorTransport {
+      const transport = this.#transport;
+      const anchor = this.#anchor;
+      if (!anchor) return transport;
+      const started = anchor.running && frame >= anchor.originFrame;
+      let position = started ? anchor.originSeconds + ((frame - anchor.originFrame) / scope.sampleRate) * anchor.rate : anchor.originSeconds;
+      const loop = anchor.loop;
+      if (loop && loop.endSeconds > loop.startSeconds && position >= loop.endSeconds) {
+        position = loop.startSeconds + ((position - loop.startSeconds) % (loop.endSeconds - loop.startSeconds));
+      }
+      transport.playing = started;
+      transport.position = position;
+      transport.rate = anchor.rate;
+      transport.loop = loop;
+      transport.epoch = anchor.epoch;
+      return transport;
     }
 
     #fail(error: unknown): void {

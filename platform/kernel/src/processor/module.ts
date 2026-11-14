@@ -10,6 +10,7 @@ import type {ModuleHandle, ModulePort} from '../module/registry';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
 import {createProcessorNode, listenToProcessor, processorParam, type ProcessorNodeFactory} from './node';
 import {isProcessorPrepared} from './prepare';
+import type {SessionSchedulingBinding, SessionSchedulingEvent} from '../session-scheduling';
 import {PROCESSOR_IMMEDIATE_FRAME, type ProcessorMessage, type ProcessorNoteMessage} from './protocol';
 
 export type {ProcessorNodeFactory} from './node';
@@ -35,6 +36,12 @@ export interface ProcessorModuleOptions {
    * `audio-context-seconds` as is and plays `performance-seconds` gestures now.
    */
   readonly noteTime?: ProcessorNoteTime;
+  /**
+   * `context` (the default) borrows the scope's Session scheduling binding when
+   * the definition declares note input or transport; `none` ignores it. The
+   * Session must use this module's audio context as its reference clock.
+   */
+  readonly session?: 'context' | 'none';
   /** Author-defined observations the processor posts through `setup.report`. */
   readonly onReport?: (data: unknown) => void;
   readonly onCleanupError?: (error: unknown) => void;
@@ -54,7 +61,7 @@ export const defaultProcessorNoteTime: ProcessorNoteTime = event =>
  * anything else is ignored.
  */
 class ProcessorNoteBridge implements NoteInputHandler {
-  readonly #occurrences = new Map<string, number>();
+  readonly #occurrences = new Map<string, {readonly occurrence: number; readonly scheduled: boolean}>();
   #next = 1;
   #closed = false;
 
@@ -71,11 +78,11 @@ class ProcessorNoteBridge implements NoteInputHandler {
     if (at === undefined) throw new TypeError(`Processor ${this.name} cannot place notes on the ${event.axis} axis; supply noteTime.`);
     if (at !== 'now' && !Number.isFinite(at)) throw new RangeError(`Processor ${this.name} note time must be finite seconds or 'now'.`);
     const key = `${event.sourceId}\u0000${event.occurrenceId}`;
-    let occurrence = this.#occurrences.get(key);
+    let occurrence = this.#occurrences.get(key)?.occurrence;
     if (event.gate === 'on') {
       if (occurrence !== undefined) return;
       occurrence = this.#next++;
-      this.#occurrences.set(key, occurrence);
+      this.#occurrences.set(key, {occurrence, scheduled: at !== 'now'});
     } else {
       if (occurrence === undefined) return;
       this.#occurrences.delete(key);
@@ -88,17 +95,61 @@ class ProcessorNoteBridge implements NoteInputHandler {
     });
   }
 
+  /**
+   * The Session invalidated its schedule: forget scheduled occurrences (the
+   * processor cancels them) so a producer's later release of one is ignored.
+   */
+  flush(epoch: number): void {
+    if (this.#closed) return;
+    for (const [key, entry] of this.#occurrences) if (entry.scheduled) this.#occurrences.delete(key);
+    this.node.port.postMessage({type: 'flush', epoch} satisfies ProcessorMessage);
+  }
+
   /** Cancel every note this bridge started, then stop accepting. */
   close(): void {
     if (this.#closed) return;
     this.#closed = true;
-    for (const occurrence of this.#occurrences.values()) {
+    for (const {occurrence} of this.#occurrences.values()) {
       this.#post({type: 'note', gate: 'cancel', occurrence, midi: 0, cents: 0, velocity: 0, frame: PROCESSOR_IMMEDIATE_FRAME, epoch: 0});
     }
     this.#occurrences.clear();
   }
 
   #post(message: ProcessorNoteMessage): void { this.node.port.postMessage(message); }
+}
+
+/**
+ * Follow one Session scheduling binding for a processor: flush scheduled
+ * notes on invalidation and copy each anchor to the audio thread. Borrowed
+ * read-only, like Session-relative automation; the processor is not a Session
+ * participant because it owns no content with a duration.
+ */
+function followSession(
+  binding: SessionSchedulingBinding,
+  node: AudioWorkletNode,
+  audio: BaseAudioContext,
+  definition: ResolvedProcessorDefinition,
+  notes: ProcessorNoteBridge | undefined,
+): () => void {
+  const post = (message: ProcessorMessage) => node.port.postMessage(message);
+  const held = (): number => {
+    try { return binding.positionAt(audio.currentTime); } catch { return binding.snapshot.originPosition; }
+  };
+  return binding.subscribe((event: SessionSchedulingEvent) => {
+    const {snapshot} = event;
+    if (event.type === 'invalidate') notes?.flush(snapshot.epoch);
+    if (!definition.transport) return;
+    const running = event.type === 'anchor' && snapshot.phase === 'ready' && !snapshot.paused;
+    post({
+      type: 'transport',
+      originFrame: Math.round(snapshot.originTime * audio.sampleRate),
+      originSeconds: running ? snapshot.originPosition : held(),
+      rate: snapshot.rate,
+      running,
+      loop: snapshot.loop ? {startSeconds: snapshot.loop.startSeconds, endSeconds: snapshot.loop.endSeconds} : null,
+      epoch: snapshot.epoch,
+    });
+  });
 }
 
 /** `ready` until the processor fails (`error`) or the module is disposed (`detached`, terminal). */
@@ -245,8 +296,12 @@ export class ProcessorModule implements ModuleHandle {
  * {@link ProcessorModule.lateNotes} when it arrives too late. Disconnecting a
  * producer or disposing the module cancels the notes it started.
  *
- * Transport is not available on processor modules yet; a definition
- * requesting it is rejected.
+ * In a scope with a Session, a module with note input or transport borrows
+ * the Session's scheduling binding: when the Session invalidates its
+ * schedule (seek, pause, stop, loop or rate change), queued scheduled notes
+ * are withdrawn and sounding ones cancelled, while live gestures continue; a
+ * `transport` definition receives each anchor and reads the Session position
+ * in `block.transport`. Without a Session, `block.transport` reports stopped.
  */
 export function createProcessorModule(
   context: ModuleContext,
@@ -254,9 +309,10 @@ export function createProcessorModule(
   options: ProcessorModuleOptions,
 ): ProcessorModule {
   const resolved = resolveProcessorDefinition(definition);
-  if (resolved.transport) throw new TypeError(`Processor ${resolved.name} requests transport, which processor modules do not support yet.`);
   if (typeof options?.id !== 'string') throw new TypeError('Processor module needs an id.');
   const route = options.route ?? 'default';
+  const sessionMode = options.session ?? 'context';
+  if (sessionMode !== 'context' && sessionMode !== 'none') throw new TypeError(`Unknown processor session mode: ${String(sessionMode)}`);
   if (route !== 'default' && route !== 'none') throw new TypeError(`Unknown processor route: ${String(route)}`);
   const audio = context.audio.peek();
   if (!audio) throw new Error('Processor module needs a prepared audio context; prepare the environment and the processor first.');
@@ -328,14 +384,18 @@ export function createProcessorModule(
       return output;
     });
     let notes: NoteInputPort | undefined;
+    let bridge: ProcessorNoteBridge | undefined;
     if (resolved.noteInput) {
-      const bridge = new ProcessorNoteBridge(node, audio.sampleRate, options.noteTime ?? defaultProcessorNoteTime, resolved.name);
-      cleanups.push(() => bridge.close());
-      const port = new NoteInputPort(bridge, {id: 'notes'});
+      const created = new ProcessorNoteBridge(node, audio.sampleRate, options.noteTime ?? defaultProcessorNoteTime, resolved.name);
+      bridge = created;
+      cleanups.push(() => created.close());
+      const port = new NoteInputPort(created, {id: 'notes'});
       // Runs before the bridge closes, so released connections still post their cancels.
       cleanups.push(() => port.dispose());
       notes = port;
     }
+    const binding = sessionMode === 'context' && (resolved.noteInput || resolved.transport) ? context.session?.scheduling : undefined;
+    if (binding) cleanups.push(followSession(binding, node, audio, resolved, bridge));
     const params = new ParamSurface(handles);
     const created = new ProcessorModule({
       id: options.id, definition: resolved, node, params, latencySeconds, inputs, outputs,
