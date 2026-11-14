@@ -1,6 +1,7 @@
 import type {ParamDescriptor, ParamHandle} from '../module/parameter';
 import type {ResolvedProcessorDefinition} from './definition';
-import {ProcessorUnavailableError} from './prepare';
+import {preparedWasm, ProcessorUnavailableError} from './prepare';
+import {processorCapabilities, ProcessorRing} from './ring';
 import {PROCESSOR_PROTOCOL_VERSION, type ProcessorMessage, type ProcessorNodeOptions, type ProcessorReport} from './protocol';
 
 /** Builds the node; injectable for tests and for applications that wrap node creation. */
@@ -22,10 +23,18 @@ export function createProcessorNode(
     readonly createNode?: ProcessorNodeFactory;
     /** Fix every input to this channel count (an insert has exactly one input bus). */
     readonly inputChannels?: number;
+    /** Give the node the definition's shared ring when memory can be shared. Default true. */
+    readonly ring?: boolean;
   },
 ): AudioWorkletNode {
-  const processorOptions: ProcessorNodeOptions = {protocol: PROCESSOR_PROTOCOL_VERSION, name: definition.name, config: options.config};
-  return (options.createNode ?? defaultNodeFactory)(audio, definition.name, {
+  const wasm = preparedWasm(audio, definition);
+  const ring = definition.sharedRing && options.ring !== false && processorCapabilities().sharedMemory
+    ? ProcessorRing.create(definition.sharedRing.capacity) : undefined;
+  const processorOptions: ProcessorNodeOptions = {
+    protocol: PROCESSOR_PROTOCOL_VERSION, name: definition.name, config: options.config,
+    ...(wasm && {wasm}), ...(ring && {ring: ring.buffer}),
+  };
+  const node = (options.createNode ?? defaultNodeFactory)(audio, definition.name, {
     numberOfInputs: definition.audioInputs.length,
     numberOfOutputs: definition.audioOutputs.length,
     outputChannelCount: definition.audioOutputs.map(port => port.channels),
@@ -35,7 +44,14 @@ export function createProcessorNode(
     parameterData: {...options.baseValues},
     processorOptions,
   });
+  if (ring) rings.set(node, ring);
+  return node;
 }
+
+const rings = new WeakMap<AudioWorkletNode, ProcessorRing>();
+
+/** @internal The reader side of the node's shared ring, if it has one. */
+export function processorRingOf(node: AudioWorkletNode): ProcessorRing | undefined { return rings.get(node); }
 
 /** @internal Route the processor's reports; returns the cleanup that detaches and closes its port. */
 export function listenToProcessor(

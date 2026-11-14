@@ -8,7 +8,8 @@ import {NoteInputPort, type NoteEvent, type NoteInputHandler} from '../module/no
 import {PortListeners} from '../module/port';
 import type {ModuleHandle, ModulePort} from '../module/registry';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
-import {bindProcessorParams, createProcessorNode, listenToProcessor, type ProcessorNodeFactory} from './node';
+import {bindProcessorParams, createProcessorNode, listenToProcessor, processorRingOf, type ProcessorNodeFactory} from './node';
+import type {ProcessorRing} from './ring';
 import {isProcessorPrepared} from './prepare';
 import type {SessionSchedulingBinding, SessionSchedulingEvent} from '../session-scheduling';
 import {PROCESSOR_IMMEDIATE_FRAME, type ProcessorMessage, type ProcessorNoteMessage} from './protocol';
@@ -173,6 +174,8 @@ export class ProcessorModule implements ModuleHandle {
   readonly latencySeconds: number;
   /** The `notes` input when the definition declares note input. */
   readonly notes?: NoteInputPort;
+  /** The reader side of the node's shared ring; absent unless the definition requests one and memory can be shared. */
+  get ring(): ProcessorRing | undefined { return processorRingOf(this.node); }
   readonly #inputs: readonly AudioInputPort[];
   readonly #outputs: readonly AudioOutputPort[];
   readonly #ports: readonly ModulePort[];

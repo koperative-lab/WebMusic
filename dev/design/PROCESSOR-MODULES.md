@@ -290,6 +290,48 @@ declarations.
 Not established: the Element recipe and the project snippet are compiled, not
 run on the page; a third party following the guide unaided; audible quality.
 
+## Step 8 as built
+
+`source.wasm` and compilation in
+[prepare.ts](../../platform/kernel/src/processor/prepare.ts), the definition's
+`wasm` and `sharedRing`, [`ProcessorRing` and
+`processorCapabilities`](../../platform/kernel/src/processor/ring.ts), the
+kit's `setup.wasm` and `setup.ring`, and the WebAssembly reference processor
+in [`doc/shared/processors/wasm-gain*.ts`](../../doc/shared/processors/wasm-gain.ts).
+
+| Choice | Reason |
+|---|---|
+| The binary is part of the `ProcessorSource`, not the definition (changed from the proposal's `wasm` URL field); the definition only says `wasm: true` | Same rule as the worklet URL: the definition stays data a worklet imports. The flag still enters the signature, so a definition that needs a binary cannot be prepared without one |
+| Compiled once per context during preparation, before the worklet registers; each node gets the module, and the processor owns its instance and memory | Compilation is the slow, fallible part and belongs with the other waiting; a broken binary leaves nothing registered |
+| The shared ring is declared by the definition, created per node, and given only where `processorCapabilities().sharedMemory` is true | One processor works on isolated and non-isolated pages; `required: true` turns its absence into a preparation failure with the reason, as the proposal specified |
+| The ring is a single-producer, single-consumer `float32` ring; a full ring drops and counts | The audio thread must never block or allocate |
+| Insert effects get no ring | No owner of an `InsertChain` slot could read it |
+| The kit's processor class is created once per worklet scope, with a thin subclass per definition | One copy of the per-block code however many processors a worklet file defines |
+| The reference passes only integers to WebAssembly and keeps floats in its memory | Measured: with two or more instances, one JS call site passing a fractional argument to their exports allocated about 16 bytes per call (V8 boxes the double); integer arguments allocated none. Every node owns an instance, so two nodes already trigger it |
+
+Evidence:
+
+- **Automated:** unit tests for the ring (order across the wrap, the empty
+  slot, drop counting, two views of one buffer), capabilities, compilation from
+  bytes, a URL and a compiled module, rejection of a missing or broken binary
+  without registering, the required-ring rejection, per-node rings on modules
+  and none on inserts, and the kit's handoff. The WebAssembly reference
+  renders 40,000 blocks with two nodes and a ring under 128 kB of used-heap
+  growth (the argument pattern above measured 1.3 MB).
+- **Browser (2026-11-14, in-app Chromium, private runner check I11):** as a
+  normal page, `crossOriginIsolated` false, `sharedMemory` false, the
+  ring-requiring processor rejected with the isolation reason, no ring, and
+  peak reports over messages. Reopened with COOP/COEP headers,
+  `crossOriginIsolated` true, `sharedMemory` true, the strict processor
+  prepared, and the ring carried the output at about 44,000 samples a second
+  (context 44,100 Hz) with 0 dropped. On both, Arabesque No. 1 rendered
+  offline through the WebAssembly gain at 0.5000 of the dry level and played
+  live.
+
+Not established: other browsers and devices, ring throughput under load, and
+the documentation site's behaviour, which is never isolated on GitHub Pages
+(the guide says so).
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -307,7 +349,7 @@ build in order; none starts a later one's surface early.
 | 5 — done | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
 | 6 — done | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
 | 7 — done | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |
-| 8 | WASM and shared memory | Compiled-module handoff; optional ring buffer reported as a capability when `crossOriginIsolated` | Capability reporting with and without isolation |
+| 8 — done | WASM and shared memory | Compiled-module handoff; optional ring buffer reported as a capability when `crossOriginIsolated` | Capability reporting with and without isolation |
 
 Before starting a step, read the proposal's matching section and the Kernel
 types it touches. Step 1 starts from

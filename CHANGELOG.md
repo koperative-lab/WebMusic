@@ -21,7 +21,9 @@ work and does not establish npm publication, a release tag or a deployment.
   module unavailable with `ProjectModuleUnavailableError`. A new "Write a
   processor" guide walks through authoring one, and Score's `Effect.from`
   lets a Kernel effect recipe such as `processorEffect` go wherever Score takes
-  an `Effect`.
+  an `Effect`. Processors can run WebAssembly compiled during preparation and,
+  on cross-origin isolated pages, stream to the main thread through a shared
+  ring; `processorCapabilities()` reports what the page allows.
 - Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
   and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
   foundations do not contain the new module, Session and patch-editor entries.

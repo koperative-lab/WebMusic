@@ -351,6 +351,62 @@ const runtime = new ModuleProjectRuntime({audio: new ModuleAudioEnvironment({con
 await runtime.restore(savedProject);
 ```
 
+## WebAssembly and shared memory
+
+Compiled DSP fits the same shape. Declare `wasm: true`, pass the binary in the
+source, and instantiate it in `create`; each node gets its own instance and
+memory. The repository's `doc/shared/processors/wasm-gain*.ts` is a complete,
+small example.
+
+```ts
+import {prepareProcessor, type ProcessorDefinition} from '@webmusic/kernel/processor';
+import type {ProcessorImplementation} from '@webmusic/kernel/processor-worklet';
+
+declare const audio: AudioContext;
+declare const workletUrl: string;
+declare const wasmGain: ProcessorDefinition; // {..., wasm: true, params: [{id: 'gain', ...}]}
+
+// Main thread: the binary is compiled once per context and handed to every node.
+await prepareProcessor(audio, wasmGain, {module: workletUrl, wasm: new URL('./gain.wasm', location.href)});
+
+// Audio thread:
+const FACTOR = 128; // float index in the module's memory
+export const wasmGainDsp: ProcessorImplementation<{memory: Float32Array; gain: (frames: number) => void}> = {
+  create({wasm}) {
+    const instance = new WebAssembly.Instance(wasm!, {});
+    const memory = new Float32Array((instance.exports.memory as WebAssembly.Memory).buffer, 0, 129);
+    return {memory, gain: instance.exports.gain as (frames: number) => void};
+  },
+  process(state, block) {
+    state.memory[FACTOR] = block.params.gain[0]; // floats travel in memory, not as arguments
+    const input = block.inputs[0], output = block.outputs[0];
+    for (let channel = 0; channel < output.length; channel++) {
+      state.memory.set(input[channel] ?? input[0]);
+      state.gain(output[channel].length);
+      for (let frame = 0; frame < output[channel].length; frame++) output[channel][frame] = state.memory[frame];
+    }
+  },
+};
+```
+
+Two rules keep compiled DSP allocation-free:
+
+- **Pass only integers to WebAssembly exports.** Put fractional values in the
+  instance's memory. V8 boxes a fractional argument once one call site reaches
+  the exports of several instances — as soon as two nodes run your processor.
+- **Keep numbers that change every block in typed arrays**, not object
+  fields.
+
+For a scope, meter or sample stream faster than messages allow, declare
+`sharedRing: {capacity}`. On a cross-origin isolated page (served with
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`) the processor writes
+`setup.ring` and the main thread reads `module.ring`. Elsewhere — GitHub Pages
+among them — both are absent and the processor must fall back to
+`setup.report` at a bounded rate; `processorCapabilities().sharedMemory` says
+which you have. Add `required: true` only if the processor cannot work without
+it: preparation then fails with the reason on pages without isolation.
+
 ## Test it
 
 The DSP object runs anywhere: register it against a structural fake of the
@@ -387,8 +443,10 @@ instance.process([], outputs, {level: new Float32Array([0.2]), cutoff: new Float
   `ProcessorUnavailableError`; there is no `ScriptProcessorNode` fallback.
 - A note change that reaches the audio thread after its frame plays at the
   start of the next block and is counted (`onLateNotes`, `lateNotes`).
-- Notes, parameters and transport are the processor's only inputs from the
-  main thread. WebAssembly and shared memory are not supported yet.
+- Notes, parameters, transport and configuration messages are the
+  processor's inputs from the main thread; a shared ring is output only.
+- WebAssembly memory is the processor's own; Kernel passes the compiled
+  module and nothing else.
 
 ## Related
 

@@ -15,6 +15,10 @@ export interface ProcessorNodeOptions {
   readonly name: string;
   /** Author-defined, structured-cloneable initial configuration. */
   readonly config?: unknown;
+  /** The module compiled during preparation, when the source supplied `wasm`. */
+  readonly wasm?: WebAssembly.Module;
+  /** This node's shared ring, when the definition requests one and memory can be shared. */
+  readonly ring?: SharedArrayBuffer;
 }
 
 /** Author-defined configuration; never used for per-block control. */

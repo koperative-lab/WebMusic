@@ -21,11 +21,23 @@ describe('processor definition', () => {
       id: 'test.tone', version: '1.0.0', name: 'test.tone@1.0.0',
       audioInputs: [], audioOutputs: [{id: 'output', channels: 2}],
       noteInput: false, transport: false, params: [], latencySamples: 0, tailSeconds: 0,
+      wasm: false, sharedRing: null,
     });
     expect(Object.isFrozen(resolved)).toBe(true);
     expect(Object.isFrozen(resolved.audioOutputs)).toBe(true);
     expect(Object.isFrozen(resolved.audioOutputs[0])).toBe(true);
     expect(resolveProcessorDefinition(resolved)).toBe(resolved);
+  });
+
+  it('validates a shared ring request and keeps WebAssembly and the ring in the signature', () => {
+    expect(resolveProcessorDefinition({id: 'test.scope', version: '1', sharedRing: {capacity: 4096}}).sharedRing)
+      .toEqual({capacity: 4096, required: false});
+    for (const capacity of [127, 1.5, 2 ** 25, Number.NaN]) {
+      expect(() => resolveProcessorDefinition({id: 'test.scope', version: '1', sharedRing: {capacity}})).toThrow(RangeError);
+    }
+    const plain = processorSignature({id: 'test.scope', version: '1'});
+    expect(processorSignature({id: 'test.scope', version: '1', wasm: true})).not.toBe(plain);
+    expect(processorSignature({id: 'test.scope', version: '1', sharedRing: {capacity: 4096}})).not.toBe(plain);
   });
 
   it('does not alias the author object', () => {

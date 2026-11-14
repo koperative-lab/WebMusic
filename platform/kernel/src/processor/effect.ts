@@ -53,6 +53,8 @@ export function processorEffect(
       const node = createProcessorNode(context, resolved, {
         config: options.config, createNode: options.createNode, baseValues,
         inputChannels: resolved.audioInputs[0].channels,
+        // No owner could read an insert's ring, so it gets none.
+        ring: false,
       });
       let stop: (() => void) | undefined;
       try {

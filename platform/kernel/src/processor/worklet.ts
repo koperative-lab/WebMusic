@@ -7,6 +7,7 @@ import {
   type ProcessorMessage, type ProcessorNodeOptions, type ProcessorNoteMessage, type ProcessorReport,
   type ProcessorTransportMessage,
 } from './protocol';
+import {ProcessorRing} from './ring';
 
 // Audio-thread authoring kit. An author's worklet file imports this entry and
 // calls defineProcessor(); the author's bundler emits the worklet file. Nothing
@@ -75,6 +76,18 @@ export interface ProcessorSetup {
   readonly config: unknown;
   /** Post an author-defined observation to the main thread. Not for per-block use. */
   report(data: unknown): void;
+  /**
+   * The compiled module from `source.wasm`, if any. Instantiate it here with
+   * `new WebAssembly.Instance(setup.wasm, imports)`; the instance and its
+   * memory belong to this processor.
+   */
+  readonly wasm?: WebAssembly.Module;
+  /**
+   * The writer side of this node's shared ring, when the definition requests
+   * one and the page can share memory. Absent otherwise: a processor whose
+   * ring is optional must work without it. `write` never blocks or allocates.
+   */
+  readonly ring?: ProcessorRing;
 }
 
 /**
@@ -186,44 +199,27 @@ class NoteQueue {
   }
 }
 
+/** What one definition's subclass hands the shared processor class. */
+interface ProcessorSpec {
+  readonly resolved: ResolvedProcessorDefinition;
+  readonly implementation: ProcessorImplementation<unknown>;
+  readonly lateInterval: number;
+}
+
+type ProcessorBase = new (options?: {processorOptions?: ProcessorNodeOptions}) => {readonly port: WorkletPort};
+const bases = new WeakMap<ProcessorWorkletScope, ProcessorBase>();
+
 /**
- * Register a processor for `definition` in the current worklet scope. Call it
- * once at the top level of the worklet file, with the same definition object
- * the main thread passes to `prepareProcessor`.
- *
- * If `create`, `note` or `process` throws, the processor reports the error
- * once, goes silent and stops; it does not restart itself.
- *
- * With `noteInput`, the kit keeps a queue of note changes sorted by frame and
- * delivers each one to `note` before the `process` call of its block, with
- * its frame offset. A change that arrives after its frame plays at the start
- * of the next block and is counted (a late `cancel` is not counted: it means
- * stop now); the counts reach the main thread at most
- * four times a second. `cancel` before an onset withdraws that note entirely.
- * When the module's Session invalidates its schedule, the kit withdraws every
- * queued scheduled onset and cancels every sounding scheduled note; live
- * gestures continue. With `transport`, `block.transport` gives the Session
- * position at each block's first frame.
+ * The processor logic, created once per worklet scope. Every definition is a
+ * thin subclass carrying its descriptors and spec, so a worklet file that
+ * defines several processors holds one copy of the per-block code.
  */
-export function defineProcessor<State>(
-  definition: ProcessorDefinition | ResolvedProcessorDefinition,
-  implementation: ProcessorImplementation<State>,
-  scope: ProcessorWorkletScope = workletScope(),
-): void {
-  const resolved = resolveProcessorDefinition(definition);
-  if (typeof implementation?.create !== 'function' || typeof implementation.process !== 'function') {
-    throw new TypeError('A processor implementation needs create() and process().');
-  }
-  if (resolved.noteInput && typeof implementation.note !== 'function') {
-    throw new TypeError(`Processor ${resolved.name} declares note input, so its implementation needs note().`);
-  }
-  const parameterDescriptors: readonly ProcessorAudioParamDescriptor[] = processorAudioParams(resolved);
-  const lateInterval = Math.max(QUANTUM, Math.floor(scope.sampleRate / 4));
-
-  class AuthoredProcessor extends scope.AudioWorkletProcessor {
-    static get parameterDescriptors(): readonly ProcessorAudioParamDescriptor[] { return parameterDescriptors; }
-
-    #state: State | undefined;
+function processorBase(scope: ProcessorWorkletScope): ProcessorBase {
+  const cached = bases.get(scope);
+  if (cached) return cached;
+  class SharedProcessor extends scope.AudioWorkletProcessor {
+    readonly #spec: ProcessorSpec;
+    #state: unknown;
     #failed = false;
     /** The owner disposed the node; `process` returns false so Web Audio can release it. */
     #closed = false;
@@ -240,6 +236,9 @@ export function defineProcessor<State>(
 
     constructor(options?: {processorOptions?: ProcessorNodeOptions}) {
       super();
+      const spec = (new.target as unknown as {spec: ProcessorSpec}).spec;
+      this.#spec = spec;
+      const {resolved, implementation} = spec;
       const node = options?.processorOptions;
       const post = (report: ProcessorReport): void => this.port.postMessage(report);
       try {
@@ -251,6 +250,8 @@ export function defineProcessor<State>(
           sampleRate: scope.sampleRate,
           config: node?.config,
           report: data => post({type: 'data', data}),
+          ...(node?.wasm && {wasm: node.wasm}),
+          ...(node?.ring && {ring: new ProcessorRing(node.ring)}),
         });
       } catch (error) { this.#fail(error); }
       this.port.onmessage = event => {
@@ -265,13 +266,14 @@ export function defineProcessor<State>(
         } else if (message.type === 'close') {
           this.#closed = true;
         } else if (message.type === 'config' && implementation.message) {
-          try { implementation.message(this.#state as State, message.data); } catch (error) { this.#fail(error); }
+          try { implementation.message(this.#state, message.data); } catch (error) { this.#fail(error); }
         }
       };
     }
 
     process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean {
       if (this.#failed || this.#closed) return false;
+      const {resolved, implementation} = this.#spec;
       const block = this.#block;
       block.inputs = inputs;
       block.outputs = outputs;
@@ -280,7 +282,7 @@ export function defineProcessor<State>(
       if (resolved.transport) block.transport = this.#readTransport(block.frame);
       try {
         if (resolved.noteInput) this.#dispatch(block.frame, outputs[0]?.[0]?.length ?? QUANTUM);
-        implementation.process(this.#state as State, block);
+        implementation.process(this.#state, block);
       } catch (error) {
         for (const port of outputs) for (const channel of port) channel.fill(0);
         this.#fail(error);
@@ -290,6 +292,7 @@ export function defineProcessor<State>(
     }
 
     #dispatch(frame: number, length: number): void {
+      const {implementation, lateInterval} = this.#spec;
       const event = this.#event;
       for (let message = this.#notes.next(frame + length); message; message = this.#notes.next(frame + length)) {
         if (message.gate === 'on') {
@@ -313,7 +316,7 @@ export function defineProcessor<State>(
         event.cents = message.cents;
         event.velocity = message.velocity;
         event.epoch = message.epoch;
-        implementation.note!(this.#state as State, event);
+        implementation.note!(this.#state, event);
       }
       if (this.#late > 0 && frame - this.#lateReported >= lateInterval) {
         const report: ProcessorReport = {type: 'late', count: this.#late};
@@ -349,5 +352,48 @@ export function defineProcessor<State>(
     }
   }
 
+  bases.set(scope, SharedProcessor);
+  return SharedProcessor;
+}
+
+/**
+ * Register a processor for `definition` in the current worklet scope. Call it
+ * once at the top level of the worklet file, with the same definition object
+ * the main thread passes to `prepareProcessor`.
+ *
+ * If `create`, `note` or `process` throws, the processor reports the error
+ * once, goes silent and stops; it does not restart itself.
+ *
+ * With `noteInput`, the kit keeps a queue of note changes sorted by frame and
+ * delivers each one to `note` before the `process` call of its block, with
+ * its frame offset. A change that arrives after its frame plays at the start
+ * of the next block and is counted (a late `cancel` is not counted: it means
+ * stop now); the counts reach the main thread at most
+ * four times a second. `cancel` before an onset withdraws that note entirely.
+ * When the module's Session invalidates its schedule, the kit withdraws every
+ * queued scheduled onset and cancels every sounding scheduled note; live
+ * gestures continue. With `transport`, `block.transport` gives the Session
+ * position at each block's first frame.
+ */
+export function defineProcessor<State>(
+  definition: ProcessorDefinition | ResolvedProcessorDefinition,
+  implementation: ProcessorImplementation<State>,
+  scope: ProcessorWorkletScope = workletScope(),
+): void {
+  const resolved = resolveProcessorDefinition(definition);
+  if (typeof implementation?.create !== 'function' || typeof implementation.process !== 'function') {
+    throw new TypeError('A processor implementation needs create() and process().');
+  }
+  if (resolved.noteInput && typeof implementation.note !== 'function') {
+    throw new TypeError(`Processor ${resolved.name} declares note input, so its implementation needs note().`);
+  }
+  const parameterDescriptors: readonly ProcessorAudioParamDescriptor[] = processorAudioParams(resolved);
+  const lateInterval = Math.max(QUANTUM, Math.floor(scope.sampleRate / 4));
+
+  const spec: ProcessorSpec = Object.freeze({resolved, implementation: implementation as ProcessorImplementation<unknown>, lateInterval});
+  class AuthoredProcessor extends processorBase(scope) {
+    static readonly spec = spec;
+    static get parameterDescriptors(): readonly ProcessorAudioParamDescriptor[] { return parameterDescriptors; }
+  }
   scope.registerProcessor(resolved.name, AuthoredProcessor);
 }

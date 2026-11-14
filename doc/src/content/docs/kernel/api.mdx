@@ -20,7 +20,7 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
-| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects, instruments and project plugins, and the thread protocol |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects, instruments, project plugins, WebAssembly handoff, the shared ring and capabilities, and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
@@ -1324,6 +1324,46 @@ await runtime.restore(saved);
 runtime.snapshot().unresolved; // empty unless the worklet failed to load
 ```
 
+### WebAssembly and shared memory
+
+A source may add `wasm`: a URL, the bytes, or a compiled `WebAssembly.Module`.
+`prepareProcessor` compiles it once per context, before registering the
+worklet, and hands the module to every node; the processor's `create` receives
+it as `setup.wasm` and instantiates it with its own memory. A definition with
+`wasm: true` cannot be prepared without one, and a binary that fails to compile
+or load rejects preparation and is forgotten.
+
+A definition may request `sharedRing: {capacity, required?}`: a
+`ProcessorRing` of `float32` samples in a `SharedArrayBuffer` that the
+processor writes (`setup.ring`) and the main thread reads (`module.ring`,
+`instrument.ring`). It exists only where `processorCapabilities().sharedMemory`
+is true — a cross-origin isolated page. Elsewhere the processor runs without
+it, or, with `required: true`, preparation rejects with
+`ProcessorUnavailableError` and the reason. Insert effects never get a ring.
+`write` never blocks or allocates: what does not fit is dropped and counted in
+`dropped`; one slot stays empty.
+
+| Export | Meaning |
+| --- | --- |
+| `processorCapabilities()` | `{audioWorklet, wasm, sharedMemory}` for this environment |
+| `ProcessorRing` | `available`, `dropped`, `write(source, start?, length?)` (audio thread), `read(target)` (main thread), `buffer`, `capacity`; `ProcessorRing.create(capacity)` and `new ProcessorRing(buffer)` |
+| `ProcessorWasmSource` | `string \| URL \| ArrayBuffer \| ArrayBufferView \| WebAssembly.Module` |
+
+```ts
+import {createProcessorModule, prepareProcessor, processorCapabilities, type ProcessorDefinition} from '@webmusic/kernel/processor';
+import type {ModuleContext} from '@webmusic/kernel/module';
+
+declare const scope: ModuleContext;
+declare const audio: AudioContext;
+declare const scopeView: ProcessorDefinition; // {..., wasm: true, sharedRing: {capacity: 16384}}
+declare const workletUrl: URL;
+
+await prepareProcessor(audio, scopeView, {module: workletUrl, wasm: new URL('./scope.wasm', location.href)});
+const view = createProcessorModule(scope, scopeView, {id: 'scope'});
+const samples = new Float32Array(4096);
+if (processorCapabilities().sharedMemory && view.ring) view.ring.read(samples);
+```
+
 Disposing a module, effect realization or instrument posts a `close` message
 before closing the port, so the processor stops at its next block instead of
 rendering until the node is collected.
@@ -1373,6 +1413,12 @@ release never moves ahead of its own onset, a later release replaces one still
 queued, and epochs are passed through but never compared across sources. When the module's Session invalidates its schedule, the kit withdraws
 queued scheduled onsets and cancels sounding scheduled notes; immediate live
 gestures are untouched. The event object is reused.
+
+`setup.wasm` is the module compiled from `source.wasm`; instantiate it in
+`create`. Pass only integers to its exports and keep floats in its memory: V8
+boxes a fractional argument once one call site reaches the exports of several
+instances, which happens as soon as two nodes run the processor. `setup.ring`
+is the writer side of the node's shared ring, when there is one.
 
 With `transport: true`, `block.transport` gives `playing`, `position` (Session
 seconds at the block's first frame, folded into the loop), `rate`, `loop` and

@@ -37,6 +37,27 @@ export interface ProcessorDefinition {
   readonly latencySamples?: number;
   /** How long output continues after input and notes end. Default 0; `Infinity` never idles. */
   readonly tailSeconds?: number;
+  /**
+   * The processor needs a compiled WebAssembly module: preparation then
+   * requires `source.wasm`, and `create` receives the module as `setup.wasm`.
+   * Default false.
+   */
+  readonly wasm?: boolean;
+  /**
+   * A shared ring the processor writes and the main thread reads, for
+   * high-rate observation such as a scope or a sample stream. It exists only
+   * where `processorCapabilities().sharedMemory` is true; with `required`,
+   * preparation fails elsewhere instead of running without it.
+   */
+  readonly sharedRing?: ProcessorSharedRingRequest;
+}
+
+/** A processor's request for a shared ring. */
+export interface ProcessorSharedRingRequest {
+  /** Ring size in `float32` samples: an integer from 128 to 16,777,216. */
+  readonly capacity: number;
+  /** Fail preparation without cross-origin isolation. Default false: the processor runs without the ring. */
+  readonly required?: boolean;
 }
 
 /** A validated definition with every default applied. Deeply frozen. */
@@ -52,6 +73,8 @@ export interface ResolvedProcessorDefinition {
   readonly params: readonly ParamDescriptor[];
   readonly latencySamples: number;
   readonly tailSeconds: number;
+  readonly wasm: boolean;
+  readonly sharedRing: Readonly<{capacity: number; required: boolean}> | null;
 }
 
 /** The `AudioParamDescriptor` shape, declared here because worklet globals have no DOM types. */
@@ -131,6 +154,15 @@ export function resolveProcessorDefinition(definition: ProcessorDefinition | Res
   if (Number.isNaN(tailSeconds) || tailSeconds < 0) {
     throw new RangeError('Processor tailSeconds must be nonnegative or Infinity.');
   }
+  let sharedRing: ResolvedProcessorDefinition['sharedRing'] = null;
+  const request = definition.sharedRing;
+  if (request !== undefined && request !== null) {
+    const capacity = Number(request.capacity);
+    if (!Number.isInteger(capacity) || capacity < 128 || capacity > 16_777_216) {
+      throw new RangeError('Processor sharedRing capacity must be an integer from 128 to 16,777,216 samples.');
+    }
+    sharedRing = Object.freeze({capacity, required: request.required === true});
+  }
   const result: ResolvedProcessorDefinition = Object.freeze({
     id: definition.id,
     version: definition.version,
@@ -142,6 +174,8 @@ export function resolveProcessorDefinition(definition: ProcessorDefinition | Res
     params: params(definition.params),
     latencySamples,
     tailSeconds,
+    wasm: definition.wasm === true,
+    sharedRing,
   });
   resolved.add(result);
   return result;
@@ -164,9 +198,9 @@ export function processorAudioParams(definition: ProcessorDefinition | ResolvedP
  * a conflict, not an update.
  */
 export function processorSignature(definition: ProcessorDefinition | ResolvedProcessorDefinition): string {
-  const {name, audioInputs, audioOutputs, noteInput, transport, latencySamples, tailSeconds} = resolveProcessorDefinition(definition);
+  const {name, audioInputs, audioOutputs, noteInput, transport, latencySamples, tailSeconds, wasm, sharedRing} = resolveProcessorDefinition(definition);
   return JSON.stringify({
-    name, audioInputs, audioOutputs, noteInput, transport, latencySamples,
+    name, audioInputs, audioOutputs, noteInput, transport, latencySamples, wasm, sharedRing,
     tailSeconds: Number.isFinite(tailSeconds) ? tailSeconds : 'Infinity',
     params: processorAudioParams(definition),
   });

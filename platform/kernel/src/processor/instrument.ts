@@ -1,6 +1,7 @@
 import {ParamHandle, ParamSurface} from '../module/parameter';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
-import {bindProcessorParams, createProcessorNode, listenToProcessor, type ProcessorNodeFactory} from './node';
+import {bindProcessorParams, createProcessorNode, listenToProcessor, processorRingOf, type ProcessorNodeFactory} from './node';
+import type {ProcessorRing} from './ring';
 import {isProcessorPrepared} from './prepare';
 import {PROCESSOR_IMMEDIATE_FRAME, type ProcessorNoteMessage} from './protocol';
 
@@ -68,6 +69,8 @@ export class ProcessorInstrument {
     this.#cleanups = parts.cleanups;
   }
 
+  /** The reader side of the node's shared ring; absent unless the definition requests one and memory can be shared. */
+  get ring(): ProcessorRing | undefined { return processorRingOf(this.node); }
   get state(): ProcessorInstrumentState { return this.#state; }
   get error(): string | undefined { return this.#error; }
   /** Note changes played after their frame, as reported so far. */
