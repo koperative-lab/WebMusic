@@ -23,7 +23,7 @@ const demoComponents = new Set([
   'QuickStartPlayerDemo', 'ProgrammaticRackDemo', 'ProgrammaticPlayerControllerDemo',
   'ScorePlayerPlayground', 'ProgrammaticMetronomeDemo',
   'ProgrammaticInteractivePlayerDemo', 'ScoreWindowPlayground', 'PlaybackFollowersPlayground',
-  'ProgrammaticEffectDemo', 'ProgrammaticSoundDemo',
+  'ProgrammaticEffectDemo', 'ProgrammaticSoundDemo', 'ProgrammaticProcessorDemo',
   'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',

@@ -18,7 +18,10 @@ work and does not establish npm publication, a release tag or a deployment.
   how to write one. `processorPlugin` saves and restores processors in module
   projects; a processor that cannot be loaded stays an unresolved record
   instead of failing the restore, and a plugin factory can now report any
-  module unavailable with `ProjectModuleUnavailableError`.
+  module unavailable with `ProjectModuleUnavailableError`. A new "Write a
+  processor" guide walks through authoring one, and Score's `Effect.from`
+  lets a Kernel effect recipe such as `processorEffect` go wherever Score takes
+  an `Effect`.
 - Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
   and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
   foundations do not contain the new module, Session and patch-editor entries.

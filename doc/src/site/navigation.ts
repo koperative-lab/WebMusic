@@ -107,6 +107,7 @@ export const SITE_NAVIGATION: readonly Spec[] = [
   ]),
   group('Kernel', [
     link('Overview', '/kernel/'),
+    link('Write a processor', '/kernel/processors/'),
     link('@webmusic/kernel', '/kernel/api/'),
   ]),
 ];

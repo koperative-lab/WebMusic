@@ -158,6 +158,7 @@ presenter's page; the shared contract is not copied into every leaf page.
 | ScoreAudioSync | `/bridge/headless/score-audio-sync/` | Object and factory lifecycle under the Headless template |
 | Bridge root API | `/bridge/api/` | Every actual root export, linking to the object where appropriate |
 | Kernel Overview | `/kernel/` | Platform scope and admission boundary |
+| Write a processor | `/kernel/processors/` | Self-contained author guide for authored DSP: definition, DSP, worklet file, instrument/effect/module use, controls, Element recipe, projects and testing, with a live demo of the reference processor playing Arabesque No. 1; members stay in the root API |
 | Kernel root API | `/kernel/api/` | Root and public sub-entry contracts, grouped by sub-entry |
 
 Bridge has no published `/headless` subpath. Its sync class and factories are

@@ -265,6 +265,31 @@ version mismatch, note connections and report relaying.
 
 Not established: audible quality of the restored chain, other browsers.
 
+## Step 7 as built
+
+The site page [Write a processor](../../doc/src/content/docs/kernel/processors.mdx)
+(`/kernel/processors/`), its demo
+[ProgrammaticProcessorDemo](../../doc/src/components/programmatic/ProgrammaticProcessorDemo.astro),
+and Score's `Effect.from`.
+
+| Choice | Reason |
+|---|---|
+| One guide page under Kernel, not a Headless group | The site plan gives Kernel no Headless group; the guide routes to the member references in the Kernel API and Score `Sound` pages instead of copying them |
+| The demo is the reference processor playing Arabesque No. 1 as a `ScorePlayer` instrument, with a `<score-synth-panel>` on its parameter surface | It shows the whole path a reader will build, using the shipped reference and no invented notes |
+| Snippets use `declare` stand-ins for the reader's own files | The snippet checker compiles each example alone and cannot resolve local imports |
+| Score gains `Effect.from(recipe)` (new) | Writing the guide showed that Score's `Effect` slots are typed as Score's own class, so a Kernel `processorEffect` recipe could not be passed there, and the Rack master realizes effects with Score's `build()`. The adapter makes a Kernel recipe a Score `Effect` everywhere; the step 2 wording that claimed direct use in Score slots is corrected |
+
+Evidence (2026-11-14, in-app Chromium on the docs dev server): the page
+renders under Kernel in the navigation; the demo loads the worklet file
+through Vite's `?worker&url`, plays Arabesque No. 1 (time advancing, pause
+holding), the panel binds eight controls (bus gain and the seven processor
+parameters), there are no console errors, and the layout fits a 375 px viewport
+without horizontal overflow. All page snippets compile against built
+declarations.
+
+Not established: the Element recipe and the project snippet are compiled, not
+run on the page; a third party following the guide unaided; audible quality.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -281,7 +306,7 @@ build in order; none starts a later one's surface early.
 | 4 — done | Transport and Session following | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
 | 5 — done | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
 | 6 — done | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
-| 7 | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |
+| 7 — done | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |
 | 8 | WASM and shared memory | Compiled-module handoff; optional ring buffer reported as a capability when `crossOriginIsolated` | Capability reporting with and without isolation |
 
 Before starting a step, read the proposal's matching section and the Kernel

@@ -97,3 +97,30 @@ describe('kernel Effect contract', () => {
     expect(nodes.input).toBe(nodes.output);
   });
 });
+
+describe('Effect.from', () => {
+  it('adopts a Kernel recipe with its label and parameter descriptors, realizing through createAudioNodes', () => {
+    const context = {sampleRate: 48000} as unknown as BaseAudioContext;
+    const nodes = {input: {} as AudioNode, output: {} as AudioNode};
+    const calls: BaseAudioContext[] = [];
+    const recipe: KernelEffect = {
+      label: 'Soft clip',
+      parameterDescriptors: {drive: {unit: 'ratio', range: {min: 1, max: 20}, defaultValue: 1}},
+      createAudioNodes: (received) => { calls.push(received); return nodes; },
+    };
+    const effect = Effect.from(recipe);
+    expect(effect).toBeInstanceOf(Effect);
+    expect(effect.label).toBe('Soft clip');
+    expect(effect.parameterDescriptors).toBe(recipe.parameterDescriptors);
+    // The Rack master path calls build(); InsertChain calls createAudioNodes().
+    expect(effect.build(context as AudioContext)).toBe(nodes);
+    expect(effect.createAudioNodes(context)).toBe(nodes);
+    expect(calls).toEqual([context, context]);
+  });
+
+  it('returns a Score Effect unchanged and rejects a value without createAudioNodes', () => {
+    const gain = Effect.gain(0.5);
+    expect(Effect.from(gain)).toBe(gain);
+    expect(() => Effect.from({} as KernelEffect)).toThrow(/createAudioNodes/);
+  });
+});

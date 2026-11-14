@@ -144,6 +144,7 @@ optional. The option types are exported from the same Headless entry.
 | `Effect.compressor(options?)` | `CompressorOptions`: optional `threshold`, `knee` (dB), `ratio`, `attack`, `release` (s). Omitted values retain native compressor defaults. | `threshold`, `ratio` |
 | `Effect.reverb(options?)` | `ReverbOptions.seconds: 1.8`, `decay: 2.2`, `wet: 0.28`, `dry: 0.82`; seconds/decay have a minimum of 0.1. Generates a stereo noise impulse. | `wet`, `dry` |
 | `Effect.custom(implementation)` | Factory `(context: AudioContext) => EffectNode`, or a fixed `EffectNode`. | Supplied by caller |
+| `Effect.from(recipe)` | Any Kernel `Effect` recipe, such as [`processorEffect(definition)`](/kernel/processors/); a Score `Effect` is returned unchanged. | The recipe's label and parameter descriptors |
 | `Effect.chain(...effects)` | Series composition; skips `null`/`undefined`. An empty chain is unity gain. | No combined map for a nonempty chain |
 
 `params` lists the actual exported controls, not every underlying node property.

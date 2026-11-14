@@ -1,0 +1,399 @@
+---
+title: Write a processor
+description: Write your own per-sample DSP as an AudioWorklet processor, then use it as an instrument, an insert effect, a module, an Element and a project plugin.
+---
+import ProgrammaticProcessorDemo from '../../../components/programmatic/ProgrammaticProcessorDemo.astro';
+
+<ProgrammaticProcessorDemo />
+
+A processor is your own DSP code running on the audio thread in an
+`AudioWorklet`. You write it once — a definition and a DSP object — and
+WebMusic gives it the same parameters, ports, timing and lifecycle as its
+built-in modules. The demo above is the reference polyphonic processor playing
+Arabesque No. 1 as a `ScorePlayer` instrument; the panel edits its parameters
+while it plays.
+
+This page walks through writing one from nothing. The members are documented
+in the Kernel [`processor`](/kernel/api/#processor--webmusickernelprocessor)
+and [`processor-worklet`](/kernel/api/#processor-worklet--webmusickernelprocessor-worklet)
+references.
+
+## What you write
+
+Three files. The reference processor in the repository's
+`doc/shared/processors/` folder is a complete example to copy:
+
+| File | Thread | Contains |
+| --- | --- | --- |
+| `poly-synth.ts` | both | The `ProcessorDefinition`: plain data |
+| `poly-synth-dsp.ts` | audio | The DSP: a `ProcessorImplementation` object |
+| `poly-synth.worklet.ts` | audio | One `defineProcessor(definition, dsp)` call; your bundler emits it as its own file |
+
+Keep the DSP in its own file, apart from the worklet file, so tests can run it
+against a fake worklet scope.
+
+## 1 · Define it
+
+The definition names the processor and declares everything the main thread
+needs to know: audio buses, note input, Session transport, parameters,
+latency and tail. Both threads import the same object.
+
+```ts
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+
+export const polySynth: ProcessorDefinition = {
+  id: 'example.poly-synth',          // with version, the registration name: example.poly-synth@1.0.0
+  version: '1.0.0',
+  noteInput: true,                   // receives notes; an effect declares audioInputs instead
+  audioOutputs: [{id: 'output', channels: 2}],
+  tailSeconds: 5,                    // longest release
+  params: [
+    {id: 'level', label: 'Level', unit: 'ratio', range: {min: 0, max: 1}, defaultValue: 0.2},
+    {id: 'cutoff', label: 'Cutoff', unit: 'hertz', range: {min: 40, max: 18000}, defaultValue: 2400,
+      scale: 'logarithmic', modulation: 'control-rate'},
+    {id: 'release', label: 'Release', unit: 'seconds', range: {min: 0.005, max: 5}, defaultValue: 0.3},
+  ],
+};
+```
+
+Change `version` whenever the parameters or buses change. Projects store it,
+and a project saved with another version stays unresolved rather than loading
+an incompatible processor.
+
+| Parameter `modulation` | On the audio thread | Accepts LFOs and other modulation |
+| --- | --- | --- |
+| `'audio-rate'` | One value per frame while it changes | Yes, per frame |
+| `'control-rate'` | One value per block | Yes, per block |
+| absent or `'none'` | One value per block | No; set directly |
+
+## 2 · Write the DSP
+
+`create` allocates everything once. `note` and `process` run on the audio
+thread for every 128-frame block and must not allocate, create closures or
+strings, or post messages. Keep voices in typed arrays.
+
+```ts
+import type {ProcessorImplementation} from '@webmusic/kernel/processor-worklet';
+
+const VOICES = 16;
+
+interface State {
+  readonly sampleRate: number;
+  readonly occurrence: Int32Array;   // -1 when the voice is free
+  readonly phase: Float64Array;
+  readonly step: Float64Array;
+  readonly gain: Float64Array;
+  readonly releasing: Uint8Array;
+  readonly startAt: Int32Array;      // frame in the coming block, or -1
+  readonly releaseAt: Int32Array;
+}
+
+export const polySynthDsp: ProcessorImplementation<State> = {
+  create: ({sampleRate}) => ({
+    sampleRate,
+    occurrence: new Int32Array(VOICES).fill(-1),
+    phase: new Float64Array(VOICES),
+    step: new Float64Array(VOICES),
+    gain: new Float64Array(VOICES),
+    releasing: new Uint8Array(VOICES),
+    startAt: new Int32Array(VOICES).fill(-1),
+    releaseAt: new Int32Array(VOICES).fill(-1),
+  }),
+
+  // Called just before process() for each note change in the coming block.
+  note(state, event) {
+    if (event.gate === 'on') {
+      let voice = state.occurrence.indexOf(-1);
+      if (voice < 0) voice = 0; // the reference steals the quietest or oldest voice instead
+      state.occurrence[voice] = event.occurrence;
+      state.step[voice] = 440 * 2 ** ((event.midi - 69 + event.cents / 100) / 12) / state.sampleRate;
+      state.startAt[voice] = event.frameOffset;   // start on the exact sample
+      state.releaseAt[voice] = -1;
+      return;
+    }
+    const voice = state.occurrence.indexOf(event.occurrence);
+    if (voice < 0) return;
+    if (event.gate === 'off') state.releaseAt[voice] = event.frameOffset;
+    else state.occurrence[voice] = -1;            // cancel: stop at once
+  },
+
+  process(state, block) {
+    const [left, right] = block.outputs[0];
+    const level = block.params.level[0];
+    const fall = Math.pow(0.001, 1 / (block.params.release[0] * state.sampleRate));
+    for (let voice = 0; voice < VOICES; voice++) {
+      if (state.occurrence[voice] < 0) continue;
+      const startAt = state.startAt[voice], releaseAt = state.releaseAt[voice];
+      let gain = state.gain[voice], phase = state.phase[voice], releasing = state.releasing[voice] === 1;
+      for (let frame = Math.max(0, startAt); frame < left.length; frame++) {
+        if (frame === startAt) { gain = level; phase = 0; releasing = false; }
+        if (frame === releaseAt) releasing = true;
+        if (releasing) gain *= fall;
+        const sample = (2 * phase - 1) * gain;   // naive sawtooth; the reference band-limits it
+        left[frame] += sample;
+        right[frame] += sample;
+        phase += state.step[voice];
+        if (phase >= 1) phase -= 1;
+      }
+      state.gain[voice] = gain;
+      state.phase[voice] = phase;
+      state.releasing[voice] = releasing ? 1 : 0;
+      state.startAt[voice] = state.releaseAt[voice] = -1;
+      if (releasing && gain < 1e-5) state.occurrence[voice] = -1;
+    }
+  },
+};
+```
+
+How the block works:
+
+- `block.outputs[port][channel]` is zero-filled before each call; add into
+  it. An effect reads `block.inputs[port][channel]`.
+- `block.params[id]` holds one value, or one per frame for an `audio-rate`
+  parameter that changes inside the block.
+- `block.frame / block.sampleRate` is the audio time of the block's first
+  sample.
+- `event.frameOffset` is where in the coming block a note change applies.
+- With `transport: true` in the definition, `block.transport` gives the
+  Session's `playing`, `position`, `rate`, `loop` and `epoch` at the block's
+  first frame.
+- If `create`, `note` or `process` throws, the processor reports the error
+  once, goes silent and stops. It never restarts itself.
+
+## 3 · Register and bundle the worklet file
+
+```ts
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+import {defineProcessor, type ProcessorImplementation} from '@webmusic/kernel/processor-worklet';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthDsp: ProcessorImplementation<unknown>; // from poly-synth-dsp.ts
+
+defineProcessor(polySynth, polySynthDsp);
+```
+
+The worklet file must reach the browser as its own module. With Vite, import
+its URL with `?worker&url`, which bundles its imports into one file; with
+another bundler, emit it as a separate entry and use that URL. It must not
+import main-thread code.
+
+```ts
+import polySynthUrl from './poly-synth.worklet.ts?worker&url';
+```
+
+## 4 · Use it
+
+Preparation loads the worklet file into one `AudioContext` and is
+asynchronous; creating nodes afterwards is synchronous. Prepare before you
+build, or let `Sound.processor` and `processorPlugin` prepare from a `source`.
+
+### As an instrument
+
+`Sound.processor` makes a note-input processor the instrument of any
+[`ScorePlayer`](/score/headless/play/score-player/), Rack channel or
+`<score-player>`. Onsets, note lengths, releases and cancellations land on their
+exact sample.
+
+```ts
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+import {loadScoreFromUrl} from '@webmusic/score/io';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthUrl: string; // import polySynthUrl from './poly-synth.worklet.ts?worker&url'
+
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
+const sound = Sound.processor(polySynth, {
+  source: {module: polySynthUrl},
+  onLateNotes: (count) => console.warn(`${count} notes played late`),
+});
+const player = new ScorePlayer(score, {synth: sound, synthOwnership: 'owned'});
+await player.preload();  // loads the worklet into the player's context
+await player.play();
+sound.params.get('cutoff')?.setBaseValue(900);
+```
+
+### As an insert effect
+
+A processor with `audioInputs` becomes an `Effect` recipe with
+`processorEffect`. Use it directly in an `InsertChain` slot; wrap it with Score's
+`Effect.from()` for a player's `effect`, a Rack channel or master, or a
+`<score-effect>`. Prepare it in that context first.
+
+```ts
+import {prepareProcessor, processorEffect, type ProcessorDefinition} from '@webmusic/kernel/processor';
+import {Effect, ScorePlayer} from '@webmusic/score/play/headless';
+
+declare const softClip: ProcessorDefinition;   // audioInputs: [{id: 'input', channels: 2}]
+declare const softClipUrl: string;
+declare const score: import('@webmusic/score').Score;
+
+const audioContext = new AudioContext();
+await prepareProcessor(audioContext, softClip, {module: softClipUrl});
+// Score takes its own Effect class; Effect.from adopts the Kernel recipe.
+const player = new ScorePlayer(score, {audioContext, effect: Effect.from(processorEffect(softClip, {label: 'Soft clip'}))});
+await player.play();
+```
+
+### As a module
+
+`createProcessorModule` gives a processor typed ports in a module scope: an
+audio input and output per bus, a `notes` input for a note-input processor,
+and a `params` control port. In a scope with a Session it follows seek, pause
+and loop.
+
+```ts
+import {ModuleAudioEnvironment, ModuleContext, NoteOutputPort} from '@webmusic/kernel/module';
+import {createProcessorModule, prepareProcessor, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthUrl: string; // import polySynthUrl from './poly-synth.worklet.ts?worker&url'
+
+const audio = new AudioContext();
+const scope = new ModuleContext({id: 'root', audio: new ModuleAudioEnvironment({context: audio})});
+await prepareProcessor(audio, polySynth, {module: polySynthUrl});
+
+const synth = createProcessorModule(scope, polySynth, {id: 'poly'});  // routed to the speakers
+const keys = new NoteOutputPort({id: 'keys'});
+synth.notes?.connect(keys);
+keys.emit({occurrenceId: 'n1', sourceId: 'keys', pitch: {midi: 64}, velocity: 0.8,
+  gate: 'on', axis: 'audio-context-seconds', time: audio.currentTime + 0.1, epoch: 0});
+```
+
+## 5 · Give it controls
+
+Every processor exposes a `ParamSurface` built from its parameter
+declarations, so existing panels show its labels, units and ranges without
+extra code. `<score-synth-panel sections="sound">` renders one knob per
+parameter of the module it targets:
+
+```ts
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+import {Sound} from '@webmusic/score/play/headless';
+import {defineAllElements} from '@webmusic/score/play/element';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+
+defineAllElements();
+const sound = Sound.processor(polySynth);
+const panel = document.querySelector('score-synth-panel') as HTMLElement & {moduleTarget?: unknown};
+panel.moduleTarget = {id: 'poly-synth', params: sound.params};
+```
+
+A processor module or insert also works with a panel's `target` selector, and
+with any UI Kit presenter you bind to a `ParamHandle` yourself. Parameter
+changes are written to the node's `AudioParam`s; modulation follows the
+parameter's declared rate.
+
+## 6 · Wrap it in an Element
+
+No generator is needed. Extend `WebMusicElement`, create the module from the
+scope the Element finds itself in, and expose it as `module` so panels and
+patch editors can target it.
+
+```ts
+import {WebMusicElement, defineOnce, notifyModuleChange, observeModuleContext} from '@webmusic/kernel/element';
+import type {ModuleContext} from '@webmusic/kernel/module';
+import {createProcessorModule, prepareProcessor, type ProcessorModule, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthUrl: string; // import polySynthUrl from './poly-synth.worklet.ts?worker&url'
+
+class PolySynthElement extends WebMusicElement {
+  module?: ProcessorModule;
+  #generation = 0;
+
+  protected override onMount() {
+    const stop = observeModuleContext(this, (context) => this.#bind(context));
+    return () => { stop(); this.#bind(undefined); };
+  }
+
+  #bind(context: ModuleContext | undefined): void {
+    const generation = ++this.#generation;
+    this.module?.dispose();
+    this.module = undefined;
+    notifyModuleChange(this);
+    if (!context) return;
+    prepareProcessor(context.audio.prepare(), polySynth, {module: polySynthUrl}).then(() => {
+      if (generation !== this.#generation) return;      // the scope changed while loading
+      this.module = createProcessorModule(context, polySynth, {id: this.id || 'poly-synth'});
+      notifyModuleChange(this);
+    }).catch(reportError);
+  }
+}
+defineOnce('poly-synth', PolySynthElement);
+```
+
+Place it inside a provider such as `<score-player>` or `<score-rack-control>`
+and its output joins that scope's route. A `<score-synth-panel target="#lead">`
+then finds `#lead`'s `module`.
+
+## 7 · Save it in projects
+
+`processorPlugin` registers the processor with a module project. A module
+record stores the definition's `id` and `version`, its `config` (handed to
+`create`) and its parameter values. When the processor cannot be loaded, the
+record, its parameters and its connections stay unresolved instead of failing
+the restore; `retryMissing()` recovers them.
+
+```ts
+import {ModuleAudioEnvironment, ModuleProjectRuntime, ProjectPluginRegistry} from '@webmusic/kernel/module';
+import {processorPlugin, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthUrl: string; // import polySynthUrl from './poly-synth.worklet.ts?worker&url'
+
+declare const savedProject: unknown;
+
+const plugins = new ProjectPluginRegistry();
+plugins.register(processorPlugin(polySynth, {source: {module: polySynthUrl}}));
+const runtime = new ModuleProjectRuntime({audio: new ModuleAudioEnvironment({context: new AudioContext()}), plugins});
+await runtime.restore(savedProject);
+```
+
+## Test it
+
+The DSP object runs anywhere: register it against a structural fake of the
+worklet scope, post note messages to its port, and call `process` with your
+own buffers. The repository's `doc/test/processor-reference.test.ts` does this
+for the reference processor, including a check that ten minutes of dense
+polyphony neither grow the heap nor allocate per block.
+
+```ts
+import {PROCESSOR_PROTOCOL_VERSION, type ProcessorDefinition} from '@webmusic/kernel/processor';
+import {defineProcessor, type ProcessorWorkletScope, type ProcessorImplementation} from '@webmusic/kernel/processor-worklet';
+
+declare const polySynth: ProcessorDefinition; // from poly-synth.ts
+declare const polySynthDsp: ProcessorImplementation<unknown>; // from poly-synth-dsp.ts
+
+let Processor: any;
+const scope = {
+  currentFrame: 0, sampleRate: 48000,
+  registerProcessor: (_name: string, processor: unknown) => { Processor = processor; },
+  AudioWorkletProcessor: class { readonly port = {onmessage: null, postMessage() {}}; },
+};
+defineProcessor(polySynth, polySynthDsp, scope as unknown as ProcessorWorkletScope);
+const instance = new Processor({processorOptions: {protocol: PROCESSOR_PROTOCOL_VERSION, name: 'example.poly-synth@1.0.0'}});
+instance.port.onmessage({data: {type: 'note', gate: 'on', occurrence: 1, midi: 60, cents: 0, velocity: 1, frame: 5, epoch: 0}});
+const outputs = [[new Float32Array(128), new Float32Array(128)]];
+instance.process([], outputs, {level: new Float32Array([0.2]), cutoff: new Float32Array([2400]), release: new Float32Array([0.3])});
+```
+
+## Limits
+
+- Processor code is trusted, like any script the page loads. Load only URLs
+  you control.
+- `AudioWorklet` is required. Without it, preparation rejects with
+  `ProcessorUnavailableError`; there is no `ScriptProcessorNode` fallback.
+- A note change that reaches the audio thread after its frame plays at the
+  start of the next block and is counted (`onLateNotes`, `lateNotes`).
+- Notes, parameters and transport are the processor's only inputs from the
+  main thread. WebAssembly and shared memory are not supported yet.
+
+## Related
+
+- [Kernel `processor` reference](/kernel/api/#processor--webmusickernelprocessor)
+  and [`processor-worklet` reference](/kernel/api/#processor-worklet--webmusickernelprocessor-worklet)
+- [`Sound`](/score/headless/play/sound/) — `Sound.processor` beside the built-in timbres
+- [`ScorePlayer`](/score/headless/play/score-player/)
+- [Modular composition](/bridge/modular-composition/) — scopes, Racks and projects

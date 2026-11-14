@@ -1238,9 +1238,10 @@ clip.getInput('input');  // AudioInputPort: connect a producer's output port to 
 clip.dispose();
 ```
 
-`processorEffect(definition, options)` returns an `Effect` recipe, so a
-prepared processor works anywhere an effect does: an `InsertChain` slot, a
-Rack channel insert, a player's `.effect` or a `<score-effect>`'s `.effect`.
+`processorEffect(definition, options)` returns an `Effect` recipe for an
+`InsertChain` slot, including a module's `inserts`. Score takes its own
+`Effect` class, so wrap the recipe with Score's `Effect.from()` for a player's
+`effect`, a Rack channel or master, or a `<score-effect>`.
 Each realization creates its own node, which is both the slot's input and
 output; the chain feeds the first input bus (at its declared channel count)
 and reads the first output. `createAudioNodes` stays synchronous, so it throws
