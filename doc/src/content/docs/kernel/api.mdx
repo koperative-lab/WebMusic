@@ -20,7 +20,7 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
-| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation and the thread protocol |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
@@ -1166,9 +1166,39 @@ isProcessorPrepared(context, softClip); // true
 Every parameter becomes an `AudioParam` of the node: `modulation:
 'audio-rate'` makes it a-rate, anything else k-rate. The entry also exports the
 message protocol between the two threads (`ProcessorMessage`,
-`ProcessorReport`, `PROCESSOR_PROTOCOL_VERSION`). The module that turns a
-prepared definition into ports, parameters and an insert effect is not
-delivered yet.
+`ProcessorReport`, `PROCESSOR_PROTOCOL_VERSION`).
+
+`createProcessorModule(context, definition, options)` turns a prepared
+definition into a module: one `AudioWorkletNode`, an `AudioInputPort` and
+`AudioOutputPort` per declared bus, and a `params` control port whose
+`ParamHandle`s drive the node's `AudioParam`s. It throws, without creating a
+node, unless `prepareProcessor` has resolved in the context's audio
+environment. Each input has an entry node with its declared channel count, so
+producers are mixed explicitly; the first output follows the scope's
+admission or default destination unless `route: 'none'`. Parameters declared
+`audio-rate` or `control-rate` accept modulation through their handles; others
+write the `AudioParam` directly. The module registers in the scope's registry,
+reports `ready`, `error` (the processor failed and is silent; routes stay) or
+`detached`, and `dispose()` releases its node, ports, handles, route and
+registration without closing the context. Definitions that request note input
+or transport are rejected for now.
+
+```ts
+import {ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
+import {createProcessorModule, prepareProcessor, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const audio: AudioContext;
+declare const softClip: ProcessorDefinition;
+declare const workletUrl: URL;
+
+const scope = new ModuleContext({id: 'root', audio: new ModuleAudioEnvironment({context: audio})});
+await prepareProcessor(audio, softClip, {module: workletUrl});
+
+const clip = createProcessorModule(scope, softClip, {id: 'clip', params: {drive: 4}});
+clip.params.get('drive')?.setBaseValue(8);
+clip.getInput('input');  // AudioInputPort: connect a producer's output port to it
+clip.dispose();
+```
 
 ## processor-worklet — @webmusic/kernel/processor-worklet
 

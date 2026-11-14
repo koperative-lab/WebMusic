@@ -1,7 +1,7 @@
 # Processor modules: authored DSP
 
 Status: accepted direction, in delivery ([DEC-073](../DECISIONS.md#dec-073--authored-dsp-is-a-kernel-processor-module-contract)).
-Step 0 below is implemented; later steps are targets, not current API.
+Steps 0 and 1 below are implemented; later steps are targets, not current API.
 Layer and public entry: Kernel `/processor` (main thread) and
 `/processor-worklet` (audio thread); domain adapters stay in Score and Audio.
 Source: [platform/kernel/src/processor/](../../platform/kernel/src/processor/).
@@ -24,7 +24,7 @@ parameter model or clock; it produces the existing
 ```text
 ProcessorDefinition (shared data)
    ├─ main thread:  prepareProcessor(context, definition, source)   async, once per context
-   │                createProcessorModule(...)  -> ModuleHandle      step 1
+   │                createProcessorModule(...)  -> ModuleHandle
    └─ audio thread: defineProcessor(definition, implementation)      in the author's worklet file
 ```
 
@@ -61,6 +61,24 @@ at the next block and is counted. Two remain open and are settled in the step
 that needs them: offline note delivery (step 3) and where the author guide
 lives (step 7).
 
+## Step 1 as built
+
+`createProcessorModule(context, definition, options)` in
+[module.ts](../../platform/kernel/src/processor/module.ts). Choices made while
+building it:
+
+| Choice | Reason |
+|---|---|
+| Each input gets an explicit-channel-count entry `GainNode` | `AudioWorkletNode` has one `channelCount` for all inputs; the entry node gives each bus its declared count and a stable target for producers |
+| Each output gets its own exit `GainNode` | `AudioOutputPort` connects output 0 of its node; an exit per bus gives every output a port and precise disconnection |
+| Only the first output is routed by default | Matches other modules' one main route; further outputs are for explicit patching |
+| `audio-rate`/`control-rate` parameters bind through `ParamHandle.bindAudioParam` (lazy); others subscribe and write `setValueAtTime` | Native modulation needs a supported rate; an unmodulated parameter still needs its writes to reach the node |
+| Definitions requesting note input or transport are rejected | A module silently lacking its declared input would be a fake success; steps 3 and 4 lift this |
+| The module registers in its scope's registry | Same as other module factories; disposal releases it |
+
+Not covered yet: closing or replacing the audio context does not move the
+module to `detached`; that waits for real-context evidence in step 2.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -71,7 +89,7 @@ build in order; none starts a later one's surface early.
 | Step | Deliverable | Main work | Proves |
 |---|---|---|---|
 | 0 — done | Entries, definition, protocol, preparation, kit core | `definition.ts`, `protocol.ts`, `prepare.ts`, `worklet.ts`; manifest, build and policy entries; Kernel API sections | Validation, per-context preparation, block adaptation and failure reporting (unit tests) |
-| 1 | Audio-only processor module | `createProcessorModule(context, definition, options)`: `AudioWorkletNode`, audio input/output ports, a `ParamSurface` bound to the node's `AudioParam`s, readiness, error reports, disposal; declared latency published on its ports | DSP-A6, A7, A9 |
+| 1 — done | Audio-only processor module | `createProcessorModule(context, definition, options)`: `AudioWorkletNode`, audio input/output ports, a `ParamSurface` bound to the node's `AudioParam`s, readiness, error reports, disposal; declared latency published on its ports | DSP-A6, A7, A9 |
 | 2 | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
 | 3 | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
 | 4 | Transport and Session membership | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
