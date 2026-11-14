@@ -67,8 +67,13 @@ export interface ProcessorFlushMessage {
   readonly epoch: number;
 }
 
+/** The owner released the node: the processor stops at its next block instead of waiting for collection. */
+export interface ProcessorCloseMessage {
+  readonly type: 'close';
+}
+
 /** Everything the main thread can post to a processor. */
-export type ProcessorMessage = ProcessorConfigMessage | ProcessorNoteMessage | ProcessorTransportMessage | ProcessorFlushMessage;
+export type ProcessorMessage = ProcessorConfigMessage | ProcessorNoteMessage | ProcessorTransportMessage | ProcessorFlushMessage | ProcessorCloseMessage;
 
 /** The processor threw; Web Audio has stopped calling it. Sent once. */
 export interface ProcessorErrorReport {

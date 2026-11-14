@@ -48,6 +48,7 @@ export {
   type WavetableOptions,
   type NoiseOptions,
   type MidiOutOptions,
+  type ProcessorSoundOptions,
   type MidiOutputLike,
   type SampleZone,
   type ToneInstrumentLike,

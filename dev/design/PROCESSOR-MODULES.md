@@ -194,6 +194,50 @@ so is an existing `SessionTransport` contract question.
 Not established: background-tab timing, other browsers and devices, and
 audible quality.
 
+## Step 5 as built
+
+[`createProcessorInstrument`](../../platform/kernel/src/processor/instrument.ts),
+Score's [`Sound.processor`](../../packages/score/src/play/headless/sounds/processor.ts),
+and the reference polyphonic processor in
+[`doc/shared/processors/`](../../doc/shared/processors/poly-synth-dsp.ts): its
+definition, its DSP and its worklet file, written only with the public kit.
+
+| Choice | Reason |
+|---|---|
+| `Sound.processor` is built on a new Kernel `ProcessorInstrument`, not on a processor module (changed from the plan) | A synth backend speaks AudioContext seconds and occurrence handles and needs no ports, registry or Session; a module's note port allows one terminal gate per occurrence, but a player schedules a release with the onset and may later move or cancel it |
+| A later release replaces one still queued in the kit | Gives exact scheduled durations that a pause, rate change or loop can still retime, earlier or later, until the release is reached; the note port sends one release per occurrence, so modules are unaffected |
+| `cancelScheduledNote` withdraws a voice before its onset and releases a sounding one | Matches `OscillatorSynth`: a pause or seek fades held notes instead of clicking |
+| A release at or after a voice's scheduled end is ignored | The player's timer-driven note-off arrives a little after the exact end the onset already scheduled |
+| A borrowed parameter surface survives reconnection; the instrument binds and releases only its own bindings | `Sound.params` is created once and must keep driving each new node |
+| `source` lets `Sound.processor` prepare itself on first connection; readiness waits for it | A player element creates its context lazily, so the application cannot always prepare first. Without `source`, connecting unprepared throws, as for effects |
+| Disposal posts `close`; the kit returns `false` from `process` from then on | A disconnected node otherwise keeps rendering until garbage collection |
+| The reference lives in `doc/shared/processors/` as copyable source, not a package export | It is an example for authors (step 7's guide uses it), tested by the documentation workspace and imported by the private runner through its checkout link |
+| The reference voice is one PolyBLEP sawtooth, a TPT state-variable lowpass and an ADSR; 32 voices; stealing fades the old note up to the new onset | Comparable with `OscillatorSynth`'s sawtooth, lowpass and envelope; all state lives in typed arrays allocated in `create` |
+
+Evidence:
+
+- **DSP-A10 (automated, `doc/test/processor-reference.test.ts`):** 10 minutes
+  of dense polyphony through the kit and the reference, with forced
+  collection: retained heap growth under 64 kB. With no collection in
+  between, 40,000 further blocks add under 128 kB to the used heap; a fixed
+  30–50 kB is measurement overhead at any block count, and a deliberate
+  per-block allocation in `process` raised it to 1.17 MB in 20,000 blocks.
+- **DSP-A11 (browser, recorded and not gated; I9, 2026-11-14, in-app
+  Chromium on the development Mac):** 30 s of Arabesque No. 1 rendered offline,
+  median of 3, peak polyphony 7 per channel. One channel: `OscillatorSynth`
+  172 ms (16.6 µs per block, 833 nodes), processor 159 ms (15.4 µs, 13 nodes),
+  ratio 0.92. Four Rack channels (28 voices): 648 ms (62.7 µs, 3,323 nodes)
+  against 523 ms (50.6 µs, 43 nodes), ratio 0.81. Node counts include the
+  Rack's and Sounds' own gains; the processor adds one worklet node per
+  channel. These numbers are not a budget until they are observed on devices.
+- **DSP-A12 live (I8):** Arabesque through a Rack channel on
+  `Sound.processor(polySynth, {source})`: prepared on first play, 10 s
+  played with 0 late notes and peak 0.11 at the channel bus, silent 600 ms
+  after pause, sounding again after a seek to 40 s.
+
+Not established: realtime CPU load (the benchmark is offline), background-tab
+timing, other browsers and devices, and audible quality.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -208,7 +252,7 @@ build in order; none starts a later one's surface early.
 | 2 — done | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
 | 3 — done | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
 | 4 — done | Transport and Session following | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
-| 5 | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
+| 5 — done | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
 | 6 | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
 | 7 | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |
 | 8 | WASM and shared memory | Compiled-module handoff; optional ring buffer reported as a capability when `crossOriginIsolated` | Capability reporting with and without isolation |

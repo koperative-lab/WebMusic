@@ -156,6 +156,11 @@ class NoteQueue {
       this.#events = this.#events.filter(event => event.occurrence !== message.occurrence);
       return false;
     }
+    if (message.gate === 'off') {
+      // A later release replaces one still queued, so a scheduled end can move
+      // earlier or later until it is reached.
+      this.#events = this.#events.filter(event => event.occurrence !== message.occurrence || event.gate !== 'off');
+    }
     if (message.gate !== 'on') {
       // A release never overtakes its own onset, even with an earlier time:
       // it takes the onset's frame instead.
@@ -220,6 +225,8 @@ export function defineProcessor<State>(
 
     #state: State | undefined;
     #failed = false;
+    /** The owner disposed the node; `process` returns false so Web Audio can release it. */
+    #closed = false;
     readonly #block: ProcessorBlock = {inputs: [], outputs: [], params: {}, frame: 0, sampleRate: scope.sampleRate};
     readonly #notes = new NoteQueue();
     readonly #active = new Set<number>();
@@ -255,6 +262,8 @@ export function defineProcessor<State>(
           if (resolved.noteInput) this.#notes.flush(this.#scheduled, message.epoch);
         } else if (message.type === 'transport') {
           if (resolved.transport) this.#anchor = message;
+        } else if (message.type === 'close') {
+          this.#closed = true;
         } else if (message.type === 'config' && implementation.message) {
           try { implementation.message(this.#state as State, message.data); } catch (error) { this.#fail(error); }
         }
@@ -262,7 +271,7 @@ export function defineProcessor<State>(
     }
 
     process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean {
-      if (this.#failed) return false;
+      if (this.#failed || this.#closed) return false;
       const block = this.#block;
       block.inputs = inputs;
       block.outputs = outputs;

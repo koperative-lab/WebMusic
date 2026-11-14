@@ -9,73 +9,7 @@ import {
   ProcessorUnavailableError, type ProcessorDefinition, type ProcessorNodeFactory,
 } from '../src/processor';
 
-// Structural stand-ins for the Web Audio objects a processor module touches.
-// They record connections so tests can assert the managed graph exactly.
-
-class FakeNode {
-  readonly edges: {destination: FakeNode; output: number; input: number}[] = [];
-  channelCount = 2;
-  channelCountMode = 'max';
-  channelInterpretation = 'speakers';
-  disconnected = 0;
-  constructor(readonly context: FakeContext, readonly label: string) {}
-  connect(destination: FakeNode, output = 0, input = 0): FakeNode {
-    this.edges.push({destination, output, input});
-    return destination;
-  }
-  disconnect(destination?: FakeNode): void {
-    if (destination) {
-      const index = this.edges.findIndex(edge => edge.destination === destination);
-      if (index >= 0) this.edges.splice(index, 1);
-      return;
-    }
-    this.disconnected++;
-    this.edges.length = 0;
-  }
-  targets(): FakeNode[] { return this.edges.map(edge => edge.destination); }
-}
-
-class FakeParam {
-  readonly writes: {value: number; time: number}[] = [];
-  constructor(public value: number, readonly automationRate: 'a-rate' | 'k-rate') {}
-  setValueAtTime(value: number, time: number): this {
-    this.value = value;
-    this.writes.push({value, time});
-    return this;
-  }
-}
-
-class FakeWorkletNode extends FakeNode {
-  readonly parameters = new Map<string, FakeParam>();
-  readonly posted: unknown[] = [];
-  closed = 0;
-  onprocessorerror: (() => void) | null = null;
-  readonly port = {
-    onmessage: null as ((event: {data: unknown}) => void) | null,
-    postMessage: (message: unknown) => { this.posted.push(message); },
-    close: () => { this.closed++; },
-  };
-  constructor(context: FakeContext, readonly name: string, readonly options: AudioWorkletNodeOptions,
-    params: readonly {id: string; rate: 'a-rate' | 'k-rate'}[]) {
-    super(context, 'worklet');
-    for (const {id, rate} of params) this.parameters.set(id, new FakeParam(Number(options.parameterData?.[id] ?? 0), rate));
-  }
-  receive(data: unknown): void { this.port.onmessage?.({data}); }
-}
-
-class FakeContext {
-  state = 'suspended';
-  sampleRate = 48000;
-  currentTime = 1.5;
-  readonly destination = new FakeNode(this, 'destination');
-  readonly gains: FakeNode[] = [];
-  readonly audioWorklet = {addModule: () => Promise.resolve()};
-  createGain(): FakeNode {
-    const gain = new FakeNode(this, `gain${this.gains.length}`);
-    this.gains.push(gain);
-    return gain;
-  }
-}
+import {FakeContext, FakeWorkletNode} from './processor-fakes';
 
 const gain: ProcessorDefinition = {
   id: 'test.stereo-gain',
@@ -418,9 +352,11 @@ describe('createProcessorModule', () => {
       let postedBeforeClose = 0;
       port.close = () => { postedBeforeClose = nodes[0].posted.length; close(); };
       module.dispose();
-      expect(nodes[0].posted.slice(2).map(message => (message as {gate: string; occurrence: number}).occurrence).sort()).toEqual([1, 2]);
-      expect(nodes[0].posted.slice(2).every(message => (message as {gate: string}).gate === 'cancel')).toBe(true);
-      expect(postedBeforeClose).toBe(4);
+      expect(nodes[0].posted.slice(2, 4).map(message => (message as {gate: string; occurrence: number}).occurrence).sort()).toEqual([1, 2]);
+      expect(nodes[0].posted.slice(2, 4).every(message => (message as {gate: string}).gate === 'cancel')).toBe(true);
+      // The processor is told to stop after the cancels and before its port closes.
+      expect(nodes[0].posted[4]).toEqual({type: 'close'});
+      expect(postedBeforeClose).toBe(5);
       expect(module.notes!.readiness).toBe('detached');
     });
 

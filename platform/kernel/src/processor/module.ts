@@ -3,12 +3,12 @@ import {routeModuleOutput} from '../module/context';
 import {AudioInputPort, AudioOutputPort} from '../module/audio-port';
 import {createControlPort, type ControlPort} from '../module/control-port';
 import type {ConnectionLease} from '../module/lease';
-import {ParamHandle, ParamSurface, type ParamDescriptor} from '../module/parameter';
+import {ParamHandle, ParamSurface} from '../module/parameter';
 import {NoteInputPort, type NoteEvent, type NoteInputHandler} from '../module/note-port';
 import {PortListeners} from '../module/port';
 import type {ModuleHandle, ModulePort} from '../module/registry';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
-import {createProcessorNode, listenToProcessor, processorParam, type ProcessorNodeFactory} from './node';
+import {bindProcessorParams, createProcessorNode, listenToProcessor, type ProcessorNodeFactory} from './node';
 import {isProcessorPrepared} from './prepare';
 import type {SessionSchedulingBinding, SessionSchedulingEvent} from '../session-scheduling';
 import {PROCESSOR_IMMEDIATE_FRAME, type ProcessorMessage, type ProcessorNoteMessage} from './protocol';
@@ -154,10 +154,6 @@ function followSession(
 
 /** `ready` until the processor fails (`error`) or the module is disposed (`detached`, terminal). */
 export type ProcessorModuleState = 'ready' | 'error' | 'detached';
-
-function nativeModulation(descriptor: ParamDescriptor): boolean {
-  return descriptor.modulation === 'audio-rate' || descriptor.modulation === 'control-rate';
-}
 
 /**
  * An authored DSP processor as a module: one `AudioWorkletNode`, typed audio
@@ -349,19 +345,7 @@ export function createProcessorModule(
       data: options.onReport, report: options.onCleanupError,
     }));
 
-    for (const handle of handles) {
-      const param = processorParam(node, resolved, handle.descriptor.id);
-      if (nativeModulation(handle.descriptor)) {
-        const lease = handle.bindAudioParam(audio, param, {lazy: true});
-        cleanups.push(() => lease.release());
-      } else {
-        param.value = handle.snapshot.baseValue;
-        const stop = handle.subscribe(snapshot => {
-          if (!snapshot.disposed) param.setValueAtTime(snapshot.baseValue, audio.currentTime);
-        });
-        cleanups.push(stop);
-      }
-    }
+    bindProcessorParams(audio, node, resolved, handles, cleanups);
 
     const latencySeconds = resolved.latencySamples / audio.sampleRate;
     const inputs = resolved.audioInputs.map((port, index) => {

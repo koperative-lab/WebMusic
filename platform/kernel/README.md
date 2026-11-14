@@ -92,7 +92,7 @@ Common mechanisms do not make distinct domain policies interchangeable.
 | `@webmusic/kernel/transport` | `TransportClock` affine anchor math, `TimelineMapping`, constant-tempo `TempoGrid` helpers and the read-only `TempoClock` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
 | `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |
-| `@webmusic/kernel/processor` | Authored DSP definitions, per-context `AudioWorklet` preparation and the main/audio thread protocol |
+| `@webmusic/kernel/processor` | Authored DSP definitions, per-context `AudioWorklet` preparation, processor modules, insert effects and instruments, and the main/audio thread protocol |
 | `@webmusic/kernel/processor-worklet` | Audio-thread authoring kit: `defineProcessor` over a reused render block |
 
 Pure time math remains in `/transport` and wakeups in `/tick`. The modular

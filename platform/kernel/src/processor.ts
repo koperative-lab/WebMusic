@@ -3,3 +3,4 @@ export * from './processor/protocol';
 export * from './processor/prepare';
 export * from './processor/module';
 export * from './processor/effect';
+export * from './processor/instrument';

@@ -176,7 +176,7 @@ for units, scheduled base automation, declared rate and unavailable effective re
 
 ### Construction
 
-The constructor is private. All eleven factories return `Sound`.
+The constructor is private. All twelve factories return `Sound`.
 
 | Member | Options | Description |
 | --- | --- | --- |
@@ -191,6 +191,7 @@ The constructor is private. All eleven factories return `Sound`.
 | `Sound.wavetable(options?)` | `WavetableOptions` | Web Audio `PeriodicWave` synthesis. |
 | `Sound.noise(options?)` | `NoiseOptions` | White noise, optionally band-pass filtered at the note pitch. |
 | `Sound.midiOut(options?)` | `MidiOutOptions` | Send MIDI note messages to a borrowed output. |
+| `Sound.processor(definition, options?)` | A `ProcessorDefinition` with `noteInput`; `ProcessorSoundOptions` | An authored DSP processor as the instrument. Onsets, durations, releases and cancellations land on their exact sample. `params` holds the bus gain followed by the definition's parameters. |
 
 ### Options and supporting types
 
@@ -204,6 +205,9 @@ The constructor is private. All eleven factories return `Sound`.
 | `MidiOutOptions` | `channel: 0`, first available output | `output?: MidiOutputLike`; otherwise requests Web MIDI access. Channel is masked to four bits. Inherited bus `gain` does not scale MIDI messages. |
 | `MidiOutputLike` | — | Structural `send(data: number[] \| Uint8Array, timestamp?)` output; the wrapper never closes it. |
 | `ToneInstrumentLike` | — | Optional `triggerAttack`, `triggerRelease`, `connect`, `disconnect`, and `dispose` methods. Attack receives a note name and normalized 0–1 velocity. |
+| `ProcessorSoundOptions.source` | — | `{module}` or `{register(context)}`: where to load the worklet when it is not yet prepared in the player's context. Readiness waits for it; attacks before then are silent. Without it, connecting throws unless `prepareProcessor` has resolved in that context. |
+| `ProcessorSoundOptions.values` / `config` | definition defaults / none | Initial parameter base values, and a structured-cloneable value for the processor's `create`. |
+| `ProcessorSoundOptions.onLateNotes` / `onError` / `onReport` | — | Notes the processor played after their frame; a processor failure (it is then silent); author-defined reports. |
 | `SfzOptions.attackSeconds` / `releaseSeconds` / `gain` | `0.004` / `0.12` / `1` | Sample envelope and Sound bus gain. |
 | `SfzOptions.decaySeconds` / `sustainLevel` | `0` / `1` | Decay duration in seconds and sustained level ratio. |
 | `SfzOptions.maxSfzBytes` | `1_000_000` bytes | Definition response limit. |
@@ -237,6 +241,30 @@ selection helpers are documented with `RangeSampler`.
 The wrapper has no state subscription or transport events. Optional forwarding
 methods are inert when no backend is connected; they do not queue attacks for
 future readiness.
+
+`Sound.processor` plays an authored DSP processor (see the Kernel
+[`processor` entry](/kernel/api/#processor--webmusickernelprocessor)). Your
+bundler emits the worklet file; `source` names it, so the first connection
+prepares it in the player's context and `preload()` waits for that. Each
+connection creates one `AudioWorkletNode`; reconnecting keeps the parameter
+surface. A finite duration schedules the release with the onset, and a later
+release, retime or cancellation replaces it while it is still queued; a
+cancellation before the onset means the note never sounds.
+
+```ts
+import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const voice: ProcessorDefinition; // {..., noteInput: true}, shared with the worklet file
+declare const workletUrl: URL; // emitted by your bundler for the worklet file
+
+const player = new ScorePlayer(score, {
+  synth: Sound.processor(voice, {source: {module: workletUrl}, onLateNotes: (count) => console.warn(count)}),
+  synthOwnership: 'owned',
+});
+await player.preload(); // also prepares the processor
+await player.play();
+```
 
 ### Synth backends
 

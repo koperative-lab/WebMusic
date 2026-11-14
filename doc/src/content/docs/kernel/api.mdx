@@ -20,7 +20,7 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
-| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules and insert effects, and the thread protocol |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects and instruments, and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
@@ -1262,6 +1262,39 @@ chain.setSlot({id: 'clip', recipe: processorEffect(softClip, {label: 'Soft clip'
 chain.instances[0].params.get('drive')?.setBaseValue(6);
 ```
 
+`createProcessorInstrument(audio, definition, options)` plays a prepared
+note-input processor directly on the audio clock, for an adapter whose callers
+already speak in AudioContext seconds, such as a synth backend; Score's
+`Sound.processor` is built on it. It has one node and no ports, registry or
+Session: `instrument.node` is its output, which the owner connects. `start(midi,
+velocity, time, cents?)` returns a new occurrence; `release(occurrence, time)`
+and `cancel(occurrence, time)` name it. A time at or before `currentTime`
+applies at the next block. A later `release` replaces one still queued, so a
+scheduled end can move earlier or later until it is reached; `cancel` before
+the onset withdraws the note. With `params`, it binds borrowed handles (each
+declared ID, same modulation) and leaves them alive, so a surface can outlive
+one node; the owner calls `releaseAudio(context)` when it leaves the context.
+Without them it creates and owns its handles, starting from `values`.
+`onError`, `onLateNotes` and `onReport` relay the processor's reports;
+`dispose()` stops the processor and releases the node and bindings.
+
+```ts
+import {createProcessorInstrument, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const audio: AudioContext; // the processor is prepared here
+declare const voice: ProcessorDefinition; // {..., noteInput: true}
+
+const instrument = createProcessorInstrument(audio, voice, {onLateNotes: count => console.warn(count)});
+instrument.node.connect(audio.destination);
+const note = instrument.start(64, 0.8, audio.currentTime + 0.1);
+instrument.release(note, audio.currentTime + 1.1);
+instrument.release(note, audio.currentTime + 0.6); // the earlier end replaces the queued one
+```
+
+Disposing a module, effect realization or instrument posts a `close` message
+before closing the port, so the processor stops at its next block instead of
+rendering until the node is collected.
+
 ## processor-worklet — @webmusic/kernel/processor-worklet
 
 The audio-thread authoring kit. A worklet file imports it and calls
@@ -1302,9 +1335,9 @@ A definition with `noteInput` needs a `note(state, event)` callback. The kit
 keeps the incoming changes sorted by frame and calls `note` for each change
 in the coming block, in time order, just before `process`; `event.frameOffset`
 says where in that block it applies, so a voice can start mid-block. `cancel`
-means stop at once. a cancel before its onset withdraws the note entirely, a release never moves
-ahead of its own onset, and epochs are passed through but never compared across
-sources. When the module's Session invalidates its schedule, the kit withdraws
+means stop at once. A cancel before its onset withdraws the note entirely, a
+release never moves ahead of its own onset, a later release replaces one still
+queued, and epochs are passed through but never compared across sources. When the module's Session invalidates its schedule, the kit withdraws
 queued scheduled onsets and cancels sounding scheduled notes; immediate live
 gestures are untouched. The event object is reused.
 

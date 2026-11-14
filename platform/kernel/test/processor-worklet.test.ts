@@ -131,6 +131,17 @@ describe('defineProcessor', () => {
     expect((posted[0] as {type: string}).type).toBe('error');
   });
 
+  it('stops rendering once its owner closes it', () => {
+    const {scope, registered} = fakeScope();
+    const processed = vi.fn();
+    defineProcessor(definition, {...gain, process: processed}, scope);
+    const instance = new (registered.get('test.gain@1.0.0')!)();
+    expect(instance.process(quantum(), quantum(), {gain: new Float32Array([1])})).toBe(true);
+    instance.port.onmessage!({data: {type: 'close'}});
+    expect(instance.process(quantum(), quantum(), {gain: new Float32Array([1])})).toBe(false);
+    expect(processed).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an invalid definition or implementation before registering', () => {
     const {scope, registered} = fakeScope();
     expect(() => defineProcessor({id: '', version: '1'}, gain, scope)).toThrow(TypeError);
@@ -248,6 +259,32 @@ describe('defineProcessor note queue', () => {
     note('cancel', 1, 140);
     render(128);
     expect(seen.map(event => `${event.gate}@${event.frameOffset}`)).toEqual(['on@0', 'cancel@12']);
+  });
+
+  it('lets a later release replace one still queued, earlier or later', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 0);
+    note('off', 1, 400);
+    note('off', 1, 100);
+    note('on', 2, 0);
+    note('off', 2, 50);
+    note('off', 2, 300);
+    render(0);
+    render(128);
+    render(256);
+    render(384);
+    expect(seen.map(event => `${event.gate}${event.occurrence}@${event.frame + event.frameOffset}`))
+      .toEqual(['on1@0', 'on2@0', 'off1@100', 'off2@300']);
+  });
+
+  it('ignores a release that arrives after the occurrence was released', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 0);
+    note('off', 1, 10);
+    render(0);
+    note('off', 1, 200);
+    render(128);
+    expect(seen.map(event => `${event.gate}${event.occurrence}`)).toEqual(['on1', 'off1']);
   });
 
   it('releases same-pitch occurrences independently', () => {

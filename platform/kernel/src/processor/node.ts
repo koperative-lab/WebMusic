@@ -1,6 +1,7 @@
+import type {ParamDescriptor, ParamHandle} from '../module/parameter';
 import type {ResolvedProcessorDefinition} from './definition';
 import {ProcessorUnavailableError} from './prepare';
-import {PROCESSOR_PROTOCOL_VERSION, type ProcessorNodeOptions, type ProcessorReport} from './protocol';
+import {PROCESSOR_PROTOCOL_VERSION, type ProcessorMessage, type ProcessorNodeOptions, type ProcessorReport} from './protocol';
 
 /** Builds the node; injectable for tests and for applications that wrap node creation. */
 export type ProcessorNodeFactory = (context: BaseAudioContext, name: string, options: AudioWorkletNodeOptions) => AudioWorkletNode;
@@ -58,6 +59,9 @@ export function listenToProcessor(
   };
   node.onprocessorerror = () => handlers.fail('The processor stopped with an uncaught error.');
   return () => {
+    // Stop the processor now; a disconnected node otherwise keeps rendering until it is collected.
+    const close: ProcessorMessage = {type: 'close'};
+    node.port.postMessage(close);
     node.port.onmessage = null;
     node.onprocessorerror = null;
     node.port.close();
@@ -69,4 +73,36 @@ export function processorParam(node: AudioWorkletNode, definition: ResolvedProce
   const param = node.parameters.get(id);
   if (!param) throw new Error(`Processor ${definition.name} node has no AudioParam ${id}; its worklet file may use another definition.`);
   return param;
+}
+
+function nativeModulation(descriptor: ParamDescriptor): boolean {
+  return descriptor.modulation === 'audio-rate' || descriptor.modulation === 'control-rate';
+}
+
+/**
+ * @internal Drive the node's `AudioParam`s from their handles, pushing each
+ * binding's release onto `cleanups`. Parameters declared `audio-rate` or
+ * `control-rate` bind through the handle and accept modulation; others write
+ * the base value directly.
+ */
+export function bindProcessorParams(
+  audio: BaseAudioContext,
+  node: AudioWorkletNode,
+  definition: ResolvedProcessorDefinition,
+  handles: Iterable<ParamHandle>,
+  cleanups: (() => void)[],
+): void {
+  for (const handle of handles) {
+    const param = processorParam(node, definition, handle.descriptor.id);
+    if (nativeModulation(handle.descriptor)) {
+      const lease = handle.bindAudioParam(audio, param, {lazy: true});
+      cleanups.push(() => lease.release());
+    } else {
+      param.value = handle.snapshot.baseValue;
+      const stop = handle.subscribe(snapshot => {
+        if (!snapshot.disposed) param.setValueAtTime(snapshot.baseValue, audio.currentTime);
+      });
+      cleanups.push(stop);
+    }
+  }
 }

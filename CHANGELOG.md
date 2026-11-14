@@ -12,6 +12,10 @@ work and does not establish npm publication, a release tag or a deployment.
   `processorEffect` uses it as an insert in any effect chain, live or offline.
   Processors with note input play notes on their exact sample, follow their
   Session through seek, pause and loop, and can read its position.
+  `createProcessorInstrument` plays one directly on the audio clock, and
+  Score's `Sound.processor` makes it an instrument for any player or Rack
+  channel. A reference polyphonic processor in the documentation source shows
+  how to write one.
 - Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
   and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
   foundations do not contain the new module, Session and patch-editor entries.
