@@ -7,6 +7,8 @@ export class FakeNode {
   channelCountMode = 'max';
   channelInterpretation = 'speakers';
   disconnected = 0;
+  /** A gain node's level; the project runtime fades its output gate with it. */
+  readonly gain = new FakeParam(1, 'a-rate');
   constructor(readonly context: FakeContext, readonly label: string) {}
   connect(destination: FakeNode, output = 0, input = 0): FakeNode {
     this.edges.push({destination, output, input});
@@ -32,6 +34,10 @@ export class FakeParam {
     this.writes.push({value, time});
     return this;
   }
+  cancelScheduledValues(): this { return this; }
+  cancelAndHoldAtTime(): this { return this; }
+  linearRampToValueAtTime(value: number, time: number): this { return this.setValueAtTime(value, time); }
+  setTargetAtTime(value: number, time: number): this { return this.setValueAtTime(value, time); }
 }
 
 export class FakeWorkletNode extends FakeNode {

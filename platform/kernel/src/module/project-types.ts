@@ -121,8 +121,33 @@ export interface ProjectModuleInstance {
   exportConfig?(): ProjectJsonObject;
   dispose(): void;
 }
+/**
+ * Thrown by a plugin factory when its module cannot exist in this environment
+ * (a capability, preparation or resource it needs is unavailable). Restoration
+ * keeps the record unresolved with this message, exactly like a missing
+ * plugin, instead of failing; any other error still fails the restore.
+ */
+export class ProjectModuleUnavailableError extends Error {
+  /** The underlying failure, when there is one. */
+  readonly cause?: unknown;
+  constructor(message: string, options?: {cause?: unknown}) {
+    super(message);
+    this.name = 'ProjectModuleUnavailableError';
+    if (options && 'cause' in options) this.cause = options.cause;
+  }
+}
+
+/** True for {@link ProjectModuleUnavailableError}, also across duplicate package copies. */
+export function isProjectModuleUnavailable(error: unknown): error is ProjectModuleUnavailableError {
+  return error instanceof ProjectModuleUnavailableError || (error instanceof Error && error.name === 'ProjectModuleUnavailableError');
+}
+
 export interface ProjectPluginFactory extends ProjectPluginReference {
-  /** Must return a fresh, exclusively owned instance, even when replacing the same stable ID. */
+  /**
+   * Must return a fresh, exclusively owned instance, even when replacing the
+   * same stable ID. Throw {@link ProjectModuleUnavailableError} to leave the
+   * module unresolved.
+   */
   create(request: ProjectFactoryRequest): ProjectModuleInstance | Promise<ProjectModuleInstance>;
 }
 export interface ProjectConnectionRequest {

@@ -238,6 +238,33 @@ Evidence:
 Not established: realtime CPU load (the benchmark is offline), background-tab
 timing, other browsers and devices, and audible quality.
 
+## Step 6 as built
+
+[`processorPlugin`](../../platform/kernel/src/processor/plugin.ts) and
+`ProjectModuleUnavailableError` in
+[project-types.ts](../../platform/kernel/src/module/project-types.ts), honoured
+by the project runtime's restore.
+
+| Choice | Reason |
+|---|---|
+| A factory can declare its module unavailable; the runtime keeps that record unresolved instead of failing the restore (new, general) | Before, only a missing plugin stayed unresolved and any factory error rejected the whole project. An unprepared processor is the same situation as a missing plugin: the document is valid, this environment cannot build that module yet |
+| Only that error type is downgraded; every other factory error still rejects | A broken factory or bad saved data must not be silently hidden |
+| The plugin prepares from `source` when given; otherwise an unprepared processor is unavailable | Applications that preload processors keep control; others let restoration load them |
+| The record's `config` is the processor's `create` config; parameters use the existing save and restore of the parameter surface | No processor-specific schema |
+| Registered under the definition's `id` and `version` | A project saved with another processor version stays unresolved instead of loading an incompatible processor |
+| `retryMissing()` recovers an unresolved processor | It re-restores from the export, which keeps the unresolved record, its parameters and its connections |
+
+Evidence (2026-11-14, in-app Chromium, private runner check I10): a project
+with Arabesque No. 1 from a Bridge Score player routed through a soft-clip
+processor module restored with the processor unprepared — the module and its
+connection unresolved, with the reason, and the saved drive 6 kept. After
+`prepareProcessor` and `retryMissing()` the module was ready with drive 6 and
+nothing unresolved; setting drive 20, exporting to JSON and restoring gave 20
+saved and live. Unit tests cover the same paths plus a failed source load, a
+version mismatch, note connections and report relaying.
+
+Not established: audible quality of the restored chain, other browsers.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -253,7 +280,7 @@ build in order; none starts a later one's surface early.
 | 3 — done | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
 | 4 — done | Transport and Session following | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
 | 5 — done | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
-| 6 | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
+| 6 — done | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |
 | 7 | Author guide | One self-contained page: worklet file, definition, module, panel on its `ParamSurface`, element recipe, project registration; Headless reference page and demo | A third party can follow it without design history |
 | 8 | WASM and shared memory | Compiled-module handoff; optional ring buffer reported as a capability when `crossOriginIsolated` | Capability reporting with and without isolation |
 

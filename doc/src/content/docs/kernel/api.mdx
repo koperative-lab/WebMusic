@@ -20,7 +20,7 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
-| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects and instruments, and the thread protocol |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects, instruments and project plugins, and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
@@ -650,9 +650,13 @@ notification can be saved and restored without re-enabling the overridden track.
 
 Missing exact plugins, missing supported endpoints or an unavailable domain
 connector are retained as unresolved records with `ProjectDiagnostic`
-`{kind, id, reason}`. A factory, asset or backend construction failure rejects
-the candidate instead. Retrying after registering a factory can resolve the
-retained document. An unresolved audio replacement holds a silent replacement
+`{kind, id, reason}`. So is a module whose factory throws
+`ProjectModuleUnavailableError` — it cannot exist in this environment, for
+example a processor that is not prepared — with the error's message as the
+reason; `isProjectModuleUnavailable(error)` also recognizes one from another
+package copy. Any other factory, asset or backend construction failure rejects
+the candidate instead. Retrying after registering a factory, or after making
+the module available, can resolve the retained document. An unresolved audio replacement holds a silent replacement
 lease, preserving the declaration without leaking through a normal speaker
 route; removing that declaration restores the current valid default. Unknown
 ports are not guessed from labels or layout.
@@ -1289,6 +1293,34 @@ instrument.node.connect(audio.destination);
 const note = instrument.start(64, 0.8, audio.currentTime + 0.1);
 instrument.release(note, audio.currentTime + 1.1);
 instrument.release(note, audio.currentTime + 0.6); // the earlier end replaces the queued one
+```
+
+`processorPlugin(definition, options)` is the project plugin for one
+processor, registered under the definition's `id` and `version`. Each module
+record becomes a processor module in its context: the record's `config` goes
+to the processor's `create`, saved parameters restore and export through the
+parameter surface, the first output takes the context's default route, and
+audio and note connections reach its ports. When the processor is not
+prepared in the project's audio context, `options.source` prepares it during
+restoration; without a source, or when loading fails, the module stays
+unresolved with the reason and its record, parameters and connections are
+kept, so `retryMissing()` recovers it once the processor is prepared. A project
+saved with another processor version finds no plugin and stays unresolved.
+
+```ts
+import {ModuleAudioEnvironment, ModuleProjectRuntime, ProjectPluginRegistry} from '@webmusic/kernel/module';
+import {processorPlugin, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const audio: AudioContext;
+declare const softClip: ProcessorDefinition;
+declare const workletUrl: URL;
+declare const saved: unknown; // a project document containing a soft-clip module
+
+const plugins = new ProjectPluginRegistry();
+plugins.register(processorPlugin(softClip, {source: {module: workletUrl}}));
+const runtime = new ModuleProjectRuntime({audio: new ModuleAudioEnvironment({context: audio}), plugins});
+await runtime.restore(saved);
+runtime.snapshot().unresolved; // empty unless the worklet failed to load
 ```
 
 Disposing a module, effect realization or instrument posts a `close` message

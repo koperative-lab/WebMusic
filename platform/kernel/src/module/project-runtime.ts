@@ -14,6 +14,7 @@ import type {
   ProjectLayout, ProjectModuleInstance, ProjectModulationRecord, ProjectRestoreOptions,
   ProjectRestoreResult, ProjectRuntimeOptions, ProjectRuntimeResources, ProjectRuntimeSnapshot,
 } from './project-types';
+import {isProjectModuleUnavailable} from './project-types';
 
 interface Graph {
   project: ModuleProject;
@@ -388,15 +389,23 @@ export class ModuleProjectRuntime {
             continue;
           }
           const asset = (role: string) => { const id = moduleRecord.assets?.[role]; return id === undefined ? undefined : assets.get(id); };
-          const instance = await abortable(factory.create({record: moduleRecord, context: scope, signal, asset,
-            resolveAsset: async (role) => {
-              assertSignal(signal);
-              const reference = asset(role);
-              if (!reference) throw new Error(`Missing asset role ${role} for ${moduleRecord.id}.`);
-              if (!this.#options.resolveAsset) throw new Error('No project asset resolver was supplied.');
-              return abortable(Promise.resolve(this.#options.resolveAsset(reference, signal)), signal);
-            },
-          }), signal, value => { if (!this.#ownedInstances.has(value)) this.#disposeInstance(value); });
+          let instance: ProjectModuleInstance;
+          try {
+            instance = await abortable(factory.create({record: moduleRecord, context: scope, signal, asset,
+              resolveAsset: async (role) => {
+                assertSignal(signal);
+                const reference = asset(role);
+                if (!reference) throw new Error(`Missing asset role ${role} for ${moduleRecord.id}.`);
+                if (!this.#options.resolveAsset) throw new Error('No project asset resolver was supplied.');
+                return abortable(Promise.resolve(this.#options.resolveAsset(reference, signal)), signal);
+              },
+            }), signal, value => { if (!this.#ownedInstances.has(value)) this.#disposeInstance(value); });
+          } catch (error) {
+            // An unavailable module stays a retained, unresolved record, like a missing plugin.
+            if (signal.aborted || !isProjectModuleUnavailable(error)) throw error;
+            graph.diagnostics.push({kind: 'module', id: moduleRecord.id, reason: error.message});
+            continue;
+          }
           if (this.#ownedInstances.has(instance)) throw new Error('Project factories must return fresh owned instances.');
           this.#ownedInstances.add(instance);
           graph.instances.set(moduleRecord.id, instance);
