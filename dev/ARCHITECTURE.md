@@ -410,7 +410,7 @@ Each package exports `.` and `/package.json`. Score/Audio capability roots are
 APIs; `/element` is the only element spelling. `/elements` and `/api` are not
 public aliases. Kernel exports `/events`, `/element`, `/worker`,
 `/audio-context`, `/player`, `/effect`, `/module`, `/session`, `/meter`,
-`/transport`, `/tick` and `/sync`. Domain packages have no `/session` alias.
+`/transport`, `/tick`, `/processor` and `/processor-worklet`. Domain packages have no `/session` alias.
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
 

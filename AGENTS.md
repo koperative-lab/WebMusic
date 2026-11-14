@@ -124,6 +124,7 @@ review; only the owner's explicit request in the current conversation changes it
 | Component design | [COMPONENT-DESIGN.md](dev/design/COMPONENT-DESIGN.md) | Design questions, copyable design template and acceptance scenarios |
 | Analyze/View attachment to Play | [PLAYER-BINDING.md](dev/design/PLAYER-BINDING.md) | Accepted data/state/time binding direction, target companion syntax, open contract choices and acceptance scenarios; STATUS owns delivery gaps |
 | Modular players, Racks, effects and Session composition | [MODULAR-COMPOSITION.md](dev/design/MODULAR-COMPOSITION.md) | DEC-063's opt-in contract, ownership/default-routing rules, compatibility and acceptance; consult STATUS for delivery evidence and later stages |
+| Authored DSP processors and their delivery steps | [PROCESSOR-MODULES.md](dev/design/PROCESSOR-MODULES.md) | DEC-073's processor definition, preparation and worklet-kit contract, and the development sequence; STATUS DSP-01 owns delivery |
 | Analyze component boundaries | [ANALYZE-COMPONENTS.md](dev/design/ANALYZE-COMPONENTS.md) | Live analysis surfaces, retained roles and API/Headless report ownership |
 | View component families | [VIEW-COMPONENTS.md](dev/design/VIEW-COMPONENTS.md), [Audio View](dev/design/AUDIO-VIEW-COMPONENTS.md) | Type-selected representations, independent views and notation boundaries |
 | Play component boundaries | [Score Play](dev/design/PLAY-COMPONENTS.md), [Audio Play](dev/design/AUDIO-PLAY-COMPONENTS.md) | Domain-specific playback/input/control roles, shared transport and lifecycle ownership |

@@ -50,6 +50,7 @@ indexes all repository Markdown/MDX files, including historical material.
 | Add, combine or change a component | [Component design](design/COMPONENT-DESIGN.md), then the applicable [family contract](design/README.md) |
 | Attach analysis or a view to playback | [Player binding](design/PLAYER-BINDING.md), Architecture and the owning source/reference |
 | Implement nested modules, Rack routing or shared effect controls | [Modular composition](design/MODULAR-COMPOSITION.md), DEC-063 and the MOD work items in STATUS |
+| Write per-sample DSP as a module, or continue its delivery | [Processor modules](design/PROCESSOR-MODULES.md), DEC-073 and STATUS DSP-01 |
 | Add document editing, local history or playback revision application | [Editing contracts](design/EDIT-COMPONENTS.md), DEC-053 and STATUS EDIT-01 |
 | Audit algorithms, architecture and frontend behavior | [Score review workflow and Audio starting brief](log/2026-09-09-score-review-workflow.md), then current design and STATUS; record each phase's actual evidence |
 | Write a public reference or demo | [Documentation authoring](docs/README.md), site plan, conventions and the template for that public surface |

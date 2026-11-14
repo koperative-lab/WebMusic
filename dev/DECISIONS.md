@@ -3219,6 +3219,46 @@ unchanged pin. Run the private application checks and runner build, then inspect
 Doc, Website, Library, Studio and Test through their actual development entries.
 Application build success does not establish audible or device acceptance.
 
+## DEC-073 — Authored DSP is a Kernel processor-module contract
+
+**Date / status:** 2026-11-13; direction accepted by the repository owner, who
+asked for the framework to be built on the `dsp-modules` branch. Delivery:
+STATUS DSP-01.
+
+**Problem:** no package registers its own `AudioWorkletProcessor`, so a
+developer cannot add per-sample DSP — a custom voice, a waveshaper, a research
+algorithm — as a module. Sound can only be assembled from native Web Audio
+nodes, and `Effect.createAudioNodes` is synchronous, so an effect cannot wait
+for a worklet to load. The [proposal](plans/2026-11-12-authored-dsp-modules.md)
+records the baseline.
+
+**Decision:** authored DSP is a Kernel contract over `AudioWorklet`, in the
+entries `/processor` and `/processor-worklet`. One serializable
+`ProcessorDefinition` is shared by both threads. Preparation in a context is
+asynchronous and separate from synchronous graph edits. A processor exposes
+only the existing port families, and every parameter is an `AudioParam` behind
+the existing `ParamHandle` path. A changed contract needs a new version.
+Shared memory is optional and reported as a capability. Processor code is
+trusted, like project plugin factories. Open choices follow the proposal's
+recommendations until the owner changes them.
+
+**Alternatives considered:** a separate platform package, which would
+duplicate port and parameter types Kernel already owns; an asynchronous
+`Effect` contract, which would make every insert edit asynchronous; a
+`ScriptProcessorNode` fallback, which imitates a capability on the main thread.
+
+**Consequences:** Kernel gains two public entries and their policy, build and
+reference surfaces. The existing synths and effects do not migrate. Subgraph
+modules, latency compensation, a beat axis and isolated third-party loading
+remain separate proposals.
+
+**Owner:** [Processor modules](design/PROCESSOR-MODULES.md), which also owns
+the development sequence.
+
+**Verification:** each step adds unit tests and, from the first audible step,
+browser evidence; unit tests against structural fakes do not establish sound
+or timing.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

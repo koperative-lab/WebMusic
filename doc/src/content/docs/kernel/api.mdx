@@ -20,6 +20,8 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation and the thread protocol |
+| [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
 
@@ -1127,3 +1129,79 @@ ticks.start(() => schedulerPass());
 // later: ticks.stop() to pause, ticks.dispose() to release the worker
 ```
 
+
+## processor — @webmusic/kernel/processor
+
+Main-thread contracts for authored DSP: a developer's own per-sample code
+running in an `AudioWorklet`. A `ProcessorDefinition` is plain data — identity,
+audio buses, parameters, declared latency and tail — shared by both threads.
+`resolveProcessorDefinition()` validates it and applies defaults (no inputs,
+one stereo `output`); `processorName()` is its `id@version` registration name.
+
+`prepareProcessor(context, definition, source)` loads the author's worklet
+file into one audio context. Preparation is asynchronous and separate from
+graph edits, so every wait happens before a node is created. Repeated and
+concurrent calls share one load; a different definition under the same
+`id@version` rejects; a failed load is forgotten so a retry is an explicit
+call; a context without `audioWorklet` rejects with
+`ProcessorUnavailableError`. It creates and resumes no context.
+
+```ts
+import {prepareProcessor, isProcessorPrepared, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+export const softClip: ProcessorDefinition = {
+  id: 'example.soft-clip',
+  version: '1.0.0',
+  audioInputs: [{id: 'input', channels: 2}],
+  params: [{id: 'drive', unit: 'ratio', range: {min: 1, max: 20}, defaultValue: 1, modulation: 'audio-rate'}],
+};
+
+declare const context: AudioContext;
+declare const workletUrl: URL; // emitted by your bundler for the worklet file
+
+await prepareProcessor(context, softClip, {module: workletUrl});
+isProcessorPrepared(context, softClip); // true
+```
+
+Every parameter becomes an `AudioParam` of the node: `modulation:
+'audio-rate'` makes it a-rate, anything else k-rate. The entry also exports the
+message protocol between the two threads (`ProcessorMessage`,
+`ProcessorReport`, `PROCESSOR_PROTOCOL_VERSION`). The module that turns a
+prepared definition into ports, parameters and an insert effect is not
+delivered yet.
+
+## processor-worklet — @webmusic/kernel/processor-worklet
+
+The audio-thread authoring kit. A worklet file imports it and calls
+`defineProcessor(definition, implementation)` once at its top level, with the
+same definition object the main thread prepares. The entry touches no global
+when imported, so it is safe to import anywhere; `defineProcessor` itself
+throws outside an `AudioWorklet` scope.
+
+```ts
+import {defineProcessor} from '@webmusic/kernel/processor-worklet';
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const softClip: ProcessorDefinition; // the shared definition
+
+defineProcessor(softClip, {
+  create: () => ({}),
+  process(_state, block) {
+    const drive = block.params.drive;
+    for (let channel = 0; channel < block.outputs[0].length; channel++) {
+      const input = block.inputs[0][channel], output = block.outputs[0][channel];
+      if (!input) continue;
+      for (let frame = 0; frame < output.length; frame++) {
+        output[frame] = Math.tanh(input[frame] * (drive.length > 1 ? drive[frame] : drive[0]));
+      }
+    }
+  },
+});
+```
+
+`create(setup)` allocates all state; `process(state, block)` runs once per
+render quantum and must not allocate. The block object and its arrays are
+reused between calls. `block.params[id]` holds one value per block, or one per
+frame for an a-rate parameter that changes within it. `block.frame /
+block.sampleRate` is audio reference time. If `create` or `process` throws, the
+processor reports the error once, outputs silence and stops.

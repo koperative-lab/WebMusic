@@ -34,6 +34,8 @@ export const expectedPublicEntries = Object.freeze({
     "./transport",
     "./tick",
     "./session",
+    "./processor",
+    "./processor-worklet",
     "./package.json",
   ],
   "@webmusic/ui": [

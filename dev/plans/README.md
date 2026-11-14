@@ -14,7 +14,7 @@ context rather than its scope.
 
 | Record | Historical scope | Current starting point |
 |---|---|---|
-| [Authored DSP modules — 2026-11-12](2026-11-12-authored-dsp-modules.md) | Open proposal: a processor definition and worklet file become a module with the existing audio, note and control ports; not accepted or implemented | STATUS DSP-01 and [Modular composition](../design/MODULAR-COMPOSITION.md) |
+| [Authored DSP modules — 2026-11-12](2026-11-12-authored-dsp-modules.md) | Proposal for authored DSP: a processor definition and worklet file become a module with the existing audio, note and control ports; direction accepted as DEC-073, with changes recorded in the design | [Processor modules](../design/PROCESSOR-MODULES.md) and STATUS DSP-01 |
 | [Unified modular composition — 2026-11-06](2026-11-06-unified-modular-composition.md) | Roadmap U0–U10 making modular composition the only model across every Element, Headless runtime and API; U0 promotes its target model into the design | [Modular composition](../design/MODULAR-COMPOSITION.md), DEC-068 and STATUS MOD-15 |
 | [Editing capabilities — 2026-10-13](2026-10-13-editing-capabilities.md) | Original proposal and P0–P8 sequence; P0 promoted to accepted design, with the current work consolidated into five phases P0–P4 | [Editing contracts and current roadmap](../design/EDIT-COMPONENTS.md#implementation-and-reference-delivery), DEC-053 and STATUS EDIT-01 |
 | [Analysis workbench design](analysis-workbench-design.md) | Chordio workbench proposal and its visual prototype | [Analyze design](../design/ANALYZE-COMPONENTS.md) |

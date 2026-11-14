@@ -1,5 +1,11 @@
 # Authored DSP modules — 2026-11-12
 
+> **2026-11-13:** the direction is accepted as
+> [DEC-073](../DECISIONS.md#dec-073--authored-dsp-is-a-kernel-processor-module-contract).
+> [Processor modules](../design/PROCESSOR-MODULES.md) owns the current contract,
+> the points where building changed this proposal, and the development
+> sequence. The body below keeps its original wording.
+
 Status: proposed. Nothing in this document is an implemented or accepted API.
 Layer and public entry: proposed Kernel `/processor` (main thread) and
 `/processor/worklet` (audio thread); domain adapters stay in Score and Audio.

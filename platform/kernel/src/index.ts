@@ -9,3 +9,5 @@ export * from './meter';
 export * from './transport';
 export * from './tick';
 export * from './session';
+export * from './processor';
+export * from './processor-worklet';
