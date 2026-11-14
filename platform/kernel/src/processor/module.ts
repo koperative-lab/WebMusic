@@ -7,11 +7,11 @@ import {ParamHandle, ParamSurface, type ParamDescriptor} from '../module/paramet
 import {PortListeners} from '../module/port';
 import type {ModuleHandle, ModulePort} from '../module/registry';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
-import {isProcessorPrepared, ProcessorUnavailableError} from './prepare';
-import {PROCESSOR_PROTOCOL_VERSION, type ProcessorMessage, type ProcessorNodeOptions, type ProcessorReport} from './protocol';
+import {createProcessorNode, listenToProcessor, processorParam, type ProcessorNodeFactory} from './node';
+import {isProcessorPrepared} from './prepare';
+import type {ProcessorMessage} from './protocol';
 
-/** Builds the node; injectable for tests and for applications that wrap node creation. */
-export type ProcessorNodeFactory = (context: BaseAudioContext, name: string, options: AudioWorkletNodeOptions) => AudioWorkletNode;
+export type {ProcessorNodeFactory} from './node';
 
 export interface ProcessorModuleOptions {
   /** Module ID; immutable for the module's life and unique in its registry. */
@@ -34,12 +34,6 @@ export interface ProcessorModuleOptions {
 
 /** `ready` until the processor fails (`error`) or the module is disposed (`detached`, terminal). */
 export type ProcessorModuleState = 'ready' | 'error' | 'detached';
-
-function defaultNodeFactory(context: BaseAudioContext, name: string, options: AudioWorkletNodeOptions): AudioWorkletNode {
-  const Constructor = (globalThis as {AudioWorkletNode?: typeof AudioWorkletNode}).AudioWorkletNode;
-  if (typeof Constructor !== 'function') throw new ProcessorUnavailableError('AudioWorkletNode is unavailable in this environment.');
-  return new Constructor(context, name, options);
-}
 
 function nativeModulation(descriptor: ParamDescriptor): boolean {
   return descriptor.modulation === 'audio-rate' || descriptor.modulation === 'control-rate';
@@ -197,24 +191,19 @@ export function createProcessorModule(
       handles.push(handle);
       cleanups.push(() => handle.dispose());
     }
-    const nodeOptions: ProcessorNodeOptions = {protocol: PROCESSOR_PROTOCOL_VERSION, name: resolved.name, config: options.config};
-    const node = (options.createNode ?? defaultNodeFactory)(audio, resolved.name, {
-      numberOfInputs: resolved.audioInputs.length,
-      numberOfOutputs: resolved.audioOutputs.length,
-      outputChannelCount: resolved.audioOutputs.map(port => port.channels),
-      parameterData: Object.fromEntries(handles.map(handle => [handle.descriptor.id, handle.snapshot.baseValue])),
-      processorOptions: nodeOptions,
+    const node = createProcessorNode(audio, resolved, {
+      config: options.config, createNode: options.createNode,
+      baseValues: Object.fromEntries(handles.map(handle => [handle.descriptor.id, handle.snapshot.baseValue])),
     });
     cleanups.push(() => node.disconnect());
-    cleanups.push(() => {
-      node.port.onmessage = null;
-      node.onprocessorerror = null;
-      node.port.close();
-    });
+    // The module does not exist yet; reports arriving first have nothing to fail.
+    const owner: {module?: ProcessorModule} = {};
+    cleanups.push(listenToProcessor(node, {
+      fail: message => owner.module?.fail(message), data: options.onReport, report: options.onCleanupError,
+    }));
 
     for (const handle of handles) {
-      const param = node.parameters.get(handle.descriptor.id);
-      if (!param) throw new Error(`Processor ${resolved.name} node has no AudioParam ${handle.descriptor.id}; its worklet file may use another definition.`);
+      const param = processorParam(node, resolved, handle.descriptor.id);
       if (nativeModulation(handle.descriptor)) {
         const lease = handle.bindAudioParam(audio, param, {lazy: true});
         cleanups.push(() => lease.release());
@@ -253,17 +242,7 @@ export function createProcessorModule(
       control: handles.length ? createControlPort(params) : undefined,
       cleanups, onCleanupError: options.onCleanupError,
     });
-
-    node.port.onmessage = event => {
-      const report = event.data as ProcessorReport | undefined;
-      if (report?.type === 'error') created.fail(String(report.message));
-      else if (report?.type === 'data') {
-        try { options.onReport?.(report.data); } catch (error) {
-          try { options.onCleanupError?.(error); } catch { /* A diagnostic cannot stop delivery. */ }
-        }
-      }
-    };
-    node.onprocessorerror = () => created.fail('The processor stopped with an uncaught error.');
+    owner.module = created;
 
     const registration: ConnectionLease = context.registry.register(created);
     cleanups.push(() => registration.release());

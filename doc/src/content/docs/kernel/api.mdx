@@ -20,7 +20,7 @@ take exactly what they use.
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
-| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules and the thread protocol |
+| [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules and insert effects, and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
 
 ## events — @webmusic/kernel/events
@@ -1198,6 +1198,34 @@ const clip = createProcessorModule(scope, softClip, {id: 'clip', params: {drive:
 clip.params.get('drive')?.setBaseValue(8);
 clip.getInput('input');  // AudioInputPort: connect a producer's output port to it
 clip.dispose();
+```
+
+`processorEffect(definition, options)` returns an `Effect` recipe, so a
+prepared processor works anywhere an effect does: an `InsertChain` slot, a
+Rack channel insert, a player's `.effect` or a `<score-effect>`'s `.effect`.
+Each realization creates its own node, which is both the slot's input and
+output; the chain feeds the first input bus (at its declared channel count)
+and reads the first output. `createAudioNodes` stays synchronous, so it throws
+— and the chain keeps its working graph — unless the processor is prepared in
+that context. The chain builds the slot's parameter handles from the
+definition, so a synth panel shows the declared labels, units and ranges, and
+`audio-rate` parameters accept modulation. `onError` reports a realization
+whose processor failed; it stays in the chain, silent. Offline rendering works
+the same way: prepare the processor on the offline context inside
+`renderModuleGraph`'s `build` before creating the effect.
+
+```ts
+import {InsertChain} from '@webmusic/kernel/effect';
+import {prepareProcessor, processorEffect, type ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const audio: AudioContext;
+declare const softClip: ProcessorDefinition;
+declare const workletUrl: URL;
+
+await prepareProcessor(audio, softClip, {module: workletUrl});
+const chain = new InsertChain(audio);
+chain.setSlot({id: 'clip', recipe: processorEffect(softClip, {label: 'Soft clip'})});
+chain.instances[0].params.get('drive')?.setBaseValue(6);
 ```
 
 ## processor-worklet — @webmusic/kernel/processor-worklet

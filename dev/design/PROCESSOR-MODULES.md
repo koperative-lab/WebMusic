@@ -1,7 +1,7 @@
 # Processor modules: authored DSP
 
 Status: accepted direction, in delivery ([DEC-073](../DECISIONS.md#dec-073--authored-dsp-is-a-kernel-processor-module-contract)).
-Steps 0 and 1 below are implemented; later steps are targets, not current API.
+Steps 0–2 below are implemented; later steps are targets, not current API.
 Layer and public entry: Kernel `/processor` (main thread) and
 `/processor-worklet` (audio thread); domain adapters stay in Score and Audio.
 Source: [platform/kernel/src/processor/](../../platform/kernel/src/processor/).
@@ -79,6 +79,41 @@ building it:
 Not covered yet: closing or replacing the audio context does not move the
 module to `detached`; that waits for real-context evidence in step 2.
 
+## Step 2 as built
+
+`processorEffect(definition, options)` in
+[effect.ts](../../platform/kernel/src/processor/effect.ts); node construction
+and report handling are shared with the module in
+[node.ts](../../platform/kernel/src/processor/node.ts).
+
+| Choice | Reason |
+|---|---|
+| The node is the slot's input and output | An insert has one path; entry and exit nodes would add two nodes per slot for nothing |
+| The first input bus fixes the node's channel count (`explicit`) | Producers are mixed to the declared count, as in the module |
+| Undeclared modulation is stated as `none` in the recipe's descriptors | `InsertChain` would otherwise infer `control-rate` from a k-rate `AudioParam` and accept modulation the definition did not declare |
+| Failure goes to `onError`, once per realization | An `Effect` has no state channel; the slot stays in place and silent |
+
+Browser evidence (2026-11-13, in-app Chromium, private acceptance runner,
+checks I1–I3, on the reference gain and soft-clip processors written with the
+public kit):
+
+- **DSP-A1:** offline, Arabesque through a Score player insert at gain 0.5
+  measured a wet ÷ dry level of 0.5000, and 0.5000–0.5000 across 16
+  half-second windows. Two 8 s renders took 96 ms together.
+- **DSP-A2:** a 2 Hz `ControlLFO` on the a-rate gain swept the 10 ms ratio
+  from 0.000 to 1.000; the largest gain change inside one 128-frame block
+  measured 0.0181 against a predicted 0.0182 (a k-rate parameter reads 0).
+- **Live:** a soft-clip `<score-effect>` on a playing `<score-player>`
+  realized an `AudioWorkletNode`; its synth panel showed Drive with the
+  declared range, and Drive 22.1 set from the keyboard reached the node's
+  `AudioParam`. No console errors.
+- The production runner build bundles the author's worklet file as one
+  self-contained 5.3 kB module.
+
+Not established: audible quality and click-free parameter changes (the
+owner's manual check I3), other browsers, devices, and the step 1 gap on
+context closure.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -90,7 +125,7 @@ build in order; none starts a later one's surface early.
 |---|---|---|---|
 | 0 — done | Entries, definition, protocol, preparation, kit core | `definition.ts`, `protocol.ts`, `prepare.ts`, `worklet.ts`; manifest, build and policy entries; Kernel API sections | Validation, per-context preparation, block adaptation and failure reporting (unit tests) |
 | 1 — done | Audio-only processor module | `createProcessorModule(context, definition, options)`: `AudioWorkletNode`, audio input/output ports, a `ParamSurface` bound to the node's `AudioParam`s, readiness, error reports, disposal; declared latency published on its ports | DSP-A6, A7, A9 |
-| 2 | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
+| 2 — done | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
 | 3 | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
 | 4 | Transport and Session membership | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
 | 5 | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |

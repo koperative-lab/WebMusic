@@ -8,8 +8,9 @@ work and does not establish npm publication, a release tag or a deployment.
 - Add the Kernel `/processor` and `/processor-worklet` entries for authored
   DSP: shared processor definitions, per-context `AudioWorklet` preparation and
   an audio-thread authoring kit. `createProcessorModule` exposes a prepared
-  processor as typed audio ports and a parameter surface; note input,
-  transport and insert-effect use are not included yet.
+  processor as typed audio ports and a parameter surface, and
+  `processorEffect` uses it as an insert in any effect chain, live or offline.
+  Note input and transport are not included yet.
 - Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
   and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
   foundations do not contain the new module, Session and patch-editor entries.
