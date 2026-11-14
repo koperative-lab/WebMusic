@@ -1,9 +1,12 @@
 // Messages between a processor module (main thread) and its processor (audio
-// thread). Types and one constant only: both sides import this file, and it
+// thread). Types and constants only: both sides import this file, and it
 // must stay free of runtime dependencies.
 
 /** Bumped when a message shape changes incompatibly; the two sides must match. */
 export const PROCESSOR_PROTOCOL_VERSION = 1;
+
+/** `frame` of a note that plays as soon as possible: a live gesture with no scheduled time. */
+export const PROCESSOR_IMMEDIATE_FRAME = -1;
 
 /** `processorOptions` handed to the processor's constructor. */
 export interface ProcessorNodeOptions {
@@ -33,7 +36,10 @@ export interface ProcessorNoteMessage {
   readonly cents: number;
   /** Normalized 0–1. */
   readonly velocity: number;
-  /** Absolute frame on the context's sample clock. */
+  /**
+   * Absolute frame on the context's sample clock, or {@link PROCESSOR_IMMEDIATE_FRAME}
+   * for a live gesture that plays at the next block without counting as late.
+   */
   readonly frame: number;
   readonly epoch: number;
 }
@@ -60,7 +66,7 @@ export interface ProcessorErrorReport {
   readonly message: string;
 }
 
-/** Note events that arrived after their frame since the last report. */
+/** Note events that arrived after their frame since the last report. Posted at most four times a second. */
 export interface ProcessorLateReport {
   readonly type: 'late';
   readonly count: number;

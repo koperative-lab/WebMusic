@@ -1,7 +1,7 @@
 # Processor modules: authored DSP
 
 Status: accepted direction, in delivery ([DEC-073](../DECISIONS.md#dec-073--authored-dsp-is-a-kernel-processor-module-contract)).
-Steps 0–2 below are implemented; later steps are targets, not current API.
+Steps 0–3 below are implemented; later steps are targets, not current API.
 Layer and public entry: Kernel `/processor` (main thread) and
 `/processor-worklet` (audio thread); domain adapters stay in Score and Audio.
 Source: [platform/kernel/src/processor/](../../platform/kernel/src/processor/).
@@ -114,6 +114,46 @@ Not established: audible quality and click-free parameter changes (the
 owner's manual check I3), other browsers, devices, and the step 1 gap on
 context closure.
 
+## Step 3 as built
+
+The module's note bridge (`ProcessorNoteBridge` in
+[module.ts](../../platform/kernel/src/processor/module.ts)) and the kit's
+`NoteQueue` in [worklet.ts](../../platform/kernel/src/processor/worklet.ts).
+
+| Choice | Reason |
+|---|---|
+| The kit calls `note()` with a frame offset before `process`, rather than splitting the block | Splitting would need per-segment views of every buffer; an offset lets the author start a voice mid-block with no allocation |
+| All queue allocation happens on message arrival; dispatch only advances an index and updates a `Set` | `process` stays allocation-free apart from the `Set`'s own growth |
+| A newer epoch withdraws older queued onsets but keeps every release | Dropping a release could leave a note hanging |
+| A release that names an earlier time than its onset takes the onset's frame | The author never sees an `off` before its `on` |
+| Live `performance-seconds` gestures post with an immediate frame | They have no scheduled time; playing them at the next block is not lateness |
+| A late `cancel` is not counted | Releasing a producer cancels its held notes with their past onset times; that is "stop now", not a scheduling failure (found in the live browser check) |
+| Other axes are rejected unless `noteTime` maps them | A wrong mapping would play at the wrong time without any error; step 4 supplies the Session mapping |
+| Late counts reach the main thread at most four times a second | Reporting is the only message the audio thread sends during normal running |
+
+**Offline note delivery, decided by measurement.** The proposal left open
+whether notes must all be posted before an offline render or can come from a
+lookahead scheduler that `renderModuleGraph` ticks in rendered time. Both work:
+in check I4 the first 45 Arabesque onsets landed on their exact sample either
+way, with no stray markers and no late notes. A lookahead shorter than the
+tick step (5 ms ahead, 25 ms ticks) produced 76 late changes and moved 39
+onsets, so a scheduler only needs to look further ahead than one tick, as live
+schedulers already do. No separate offline path is needed.
+
+Browser evidence (2026-11-14, in-app Chromium, private runner checks I4–I5,
+with a polyphonic sine "note-probe" instrument written with the public kit):
+
+- **DSP-A3:** 45/45 onsets on their exact frame offline, in both delivery modes.
+- **DSP-A4** is covered by unit tests (same-pitch occurrences from two
+  sources, cancel before onset); the live check additionally showed no hanging
+  notes after restarting the schedule twice.
+- **Live:** a 25 ms tick, 150 ms lookahead scheduler on the main thread played
+  the opening of Arabesque with 0 late notes in the foreground, including after
+  two restarts.
+
+Not established: background-tab timing (part of manual check I5), other
+browsers and devices, and audible quality.
+
 ## Development sequence
 
 Each step is one reviewable change. It ends with its tests failing without the
@@ -126,7 +166,7 @@ build in order; none starts a later one's surface early.
 | 0 — done | Entries, definition, protocol, preparation, kit core | `definition.ts`, `protocol.ts`, `prepare.ts`, `worklet.ts`; manifest, build and policy entries; Kernel API sections | Validation, per-context preparation, block adaptation and failure reporting (unit tests) |
 | 1 — done | Audio-only processor module | `createProcessorModule(context, definition, options)`: `AudioWorkletNode`, audio input/output ports, a `ParamSurface` bound to the node's `AudioParam`s, readiness, error reports, disposal; declared latency published on its ports | DSP-A6, A7, A9 |
 | 2 — done | Processor as an insert effect | `processorEffect(definition)` for `InsertChain` and `.effect`; offline realization through `renderModuleGraph`; first browser check with a gain or soft-clip processor on Arabesque No. 1 | DSP-A1, A2 |
-| 3 | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
+| 3 — done | Notes on the audio thread | Main-thread note bridge (occurrence integers, frame conversion); kit event queue with sample-offset dispatch, `cancel`, epochs and a late counter; decide offline note delivery by measurement | DSP-A3, A4 |
 | 4 | Transport and Session membership | Anchor messages, `block.transport`, participant registration with the real timing mode, invalidation on seek, pause and loop | DSP-A5 |
 | 5 | Reference instrument | A polyphonic reference processor to copy; Score `Sound.processor(definition)` over `HeadlessSynth`; allocation harness and the first benchmark against `OscillatorSynth` | DSP-A10, A11, A12 |
 | 6 | Projects | `processorPlugin(definition)`; save, restore and unresolved recovery | DSP-A8 |

@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {checkModuleConformance} from '../src/module/conformance';
 import {ModuleAudioEnvironment, ModuleContext} from '../src/module/context';
 import {createConnectionLease} from '../src/module/lease';
+import {NoteOutputPort, type NoteEvent} from '../src/module/note-port';
 import {
   createProcessorModule, isProcessorPrepared, prepareProcessor, PROCESSOR_PROTOCOL_VERSION,
   ProcessorUnavailableError, type ProcessorDefinition, type ProcessorNodeFactory,
@@ -300,7 +301,6 @@ describe('createProcessorModule', () => {
 
   it('rejects requests it cannot honour before creating anything', async () => {
     const {context, createNode} = await setup();
-    expect(() => createProcessorModule(context, {...gain, noteInput: true}, {id: 'fx', createNode})).toThrow(/note input/);
     expect(() => createProcessorModule(context, {...gain, transport: true}, {id: 'fx', createNode})).toThrow(/transport/);
     expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, params: {missing: 1}})).toThrow(/no parameter missing/);
     expect(() => createProcessorModule(context, gain, {id: 'fx', createNode, params: {gain: 5}})).toThrow(RangeError);
@@ -335,5 +335,112 @@ describe('createProcessorModule', () => {
       return {module: created, dispose: () => created.dispose()};
     });
     expect(report.passed).toBe(true);
+  });
+
+  describe('note input', () => {
+    const synth: ProcessorDefinition = {id: 'test.synth', version: '1.0.0', noteInput: true};
+    const event = (gate: NoteEvent['gate'], occurrenceId: string, time: number, extra: Partial<NoteEvent> = {}): NoteEvent => ({
+      occurrenceId, sourceId: 'keys', pitch: {midi: 60}, velocity: 0.5, gate, axis: 'audio-context-seconds', time, epoch: 0, ...extra,
+    });
+
+    it('exposes a notes input between the audio inputs and outputs', async () => {
+      const {context, createNode} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      expect(module.ports().map(port => `${port.family}/${port.direction}/${port.id}`)).toEqual(['note/input/notes', 'audio/output/output']);
+      expect(module.notes).toBe(module.ports()[0]);
+    });
+
+    it('posts each change with an integer occurrence and an absolute frame', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      module.notes!.accept(event('on', 'a', 2, {pitch: {midi: 64, cents: -12}}));
+      module.notes!.accept(event('on', 'b', 2.5));
+      module.notes!.accept(event('off', 'a', 3));
+      expect(nodes[0].posted).toEqual([
+        {type: 'note', gate: 'on', occurrence: 1, midi: 64, cents: -12, velocity: 0.5, frame: 96000, epoch: 0},
+        {type: 'note', gate: 'on', occurrence: 2, midi: 60, cents: 0, velocity: 0.5, frame: 120000, epoch: 0},
+        {type: 'note', gate: 'off', occurrence: 1, midi: 60, cents: 0, velocity: 0.5, frame: 144000, epoch: 0},
+      ]);
+    });
+
+    it('keeps same-pitch occurrences from two sources apart and ignores unknown releases', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      module.notes!.accept(event('on', 'n', 1));
+      module.notes!.accept(event('on', 'n', 1, {sourceId: 'midi'}));
+      module.notes!.accept(event('off', 'n', 2, {sourceId: 'midi'}));
+      module.notes!.accept(event('off', 'missing', 2));
+      module.notes!.accept(event('on', 'n', 3));
+      expect(nodes[0].posted.map(message => {
+        const note = message as {gate: string; occurrence: number};
+        return `${note.gate}${note.occurrence}`;
+      })).toEqual(['on1', 'on2', 'off2']);
+    });
+
+    it('plays live gestures now and rejects axes it cannot place', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      module.notes!.accept(event('on', 'k', 12.5, {axis: 'performance-seconds'}));
+      expect(nodes[0].posted[0]).toMatchObject({gate: 'on', frame: -1});
+      expect(() => module.notes!.accept(event('on', 's', 1, {axis: 'session-seconds'}))).toThrow(/session-seconds axis/);
+    });
+
+    it('uses a supplied noteTime mapping', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {
+        id: 'synth', createNode, noteTime: note => note.axis === 'session-seconds' ? 10 + note.time : undefined,
+      });
+      module.notes!.accept(event('on', 's', 0.5, {axis: 'session-seconds'}));
+      expect(nodes[0].posted[0]).toMatchObject({frame: 504000});
+      expect(() => module.notes!.accept(event('on', 'a', 1))).toThrow(/audio-context-seconds axis/);
+    });
+
+    it('cancels what a producer started when its connection is released', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      const keys = new NoteOutputPort();
+      const lease = module.notes!.connect(keys);
+      keys.emit(event('on', 'a', 1));
+      lease.release();
+      expect(nodes[0].posted.at(-1)).toMatchObject({gate: 'cancel', occurrence: 1});
+    });
+
+    it('cancels held notes on disposal before closing the processor port', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      const keys = new NoteOutputPort();
+      module.notes!.connect(keys);
+      keys.emit(event('on', 'a', 1));
+      module.notes!.accept(event('on', 'direct', 1));
+      const port = nodes[0].port;
+      const close = port.close;
+      let postedBeforeClose = 0;
+      port.close = () => { postedBeforeClose = nodes[0].posted.length; close(); };
+      module.dispose();
+      expect(nodes[0].posted.slice(2).map(message => (message as {gate: string; occurrence: number}).occurrence).sort()).toEqual([1, 2]);
+      expect(nodes[0].posted.slice(2).every(message => (message as {gate: string}).gate === 'cancel')).toBe(true);
+      expect(postedBeforeClose).toBe(4);
+      expect(module.notes!.readiness).toBe('detached');
+    });
+
+    it('counts late notes the processor reports and notifies subscribers', async () => {
+      const {context, createNode, nodes} = await setup(synth);
+      const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+      const changes = vi.fn();
+      module.subscribe(changes);
+      nodes[0].receive({type: 'late', count: 3});
+      nodes[0].receive({type: 'late', count: 2});
+      expect(module.lateNotes).toBe(5);
+      expect(changes).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes the module conformance kit with its notes port', async () => {
+      const {context, createNode} = await setup(synth);
+      const report = await checkModuleConformance(() => {
+        const module = createProcessorModule(context, synth, {id: 'synth', createNode});
+        return {module, dispose: () => module.dispose()};
+      });
+      expect(report.failures).toEqual([]);
+    });
   });
 });

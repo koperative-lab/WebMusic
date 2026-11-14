@@ -4,12 +4,13 @@ import {AudioInputPort, AudioOutputPort} from '../module/audio-port';
 import {createControlPort, type ControlPort} from '../module/control-port';
 import type {ConnectionLease} from '../module/lease';
 import {ParamHandle, ParamSurface, type ParamDescriptor} from '../module/parameter';
+import {NoteInputPort, type NoteEvent, type NoteInputHandler} from '../module/note-port';
 import {PortListeners} from '../module/port';
 import type {ModuleHandle, ModulePort} from '../module/registry';
 import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from './definition';
 import {createProcessorNode, listenToProcessor, processorParam, type ProcessorNodeFactory} from './node';
 import {isProcessorPrepared} from './prepare';
-import type {ProcessorMessage} from './protocol';
+import {PROCESSOR_IMMEDIATE_FRAME, type ProcessorMessage, type ProcessorNoteMessage} from './protocol';
 
 export type {ProcessorNodeFactory} from './node';
 
@@ -27,9 +28,77 @@ export interface ProcessorModuleOptions {
    */
   readonly route?: 'default' | 'none';
   readonly createNode?: ProcessorNodeFactory;
+  /**
+   * Places a note event on the audio clock: audio-context seconds, `'now'` for
+   * a live gesture with no scheduled time, or undefined when the event's axis
+   * has no mapping (the event is rejected). The default accepts
+   * `audio-context-seconds` as is and plays `performance-seconds` gestures now.
+   */
+  readonly noteTime?: ProcessorNoteTime;
   /** Author-defined observations the processor posts through `setup.report`. */
   readonly onReport?: (data: unknown) => void;
   readonly onCleanupError?: (error: unknown) => void;
+}
+
+/** Where a note event falls on the audio clock; see {@link ProcessorModuleOptions.noteTime}. */
+export type ProcessorNoteTime = (event: NoteEvent) => number | 'now' | undefined;
+
+/** Accepts scheduled `audio-context-seconds` notes and plays live `performance-seconds` gestures at once. */
+export const defaultProcessorNoteTime: ProcessorNoteTime = event =>
+  event.axis === 'audio-context-seconds' ? event.time : event.axis === 'performance-seconds' ? 'now' : undefined;
+
+/**
+ * Main-thread side of a processor's note input: string occurrence IDs become
+ * small integers, times become frames, and every change is posted ahead of
+ * its frame. It keeps only the occurrences it has started, so a release for
+ * anything else is ignored.
+ */
+class ProcessorNoteBridge implements NoteInputHandler {
+  readonly #occurrences = new Map<string, number>();
+  #next = 1;
+  #closed = false;
+
+  constructor(
+    private readonly node: AudioWorkletNode,
+    private readonly sampleRate: number,
+    private readonly time: ProcessorNoteTime,
+    private readonly name: string,
+  ) {}
+
+  accept(event: NoteEvent): void {
+    if (this.#closed) return;
+    const at = this.time(event);
+    if (at === undefined) throw new TypeError(`Processor ${this.name} cannot place notes on the ${event.axis} axis; supply noteTime.`);
+    if (at !== 'now' && !Number.isFinite(at)) throw new RangeError(`Processor ${this.name} note time must be finite seconds or 'now'.`);
+    const key = `${event.sourceId}\u0000${event.occurrenceId}`;
+    let occurrence = this.#occurrences.get(key);
+    if (event.gate === 'on') {
+      if (occurrence !== undefined) return;
+      occurrence = this.#next++;
+      this.#occurrences.set(key, occurrence);
+    } else {
+      if (occurrence === undefined) return;
+      this.#occurrences.delete(key);
+    }
+    this.#post({
+      type: 'note', gate: event.gate, occurrence,
+      midi: event.pitch.midi, cents: event.pitch.cents ?? 0, velocity: event.velocity,
+      frame: at === 'now' ? PROCESSOR_IMMEDIATE_FRAME : Math.max(0, Math.round(at * this.sampleRate)),
+      epoch: event.epoch,
+    });
+  }
+
+  /** Cancel every note this bridge started, then stop accepting. */
+  close(): void {
+    if (this.#closed) return;
+    this.#closed = true;
+    for (const occurrence of this.#occurrences.values()) {
+      this.#post({type: 'note', gate: 'cancel', occurrence, midi: 0, cents: 0, velocity: 0, frame: PROCESSOR_IMMEDIATE_FRAME, epoch: 0});
+    }
+    this.#occurrences.clear();
+  }
+
+  #post(message: ProcessorNoteMessage): void { this.node.port.postMessage(message); }
 }
 
 /** `ready` until the processor fails (`error`) or the module is disposed (`detached`, terminal). */
@@ -55,6 +124,8 @@ export class ProcessorModule implements ModuleHandle {
   readonly params: ParamSurface;
   /** Declared processing latency, `latencySamples / sampleRate`; never measured. */
   readonly latencySeconds: number;
+  /** The `notes` input when the definition declares note input. */
+  readonly notes?: NoteInputPort;
   readonly #inputs: readonly AudioInputPort[];
   readonly #outputs: readonly AudioOutputPort[];
   readonly #ports: readonly ModulePort[];
@@ -63,6 +134,7 @@ export class ProcessorModule implements ModuleHandle {
   readonly #onCleanupError?: (error: unknown) => void;
   #state: ProcessorModuleState = 'ready';
   #error?: string;
+  #lateNotes = 0;
 
   /** @internal Use {@link createProcessorModule}. */
   constructor(parts: {
@@ -74,6 +146,7 @@ export class ProcessorModule implements ModuleHandle {
     inputs: readonly AudioInputPort[];
     outputs: readonly AudioOutputPort[];
     control?: ControlPort;
+    notes?: NoteInputPort;
     cleanups: (() => void)[];
     onCleanupError?: (error: unknown) => void;
   }) {
@@ -84,7 +157,10 @@ export class ProcessorModule implements ModuleHandle {
     this.latencySeconds = parts.latencySeconds;
     this.#inputs = parts.inputs;
     this.#outputs = parts.outputs;
-    this.#ports = Object.freeze([...parts.inputs, ...parts.outputs, ...(parts.control ? [parts.control] : [])]);
+    this.notes = parts.notes;
+    this.#ports = Object.freeze([
+      ...parts.inputs, ...(parts.notes ? [parts.notes] : []), ...parts.outputs, ...(parts.control ? [parts.control] : []),
+    ]);
     this.#cleanups = parts.cleanups;
     this.#onCleanupError = parts.onCleanupError;
     this.#listeners = new PortListeners<void>(parts.onCleanupError);
@@ -93,8 +169,10 @@ export class ProcessorModule implements ModuleHandle {
   get state(): ProcessorModuleState { return this.#state; }
   /** The processor's failure message while `state` is `error`. */
   get error(): string | undefined { return this.#error; }
+  /** Note changes the processor played after their frame, as reported so far. Zero means every note was on time. */
+  get lateNotes(): number { return this.#lateNotes; }
 
-  /** Every port, in definition order: audio inputs, audio outputs, then `params` when the definition has parameters. */
+  /** Every port: audio inputs, `notes` with note input, audio outputs, then `params` when the definition has parameters. */
   ports(): readonly ModulePort[] { return this.#ports; }
   /** An audio output by its definition ID. */
   getPort(name: string): AudioOutputPort | undefined { return this.#outputs.find(port => port.id === name); }
@@ -108,7 +186,7 @@ export class ProcessorModule implements ModuleHandle {
     this.node.port.postMessage(message);
   }
 
-  /** Called after a state change. */
+  /** Called after a state change and after a late-note report. */
   subscribe(listener: () => void): () => void {
     if (this.#state === 'detached') return () => {};
     return this.#listeners.add(listener);
@@ -138,6 +216,13 @@ export class ProcessorModule implements ModuleHandle {
     this.#listeners.emit();
   }
 
+  /** @internal Late-note report from the processor. */
+  late(count: number): void {
+    if (this.#state === 'detached' || count <= 0) return;
+    this.#lateNotes += count;
+    this.#listeners.emit();
+  }
+
   #report(error: unknown): void {
     try { this.#onCleanupError?.(error); } catch { /* Cleanup continues. */ }
   }
@@ -154,8 +239,14 @@ export class ProcessorModule implements ModuleHandle {
  * `AudioParam`s through their handles and accept modulation; other parameters
  * write the `AudioParam` directly.
  *
- * Note input and transport are not available on processor modules yet; a
- * definition requesting either is rejected.
+ * With note input, the module exposes a `notes` input port. Each event is
+ * placed on the audio clock with `noteTime` and posted ahead of its frame; the
+ * processor plays it at that frame, or at the next block and counts it in
+ * {@link ProcessorModule.lateNotes} when it arrives too late. Disconnecting a
+ * producer or disposing the module cancels the notes it started.
+ *
+ * Transport is not available on processor modules yet; a definition
+ * requesting it is rejected.
  */
 export function createProcessorModule(
   context: ModuleContext,
@@ -163,7 +254,6 @@ export function createProcessorModule(
   options: ProcessorModuleOptions,
 ): ProcessorModule {
   const resolved = resolveProcessorDefinition(definition);
-  if (resolved.noteInput) throw new TypeError(`Processor ${resolved.name} requests note input, which processor modules do not support yet.`);
   if (resolved.transport) throw new TypeError(`Processor ${resolved.name} requests transport, which processor modules do not support yet.`);
   if (typeof options?.id !== 'string') throw new TypeError('Processor module needs an id.');
   const route = options.route ?? 'default';
@@ -199,7 +289,8 @@ export function createProcessorModule(
     // The module does not exist yet; reports arriving first have nothing to fail.
     const owner: {module?: ProcessorModule} = {};
     cleanups.push(listenToProcessor(node, {
-      fail: message => owner.module?.fail(message), data: options.onReport, report: options.onCleanupError,
+      fail: message => owner.module?.fail(message), late: count => owner.module?.late(count),
+      data: options.onReport, report: options.onCleanupError,
     }));
 
     for (const handle of handles) {
@@ -236,11 +327,20 @@ export function createProcessorModule(
       cleanups.push(() => output.dispose());
       return output;
     });
+    let notes: NoteInputPort | undefined;
+    if (resolved.noteInput) {
+      const bridge = new ProcessorNoteBridge(node, audio.sampleRate, options.noteTime ?? defaultProcessorNoteTime, resolved.name);
+      cleanups.push(() => bridge.close());
+      const port = new NoteInputPort(bridge, {id: 'notes'});
+      // Runs before the bridge closes, so released connections still post their cancels.
+      cleanups.push(() => port.dispose());
+      notes = port;
+    }
     const params = new ParamSurface(handles);
     const created = new ProcessorModule({
       id: options.id, definition: resolved, node, params, latencySeconds, inputs, outputs,
       control: handles.length ? createControlPort(params) : undefined,
-      cleanups, onCleanupError: options.onCleanupError,
+      notes, cleanups, onCleanupError: options.onCleanupError,
     });
     owner.module = created;
 

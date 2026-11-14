@@ -39,11 +39,17 @@ export function createProcessorNode(
 /** @internal Route the processor's reports; returns the cleanup that detaches and closes its port. */
 export function listenToProcessor(
   node: AudioWorkletNode,
-  handlers: {readonly fail: (message: string) => void; readonly data?: (data: unknown) => void; readonly report?: (error: unknown) => void},
+  handlers: {
+    readonly fail: (message: string) => void;
+    readonly data?: (data: unknown) => void;
+    readonly late?: (count: number) => void;
+    readonly report?: (error: unknown) => void;
+  },
 ): () => void {
   node.port.onmessage = event => {
     const message = event.data as ProcessorReport | undefined;
     if (message?.type === 'error') handlers.fail(String(message.message));
+    else if (message?.type === 'late') handlers.late?.(Number(message.count) || 0);
     else if (message?.type === 'data' && handlers.data) {
       try { handlers.data(message.data); } catch (error) {
         try { handlers.report?.(error); } catch { /* A diagnostic cannot stop delivery. */ }

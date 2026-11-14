@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {PROCESSOR_PROTOCOL_VERSION, type ProcessorDefinition, type ProcessorNodeOptions} from '../src/processor';
 import {defineProcessor, type ProcessorBlock, type ProcessorImplementation, type ProcessorWorkletScope} from '../src/processor-worklet';
 
@@ -140,5 +140,163 @@ describe('defineProcessor', () => {
 
   it('explains itself outside a worklet scope', () => {
     expect(() => defineProcessor(definition, gain)).toThrow(/inside an AudioWorklet module/);
+  });
+});
+
+describe('defineProcessor note queue', () => {
+  const synth: ProcessorDefinition = {id: 'test.synth', version: '1.0.0', noteInput: true};
+  type Seen = {gate: string; occurrence: number; midi: number; frameOffset: number; frame: number; epoch: number};
+
+  function instrument() {
+    const {scope, registered, posted} = fakeScope();
+    const seen: Seen[] = [];
+    defineProcessor(synth, {
+      create: () => null,
+      process() {},
+      note(_state, event) { seen.push({gate: event.gate, occurrence: event.occurrence, midi: event.midi, frameOffset: event.frameOffset, frame: scope.currentFrame, epoch: event.epoch}); },
+    }, scope);
+    const instance = new (registered.get('test.synth@1.0.0')!)();
+    const note = (gate: 'on' | 'off' | 'cancel', occurrence: number, frame: number, epoch = 0, midi = 60) =>
+      instance.port.onmessage!({data: {type: 'note', gate, occurrence, midi, cents: 0, velocity: 1, frame, epoch}});
+    const render = (frame: number) => {
+      scope.currentFrame = frame;
+      return instance.process([], [[new Float32Array(128)]], {});
+    };
+    return {seen, posted, note, render, scope};
+  }
+
+  it('requires note() when the definition declares note input', () => {
+    const {scope} = fakeScope();
+    expect(() => defineProcessor(synth, {create: () => null, process() {}}, scope)).toThrow(/needs note/);
+  });
+
+  it('delivers each change before the process call of its block, at its frame offset, in time order', () => {
+    const {seen, note, render} = instrument();
+    note('on', 2, 300);
+    note('on', 1, 130);
+    note('off', 1, 250);
+    render(0);
+    expect(seen).toEqual([]);
+    render(128);
+    expect(seen).toEqual([
+      {gate: 'on', occurrence: 1, midi: 60, frameOffset: 2, frame: 128, epoch: 0},
+      {gate: 'off', occurrence: 1, midi: 60, frameOffset: 122, frame: 128, epoch: 0},
+    ]);
+    render(256);
+    expect(seen.at(-1)).toMatchObject({gate: 'on', occurrence: 2, frameOffset: 44});
+  });
+
+  it('keeps arrival order at equal frames and never lets a release overtake its onset', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 10);
+    note('on', 2, 10);
+    note('off', 1, 5);
+    render(0);
+    expect(seen.map(event => `${event.gate}${event.occurrence}@${event.frameOffset}`)).toEqual(['on1@10', 'on2@10', 'off1@10']);
+  });
+
+  it('plays a late change at the block start and reports the count at a bounded rate', () => {
+    const {seen, posted, note, render} = instrument();
+    render(0);
+    note('on', 1, 10);
+    note('on', 2, 20);
+    render(128);
+    expect(seen.map(event => event.frameOffset)).toEqual([0, 0]);
+    expect(posted).toEqual([{type: 'late', count: 2}]);
+    note('off', 1, 30);
+    render(256);
+    expect(posted).toHaveLength(1);
+    render(256 + 48000 / 4);
+    expect(posted).toEqual([{type: 'late', count: 2}, {type: 'late', count: 1}]);
+  });
+
+  it('does not count a past-time cancel as late', () => {
+    const {seen, posted, note, render} = instrument();
+    note('on', 1, 0);
+    render(0);
+    note('cancel', 1, 0);
+    render(128);
+    render(128 + 48000);
+    expect(seen.map(event => `${event.gate}@${event.frameOffset}`)).toEqual(['on@0', 'cancel@0']);
+    expect(posted).toEqual([]);
+  });
+
+  it('plays an immediate gesture at the next block without counting it late', () => {
+    const {seen, posted, note, render} = instrument();
+    render(0);
+    note('on', 1, -1);
+    render(128);
+    expect(seen).toEqual([{gate: 'on', occurrence: 1, midi: 60, frameOffset: 0, frame: 128, epoch: 0}]);
+    expect(posted).toEqual([]);
+  });
+
+  it('withdraws a note cancelled before its onset so it never sounds', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 200);
+    note('off', 1, 300);
+    note('cancel', 1, 50);
+    render(128);
+    render(256);
+    expect(seen).toEqual([]);
+  });
+
+  it('cancels a sounding note at its frame', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 0);
+    render(0);
+    note('cancel', 1, 140);
+    render(128);
+    expect(seen.map(event => `${event.gate}@${event.frameOffset}`)).toEqual(['on@0', 'cancel@12']);
+  });
+
+  it('releases same-pitch occurrences independently', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 0, 0, 64);
+    note('on', 2, 1, 0, 64);
+    note('off', 1, 10, 0, 64);
+    render(0);
+    note('off', 2, 200, 0, 64);
+    render(128);
+    expect(seen.map(event => `${event.gate}${event.occurrence}`)).toEqual(['on1', 'on2', 'off1', 'off2']);
+  });
+
+  it('ignores releases for unknown occurrences and duplicate onsets', () => {
+    const {seen, note, render} = instrument();
+    note('off', 9, 0);
+    note('on', 1, 0);
+    note('on', 1, 1);
+    render(0);
+    expect(seen.map(event => `${event.gate}${event.occurrence}`)).toEqual(['on1']);
+  });
+
+  it('withdraws unsounded onsets of an older epoch but keeps every release', () => {
+    const {seen, note, render} = instrument();
+    note('on', 1, 0, 0);
+    render(0);
+    note('on', 2, 300, 0);
+    note('off', 1, 310, 0);
+    note('on', 3, 320, 1);
+    note('on', 4, 330, 0);
+    render(256);
+    expect(seen.map(event => `${event.gate}${event.occurrence}/${event.epoch}`)).toEqual(['on1/0', 'off1/0', 'on3/1']);
+  });
+
+  it('ignores note messages when the definition has no note input', () => {
+    const {scope, registered} = fakeScope();
+    const note = vi.fn();
+    defineProcessor(definition, {...gain, note}, scope);
+    const instance = new (registered.get('test.gain@1.0.0')!)();
+    instance.port.onmessage!({data: {type: 'note', gate: 'on', occurrence: 1, midi: 60, cents: 0, velocity: 1, frame: 0, epoch: 0}});
+    instance.process(quantum(), quantum(), {gain: new Float32Array([1])});
+    expect(note).not.toHaveBeenCalled();
+  });
+
+  it('stops after a note() error like a process() error', () => {
+    const {scope, registered, posted} = fakeScope();
+    defineProcessor(synth, {create: () => null, process() {}, note() { throw new Error('voice overflow'); }}, scope);
+    const instance = new (registered.get('test.synth@1.0.0')!)();
+    instance.port.onmessage!({data: {type: 'note', gate: 'on', occurrence: 1, midi: 60, cents: 0, velocity: 1, frame: 0, epoch: 0}});
+    expect(instance.process([], [[new Float32Array(128)]], {})).toBe(false);
+    expect(posted).toEqual([{type: 'error', message: 'voice overflow'}]);
   });
 });

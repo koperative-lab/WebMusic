@@ -1180,8 +1180,33 @@ admission or default destination unless `route: 'none'`. Parameters declared
 write the `AudioParam` directly. The module registers in the scope's registry,
 reports `ready`, `error` (the processor failed and is silent; routes stay) or
 `detached`, and `dispose()` releases its node, ports, handles, route and
-registration without closing the context. Definitions that request note input
-or transport are rejected for now.
+registration without closing the context. Definitions that request transport
+are rejected for now.
+
+A definition with `noteInput: true` gives the module a `notes` input port
+(`module.notes`). Connect any note producer to it, or call `accept()` directly.
+Each event is placed on the audio clock by `noteTime`: the default takes
+`audio-context-seconds` as is and plays live `performance-seconds` gestures at
+the next block; another axis is rejected unless `noteTime` maps it. The
+processor plays every change at its exact frame. One that arrives after its
+frame plays at the next block and is counted in `module.lateNotes`, which
+subscribers hear about. Releasing a producer or disposing the module cancels
+only the notes it started.
+
+```ts
+import {NoteOutputPort} from '@webmusic/kernel/module';
+import {createProcessorModule, type ProcessorDefinition} from '@webmusic/kernel/processor';
+import type {ModuleContext} from '@webmusic/kernel/module';
+
+declare const scope: ModuleContext; // its audio context has the processor prepared
+declare const voice: ProcessorDefinition; // {..., noteInput: true}
+
+const synth = createProcessorModule(scope, voice, {id: 'voice'});
+const keys = new NoteOutputPort({id: 'keys'});
+synth.notes?.connect(keys);
+keys.emit({occurrenceId: 'a', sourceId: 'keys', pitch: {midi: 64}, velocity: 0.8,
+  gate: 'on', axis: 'audio-context-seconds', time: 1.5, epoch: 0});
+```
 
 ```ts
 import {ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
@@ -1261,5 +1286,40 @@ defineProcessor(softClip, {
 render quantum and must not allocate. The block object and its arrays are
 reused between calls. `block.params[id]` holds one value per block, or one per
 frame for an a-rate parameter that changes within it. `block.frame /
-block.sampleRate` is audio reference time. If `create` or `process` throws, the
-processor reports the error once, outputs silence and stops.
+block.sampleRate` is audio reference time. If `create`, `note` or `process`
+throws, the processor reports the error once, outputs silence and stops.
+
+A definition with `noteInput` needs a `note(state, event)` callback. The kit
+keeps the incoming changes sorted by frame and calls `note` for each change
+in the coming block, in time order, just before `process`; `event.frameOffset`
+says where in that block it applies, so a voice can start mid-block. `cancel`
+means stop at once. A newer `epoch` withdraws older onsets that have not
+sounded, a cancel before its onset withdraws the note entirely, and a release
+never moves ahead of its own onset. The event object is reused.
+
+```ts
+import {defineProcessor} from '@webmusic/kernel/processor-worklet';
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const voice: ProcessorDefinition; // {..., noteInput: true}
+
+defineProcessor(voice, {
+  create: () => ({phase: 0, step: 0, gain: 0, startAt: 0}),
+  note(state, event) {
+    if (event.gate === 'on') {
+      state.step = (2 * Math.PI * 440 * 2 ** ((event.midi - 69) / 12)) / sampleRate;
+      state.gain = 0.2 * event.velocity;
+      state.startAt = event.frameOffset;
+    } else state.gain = 0;
+  },
+  process(state, block) {
+    const out = block.outputs[0][0];
+    for (let frame = state.startAt; frame < out.length; frame++) {
+      out[frame] = Math.sin((state.phase += state.step)) * state.gain;
+    }
+    state.startAt = 0;
+  },
+});
+
+declare const sampleRate: number; // an AudioWorkletGlobalScope global
+```
