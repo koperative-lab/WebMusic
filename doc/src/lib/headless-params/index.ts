@@ -1,4 +1,4 @@
-// The catalog for every documented headless object, grouped the way the
+// The catalog for every documented Headless instance, grouped the way the
 // packages are: family × capability. <HeadlessPlayground> looks an object up
 // here and renders its construction and live command controls.
 

@@ -6,7 +6,7 @@
 // The stateful and visual layers live in the companion subpaths:
 //   @webmusic/audio/play/headless   — runtime objects (players, mixer, recorder,
 //                               engines, effect factories)
-//   @webmusic/audio/play/element    — styled Web Components
+//   @webmusic/audio/play/element    — styled Components
 // ============================================================================
 
 // ---- WAV (pure-JS, the testable byte-level core) ----

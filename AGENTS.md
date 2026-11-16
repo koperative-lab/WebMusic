@@ -70,6 +70,36 @@ review; only the owner's explicit request in the current conversation changes it
   reference in the documentation source that is not one of these four files. Keep it in those
   gates; never relax it to make a change pass.
 
+## Product layers: object, component, app
+
+This vocabulary is fixed by the repository owner (DEC-074). Use it in code
+comments, documentation, Studio and Library; do not substitute Max's or
+another tool's names for the layers.
+
+| Layer | Max counterpart | Definition |
+| --- | --- | --- |
+| **Object** | object | One node in a Studio graph: a typed box with inlets and outlets, backed by one Kernel module from a project plugin. |
+| **Component** | patch | A graph of objects delivered as portable code. A developer copies it into a web project, installs the WebMusic packages, and it runs. The packages' own Components are the official components. |
+| **App** | — | Music software a user assembles from several components chosen in the Library, official or from the community. |
+
+- Each layer is built only from the one below it. An object behaves the same
+  in every component; a component behaves the same pasted into a project or
+  placed in an app.
+- A component depends only on public package entries: never on Studio, private
+  source or a hosted service. Its resources are declared. Anything that would
+  break this is not a component.
+- Old names are retired in current writing: write *Component* (never *Web
+  Component*) for the packages' tags, *component* (never *patch*) for a graph
+  of objects in Studio, and *Headless class* or *Headless instance* (never
+  *Headless object* or *Headless component*). *Custom element* names the
+  browser technology. *Module*, *project*, *Element* and *presenter* keep
+  their technical meanings (see
+  [Product](dev/PRODUCT.md#objects-components-and-apps)). Dated records,
+  earlier decisions and public API names (`/element`, `define…Element`,
+  `@webmusic/ui/patch-editor`) are not renamed.
+- Component export from Studio is open work (STATUS LAYER-01); do not describe
+  it as delivered.
+
 ## Start every task
 
 1. Read the user's current request. Inspect `git status --short`, the current
@@ -79,7 +109,7 @@ review; only the owner's explicit request in the current conversation changes it
    [Demo music: Arabesque No. 1 only](#demo-music-arabesque-no-1-only).
 2. Read [dev/README.md](dev/README.md) for documentation ownership, then
    [PRODUCT.md](dev/PRODUCT.md) for the product direction. WebMusic is a music
-   interaction toolkit supporting Web Components, Headless, and API + UI
+   interaction toolkit supporting Components, Headless, and API + UI
    composition, with music software and installations as application goals.
 3. Consult [STATUS.md](dev/STATUS.md) for the relevant implementation gaps and
    [DECISIONS.md](dev/DECISIONS.md) before changing an accepted contract. The
@@ -134,7 +164,7 @@ review; only the owner's explicit request in the current conversation changes it
 | Contributor workflow | [DEVELOPMENT.md](dev/DEVELOPMENT.md) | Setup, commands, final acceptance, CI and build troubleshooting |
 | Documentation information architecture | [DOCS-SITE-PLAN.md](dev/docs/DOCS-SITE-PLAN.md) | Routes, page ownership, navigation and demo responsibilities |
 | Documentation checks | [DOCS-CONVENTIONS.md](dev/docs/DOCS-CONVENTIONS.md) | Authoring rules, actual gate coverage and manual acceptance boundaries |
-| Web Component reference | [COMPONENT-PAGE-TEMPLATE.md](dev/docs/COMPONENT-PAGE-TEMPLATE.md) | Tag/workflow page, live demo, attributes/properties/events and styling |
+| Component reference | [COMPONENT-PAGE-TEMPLATE.md](dev/docs/COMPONENT-PAGE-TEMPLATE.md) | Tag/workflow page, live demo, attributes/properties/events and styling |
 | Headless reference | [HEADLESS-PAGE-TEMPLATE.md](dev/docs/HEADLESS-PAGE-TEMPLATE.md) | Import, options, commands, state, events, lifecycle and Related links |
 | UI presenter reference | [UIKIT-PAGE-TEMPLATE.md](dev/docs/UIKIT-PAGE-TEMPLATE.md) | Binding, handle, interaction, styling and composition contracts |
 | Package/API reference | [API-PAGE-TEMPLATE.md](dev/docs/API-PAGE-TEMPLATE.md) | Entry maps, examples, complete API ownership and dependencies |
@@ -208,8 +238,8 @@ alternative specification:
 - Every visible UI follows [Visual design](dev/design/VISUAL-DESIGN.md):
   neutral monochrome tokens, square one-height controls, icon-only toolbars,
   adjustment cards inside the component over a scrim, no visible scrollbars,
-  no explanatory text in the component; Web Component demos show the default
-  composition without Parameters, Headless demos show the object with its
+  no explanatory text in the component; Component demos show the default
+  composition without Parameters, Headless demos show the instance with its
   defaults and no Parameters either, and only UI Kit presenter demo settings
   go in Parameters.
 

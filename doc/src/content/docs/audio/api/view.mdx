@@ -3,7 +3,7 @@ title: '@webmusic/audio/view'
 description: Audio visualization — retained visualizers, fitted overview and live-frame helpers, Headless view models/controllers, structural bindings, virtualization and colormaps.
 ---
 
-`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math, data contracts and [editable-document](#editable-documents) operations; `/headless` supplies `AudioClipEditor`, its `loadAudioClipEditor` URL loader and document-editing controllers. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
+`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math, data contracts and [editable-document](#editable-documents) operations; `/headless` supplies `AudioClipEditor`, its `loadAudioClipEditor` URL loader and document-editing controllers. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Drop-in Components live under [Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
 
 It is **bring-your-own-data**: the renderers consume the typed-array structures produced by [`@webmusic/audio/analyze`](/audio/api/analyze/) (the `AudioPeaks` pyramid and `SpectrogramData`), but `@webmusic/audio/view` does **not** depend on `@webmusic/audio/analyze` — the spectrogram payload is declared structurally here. Playback lives in [`@webmusic/audio/play`](/audio/api/play/), while the renderer binding talks to a structural `ViewPlayerBinding` interface and does not import the play capability. The optional `<audio-view src="…">` convenience resolves `@webmusic/audio/play` dynamically. All renderer DOM work is confined to call time, so importing the capability root or `/headless` remains safe in non-browser environments.
 
@@ -15,7 +15,7 @@ The root model and this capability ship in that one package. `<audio-view src="�
 
 The view capability has these entry points — the [package subpath table](/audio/api/#package-subpaths) lists them with every other `@webmusic/audio` entry:
 
-The `@webmusic/audio/view` root supplies stateless data functions and public types; `/element` is the opt-in styled Web Component entry. These boundaries keep code-only consumers free of element registration and skin code.
+The `@webmusic/audio/view` root supplies stateless data functions and public types; `/element` is the opt-in styled Component entry. These boundaries keep code-only consumers free of element registration and skin code.
 
 Nothing here is a module. Renderers, view models and editors draw or own data;
 the View Elements are companions that follow the module named by `input` or

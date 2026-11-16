@@ -10,7 +10,7 @@ An independently usable component has a complete usage path. A declaration or co
 
 ## 2. Give data, behavior, and presentation clear authority
 
-Models represent musical material. Headless objects own behavior and session state. Presenters read caller-supplied bindings and issue commands. Elements compose those parts into browser tags. A visible value should be traceable to one state owner; repainting does not create another copy of playback truth.
+Models represent musical material. Headless classes own behavior and session state. Presenters read caller-supplied bindings and issue commands. Elements compose those parts into browser tags. A visible value should be traceable to one state owner; repainting does not create another copy of playback truth.
 
 Use functions for explicit input/output operations and stateful objects for starting, stopping, subscriptions, and disposal. UI does not own audio devices or introduce another scheduler because it displays a Play button. Animation frames may drive drawing and readouts, but are not independent musical clocks.
 
@@ -114,4 +114,4 @@ Resource adapters declare capabilities, formats, precision, dependencies, enviro
 
 ## 10. Extend through contracts and evidence
 
-Before introducing a capability, check whether an existing model, API, Headless object, presenter, or driver can express it. Record shared decisions in [DECISIONS](DECISIONS.md) and use the component template for acceptance scenarios. Automated checks cover mechanical contracts; browsers, sound, and devices verify user outcomes. Neither substitutes for the other.
+Before introducing a capability, check whether an existing model, API, Headless class, presenter, or driver can express it. Record shared decisions in [DECISIONS](DECISIONS.md) and use the component template for acceptance scenarios. Automated checks cover mechanical contracts; browsers, sound, and devices verify user outcomes. Neither substitutes for the other.

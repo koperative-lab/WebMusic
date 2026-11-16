@@ -23,10 +23,10 @@ const publishedUiCount = UI_COMPOSITION_CATALOG.filter((entry) => entry.publishe
 ---
 
 <div class="composition not-content">
-  <div class="composition__equation" aria-label="Target Web Component architecture">
+  <div class="composition__equation" aria-label="Target Component architecture">
     <section class="wui-panel composition__term">
       <span class="wui-badge">STATE + BEHAVIOR</span>
-      <strong>Headless Component</strong>
+      <strong>Headless class</strong>
       <p>Owns clocks, audio graphs, analysis sessions, view state and resource lifecycle. No DOM.</p>
     </section>
     <span class="composition__operator" aria-hidden="true">+</span>
@@ -38,7 +38,7 @@ const publishedUiCount = UI_COMPOSITION_CATALOG.filter((entry) => entry.publishe
     <span class="composition__operator" aria-hidden="true">=</span>
     <section class="wui-panel composition__term composition__term--result">
       <span class="wui-badge">COMPOSITION ROOT</span>
-      <strong>Web Component</strong>
+      <strong>Component</strong>
       <p>The concrete Element class maps its own public API and directly composes the two layers.</p>
     </section>
   </div>
@@ -71,7 +71,7 @@ const publishedUiCount = UI_COMPOSITION_CATALOG.filter((entry) => entry.publishe
         <div class="composition__table-wrap">
           <table class="composition__table">
             <thead>
-              <tr><th>Web Component</th><th>Headless / model</th><th>UI Kit composition</th><th>Headless status</th><th>Published UI</th></tr>
+              <tr><th>Component</th><th>Headless / model</th><th>UI Kit composition</th><th>Headless status</th><th>Published UI</th></tr>
             </thead>
             <tbody>
               {entries.map((entry) => (

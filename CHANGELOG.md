@@ -5,6 +5,18 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Add messages, objects and controls (DEC-075). Kernel gains a sixth port
+  family, `message`: typed atoms with an optional logical time, delivered
+  synchronously and depth first, with message clocks for timed events and
+  message cords to parameters. The new `/objects` entry ships Max-style objects
+  as project plugins — `metro`, `delay`, `pipe`, `line`, `loadbang`, `counter`,
+  `select`, `route`, `gate`, `switch`, `trigger`, `pack`, `unpack`, `expr`,
+  `scale`, `random`, `print`, `sig`, `ramp` and ten interface objects — and
+  project module instances may now implement `activate()`, called once their
+  graph commits. UI Kit gains `/controls`: `mountButton`, `mountToggle`,
+  `mountNumber`, `mountSlider`, `mountDial`, `mountMessage`, `mountMenu`,
+  `mountTabs`, `mountMultislider` and `mountMatrix`. The kit's fader and knob
+  take an optional `formatValue`.
 - Add the Kernel `/processor` and `/processor-worklet` entries for authored
   DSP: shared processor definitions, per-context `AudioWorklet` preparation and
   an audio-thread authoring kit. `createProcessorModule` exposes a prepared

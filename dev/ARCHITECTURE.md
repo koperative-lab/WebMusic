@@ -99,7 +99,7 @@ their domain owners.
 
 ## Three usage levels and source layers
 
-Consumers choose Web Components, Headless, or API + UI. These paths share domain
+Consumers choose Components, Headless, or API + UI. These paths share domain
 behavior; they are not three independent playback implementations or mandatory
 wrapper stages. Their composition rules are defined in
 [COMPONENT-DESIGN.md](design/COMPONENT-DESIGN.md).
@@ -361,9 +361,9 @@ player's state does not create another clock and is separate from the multi-engi
 shared-clock injection protocol.
 
 ```text
-domain Headless object + @webmusic/ui presenter
+domain Headless instance + @webmusic/ui presenter
                composed directly by the Element class
-                         = Web Component
+                         = Component
 ```
 
 The Element maps public attributes/properties/events, selects ownership and builds
@@ -387,8 +387,10 @@ The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 introduced modular composition;
 [DEC-068](DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
 makes it the only model: every Element and Headless runtime is a module with
-typed audio, note, control, transport and source ports. Kernel `/module`, `/session` and
-`/effect` supply the shared runtime; `/element` supplies scoped browser discovery.
+typed audio, note, control, transport and source ports; DEC-075 adds message
+ports for discrete values between objects. Kernel `/module`, `/session` and
+`/effect` supply the shared runtime, `/objects` the message object library, and
+`/element` scoped browser discovery.
 [Modular composition](design/MODULAR-COMPOSITION.md) owns the context, typed-port,
 route-lease, effect/parameter and Session invariants. DOM layout, resource
 ownership, audio routing and Session membership remain separate relationships.

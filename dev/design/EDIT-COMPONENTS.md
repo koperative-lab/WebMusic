@@ -12,7 +12,7 @@ Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and
 [DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
 places editing inside View rather than a separate capability, and
 [DEC-057](../DECISIONS.md#dec-057--editable-documents-are-an-api-not-a-web-component),
-which replaces the document Web Components with loading APIs, and
+which replaces the document Components with loading APIs, and
 [DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view).
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
@@ -353,9 +353,9 @@ for a sequence, never its first asset. Clip-only companions report unavailable;
 graph meters can continue, and sequence-aware View reads the sequence directly.
 Static PCM analysis uses an explicit render adapter.
 
-## Web Components and source selection
+## Components and source selection
 
-There is no document Web Component (DEC-057). An application creates and owns
+There is no document Component (DEC-057). An application creates and owns
 the editor through the Headless API, then lends it to Elements through the
 `.editor` property. The owning public references list each shipped member.
 

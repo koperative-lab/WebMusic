@@ -18,7 +18,7 @@ Install `@webmusic/score` once, then import the root model or a capability entry
 
 Every published entry of `@webmusic/score`, grouped by capability. A
 capability root is its API; `/headless` is code-only domain objects;
-`/element` is side-effect-free Web Component classes and `/auto` registers
+`/element` is side-effect-free Component classes and `/auto` registers
 them; `/global` is the browser IIFE. This table is the package map — the
 capability pages below document what is inside each entry.
 
@@ -32,18 +32,18 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/play` | [capability root](/score/api/play/) | Stateless playback: SFZ parsing, offline WAV render, recording → `Score`. |
 | `@webmusic/score/play/headless` | [Headless](/score/headless/#play) | `ScorePlayer`, `InteractivePlayer`, `Rack`, `Sound`, `Effect`, `LfoController`, `PlayerController`. |
 | `@webmusic/score/play/drivers` | code-only sub-entry | Browser transport adapters: scroll, pointer, orientation, arbitrary values. |
-| `@webmusic/score/play/element` | [Web Components](/score/element/#play) | `<score-player>`, `<score-rack-control>`, `<score-note-input>`, `<score-recorder>`, `<score-synth-panel>`. |
+| `@webmusic/score/play/element` | [Components](/score/element/#play) | `<score-player>`, `<score-rack-control>`, `<score-note-input>`, `<score-recorder>`, `<score-synth-panel>`. |
 | `@webmusic/score/play/auto` | registration | Imports the play elements and registers them on evaluation. |
 | `@webmusic/score/play/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicScorePlay` and registering the play elements. |
 | `@webmusic/score/play/demos` | teaching entry | Ready-made demo elements with built-in sample music. |
 | `@webmusic/score/analyze` | [capability root](/score/api/analyze/) | Key, chords, roman numerals, motifs, voice leading, rhythm, distributions, summaries. |
 | `@webmusic/score/analyze/headless` | [Headless](/score/headless/#analyze) | `AnalysisSession`, the live trackers, `createScoreReport`. |
-| `@webmusic/score/analyze/element` | [Web Components](/score/element/#analyze) | Chord score/live modes, spelled intervals, explicit scale degrees and grouped rhythmic placement. |
+| `@webmusic/score/analyze/element` | [Components](/score/element/#analyze) | Chord score/live modes, spelled intervals, explicit scale degrees and grouped rhythmic placement. |
 | `@webmusic/score/analyze/worker-client` · `@webmusic/score/analyze/worker-protocol` · `@webmusic/score/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
 | `@webmusic/score/view` | [capability root](/score/api/view/) | Layout and projection helpers, pure edit operations, document contracts and position maps. |
 | `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, map/pitch/editing models, `createActiveNoteTracker`, `ScoreEditor` and `loadScoreEditor`. |
 | `@webmusic/score/view/render` | code-only sub-entry | Imperative DOM/canvas/SVG renderers and the player binding. |
-| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>`. |
+| `@webmusic/score/view/element` | [Components](/score/element/#view) | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>`. |
 | `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks for the existing I/O, Play, Analyze and View composition; React is an optional peer. |
 
 Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`.

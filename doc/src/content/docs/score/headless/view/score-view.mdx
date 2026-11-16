@@ -63,7 +63,7 @@ render adapter additionally reads the original `score` for written durations,
 rests, voices, beams, tuplets, timed clefs and expressive directions. A custom notation renderer should also
 use that Score data; the flattened sequence alone cannot reproduce the source's
 notation. Glyph layout and VexFlow remain on `/render`, with no DOM or engraving
-dependency in this Headless object.
+dependency in this Headless instance.
 
 The staff renderer's [`showAnnotations` option](/score/api/view/#render-annotations)
 controls expressive directions; piano-roll and waterfall renderers draw none.

@@ -1,4 +1,5 @@
 import type {NoteInputPort, NoteOutputPort} from './note-port';
+import {connectMessageToParameter, type MessageInputPort, type MessageOutputPort} from './message';
 import {attachSessionAutomation, SessionTransport, type SessionAutomationLease} from '../session';
 import type {TransportCommit} from '../sync';
 import type {AudioOutputPort} from './audio-port';
@@ -507,6 +508,17 @@ export class ModuleProjectRuntime {
       const target = getModulePort(to.module, connection.to.port, 'note', 'input') as NoteInputPort | undefined;
       if (source && target) return target.connect(source);
     }
+    if (connection.kind === 'message' && from && to) {
+      // Message edges are native Kernel ports (DEC-075). A `param:<id>` target
+      // sets that parameter's base value from each message's first number.
+      const source = getModulePort(from.module, connection.from.port, 'message', 'output') as MessageOutputPort | undefined;
+      if (source && connection.to.port.startsWith('param:')) {
+        const handle = this.#parameter(graph, {moduleId: connection.to.moduleId, param: connection.to.port.slice('param:'.length)});
+        if (handle) return connectMessageToParameter(source, handle, graph.gate.context);
+      }
+      const target = getModulePort(to.module, connection.to.port, 'message', 'input') as MessageInputPort | undefined;
+      if (source && target) return target.connect(source);
+    }
     if (from && to && this.#options.connect) {
       const lease = await abortable(this.#options.connect({connection, from, to, context: graph.context, signal: graph.controller.signal}), graph.controller.signal, value => this.#retire(value));
       if (lease !== undefined) {
@@ -583,6 +595,11 @@ export class ModuleProjectRuntime {
       throw error;
     } finally { this.#committing = false; }
     if (previous) this.#disposeGraph(previous);
+    // Only a committed graph acts: timers start and loadbangs fire after the
+    // previous graph has stopped, in creation order.
+    for (const instance of candidate.instances.values()) {
+      if (instance.activate) this.#cleanup(() => instance.activate!());
+    }
     this.#notify(committed.revision, committed);
     return committed;
   }

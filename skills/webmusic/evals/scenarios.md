@@ -11,7 +11,7 @@ commands/outcomes and browser observations. Distinguish compiled behavior from
 audible output or device behavior. A check that merely finds particular words
 in the skill cannot establish these outcomes.
 
-## 1. Web Components: player and followers
+## 1. Components: player and followers
 
 **Setup:** Fresh Vite/TypeScript application and a served MIDI or MusicXML file.
 

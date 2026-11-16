@@ -7,7 +7,7 @@ sidebar:
 ---
 
 WebMusic is a toolkit for music software, interactive demos, and web-based
-musical installations. Use ready-made **Web Components**, drive **Headless
+musical installations. Use ready-made **Components**, drive **Headless
 objects** with your own interface, or compose **APIs and UI presenters**
 directly. These choices share data and runtime contracts so a prototype can
 grow without replacing every layer.
@@ -49,3 +49,12 @@ references, skills and project instructions.
 
 Search covers every package at once, so a term from one family will find the
 other.
+
+## Objects, components and apps
+
+WebMusic builds music software in three layers. An **object** is one node
+with inlets and outlets — a source, an effect, a keyboard, a scope. A
+**component** is a graph of objects that you copy into a web project; once the
+WebMusic packages are installed, it runs. The packages' own Components,
+such as `<score-player>` and `<audio-oscilloscope>`, are the official
+components. An **app** is music software assembled from several components.

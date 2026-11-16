@@ -4,14 +4,14 @@
 WAV decoding in JavaScript and compressed-audio decoding through a supplied
 context's native decoder with optional WASM fallbacks, playback and mixing,
 reference-based document editing and local history, waveform / spectrogram views, MIR analysis and
-transcription, Web Components, and React bindings.
+transcription, Components, and React bindings.
 
 ```bash
 npm install @webmusic/audio
 ```
 
 That installation keeps the model, API and Headless paths UI-free. Install the
-optional presenter peer for Web Components and the default meter renderer:
+optional presenter peer for Components and the default meter renderer:
 
 ```bash
 npm install @webmusic/audio @webmusic/ui
@@ -35,7 +35,7 @@ context is supplied, decoding falls back to an installed decoder for the
 format. Browser format support varies; WAV uses the pure-JavaScript path.
 Retain players for the interaction lifetime and dispose them during teardown.
 
-…or draw a waveform with a Web Component:
+…or draw a waveform with a Component:
 
 ```ts
 import '@webmusic/audio/view/auto';        // registers <audio-view> et al.
@@ -53,7 +53,7 @@ render, and analyze the same immutable object — or ship it to a Worker.
 Current usage and reference pages are maintained in the documentation site:
 
 - [Getting started](../../doc/src/content/docs/audio/index.mdx)
-- [Web Components](../../doc/src/content/docs/audio/element/index.mdx)
+- [Components](../../doc/src/content/docs/audio/element/index.mdx)
 - [Headless](../../doc/src/content/docs/audio/headless/index.mdx)
 - [API entries](../../doc/src/content/docs/audio/api/index.mdx)
 
@@ -204,7 +204,7 @@ core ──▶ headless ──▶ api ──▶ element
 | `core/` | Stateless algorithms, contracts, data transforms. Internal — never a published entry, so helpers do not become permanent semver surface. | No |
 | `headless/` | Stateful, code-only components: engines, sessions, controllers, view models. | No |
 | `api/` | The supported code-facing facade the capability root re-exports. **The capability root is the API**; `api/` is its implementation. | No |
-| `element/` | Styled Web Components. Each class composes a Headless object with a `@webmusic/ui` presenter. | Yes — it is the only layer that may |
+| `element/` | Styled Components. Each class composes a Headless instance with a `@webmusic/ui` presenter. | Yes — it is the only layer that may |
 
 `core`, `headless` and `api` are **code-only**: they cannot reference DOM,
 canvas or SVG types, cannot create or mutate nodes, and cannot carry markup or
@@ -352,7 +352,7 @@ The `view` capability splits in two, and the split is the point:
   geometry, playhead position — and returns values. No canvas, no DOM.
 - **`/view/render`** is an explicit imperative adapter that paints onto a
   caller-owned surface. It is a `/render` entry precisely so it can never be
-  mistaken for a headless component.
+  mistaken for a Headless class.
 
 Both time-axis renderers share the same two constraints. **The canvas is
 viewport-sized and static**: scrolling redraws its contents at a new offset
@@ -407,12 +407,12 @@ transferred rather than cloned, and responses clone any array the incremental
 session still caches *before* transferring it, so offloading analysis does not
 detach the cache it depends on.
 
-### Web Components: composition, not inheritance
+### Components: composition, not inheritance
 
-A domain Web Component here is one equation:
+A domain Component here is one equation:
 
 ```
-Headless object + @webmusic/ui presenter, composed by the Element class
+Headless instance + @webmusic/ui presenter, composed by the Element class
 ```
 
 The Element class is the browser composition root. It translates attributes,
@@ -537,7 +537,7 @@ The design buys its properties with real costs. The honest list:
 | Package | What it is |
 |---|---|
 | [`@webmusic/kernel`](https://github.com/koperative-lab/WebMusic) | The zero-domain contracts every package shares. |
-| `@webmusic/ui` | Optional domain-neutral presenters used by Audio Web Components and the meter renderer. |
+| `@webmusic/ui` | Optional domain-neutral presenters used by Audio Components and the meter renderer. |
 | [`@webmusic/score`](https://github.com/koperative-lab/WebMusic) | Symbolic music: MIDI / MusicXML / MXL / ABC scores. |
 | `@webmusic/audio` | This package. |
 | [`@webmusic/bridge`](https://github.com/koperative-lab/WebMusic) | Score ↔ audio: synchronized playback, score→clip rendering, transcription assembly. |

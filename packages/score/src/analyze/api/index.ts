@@ -5,7 +5,7 @@
 //
 // The package's other layers build on this one:
 //   @webmusic/score/analyze/headless  — incremental stateful analysis
-//   @webmusic/score/analyze/element  — Web Components (<live-chord>, …)
+//   @webmusic/score/analyze/element  — Components (<live-chord>, …)
 // ============================================================================
 
 export {identifyChord, identifyChordFromMidi, segmentChords} from '../core';

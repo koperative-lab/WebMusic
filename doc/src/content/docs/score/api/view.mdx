@@ -1,10 +1,10 @@
 ---
 title: '@webmusic/score/view'
-description: Score visualization and document editing — stateless layout and edit operations, code-only view, navigation and editor models, SVG renderers including page engraving, and the View Web Components.
+description: Score visualization and document editing — stateless layout and edit operations, code-only view, navigation and editor models, SVG renderers including page engraving, and the View Components.
 ---
 
 
-`@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its visual Web Components are `<score-view>` for read-only score-position views, `<score-grid-view>` for a piano-roll grid that edits notes, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving. An editable document is a [`ScoreEditor`](/score/headless/view/score-editor/) that your application owns and lends to views and players.
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its visual Components are `<score-view>` for read-only score-position views, `<score-grid-view>` for a piano-roll grid that edits notes, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving. An editable document is a [`ScoreEditor`](/score/headless/view/score-editor/) that your application owns and lends to views and players.
 
 Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the static thumbnail renderer is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
@@ -17,7 +17,7 @@ renderer includes its VexFlow dependency; it needs no separate installation.
 Optional integration:
 
 ```txt
-@webmusic/score/io     sibling capability used by the Web Component to load a `src` file
+@webmusic/score/io     sibling capability used by the Component to load a `src` file
 ```
 
 The view capability has four entry points — the [package subpath table](/score/api/#package-subpaths) lists them with every other `@webmusic/score` entry:
@@ -28,9 +28,9 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 ---
 
-## Web Components
+## Components
 
-`<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+`<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
 Views are companions, not modules. Headless views and the View Elements
 consume the payload of a Score module's `source` port (`ScorePlaybackSource`,
@@ -975,12 +975,12 @@ Output:
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff and waterfall types. |
-| `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
-| `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>`, engraved pages with notation editing. |
-| `defineScoreGridViewElement(tag?)` | Web Component | Register `<score-grid-view>`, the piano-roll grid with an editing toolbar. |
-| `defineAllViewElements()` | Web Component | Register the four default View tags. |
-| `ScoreViewElement`, `ScoreGridViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `defineScoreViewElement(tag?)` | Component | Register `<score-view>` with piano-roll, staff and waterfall types. |
+| `definePitchViewElement(tag?)` | Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
+| `defineSheetViewElement(tag?)` | Component | Register `<score-sheet-view>`, engraved pages with notation editing. |
+| `defineScoreGridViewElement(tag?)` | Component | Register `<score-grid-view>`, the piano-roll grid with an editing toolbar. |
+| `defineAllViewElements()` | Component | Register the four default View tags. |
+| `ScoreViewElement`, `ScoreGridViewElement`, `PitchViewElement`, `SheetViewElement` | Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
 | `ScoreGridFeature`, `ScoreGridTool`, `ScoreGridSnap`, `ScoreGridSettings`, `ScoreGridSettingsChangeDetail` | Element types | [Grid features, settings and the `gridsettingschange` detail](/score/element/view/score-grid-view/). |
 | `SHEET_VIEW_FEATURES`, `ScoreSheetFeature`, `ScoreSheetLayout`, `ScoreSheetDuration`, `ScoreSheetSettings`, `ScoreSheetSettingsChangeDetail` | Element exports | [Sheet features, settings and the `sheetsettingschange` detail](/score/element/view/score-sheet-view/). |
 | `ScoreViewDirection` | Type | `up`, `down`, `left` or `right`; exported by the View API and Element entries. Piano-roll uses increasing-time direction; waterfall uses note-travel direction. |

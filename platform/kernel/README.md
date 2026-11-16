@@ -94,11 +94,12 @@ Common mechanisms do not make distinct domain policies interchangeable.
 | `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |
 | `@webmusic/kernel/processor` | Authored DSP definitions, per-context `AudioWorklet` preparation, processor modules, insert effects, instruments and project plugins, and the main/audio thread protocol |
 | `@webmusic/kernel/processor-worklet` | Audio-thread authoring kit: `defineProcessor` over a reused render block |
+| `@webmusic/kernel/objects` | Max-style message objects (time, logic, message-to-sound and interface objects) as project plugins, and the object framework |
 
 Pure time math remains in `/transport` and wakeups in `/tick`. The modular
 entries build the one composition model (DEC-068) on those foundations:
-`/module` defines module handles, the five port families (audio, note, control,
-transport, source), Racks, provider scopes, sinks and the conformance kit;
+`/module` defines module handles, the six port families (audio, note, control,
+transport, source and, under DEC-075, message) with message clocks, Racks, provider scopes, sinks and the conformance kit;
 `/effect` manages effect instances; `/session` owns the single timeline every
 participant joins; and `/element` adds browser discovery and explicit `input`
 resolution. Consumers may implement the structural

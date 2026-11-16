@@ -177,7 +177,7 @@ export function parseModuleProject(input: unknown): ModuleProject {
   const connections: ProjectConnectionRecord[] = list(data.connections, 'connections').map((entry, index) => {
     const path = `connections[${index}]`, item = object(entry, path);
     fields(item, ['id', 'kind', 'from', 'to', 'mode'], path);
-    const kind = enumeration(item.kind, ['audio', 'control', 'note', 'transport', 'source'], `${path}.kind`);
+    const kind = enumeration(item.kind, ['audio', 'control', 'note', 'transport', 'source', 'message'], `${path}.kind`);
     const mode = item.mode === undefined ? undefined : enumeration(item.mode, ['replace', 'send', 'tap'], `${path}.mode`);
     if (kind !== 'audio' && mode !== undefined) throw new TypeError('Only audio connections have routing modes.');
     return {id: text(item.id, `${path}.id`), kind, from: endpoint(item.from, `${path}.from`), to: endpoint(item.to, `${path}.to`), ...(mode ? {mode} : {})};

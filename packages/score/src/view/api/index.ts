@@ -6,7 +6,7 @@
 // The other layers of @webmusic/score/view:
 //   @webmusic/score/view/headless  — stateful code-only score views
 //   @webmusic/score/view/render    — imperative browser visualizers
-//   @webmusic/score/view/element   — styled Web Components (<score-view>, …)
+//   @webmusic/score/view/element   — styled Components (<score-view>, …)
 //
 // (All playback — engine, synths, controllers, transport drivers — lives in
 // @webmusic/score/play.)

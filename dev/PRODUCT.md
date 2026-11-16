@@ -32,8 +32,8 @@ Their common needs are a manageable starting cost, replaceable layers, reliable 
 
 | Choice | WebMusic supplies | The application supplies | Typical use |
 |---|---|---|---|
-| Web Components | Tags, attributes and object properties, events, default interaction and presentation | Data and resources, connections, appearance, and permissions | Quick demos, embedded players, analysis tools, artwork prototypes |
-| Headless components | Stateful players, controllers, sessions, models, and lifecycle contracts | UI, framework bindings, and project workflow | Custom music software and distinctive installation interactions |
+| Components | Tags, attributes and object properties, events, default interaction and presentation | Data and resources, connections, appearance, and permissions | Quick demos, embedded players, analysis tools, artwork prototypes |
+| Headless classes | Stateful players, controllers, sessions, models, and lifecycle contracts | UI, framework bindings, and project workflow | Custom music software and distinctive installation interactions |
 | API + UI | Data operations, parsing/analysis/rendering functions, and independent presenters | Capability selection and structural bindings to application-owned state and commands | Deep customization, algorithm visualization, or replacement of one layer |
 
 These choices can coexist in one application. APIs can be used without UI; presenters can bind to the caller's own model. React and other integration adapters do not change the underlying ownership or capability contracts. Environment support remains entry-specific.
@@ -64,6 +64,42 @@ the [Audio View API](../doc/src/content/docs/audio/api/view.mdx),
 [Audio Play export](../doc/src/content/docs/audio/api/play.mdx) and
 [Audio View](../doc/src/content/docs/audio/element/view/audio-view.mdx).
 Staff and notation editing are not part of the current contract (DEC-058).
+
+## Objects, components and apps
+
+WebMusic has three product layers (DEC-074). Every maintained document, Studio
+and the Library use these names for them.
+
+| Layer | Max counterpart | What it is | Who makes it | Where it runs |
+|---|---|---|---|---|
+| Object | Object | One node in a Studio graph: a typed box with inlets and outlets, backed by one Kernel module from a project plugin | The packages and Studio | Inside a component |
+| Component | Patch | A graph of objects delivered as portable code: copy it into a web project, install the WebMusic packages, and it runs | The packages (official components), Studio users and the community | Any web project |
+| App | — | Music software assembled from several components chosen in the Library | Users | The browser, as a page or an installation |
+
+Each layer is made only from the one below it, and each keeps its
+contract when it moves up: an object behaves the same in every component, and
+a component behaves the same whether it is pasted into a web project or
+placed in an app.
+
+A component's portability is its defining requirement. Its code depends only
+on public package entries: no Studio runtime, private source or hosted
+service. Its media and other resources are declared, so the receiving project
+knows what to serve. The packages' own Components — `<score-player>`,
+`<audio-oscilloscope>` and the rest — are the official components. A
+component built from objects in Studio must meet the same contract;
+exporting one is not yet implemented ([STATUS](STATUS.md), LAYER-01).
+
+Earlier names are retired in current writing. The packages' tags are
+*Components*, not *Web Components*; a graph of objects is a *component*, not a
+*patch*; the code-only classes behind Components are *Headless classes*, and
+one running one is a *Headless instance*, never a *Headless object* or
+*Headless component*. *Custom element* names the browser technology a
+Component is built on. Some words keep a technical meaning beside the layers:
+a *module* is the Kernel runtime unit behind an object, a *project* is the
+serialized Kernel document a component's graph is saved as, an *Element* is
+the class behind a Component's tag, and a *presenter* is a UI Kit renderer.
+Dated records, earlier decisions and public API names such as `/element`,
+`define…Element` and `@webmusic/ui/patch-editor` keep their wording.
 
 ## One session's time and data
 

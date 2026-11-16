@@ -39,7 +39,7 @@ install browser tooling or authorize commits, pushes or publication by itself.
 3. Check host `hidden`, minimum sizing, long-label wrapping and type switching.
    Preserve readable notation/keys with local scrolling where fitting would
    shrink them excessively; keep pointer coordinates aligned with the plot.
-4. Show a Web Component demo in its default composition with its intrinsic
+4. Show a Component demo in its default composition with its intrinsic
    musical controls, such as seeking, note input and direct plot gestures; it
    has no Parameters or Copy/Reset (DEC-071). A Headless demo shows its object
    working with its defaults and only the controls that operate it. UI Kit

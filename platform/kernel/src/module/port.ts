@@ -1,12 +1,12 @@
-/** The five signal families a module port can carry (DEC-068). */
-export type PortFamily = 'audio' | 'note' | 'control' | 'transport' | 'source';
+/** The signal families a module port can carry (DEC-068; `message` from DEC-075). */
+export type PortFamily = 'audio' | 'note' | 'control' | 'transport' | 'source' | 'message';
 export type PortDirection = 'input' | 'output';
 /** `single` accepts one producer (or, for an output, one main route); `sum` accepts several. */
 export type PortMultiplicity = 'single' | 'sum';
 /** Observable resolution state. `detached` is terminal for a disposed or revoked port. */
 export type PortReadiness = 'unresolved' | 'preparing' | 'ready' | 'error' | 'detached';
 
-export const PORT_FAMILIES: readonly PortFamily[] = Object.freeze(['audio', 'note', 'control', 'transport', 'source']);
+export const PORT_FAMILIES: readonly PortFamily[] = Object.freeze(['audio', 'note', 'control', 'transport', 'source', 'message']);
 const directions: readonly PortDirection[] = ['input', 'output'];
 const multiplicities: readonly PortMultiplicity[] = ['single', 'sum'];
 const readinessStates: readonly PortReadiness[] = ['unresolved', 'preparing', 'ready', 'error', 'detached'];

@@ -1,11 +1,11 @@
 // ============================================================================
-// @webmusic/audio/play/headless — Headless Components: the stateful playback engines
+// @webmusic/audio/play/headless — Headless classes: the stateful playback engines
 // you instantiate and drive yourself. No DOM, no custom elements — pure audio
 // objects that work in any framework (or none).
 //
 // Pair with:
 //   @webmusic/audio/play            — the stateless data API (decode / load / export)
-//   @webmusic/audio/play/element     — styled Web Components built on these engines
+//   @webmusic/audio/play/element     — styled Components built on these engines
 // ============================================================================
 
 // ---- Stable central playback owner and compatibility clip engine ----

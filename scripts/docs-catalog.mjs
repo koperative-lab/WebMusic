@@ -107,7 +107,7 @@ async function componentIndex(files) {
     '## How to use this index', '',
     'Every Element entry links its task, Headless collaboration, reviewed UI composition, source, and owning reference page. Attribute/property/event names below are derived from the documentation parameter catalog; they are navigation, not a second signature/default table. Source and the reference page own the complete contract. Presenter controls are demo catalog controls, not an assertion that every public binding or option is listed.', '',
     'Static data has no running clock. The component design contract requires each scheduling participant, follower, or interaction driver to declare its timing and resource ownership. Shared workflow pages are intentional for declarations and companions.', '',
-    '## Web Components', '',
+    '## Components', '',
   ];
   for (const family of ['Score', 'Audio']) {
     for (const capability of ['Play', 'Analyze', 'View']) {
@@ -133,7 +133,7 @@ async function componentIndex(files) {
     const page = `${DOCS}/uikit/${presenter.classSlug}/${presenter.presenter}.mdx`;
     lines.push(`| ${code(`@webmusic/ui/${presenter.presenter}`)} | ${clean(presenter.summary)} | State: ${list((presenter.state ?? []).map((p) => p.name))} Options: ${list((presenter.options ?? []).map((p) => p.name))} | ${link(output, page, 'Reference')} · ${link(output, `packages/ui/src/${presenter.presenter}.ts`, 'Source')} |`);
   }
-  lines.push('', '## Headless objects and related helpers', '', 'These are the currently documented ownership pages, not a proof that every exported member has complete reference coverage. See STATUS for catalog and template alignment work.', '', '| Reference owner | Task | Public source entry |', '|---|---|---|');
+  lines.push('', '## Headless classes and related helpers', '', 'These are the currently documented ownership pages, not a proof that every exported member has complete reference coverage. See STATUS for catalog and template alignment work.', '', '| Reference owner | Task | Public source entry |', '|---|---|---|');
   for (const file of headlessPages) {
     const source = read(file);
     const segments = file.slice(DOCS.length + 1).split('/');
@@ -230,9 +230,9 @@ function documentationMap(files) {
 // Reading routes through the decision register. Every decision belongs to
 // exactly one topic; a new DEC entry fails the check until it is filed here.
 const DECISION_TOPICS = [
-  ['Foundations', [1, 2, 3, 4, 5, 6, 7, 8, 9]],
+  ['Foundations', [1, 2, 3, 4, 5, 6, 7, 8, 9, 74]],
   ['Playback binding and transport commands', [11, 17, 18]],
-  ['Modular composition and Session', [63, 64, 65, 68, 69, 73]],
+  ['Modular composition and Session', [63, 64, 65, 68, 69, 73, 75]],
   ['Editing', [53, 55, 57, 58, 60, 61]],
   ['Score components', [12, 13, 14, 15, 16, 19, 24, 32, 34, 38, 39, 40, 41, 42, 43, 47, 48, 49, 50, 54, 56, 67]],
   ['Audio components', [25, 26, 27, 28, 29, 30, 31, 35, 36, 37, 44, 51, 62]],

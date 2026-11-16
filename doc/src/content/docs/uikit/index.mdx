@@ -65,12 +65,12 @@ subscription without disposing your state or engine. See
 
 | Integration | Use it when | Start here |
 | --- | --- | --- |
-| Web Components | You want ready-made tags that combine musical behavior with UI. | [Quick Start](/quick-start/) and [Score setup](/score/) |
+| Components | You want ready-made tags that combine musical behavior with UI. | [Quick Start](/quick-start/) and [Score setup](/score/) |
 | Headless | Your application supplies every visual and reuses WebMusic's musical behavior. | [Score Headless](/score/headless/) |
 | API + UI | You want independent presenters bound to a store, controller or your own model. | The example above and the [presenter Catalog](/uikit/catalog/) |
 
 These choices can coexist. Subclassing an exported Score Element is an advanced
-customization of the Web Component path; it is optional. Direct presenter mounts
+customization of the Component path; it is optional. Direct presenter mounts
 need no Element class, tag registration or `@webmusic/score` dependency.
 
 ## Browse by function
@@ -208,7 +208,7 @@ Customization is progressive rather than all-or-nothing:
 | Preserve an existing product skin | legacy variables/classes remain compatibility aliases during migration |
 | Mount a presenter yourself | a `mount*()` function and a structural binding |
 | Change markup or interaction | compose different presenters, use Headless with your own UI, or customize an Element mount hook |
-| Change domain behavior/API | subclass the controller/binding hooks, or compose the Headless object directly |
+| Change domain behavior/API | subclass the controller/binding hooks, or compose the Headless instance directly |
 
 CSS custom properties cross open Shadow DOM boundaries. Stable `part` names expose selected
 internal nodes without treating all private markup as public. Arbitrary markup customization

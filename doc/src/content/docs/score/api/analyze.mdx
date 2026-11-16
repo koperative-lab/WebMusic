@@ -1,12 +1,12 @@
 ---
 title: '@webmusic/score/analyze'
-description: Score analysis — stateless algorithms, code-only sessions and live trackers, plus styled analysis Web Components.
+description: Score analysis — stateless algorithms, code-only sessions and live trackers, plus styled analysis Components.
 ---
 
 import ScoreReportPlayground from '../../../../components/headless/ScoreReportPlayground.astro';
 
 
-`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, elementary chord structure, spelled intervals, explicit scale degrees, meter-aligned rhythm inspection, Roman numerals, motif search, rhythm patterns and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
+`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, elementary chord structure, spelled intervals, explicit scale degrees, meter-aligned rhythm inspection, Roman numerals, motif search, rhythm patterns and voice-leading checks. Its interactive Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
 
 The capability root and `/headless` entry have no DOM dependency, so they run in Node, workers, browsers, tests, import pipelines, and batch jobs. It does not play audio, render notation, or own a framework — those live in [`@webmusic/score/play`](/score/api/play/), [`@webmusic/score/view`](/score/api/view/), and [`@webmusic/score/react`](/score/api/react/).
 
@@ -14,17 +14,17 @@ The capability root and `/headless` entry have no DOM dependency, so they run in
 
 `npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
 
-The root model and this capability ship in that one package. A Web Component that loads a file from `src` dynamically uses the sibling `@webmusic/score/io` capability. Legacy chord naming uses the bundled `@tonaljs/chord-detect` and `@tonaljs/chord`; the elementary inspection functions below use explicit spelled triad/seventh rules.
+The root model and this capability ship in that one package. A Component that loads a file from `src` dynamically uses the sibling `@webmusic/score/io` capability. Legacy chord naming uses the bundled `@tonaljs/chord-detect` and `@tonaljs/chord`; the elementary inspection functions below use explicit spelled triad/seventh rules.
 
 The analysis capability separates stateless analysis, stateful resources and UI:
 
-The `@webmusic/score/analyze` root is the canonical stateless surface. `/headless` contains stateful code-only analysis components — the incremental session, live note-event trackers and Worker client — without UI, DOM access or styles. `/element` contains the styled Web Components. The elements reuse API/Headless inspection and keep score loading, DOM player binding, playhead state and rendering private. Each public entry tree-shakes independently; only `/worker` self-registers a runtime listener.
+The `@webmusic/score/analyze` root is the canonical stateless surface. `/headless` contains stateful code-only analysis components — the incremental session, live note-event trackers and Worker client — without UI, DOM access or styles. `/element` contains the styled Components. The elements reuse API/Headless inspection and keep score loading, DOM player binding, playhead state and rendering private. Each public entry tree-shakes independently; only `/worker` self-registers a runtime listener.
 
 ---
 
-## Web Components
+## Components
 
-Four elementary surfaces are exported by `@webmusic/score/analyze/element`: chord (score/live modes), interval, explicit scale and grouped rhythm. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
+Four elementary surfaces are exported by `@webmusic/score/analyze/element`: chord (score/live modes), interval, explicit scale and grouped rhythm. Each owning page under [Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
 
 Whole-score summaries, histograms and rhythmic-vocabulary reports use the [report workflow](/score/api/analyze/#reports). Tonal estimation, specialist Roman and voice-leading displays, pitch diagnostics and retained chord history can be composed from the code-only results below or the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif and recurring-rhythm algorithms remain code-only building blocks for application-owned displays.
 
@@ -856,13 +856,13 @@ For a custom visual report, pass these plain values to [`renderSummaryCard`, `re
 
 ### Report Related
 
-Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Analyze Web Components](/score/element/#analyze) for performance-following surfaces. The [analysis UI presenters](/uikit/views-analysis/analysis/) can render reports without an Element wrapper.
+Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Analyze Components](/score/element/#analyze) for performance-following surfaces. The [analysis UI presenters](/uikit/views-analysis/analysis/) can render reports without an Element wrapper.
 
 ## API Reference
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `defineAllAnalysisElements()` | Web Components | Register the four elementary Analyze tools from `@webmusic/score/analyze/element`; individual classes and helpers are owned by the [Element references](/score/element/#analyze). |
+| `defineAllAnalysisElements()` | Components | Register the four elementary Analyze tools from `@webmusic/score/analyze/element`; individual classes and helpers are owned by the [Element references](/score/element/#analyze). |
 | `summarizeScore(score)` | Summary | Metadata, counts, duration, tempo, meter, key, and pitch range. |
 | `distributions(score)` | Statistics | Duration-weighted pitch classes, melodic interval counts and note-duration counts. |
 | `chordTimeline(score, opts?)` | Harmony analysis | Zero-config chord labels over fixed musical windows (quarters). |

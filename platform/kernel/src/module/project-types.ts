@@ -29,7 +29,7 @@ export interface ProjectModuleRecord {
   readonly assets?: Readonly<Record<string, string>>;
   readonly params?: Readonly<Record<string, number>>;
 }
-export type ProjectSignalKind = 'audio' | 'control' | 'note' | 'transport' | 'source';
+export type ProjectSignalKind = 'audio' | 'control' | 'note' | 'transport' | 'source' | 'message';
 export interface ProjectEndpoint { readonly moduleId: string; readonly port: string }
 export interface ProjectParamEndpoint { readonly moduleId: string; readonly param: string }
 export interface ProjectConnectionRecord {
@@ -119,6 +119,12 @@ export interface ProjectModuleInstance {
   childContext?(context: ModuleContext): ModuleContext;
   /** Capture live serializable configuration such as oscillator waveform. */
   exportConfig?(): ProjectJsonObject;
+  /**
+   * Called once after the graph holding this instance commits, before
+   * observers hear of it; a candidate graph that never commits is disposed
+   * without activation. Message objects start timers and fire `loadbang` here.
+   */
+  activate?(): void;
   dispose(): void;
 }
 /**

@@ -31,7 +31,7 @@ const rootManifest = JSON.parse(await readFile(path.join(root, 'package.json'), 
 // presenter between classes remains a reviewed information-architecture change.
 const uiPresenterClassPolicy = Object.freeze({
   'transport-time': ['transport', 'timeline', 'minimap', 'playlist', 'track-list'],
-  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq', 'patch-editor'],
+  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq', 'patch-editor', 'controls'],
   'mixing-capture': ['mixer', 'meter', 'recorder'],
   notes: ['note'],
   'views-analysis': ['analysis', 'pitch', 'harmony', 'level-analyzer', 'oscilloscope', 'spectrum-analyzer', 'transient-analyzer'],
@@ -81,7 +81,7 @@ for (const [name, pkg] of packages) {
   checkCapabilityBoundaries(name, pkg);
   checkSideEffectPolicy(name, pkg);
   checkImports(name, pkg);
-  checkUiWebComponentFreedom(name, pkg);
+  checkUiCustomElementFreedom(name, pkg);
   checkUiDomainVocabulary(name, pkg);
   checkKernelPrimitiveOwnership(name, pkg);
   checkRetiredCompositionSurfaces(name, pkg);
@@ -739,7 +739,7 @@ function checkImports(name, pkg) {
   }
 }
 
-// The ui kit publishes presenters, not Web Components: registration and
+// The ui kit publishes presenters, not custom elements: registration and
 // HTMLElement subclassing live in the domain families' element layers. The
 // dependency policy keeps ui import-clean and the entry checks prove imports
 // are DOM-safe, but a registration inside a mount function evaluates nothing
@@ -847,7 +847,7 @@ function checkRetiredCompositionSurfaces(name, pkg) {
   }
 }
 
-function checkUiWebComponentFreedom(name, pkg) {
+function checkUiCustomElementFreedom(name, pkg) {
   if (name !== '@webmusic/ui') return;
   for (const file of pkg.files) {
     const inspected = modules.get(file);
@@ -858,7 +858,7 @@ function checkUiWebComponentFreedom(name, pkg) {
     }
     for (const heritage of inspected.classExtends) {
       if (/^(globalThis\.)?(HTML[A-Za-z0-9]*Element|Element|ShadowRoot)$/.test(heritage)) {
-        errors.push(`${relativeToRoot(file)} declares a class extending ${heritage}; @webmusic/ui must not define Web Components.`);
+        errors.push(`${relativeToRoot(file)} declares a class extending ${heritage}; @webmusic/ui must not define custom elements.`);
       }
     }
   }

@@ -77,7 +77,7 @@ removing a view releases only that view's borrowed connection and own resources.
 
 | Choice         | Used here                                                        | State and ownership                                                    |
 | -------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Web Components | `score-view` and `score-chord-analysis`                                 | Borrow a public playback source; no repeated `src` and no new player.  |
+| Components | `score-view` and `score-chord-analysis`                                 | Borrow a public playback source; no repeated `src` and no new player.  |
 | Headless       | `ScorePlayerModule`, `AudioPlayer`, `SessionTransport`           | Own playback behavior and participate in one Session authority.        |
 | API + UI       | Offline rendering, peaks, waveform renderer and `mountTransport` | Produce data or display state supplied by the application.             |
 

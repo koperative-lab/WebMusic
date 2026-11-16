@@ -1,12 +1,12 @@
 import {dirname, join} from 'node:path';
 import {imports, markup, prose} from './headless-docs-policy.mjs';
 
-// One page shape for every Web Component page (COMPONENT-PAGE-TEMPLATE.md)
-// and every Headless object page (HEADLESS-PAGE-TEMPLATE.md):
+// One page shape for every Component page (COMPONENT-PAGE-TEMPLATE.md)
+// and every Headless instance page (HEADLESS-PAGE-TEMPLATE.md):
 //
 //   main demo → introduction → ## Import → ## Ports and composition
 //   → optional ## topics (topic demos allowed) → API <details>
-//   → Styling <details> (Web Components only) → ## Related (a bullet list)
+//   → Styling <details> (Components only) → ## Related (a bullet list)
 //
 // Deliberately constrained source checks, not an MDX evaluator. Fenced
 // examples and comments are blanked first, so a copied skeleton inside a code
@@ -21,7 +21,7 @@ const lineStart = (name) => new RegExp(`^[ \\t]*<${name}\\b[^>]*\\/>`, 'gm');
 const detailsBlock = (summary) => new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*${summary}\\s*<\\/summary>`, 'g');
 
 /**
- * The two page kinds. A Web Component page renders its demo through
+ * The two page kinds. A Component page renders its demo through
  * `ElementDemo` and documents styling; a Headless page renders its demo
  * through `HeadlessDemoFrame` and has no styling of its own.
  */
@@ -30,12 +30,12 @@ const KINDS = {
   headless: {page: /(?:^|\/)headless\/(?:(?:play|analyze|view)\/)?([^/]+)\.mdx$/, frame: 'HeadlessDemoFrame', styling: false},
 };
 
-/** Return actionable failures for the Web Component leaf pages. */
+/** Return actionable failures for the Component leaf pages. */
 export function elementDocProblems({pages, readFile, frameFile}) {
   return pageShapeProblems({pages, readFile, frameFile, kind: 'element'});
 }
 
-/** Return actionable failures for the Headless object pages, Bridge included. */
+/** Return actionable failures for the Headless instance pages, Bridge included. */
 export function headlessShapeProblems({pages, readFile, frameFile}) {
   return pageShapeProblems({pages, readFile, frameFile, kind: 'headless'});
 }

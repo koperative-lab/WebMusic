@@ -13,7 +13,7 @@ function sidebar(base = '/'): BreadcrumbSidebarEntry[] {
     page('Quick Start', '/quick-start/'),
     group('Score', [
       page('Overview', '/score/'),
-      ...(['element', 'headless'] as const).map((form) => group(form === 'element' ? 'Web Components' : 'Headless',
+      ...(['element', 'headless'] as const).map((form) => group(form === 'element' ? 'Components' : 'Headless',
         ['play', 'analyze', 'view'].map((capability) => group(capability[0]!.toUpperCase() + capability.slice(1), [
           page('Player', `/score/${form}/${capability}/example/`),
         ])),
@@ -44,7 +44,7 @@ describe('documentation breadcrumbs', () => {
         })).toEqual([
           {label: 'WebMusic', href: `${prefix}/`},
           {label: 'Score', href: `${prefix}/score/`},
-          {label: form === 'element' ? 'Web Components' : 'Headless', href: `${prefix}/score/${form}/`},
+          {label: form === 'element' ? 'Components' : 'Headless', href: `${prefix}/score/${form}/`},
           {label: capability[0]!.toUpperCase() + capability.slice(1), href: `${prefix}/score/${form}/#${capability}`},
           {label: '<score-player>'},
         ]);
@@ -53,7 +53,7 @@ describe('documentation breadcrumbs', () => {
   });
 
   it('keeps hidden inventories discoverable without a sidebar entry', () => {
-    for (const [path, label] of [['element', 'Web Components'], ['headless', 'Headless']]) {
+    for (const [path, label] of [['element', 'Components'], ['headless', 'Headless']]) {
       expect(getBreadcrumbs({pathname: `/score/${path}/`, base: '/', title: `Score ${label}`, sidebar: sidebar()})).toEqual([
         {label: 'WebMusic', href: '/'},
         {label: 'Score', href: '/score/'},

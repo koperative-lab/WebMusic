@@ -3,7 +3,7 @@
 Accessible, domain-neutral DOM presenters for music software.
 
 ```text
-caller-owned state (a Headless object, a store, a controller)
+caller-owned state (a Headless instance, a store, a controller)
         + a small structural binding
         + a @webmusic/ui mount* presenter
         = accessible, styleable music UI
@@ -15,13 +15,13 @@ styles, but no application brand theme, palette presets or theme provider.
 A presenter receives a structural binding, mounts into a caller-supplied
 `HTMLElement` or `ShadowRoot`, and returns an explicit cleanup handle.
 
-Its most common specialization inside this repository is the Web Component
+Its most common specialization inside this repository is the Component
 equation:
 
 ```text
-domain Headless object + @webmusic/ui presenter
+domain Headless instance + @webmusic/ui presenter
              composed by the concrete Element class
-                          = Web Component
+                          = Component
 ```
 
 There is no per-component Element Adapter layer. The browser needs an
@@ -201,7 +201,7 @@ architecture gate.
 
 The package never calls `customElements.define` and never subclasses
 `HTMLElement`. It cannot own a tag name, an upgrade lifecycle or a registry —
-those belong to the consumer, who may use Web Components, a framework, or
+those belong to the consumer, who may use Components, a framework, or
 neither. *Enforced:* a source scan rejects `customElements` references (bare,
 `globalThis.`, or property access) and `HTMLElement` subclassing anywhere in
 `packages/ui/src`.
@@ -209,7 +209,7 @@ neither. *Enforced:* a source scan rejects `customElements` references (bare,
 ### 4.3 Borrow, never own
 
 A presenter owns only what it created. This is what makes the same presenter
-safe inside a Web Component that owns its `AudioContext` and inside an
+safe inside a Component that owns its `AudioContext` and inside an
 application that shares one context across a page. Ownership questions are
 answered once, at the composition root, not per presenter.
 
@@ -524,14 +524,14 @@ listed in the [presenter reference][docs-presenters].
 ## 11. Choosing a layer
 
 - **Ready-made browser UI** — install a domain package plus `@webmusic/ui`,
-  import the domain's `/auto` entry, use its Web Components, and theme with
+  import the domain's `/auto` entry, use its Components, and theme with
   `--wm-*`.
 - **Your own UI on our domain logic** — import a domain package's `/headless`
   entry. This path never reaches `@webmusic/ui` or Custom Elements.
 - **Our markup, your element API** — import a domain package's side-effect-free
   `/element` entry, subclass an exported Element class, override its protected
   controller/binding/mount hooks, register your own tag.
-- **Presenters without Web Components** — mount `@webmusic/ui` directly against
+- **Presenters without Components** — mount `@webmusic/ui` directly against
   anything satisfying a binding: a store, a controller, a signal, a mock.
 
 ## 12. Invariants and their enforcement
@@ -539,7 +539,7 @@ listed in the [presenter reference][docs-presenters].
 | Invariant | Mechanism |
 |---|---|
 | zero workspace dependencies and peers | dependency policy table, exact-match both directions |
-| no `customElements`, no `HTMLElement` subclass in ui source | `checkUiWebComponentFreedom` source scan |
+| no `customElements`, no `HTMLElement` subclass in ui source | `checkUiCustomElementFreedom` source scan |
 | `wui-*__` internals never referenced outside ui | `checkWuiInternalNamespace` literal scan |
 | code-only domain layers never import ui | per-file workspace-import audit in the layer gate |
 | every published entry imports safely in Node | built-entry import check + Node-environment SSR test |

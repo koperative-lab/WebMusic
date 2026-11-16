@@ -1,7 +1,7 @@
 # Documentation application
 
 `doc/` is the public repository's only application. The site demonstrates the music interaction component packages through
-Web Components, Headless objects, and API + UI composition. It is a consumer of
+Components, Headless classes, and API + UI composition. It is a consumer of
 the workspace packages, not the implementation of the component library or a
 complete online DAW. Website, Library, Studio and the manual acceptance runner
 belong to the separate closed-source `WebMusic-studio` repository (DEC-072).

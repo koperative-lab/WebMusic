@@ -64,7 +64,7 @@ const capability = (family: string, form: 'element' | 'headless', name: 'play' |
 
 const domain = (family: 'score' | 'audio', label: string, entries: readonly string[]): Spec => group(label, [
   link('Overview', `/${family}/`),
-  group('Web Components', [
+  group('Components', [
     link('Overview', `/${family}/element/`),
     capability(family, 'element', 'play'),
     capability(family, 'element', 'analyze'),

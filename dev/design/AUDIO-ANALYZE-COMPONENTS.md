@@ -48,7 +48,7 @@ Their nonvisual algorithms, Worker client, sessions and realtime analyzer
 remain available. Whole-clip key, tempo, loudness, summaries, chroma, pitch
 tracks and event distributions belong in the
 [Analyze API](../../doc/src/content/docs/audio/api/analyze.mdx),
-the [Headless objects](../../doc/src/content/docs/audio/headless/index.mdx#analyze)
+the [Headless classes](../../doc/src/content/docs/audio/headless/index.mdx#analyze)
 and application-owned UI.
 
 ## Composition and evidence

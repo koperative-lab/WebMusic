@@ -9,7 +9,7 @@ absolute path to the installed script instead.
 
 | Command | Result |
 |---|---|
-| `node scripts/list_components.mjs` | IDs and reference paths for Web Components, Headless objects and UI presenters |
+| `node scripts/list_components.mjs` | IDs and reference paths for Components, Headless classes and UI presenters |
 | `node scripts/get_component_docs.mjs element/score-player` | The owning player reference, including setup and lifecycle |
 | `node scripts/get_source.mjs element/score-player` | Selected implementation entry files from the verified release |
 | `node scripts/get_styles.mjs element/score-player` | Public styling reference: tokens, parts and presenter bindings |
@@ -24,7 +24,7 @@ capability can have different Element, Headless and presenter contracts.
 Source output is for implementation inspection. It contains selected entry
 files, not every imported file, and does not grant a public import path. Use
 installed `exports` and declarations for application imports. Styling output is
-reference text, not an installable stylesheet. Headless objects have no visual
+reference text, not an installable stylesheet. Headless classes have no visual
 styling contract; choose a UI presenter or Element when styling the interface.
 Source and theme command output includes the bundled MIT license notice so it
 stays with source excerpts saved or passed to another tool.
@@ -38,8 +38,8 @@ node scripts/get_docs.mjs patterns
 node scripts/get_docs.mjs full
 ```
 
-Start with `index` to locate the owning page. `components` covers Web Components,
-Headless objects and UI presenters. `patterns` covers common composition and
+Start with `index` to locate the owning page. `components` covers Components,
+Headless classes and UI presenters. `patterns` covers common composition and
 integration tasks. Use `full` when the task needs the complete public manual and
 the agent has enough context space. Filenames such as `llms-patterns.txt` and
 generated page paths such as `agent-context/score/api/react.md` also work.

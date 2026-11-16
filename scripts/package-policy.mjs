@@ -36,6 +36,7 @@ export const expectedPublicEntries = Object.freeze({
     "./session",
     "./processor",
     "./processor-worklet",
+    "./objects",
     "./package.json",
   ],
   "@webmusic/ui": [
@@ -52,6 +53,7 @@ export const expectedPublicEntries = Object.freeze({
     "./mixer",
     "./note",
     "./oscilloscope",
+    "./controls",
     "./panel",
     "./parameter",
     "./patch-editor",

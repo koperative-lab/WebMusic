@@ -104,7 +104,7 @@ and clear their flags when the current operation settles or is released.
 AudioMixer owns mix state. `snapshot()` returns immutable master/member values,
 solo identity and effective gains; `change` invalidates that readback. Elements
 retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple
-presenters and custom UI observe the same Headless object. A source's direct
+presenters and custom UI observe the same Headless instance. A source's direct
 out-of-band gain changes are not a second mixer-state authority.
 
 ## Document playback (DEC-053)

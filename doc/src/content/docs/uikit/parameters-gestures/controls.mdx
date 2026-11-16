@@ -1,0 +1,146 @@
+---
+title: '@webmusic/ui/controls'
+description: 'Ten single-value controls — button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix — over structural bindings.'
+sidebar:
+  label: 'controls'
+  order: 7
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/controls` draws one value per control: a bang button, an on/off
+toggle, a number box, a slider, a dial, a clickable message box, a menu, tabs,
+a multislider and a routing matrix. Each mounts against a structural binding —
+a `snapshot()`, one command and an optional `subscribe` — and imports no
+domain or Kernel type, so the same control drives a Kernel object's interface
+(`@webmusic/kernel/objects`), an application store or a framework state.
+
+<UiPresenterLiveDemo presenter="controls" />
+
+## Import
+
+```ts
+import {mountToggle, mountNumber, mountMenu} from '@webmusic/ui/controls';
+
+const toggle = mountToggle(host, {
+  snapshot: () => ({on: store.running}),
+  setOn: (on) => store.setRunning(on),
+  subscribe: (notify) => store.subscribe(notify),
+});
+const tempo = mountNumber(otherHost, {
+  snapshot: () => ({value: store.bpm, min: 20, max: 300}),
+  setValue: (value) => store.setBpm(value),
+});
+const wave = mountMenu(menuHost, {
+  snapshot: () => ({items: ['sine', 'square', 'sawtooth', 'triangle'], index: store.wave}),
+  select: (index) => store.setWave(index),
+}, {label: 'Waveform', cardHost: componentWindow});
+// At teardown, remove each view. The store keeps its application owner.
+toggle.destroy(); tempo.destroy(); wave.destroy();
+```
+
+To show a Kernel object, read its interface with
+`objectInterfaceOf(runtime.getModule(id))`, map `snapshot()` to the control's
+state and send each command back as a message through `interact()`.
+
+## Interaction and ownership
+
+Every control re-reads its binding on mount, on each notification and on
+`update()`; it keeps no second copy of the value. A command may return a
+promise; a thrown or rejected command reaches `onError` and the control keeps
+showing the binding's value.
+
+| Control | Pointer | Keyboard |
+| --- | --- | --- |
+| Button, message | Click presses and flashes | Enter or Space |
+| Toggle | Click flips | Enter or Space |
+| Number | Drag up or down (Shift: finer); click to type | Arrow keys and Page Up/Down step; type, then Enter; Escape cancels |
+| Slider, dial | Drag | Arrow keys, Page Up/Down, Home and End |
+| Menu | Click opens the choices as a card over a scrim in `cardHost`, or steps to the next item without one | Arrow keys step; in the card, arrows move, Tab cycles, Escape closes |
+| Tabs | Click a cell | Arrow keys choose and move |
+| Multislider | Draw across the bars | Arrow Left/Right move between bars; Up/Down and Page Up/Down change one |
+| Matrix | Click a cell to switch it | Arrow keys move between cells; Enter or Space switches |
+
+A button or message box flashes for `flashMs` after a press, and
+`handle.flash()` flashes it when its value arrives from elsewhere, as when a
+patch sends it a bang. Re-mounting any control on the same host destroys the
+previous one.
+
+<details class="component-section">
+<summary>API</summary>
+
+Every `mount…(host, binding, options?)` accepts an `HTMLElement` or open
+`ShadowRoot` and returns a handle with `element`, `update()` and `destroy()`.
+`mountButton` and `mountMessage` return a handle that also has `flash()`.
+Importing the entry needs no DOM.
+
+**Bindings**
+
+| Mount | Snapshot | Command |
+| --- | --- | --- |
+| `mountButton` | `ButtonState`: `active?`, `disabled?` | `press()` |
+| `mountToggle` | `ToggleState`: `on`, `disabled?` | `setOn(on: boolean)` |
+| `mountNumber` | `NumberState`: `value`, `min?`, `max?`, `step?`, `float?`, `disabled?` | `setValue(value: number)` |
+| `mountSlider`, `mountDial` | `RangeState`: `value`, `min`, `max`, `step?`, `float?`, `disabled?` | `setValue(value: number)` |
+| `mountMessage` | `MessageBoxState`: `text`, `disabled?` | `press()` |
+| `mountMenu`, `mountTabs` | `ChoiceState`: `items`, `index`, `disabled?` | `select(index: number)` |
+| `mountMultislider` | `MultisliderState`: `values`, `min`, `max`, `float?`, `disabled?` | `setValues(values: readonly number[])` |
+| `mountMatrix` | `MatrixState`: `columns`, `rows`, `cells` (row-major, 1 is on), `disabled?` | `setCell(column, row, on)` |
+
+Every binding may add `subscribe(notify)`, returning its unsubscribe function.
+Values without `float` are whole numbers: number boxes, sliders, dials and
+multisliders round what they send. `step` defaults to 1 for whole numbers and
+0.01 for a float number box.
+
+**Options**
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `label` | per control (`'Bang'`, `'Toggle'`, `'Number'`…) | Accessible name. |
+| `className`, `part` | — | Extra class and part token on the root. |
+| `stylesheet` | `true` | Install `controlsStyle`; false leaves styling to the host. |
+| `onError` | — | Receives command, snapshot and subscription failures. |
+| `flashMs` (button, message) | `120` | How long a press shows inverted. |
+| `orientation` (slider) | `'horizontal'` | `'vertical'` draws an upright fader. |
+| `cardHost` (menu) | — | The component window the choice card covers. |
+
+`formatControlNumber(value, float)` formats a value as the controls show it.
+
+**Accessibility.** Buttons, toggles and matrix cells are native buttons with
+`aria-pressed`; the number box is a `spinbutton`; sliders, dials and
+multislider bars are `slider`s that speak their value; tabs are a `radiogroup`;
+the menu card is a modal `dialog` with a `listbox`, returning focus to its
+trigger. Groups use a roving tab stop.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+`controlsStyle` follows [Visual design](/uikit/#theme-with-css-custom-properties):
+square cells one control height tall, a 1px line, pressed and selected cells
+inverted, a 2px ink focus ring inside the control and 30% opacity when
+disabled. The slider and dial are the kit's fader and knob, with their tokens.
+
+| Token | Fallback | Role |
+| --- | --- | --- |
+| `--wm-control-height` | `--wm-control-size`, `2rem` | Cell and field height. |
+| `--wm-control-border` | `--wm-border` | Cell and field lines. |
+| `--wm-foreground`, `--wm-accent-foreground` | `#111`, `#fff` | Ink and inverted ink. |
+| `--wm-surface`, `--wm-surface-muted` | `#fff`, `#f3f3f3` | Cell fill and hover fill. |
+| `--wm-control-scrim` | `rgb(0 0 0 / 45%)` | The menu card's scrim. |
+| `--wm-focus-ring` | `2px solid` ink | Focus outline. |
+
+Canonical classes are `.wui-control` plus one modifier class per control —
+`.wui-control--button`, `.wui-control--toggle`, `.wui-control--number`,
+`.wui-control--slider`, `.wui-control--dial`, `.wui-control--message`,
+`.wui-control--menu`, `.wui-control--tabs`, `.wui-control--multislider` or
+`.wui-control--matrix` — and `.wui-control__cell`, `.wui-control__field`,
+`.wui-control__bar`, `.wui-control__readout`, `.wui-control__card` and
+`.wui-control__scrim` inside. The root's part name is the
+control's name.
+
+</details>
+
+<UiPresenterRelated presenter="controls" />

@@ -1,5 +1,5 @@
 // ============================================================================
-// Web Component entry — imported via `@webmusic/audio/play/element`. Kept separate
+// Component entry — imported via `@webmusic/audio/play/element`. Kept separate
 // from the package's main entry so the I/O + playback API tree-shakes free of
 // any DOM / custom-element code for code-only consumers.
 //

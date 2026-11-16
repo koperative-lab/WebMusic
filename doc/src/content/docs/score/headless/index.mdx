@@ -3,7 +3,7 @@ title: Score Headless
 description: Code-only Score engines, state models and helpers — the purpose of each /headless entry and the reference page that owns every exported value.
 ---
 
-Headless components are the code-only domain objects behind the elements:
+Headless classes are the code-only domain objects behind the elements:
 engines, sessions, controllers and their supporting helpers imported from
 `@webmusic/score/<capability>/headless`. They never touch the DOM.
 
@@ -25,7 +25,7 @@ Use these objects when your application owns the interaction or presentation
 layer. The references document inputs, commands, state, event payloads and
 resource/time roles; pure helpers describe their inputs and results instead
 of inventing a lifecycle. Combine them with [UI Kit](/uikit/) presenters or a
-custom surface. Rendering adapters are separate from Headless objects and
+custom surface. Rendering adapters are separate from Headless classes and
 are documented on the capability API pages.
 
 The export tables below route every exported value to its owning reference
@@ -36,7 +36,7 @@ completeness. Those require source review.
 
 ## Play
 
-The **Headless Components** of [`@webmusic/score/play`](/score/api/play/) —
+The **Headless classes** of [`@webmusic/score/play`](/score/api/play/) —
 the stateful engines you `new` up and drive yourself, with no DOM and no
 custom elements. Some pages include a real interactive demo; others describe
 helpers or optional integrations. In your own app you bring your own UI, or
@@ -122,7 +122,7 @@ The capability root provides the stateless analytical functions.
 
 No DOM, no styles, no rendering. Import from
 `@webmusic/score/analyze/headless`; the elements that draw these results are
-under [Web Components › Analyze](/score/element/#analyze).
+under [Components › Analyze](/score/element/#analyze).
 
 | Export | Kind | Page |
 | --- | --- | --- |
@@ -214,7 +214,7 @@ pure operation and position-map functions belong to
 
 `renderPianoRollVisualizer`, `renderStaffVisualizer`,
 `renderWaterfallVisualizer`, `mountScoreGrid`, `mountScoreSheet` and
-`bindPlayerToVisualizer` are **not** headless components. They draw into a
+`bindPlayerToVisualizer` are **not** Headless classes. They draw into a
 caller-owned element, so by rule they are `/render` adapters, and they are
 documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the
 code-facing surface.

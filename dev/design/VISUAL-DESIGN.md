@@ -126,7 +126,7 @@ window:
 ## Documentation demos
 
 The live canvas shows the component in its default composition with the real
-controls it needs to be used (for example its transport). Web Component demos
+controls it needs to be used (for example its transport). Component demos
 have no Parameters strip, markup readout or Copy/Reset (DEC-071): the page's
 reference tables document configuration, and interactive adjustment is not part
 of the documentation site. The one exception is the type switch between the

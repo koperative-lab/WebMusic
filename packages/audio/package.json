@@ -1,7 +1,7 @@
 {
   "name": "@webmusic/audio",
   "version": "0.3.0",
-  "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Web Components and React bindings.",
+  "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Components and React bindings.",
   "type": "module",
   "sideEffects": [
     "./src/play/worker.ts",

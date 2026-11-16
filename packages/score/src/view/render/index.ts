@@ -1,6 +1,6 @@
 // @webmusic/score/view/render — imperative browser renderers. This explicit
 // compatibility surface owns DOM/canvas/SVG work and is intentionally
-// separate from the code-only @webmusic/score/view/headless components.
+// separate from the code-only @webmusic/score/view/Headless classes.
 export {
   renderPianoRollVisualizer,
   renderStaffVisualizer,

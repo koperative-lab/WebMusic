@@ -5,7 +5,7 @@ description: 'Symbolic music — capabilities, installation, registration and pu
 
 Score is one package, `@webmusic/score`, for **symbolic** music: notes with
 pitches, durations and voices, read from MIDI, MusicXML, MXL or ABC. The
-play, analyze, and view capabilities support Web Components, Headless objects,
+play, analyze, and view capabilities support Components, Headless classes,
 and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
 integration entries such as React build on the same contracts.
 View also provides document editing: one Headless document owner, loaded with
@@ -19,9 +19,9 @@ For a working player with notation and a keyboard, start with
 
 | Capability | What it covers | Forms |
 | --- | --- | --- |
-| **play** | Turn a `Score` into sound: push and pull engines, timbres, effect chains, racks, offline WAV render, capture of performed note events into a `Score`. | [Web Components](/score/element/#play) · [Headless](/score/headless/#play) · [API](/score/api/play/) |
-| **analyze** | Ask a `Score` questions: key, chords, roman numerals, motifs, rhythm figures, voice-leading issues, distributions and summaries. | [Web Components](/score/element/#analyze) · [Headless](/score/headless/#analyze) · [API](/score/api/analyze/) |
-| **view** | Draw a `Score`: piano roll, staff, waterfall, engraved notation, whole-piece map data and static thumbnails; own an editable document with note commands, undo/redo, checkpoints and interaction drafts. | [Web Components](/score/element/#view) · [Headless](/score/headless/#view) · [API](/score/api/view/) |
+| **play** | Turn a `Score` into sound: push and pull engines, timbres, effect chains, racks, offline WAV render, capture of performed note events into a `Score`. | [Components](/score/element/#play) · [Headless](/score/headless/#play) · [API](/score/api/play/) |
+| **analyze** | Ask a `Score` questions: key, chords, roman numerals, motifs, rhythm figures, voice-leading issues, distributions and summaries. | [Components](/score/element/#analyze) · [Headless](/score/headless/#analyze) · [API](/score/api/analyze/) |
+| **view** | Draw a `Score`: piano roll, staff, waterfall, engraved notation, whole-piece map data and static thumbnails; own an editable document with note commands, undo/redo, checkpoints and interaction drafts. | [Components](/score/element/#view) · [Headless](/score/headless/#view) · [API](/score/api/view/) |
 | **io** | Format detection and MIDI, MusicXML, MXL and ABC parsing/serialization, with worker-backed parsing. | [API](/score/api/io/) |
 | **react** | Existing Play, Analyze and View composition as React components and hooks. | [API](/score/api/react/) |
 
@@ -89,7 +89,7 @@ you use; importing a visual Element requires `@webmusic/ui`.
 
 | Peer | When it is needed |
 | --- | --- |
-| `@webmusic/ui` | Score Web Components and renderers that compose UI presenters. |
+| `@webmusic/ui` | Score Components and renderers that compose UI presenters. |
 | `tone` | An application-supplied Tone.js transport or instrument. |
 | `spessasynth_lib` | `.sf2` / `.sf3` SoundFont playback. |
 | `react` | The `/react` components and hooks. |
@@ -99,12 +99,12 @@ a served AudioWorklet. Resource preparation, worklet URLs and ownership details
 belong to the [Play API](/score/api/play/) and
 [View API](/score/api/view/) references.
 
-## Drop-in Web Components
+## Drop-in Components
 
-Web Components combine Score behavior with controls or visual presenters.
+Components combine Score behavior with controls or visual presenters.
 Register the tags needed by your page, supply their data and resources, and
 configure them through their public properties and attributes. The
-[Web Components inventory](/score/element/) lists the tags, registration functions
+[Components inventory](/score/element/) lists the tags, registration functions
 and shared theming.
 
 ### With a bundler
@@ -160,7 +160,7 @@ underlying data model or resource ownership rules.
 ## Next Steps
 
 - [Quick Start](/quick-start/) for the small player, notation and keyboard example.
-- [Web Components](/score/element/) for every tag, its owning page and shared theming.
+- [Components](/score/element/) for every tag, its owning page and shared theming.
 - [Headless](/score/headless/) for engines, sessions and their export ownership.
 - [Core API](/score/api/) for the score model, builder, time map and events.
 - [I/O API](/score/api/io/) for MIDI, MusicXML, MXL and ABC import/export.

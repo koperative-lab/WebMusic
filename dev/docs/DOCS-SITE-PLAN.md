@@ -33,7 +33,7 @@ misrepresented as completed facilities.
 ## Reader paths and top-level sections
 
 The site serves a music interaction component package. Readers can use Web
-Components, drive Headless objects, or compose API + UI according to PRODUCT.
+Components, drive Headless classes, or compose API + UI according to PRODUCT.
 Examples should make those entry points and their ownership boundaries visible.
 Longer-term DAW or music installation compositions are direction, not evidence
 that the repository already ships a finished application.
@@ -45,11 +45,11 @@ UI Kit provides presentation; Kernel exposes shared platform contracts.
 | Section shape | Sections | Page groups |
 |---|---|---|
 | Site | Introduction, Quick Start, Agent Toolkit | Orientation, first working examples and main-owned agent integration guidance |
-| Domain family | Score, Audio | Family page, Web Components, Headless, API |
+| Domain family | Score, Audio | Family page, Components, Headless, API |
 | Presenter layer | UI Kit | Overview, Catalog, functional presenter classes, root API |
 | Platform package | Bridge, Kernel | Overview, API; Bridge also has a domain Headless group |
 
-Within each family's Web Components and Headless groups, capabilities are ordered
+Within each family's Components and Headless groups, capabilities are ordered
 **Play, Analyze, View**, omitting capabilities whose form is not implemented.
 Score also has I/O API pages; React belongs to the API
 reference. Published subpaths, rather than an aspirational list, determine which
@@ -69,10 +69,10 @@ forms actually exist.
 | Quick Start | `/quick-start/` | First useful interaction and onward routing |
 | Agent Toolkit | `/agent-toolkit/` | Context downloads, reusable skill and application instructions |
 | Family page | `/<family>/` | Scope, capability navigation and full setup; Audio also owns its reviewed progressive workflow |
-| Web Components inventory | `/<family>/element/` | Every tag by capability, composition, registration and shared theming |
+| Components inventory | `/<family>/element/` | Every tag by capability, composition, registration and shared theming |
 | Element/workflow | `/<family>/element/<capability>/<tag>/` | Element template; dense order from 1 |
 | Headless inventory | `/<family>/headless/` | Export ownership and navigation, per capability |
-| Headless object | `/<family>/headless/<capability>/<object>/` | Headless template; dense order from 1 |
+| Headless instance | `/<family>/headless/<capability>/<object>/` | Headless template; dense order from 1 |
 | Root API | `/<family>/api/` | Package root reference and complete subpath inventory |
 | Capability/API entry | `/<family>/api/<entry>/` | API template, including related sub-entries without separate pages |
 
@@ -164,7 +164,7 @@ presenter's page; the shared contract is not copied into every leaf page.
 Bridge has no published `/headless` subpath. Its sync class and factories are
 root exports: list them in the root API Reference and link to their full object
 page. Stateless conversions, role adapters, rendering bridges, and types remain
-on the API page. Do not create a Web Components navigation group without a
+on the API page. Do not create a Components navigation group without a
 published element.
 
 The Bridge object page can use working prose, links, and demos without assuming
@@ -188,7 +188,7 @@ leaf pages, even when an overview names them as examples.
 Owns a short description of WebMusic consistent with PRODUCT, the package-role
 table, and the documentation vocabulary. Explain how to choose Score or Audio
 from the source material and route to Quick Start. Make the relationship among
-Web Components, Headless, and API + UI clear without duplicating their complete
+Components, Headless, and API + UI clear without duplicating their complete
 design rationale.
 
 Do not maintain element or object lists, install instructions, or member
@@ -229,7 +229,7 @@ framework or API + UI composition. One Audio workbench demo is appropriate.
 Link reference pages for every member used; keep complete API tables and
 per-capability member prose on their owning pages.
 
-### Web Components inventory — `/<family>/element/`
+### Components inventory — `/<family>/element/`
 
 Owns selection and composition for the whole family, one section per capability:
 tag → purpose → owning page/section, each group's anchor and binding
@@ -259,7 +259,7 @@ requirement.
 The Overview owns the presenter's place in the product's supported use paths,
 shared theming, exclusions, and links to the root API's shared shape and the
 Catalog. Lead with npm installation and a direct presenter mount against
-application-owned state. Explain Web Components, Headless and API + UI as the
+application-owned state. Explain Components, Headless and API + UI as the
 three integration choices; Element subclassing is an advanced customization.
 Keep individual presenter API, token/part inventories and accessibility on their pages.
 
@@ -336,10 +336,10 @@ does not establish that all anchors work.
 
 A main demo lives on the page owning the demonstrated element, object, or
 presenter. A justified composition/reskin example can live in a topic section.
-On Web Component leaf/workflow pages, the main demo is the first visible body
+On Component leaf/workflow pages, the main demo is the first visible body
 content immediately after the page title, followed by the introduction and
 reference sections. Frontmatter and imports stay above it in source; later
-topic examples retain their explanatory sections. Under DEC-071 a Web Component
+topic examples retain their explanatory sections. Under DEC-071 a Component
 demo shows only the default interaction: the authored composition with the
 controls the component needs, and no Parameters strip, markup readout, Copy or
 Reset. Interactive adjustment and code generation belong to a separate

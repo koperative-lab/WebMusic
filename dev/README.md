@@ -5,7 +5,7 @@ This is the entry point for repository-wide guidance. Start with
 the task, then follow their links to source, public types and tests.
 
 WebMusic is a toolkit for music software and installations, usable through
-Web Components, Headless objects, and API + UI composition. Accepted design
+Components, Headless classes, and API + UI composition. Accepted design
 describes the intended contracts; [STATUS.md](STATUS.md) describes this
 checkout's delivery and verification gaps. Sharing guidance between branches
 does not merge implementations or transfer old verification results. This

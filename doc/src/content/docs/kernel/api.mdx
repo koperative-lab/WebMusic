@@ -22,6 +22,7 @@ take exactly what they use.
 | [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
 | [`/processor`](#processor--webmusickernelprocessor) | Authored DSP definitions, per-context worklet preparation, processor modules, insert effects, instruments, project plugins, WebAssembly handoff, the shared ring and capabilities, and the thread protocol |
 | [`/processor-worklet`](#processor-worklet--webmusickernelprocessor-worklet) | Audio-thread kit: `defineProcessor` over a reused render block |
+| [`/objects`](#objects--webmusickernelobjects) | Max-style message objects as project plugins, the object framework and the `expr` language |
 
 ## events — @webmusic/kernel/events
 
@@ -281,8 +282,8 @@ the source node or foreign graph.
 
 ### Port families
 
-Every port declares `id`, `family` (`audio`, `note`, `control`, `transport` or
-`source`), `direction`, `multiplicity` (`single` or `sum`), `schemaVersion` and
+Every port declares `id`, `family` (`audio`, `note`, `control`, `transport`,
+`source` or `message`), `direction`, `multiplicity` (`single` or `sum`), `schemaVersion` and
 `readiness` (`unresolved`, `preparing`, `ready`, `error`, `detached`).
 `assertPortInfo(port)` validates these fields. A module lists its ports through
 `ports()`; `getModulePort(module, name, family, direction?)` finds one.
@@ -308,6 +309,45 @@ a new revision before listeners run and return it, so late asynchronous results
 can be compared against the current revision. `SOURCE_SCHEMAS` names
 `webmusic.score`, `webmusic.score-document`, `webmusic.audio-clip` and
 `webmusic.audio-document`; Kernel never imports their payload types.
+
+A `Message` is a `selector` and typed `atoms` — `int`, `float`, `symbol`,
+`dict` and `array` atoms, made with `intAtom`, `floatAtom` and `symbolAtom` —
+with an optional `time` in AudioContext seconds (DEC-075). `bang()`,
+`intMessage()`, `floatMessage()`, `symbolMessage()` and `message(selector,
+atoms, time?)` build messages; `parseMessage(text)` reads message-box text
+(`3` is an int, `3.` a float, a leading word is the selector, double quotes keep
+spaces) and `formatMessage(message)` writes it back. `atomsOf(message)` and
+`messageFromAtoms(atoms)` convert between messages and lists as Max does, and
+`numberOf(message)` reads the first number. `new MessageOutputPort({id?,
+onListenerError?})` delivers each `send(message)` synchronously and depth first
+to its inputs in connection order; nesting deeper than `MAX_MESSAGE_DEPTH`
+(512) stops with a `MessageStackOverflowError` sent to `onListenerError`. `new
+MessageInputPort(handler, {id?, multiplicity?})` takes `connect(output)`, whose
+lease stops delivery on release, and `receive(message)` for direct input.
+
+Timed message objects schedule on a `MessageClock` (`now()`,
+`schedule(time, callback)` returning a cancel function). `messageClockFor(context)`
+returns the shared `AudioMessageClock` of an AudioContext, which delivers
+events in time order up to `lookahead` (50 ms) early while it has any;
+`ManualMessageClock` runs due events on `advance(time)` for tests and offline
+work. A project connection of kind `message` joins two message ports; to a
+`param:<id>` endpoint it sets that parameter's base value from each message's
+first number, clamped to its range, at the message's time on the main thread
+(`connectMessageToParameter(output, handle, context)` does the same directly).
+
+```ts
+import {ManualMessageClock, MessageInputPort, MessageOutputPort, parseMessage, formatMessage} from '@webmusic/kernel/module';
+
+const output = new MessageOutputPort();
+const input = new MessageInputPort((message) => console.log(formatMessage(message)));
+const lease = input.connect(output);
+output.send(parseMessage('set 3 4.5')); // logs "set 3 4.5"
+lease.release();
+
+const clock = new ManualMessageClock(0);
+clock.schedule(0.25, (time) => output.send(parseMessage('bang', time)));
+clock.advance(1);
+```
 
 `createTransportPort(session, {id?, commands?})` projects a `ModuleSession` into
 `snapshot()` (`axis`, `referenceTime`, `position`, `durationSeconds`, `playing`,
@@ -1450,3 +1490,95 @@ defineProcessor(voice, {
 
 declare const sampleRate: number; // an AudioWorkletGlobalScope global
 ```
+
+## objects — @webmusic/kernel/objects
+
+Max-style message objects as project plugins (DEC-075). Each object is the
+plugin `webmusic.object.<name>@1.0.0`; its record's `config.args` holds the
+arguments as message text and `config.state` the live state it exported, so a
+rebuilt graph keeps a running `metro`, a `counter`'s count or a `toggle`'s
+value, and a saved component reopens as it was. Inlets are message ports
+`in0`, `in1`…, outlets `out0`, `out1`…; the left inlet is hot and the others
+store a value for the next trigger. Every output carries the time of the
+message that caused it. An object acts only after its graph commits: the
+project runtime calls each instance's optional `activate()` then, so `loadbang`
+fires and timers start in a committed graph only.
+
+```ts
+import {ModuleAudioEnvironment, ModuleProjectRuntime, ProjectPluginRegistry} from '@webmusic/kernel/module';
+import {createObjectPlugins, objectInterfaceOf} from '@webmusic/kernel/objects';
+
+const plugins = new ProjectPluginRegistry();
+for (const plugin of createObjectPlugins({print: (name, text) => console.log(name, text)})) plugins.register(plugin);
+const runtime = new ModuleProjectRuntime({audio: new ModuleAudioEnvironment(), plugins});
+const object = (id: string, name: string, args = '') =>
+  ({id, contextId: 'root', plugin: {id: `webmusic.object.${name}`, version: '1.0.0'}, config: {args}});
+const cord = (id: string, from: string, to: string) =>
+  ({id, kind: 'message', from: {moduleId: from, port: 'out0'}, to: {moduleId: to, port: 'in0'}});
+await runtime.restore({schema: 'webmusic.module-project', version: 1, id: 'eight', contexts: [{id: 'root'}],
+  modules: [object('go', 'loadbang'), object('tick', 'metro', '250'), object('count', 'counter', '7'), object('log', 'print')],
+  connections: [cord('a', 'go', 'tick'), cord('b', 'tick', 'count'), cord('c', 'count', 'log')]});
+// Prints 0 to 7 every two seconds until the runtime is disposed.
+objectInterfaceOf(runtime.getModule('tick')); // undefined: metro shows no control
+```
+
+| Group | Object | Arguments | Inlets → outlets |
+| --- | --- | --- | --- |
+| Time | `loadbang` | — | bang → bang when the graph commits |
+| | `metro` | interval ms (500) | on/off, bang, `stop`; interval → bang every interval |
+| | `delay` | ms (0) | bang, `stop`, ms to start; ms → bang after the delay |
+| | `pipe` | ms (0) | any value, `clear`; ms → the value after the delay |
+| | `line` | start (`0.` for floats), grain ms (20) | target or target and ms, `stop`, `set`; ms; grain → values, bang at the end |
+| Logic | `counter` | max, or min max | bang, `reset`, `set`, `min`, `max`, a number jumps; next value → count, bang when it wraps |
+| | `select` | values to match | value; match → one bang per value, anything else |
+| | `route` | values to match | message → the rest of a matching message per value, anything else |
+| | `gate` | outlets (1), open (0) | outlet to open (0 closes); message → one outlet per number |
+| | `switch` | inputs (2), open (0) | input to pass; one inlet per input → the open input |
+| | `trigger` | `b`, `i`, `f`, `s`, `l`, `a` or constants | any → one outlet per argument, right to left |
+| | `pack` | `i`, `f`, `s` or initial values | first element outputs; one inlet per element → list |
+| | `unpack` | `i`, `f`, `s` or initial values | list → one outlet per element, right to left |
+| | `expr` | an expression with `$i1`…`$i9`, `$f1`…`$f9` | one inlet per variable, the first evaluates → result |
+| | `scale` | in low, in high, out low, out high, exponent (1) | value; the four bounds → scaled value |
+| | `random` | range (2), seed | bang, `seed`; range → int from 0 |
+| | `print` | name (`print`) | any → nothing; writes `name: message` |
+| Sound | `sig` | initial value (0) | number → control output `output` set on the message's sample |
+| | `ramp` | initial value (0) | target, or target and ms pairs, `stop` → control output; bang at the end |
+| Interface | `button` | — | any → bang; flashes |
+| | `toggle` | — | bang flips, a number sets, `set` → 0 or 1 |
+| | `number`, `slider`, `dial` | min, max (`0.` for floats) | number sets and outputs, bang, `set` → value |
+| | `message` | the message text, `$1`…`$9`, commas | bang outputs, any message fills `$n`, `set` → each comma-separated message |
+| | `menu`, `tab` | items | index chooses and outputs, bang, `set` → index, item |
+| | `multislider` | count (8), min, max | list sets and outputs, bang, `set` → list |
+| | `matrix` | columns (4), rows (4) | column row value, `clear`, bang, `set` → column row value |
+
+`set` changes an interface object's value without output, as in Max.
+`sig` and `ramp` drive a `ConstantSourceNode` with `setValueAtTime` and
+`linearRampToValueAtTime`, so their control output changes on the scheduled
+sample; connect it to a parameter as a modulation. A message cord to a
+parameter applies on the main thread, accurate to a scheduler period.
+
+`createObjectPlugins(environment?)` returns every plugin; `environment` may
+supply `clock(context)` (defaults to `messageClockFor`), `print(name, text,
+moduleId)` (defaults to `console.log`), `random()` (defaults to `Math.random`)
+and `onError(error, moduleId)`. `OBJECT_NAMES` lists the names in palette order
+and `OBJECT_DEFINITIONS` the definitions. An interface object offers an
+`ObjectInterface` under the `OBJECT_INTERFACE` capability, read with
+`objectInterfaceOf(module)`: `kind`, `snapshot()` (for example `{on}` for a
+toggle, `{value, min, max, float}` for a number, `{items, index}` for a menu,
+`{columns, rows, cells}` for a matrix, `{flashes}` for a button, `{text}` for a
+message), `subscribe(listener)` and `interact(message)`, an untimed message into
+the left inlet. [`@webmusic/ui/controls`](/uikit/parameters-gestures/controls/)
+draws them.
+
+`objectPlugin(definition, environment?)` turns an `ObjectDefinition` — `name`,
+`inlets(args)`, `outlets(args)`, optional `interface` and `check(args)`, and
+`create(context)` returning an `ObjectBehavior` (`receive(index, message)`,
+optional `activate`, `state`, `snapshot`, `control` and `dispose`) — into a
+plugin. The `ObjectContext` lends `args`, the saved `state`, a `clock` whose
+events are cancelled when the object is disposed, `audio()`, `out(index,
+message)`, `changed()`, `active` and `fail(error)`. `compileExpr(source)` parses
+the `expr` language — numbers, inlet variables, `+ - * / % **`, comparisons,
+`&& || !`, bit operators, `? :` and `abs`, `min`, `max`, `pow`, `sqrt`, `exp`,
+`log`, `log10`, `sin`, `cos`, `tan`, `atan2`, `floor`, `ceil`, `round`, `int`,
+`float`, `random` and `pi` — without `eval`; an operation on two ints is an int
+and division of ints truncates.

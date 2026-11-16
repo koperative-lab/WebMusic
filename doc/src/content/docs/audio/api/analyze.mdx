@@ -5,7 +5,7 @@ description: Audio analysis — peaks, loudness, spectrogram, onsets, key, tempo
 
 `@webmusic/audio/analyze` is the **analysis** capability of the `@webmusic/audio` package. It reads decoded samples (the `Float32Array` channels of an `AudioClip` from [`@webmusic/audio`](/audio/api/)) and returns plain data — a multi-resolution peaks pyramid, loudness, an STFT spectrogram, onsets, musical key, tempo, a pitch track, and frame-level timbral features — and it adds an incremental analysis **session**, a **Web Worker** client, and an optional audio→score **transcriber**.
 
-The APIs are headless and have no DOM dependency, so they run in Node, workers, browsers, tests, and batch jobs. Importing this entry never touches the DOM, audio globals, or any optional peer. The capability does not decode audio, draw anything, or play — those live in [`@webmusic/audio/play`](/audio/api/play/) and [`@webmusic/audio/view`](/audio/api/view/). For live level, spectrum or tuning interaction over an existing audio graph, use the separate [Analyze Web Components](/audio/element/#analyze).
+The APIs are headless and have no DOM dependency, so they run in Node, workers, browsers, tests, and batch jobs. Importing this entry never touches the DOM, audio globals, or any optional peer. The capability does not decode audio, draw anything, or play — those live in [`@webmusic/audio/play`](/audio/api/play/) and [`@webmusic/audio/view`](/audio/api/view/). For live level, spectrum or tuning interaction over an existing audio graph, use the separate [Analyze Components](/audio/element/#analyze).
 
 ## Install
 
@@ -25,7 +25,7 @@ When an advanced engine's peer is missing the analyzer falls back to its bundled
 
 The analysis capability has several entry points — the [package subpath table](/audio/api/#package-subpaths) lists them with every other `@webmusic/audio` entry:
 
-The `@webmusic/audio/analyze` root is the stateless API; `/element` is the opt-in styled Web Component entry. The Worker runtime remains isolated, so code-only imports stay free of DOM and worker-global side effects.
+The `@webmusic/audio/analyze` root is the stateless API; `/element` is the opt-in styled Component entry. The Worker runtime remains isolated, so code-only imports stay free of DOM and worker-global side effects.
 
 ## Choose an analysis surface
 

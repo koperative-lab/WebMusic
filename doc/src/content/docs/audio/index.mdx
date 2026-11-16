@@ -7,7 +7,7 @@ import AudioWorkbenchDemo from "../../../components/AudioWorkbenchDemo.astro";
 
 Audio is one package, `@webmusic/audio`, for **recorded sound**: decoded
 samples in an immutable `AudioClip`, played, drawn and measured. The
-play, analyze, and view capabilities support Web Components, Headless objects,
+play, analyze, and view capabilities support Components, Headless classes,
 and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
 integration entries such as React build on the same contracts.
 
@@ -17,9 +17,9 @@ integration entries such as React build on the same contracts.
 
 | Capability | What it covers | Forms |
 | --- | --- | --- |
-| **play** | Get sound in and out: decoding and loading, buffer and media playback, mixing, microphone recording, effects, clip and edited-sequence WAV export. | [Web Components](/audio/element/#play) · [Headless](/audio/headless/#play) · [API](/audio/api/play/) |
-| **analyze** | Derive facts from a signal: peaks, loudness, tempo and beats, key, onsets, pitch, chromagram, spectrogram, Meyda features, transcription. | [Web Components](/audio/element/#analyze) · [Headless](/audio/headless/#analyze) · [API](/audio/api/analyze/) |
-| **view** | Project a signal onto a surface: waveforms, spectrograms, regions and live scrolling views; edit a contiguous asset sequence with transactions/history, selection/drafts and explicit range processing; build custom overviews from the Headless data helpers. | [Web Components](/audio/element/#view) · [Headless](/audio/headless/#view) · [API](/audio/api/view/) |
+| **play** | Get sound in and out: decoding and loading, buffer and media playback, mixing, microphone recording, effects, clip and edited-sequence WAV export. | [Components](/audio/element/#play) · [Headless](/audio/headless/#play) · [API](/audio/api/play/) |
+| **analyze** | Derive facts from a signal: peaks, loudness, tempo and beats, key, onsets, pitch, chromagram, spectrogram, Meyda features, transcription. | [Components](/audio/element/#analyze) · [Headless](/audio/headless/#analyze) · [API](/audio/api/analyze/) |
+| **view** | Project a signal onto a surface: waveforms, spectrograms, regions and live scrolling views; edit a contiguous asset sequence with transactions/history, selection/drafts and explicit range processing; build custom overviews from the Headless data helpers. | [Components](/audio/element/#view) · [Headless](/audio/headless/#view) · [API](/audio/api/view/) |
 | **react** | The same capabilities as React components and hooks. | [API](/audio/api/react/) |
 
 The package root is the model itself — `AudioClip`, `Region`, `BeatGrid`,
@@ -57,9 +57,9 @@ npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 - The [`@webmusic/audio/play`](/audio/api/play/) capability uses optional decoder peers (`mpg123-decoder` for mp3, `@wasm-audio-decoders/flac`, `@wasm-audio-decoders/ogg-vorbis`, `ogg-opus-decoder`, and `mediabunny` for AAC/containers), `music-metadata` for tags, and the time-stretch worklets (`signalsmith-stretch`, `@soundtouchjs/audio-worklet`). Each is needed only for the format or feature that uses it — WAV needs none of them.
 - The [`@webmusic/audio/analyze`](/audio/api/analyze/) capability uses the package's bundled DSP dependencies (`fft.js`, `meyda`, `music-tempo`, `pitchy`) and the optional MIR and transcription peers (`essentia.js`, `aubiojs`, `pitchfinder`, `realtime-bpm-analyzer`, `webfft`, plus `@spotify/basic-pitch`, `@magenta/music`, `@tensorflow/tfjs` behind the `./transcribe` entry).
 
-## Drop-in Web Components
+## Drop-in Components
 
-The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, the `<audio-clip-view>` waveform editor and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
+The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, the `<audio-clip-view>` waveform editor and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Components page](/audio/element/).
 
 ### From a CDN
 
@@ -134,7 +134,7 @@ import { defineAllAudioElements } from "@webmusic/audio/play/element";
 defineAllAudioElements(); // every element in @webmusic/audio/play, at default tags
 ```
 
-Elements ship from the `/element` subpath, so each capability root tree-shakes free of DOM code. Every tag, its owning page and the shared theming variables are on the **[Web Components page](/audio/element/)**.
+Elements ship from the `/element` subpath, so each capability root tree-shakes free of DOM code. Every tag, its owning page and the shared theming variables are on the **[Components page](/audio/element/)**.
 
 ## Load a clip
 
@@ -373,7 +373,7 @@ view.peaks = computePeaks(clip.channels()!, clip.sampleRate);
 
 ## Next Steps
 
-- [Web Components](/audio/element/) for every drop-in tag, its owning page and shared theming.
+- [Components](/audio/element/) for every drop-in tag, its owning page and shared theming.
 - [Headless](/audio/headless/) for the code-only transports, sessions and their export ownership.
 - [Core API](/audio/api/) for the `AudioClip` model, `Region`, `BeatGrid`, `AudioPeaks`, and events.
 - [Play API](/audio/api/play/) for decoding/loading, `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, effects, and export.

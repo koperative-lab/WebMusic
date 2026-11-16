@@ -1,4 +1,4 @@
-// The parameter catalog for Score / Audio web components, grouped the
+// The parameter catalog for Score / Audio components, grouped the
 // way the packages are: family × capability. <ElementDemo> takes each tag's
 // entry from here; the site checks and other tools read the whole catalog.
 

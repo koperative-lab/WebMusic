@@ -7,7 +7,7 @@
 //   createAudioAnalysisSession — incremental analysis over an evolving clip;
 //                            `update` recomputes only what a sample edit touched.
 //
-// No DOM — pair with your own UI, or the styled Web Components at
+// No DOM — pair with your own UI, or the styled Components at
 // `@webmusic/audio/analyze/element`. The one-shot analyzers live at the
 // `@webmusic/audio/analyze` package root.
 // ============================================================================

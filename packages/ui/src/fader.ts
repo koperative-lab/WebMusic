@@ -42,6 +42,8 @@ export interface FaderOptions {
   classNames?: FaderClassNames;
   /** Additional CSS part tokens added alongside the canonical part names. */
   parts?: FaderParts;
+  /** Spoken value for a `0…1` level. Defaults to a percentage. */
+  formatValue?: (value: number) => string;
   /** Receives the clamped `0…1` level on every move of the control. */
   onInput?: (value: number) => void;
   /** Receives pointer, keyboard and cleanup failures. */
@@ -201,7 +203,7 @@ export function createFader(document: Document, options: FaderOptions): FaderHan
       label: options.label,
       orientation: horizontal ? 'horizontal' : 'vertical',
       keyboardStep: options.keyboardStep ?? 0.05,
-      formatValue: (value) => `${Math.round(value * 100)}%`,
+      formatValue: options.formatValue ?? ((value) => `${Math.round(value * 100)}%`),
       onError: options.onError,
     },
   );

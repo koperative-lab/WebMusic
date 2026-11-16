@@ -7,7 +7,7 @@
 Composable TypeScript building blocks for music software, interactive demos,
 and web-based musical installations.
 
-Use **Web Components** for ready-made workflows, **Headless objects** for
+Use **Components** for ready-made workflows, **Headless classes** for
 behavior behind your own interface, or **APIs and UI presenters** for deeper
 composition. The same data and runtime contracts should support a small demo,
 a custom instrument, and eventually a full online music workstation.

@@ -2,7 +2,7 @@
 
 Audio adds decoded-clip playback, recording, waveform/spectral views and
 analysis. Bridge coordinates Score and Audio. These additions use the same
-Web Components, Headless and API + UI choices and resource-ownership workflow
+Components, Headless and API + UI choices and resource-ownership workflow
 as the main WebMusic Skill.
 
 Use the existing lookup commands with the context source for the checkout you

@@ -77,7 +77,7 @@ export function getBreadcrumbs({pathname, base, title, sidebar = []}: Breadcrumb
     if (!trail && !isInventory && path !== `/${section}/api`) return current();
     ancestor(groupLabels[0] ?? label, `/${section}/`);
     if (form === 'element' || form === 'headless') {
-      const formLabel = groupLabels[1] ?? (form === 'element' ? 'Web Components' : 'Headless');
+      const formLabel = groupLabels[1] ?? (form === 'element' ? 'Components' : 'Headless');
       if (isInventory) return current(formLabel);
       ancestor(formLabel, `/${section}/${form}/`);
       if (capability && capabilities[capability]) {

@@ -33,7 +33,7 @@ supplied musical input remain useful without a player. A capability does not
 become a playback participant merely because another component on the page plays
 music. Multiple independent sessions must remain isolated.
 
-The same musical capabilities must be accessible through Web Components,
+The same musical capabilities must be accessible through Components,
 Headless composition and API + UI composition. The Element adds declarative
 target resolution and presentation; it must not be the only place that can
 obtain playback state or implement analysis behavior. Equivalent capability

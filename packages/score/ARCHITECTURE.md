@@ -106,9 +106,9 @@ element → api → headless → core
 | `core/` | Stateless algorithms, contracts, data transforms owned by that capability. | **Nothing.** Deliberately internal — implementation helpers must not become permanent semver surface. |
 | `headless/` | Code-only domain components: engines, sessions, controllers, state machines. They **never** create, accept or manipulate DOM/canvas/SVG, and carry no visual styles. | `/…/headless` |
 | `api/` | The supported code-facing facade — functions, option bags, result types selected from `core` and, where useful, `headless`. | **The capability root.** `/play` *is* the API; there is no `/play/api` subpath. |
-| `element/` | Styled Web Components compose Headless with a UI presenter; reviewed declaration/behavior elements may render nothing. | `/…/element` (import-only, registers nothing) |
+| `element/` | Styled Components compose Headless with a UI presenter; reviewed declaration/behavior elements may render nothing. | `/…/element` (import-only, registers nothing) |
 
-Consumers can use Web Components, Headless, or API + UI. These reuse the same
+Consumers can use Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
 Editing adds no entries: operations and contracts ship from `/view`, the
 editor and `loadScoreEditor` from `/view/headless`. Note editing is the
@@ -344,9 +344,9 @@ importing the module on the main thread or during SSR is harmless.
 The target pattern, and what "no Element Adapter layer" means:
 
 ```
-domain Headless object  +  @webmusic/ui presenter
+domain Headless instance  +  @webmusic/ui presenter
               composed by the concrete Element class
-                    = the Web Component
+                    = the Component
 ```
 
 The Element class is the browser composition root: it translates attributes,
@@ -514,7 +514,7 @@ with the owning contract and describe unverified behavior in change reviews.
 | what a note sounds like | `play/headless/audio-contracts.ts`, `play/headless/sounds/`, `play/headless/synth.ts` |
 | what is drawn | `view/core/windowing.ts`, `view/render/renderers/` |
 | what is analysed | `analyze/core/`, `analyze/headless/session.ts` |
-| a Web Component's behaviour | `<capability>/element/`, plus the `@webmusic/ui` presenter it composes |
+| a Component's behaviour | `<capability>/element/`, plus the `@webmusic/ui` presenter it composes |
 | an architectural rule | the policy sources listed in §11 and the platform ledger |
 
 ### Shared playback-source contract

@@ -10,7 +10,7 @@ It is intentionally thin. Functional APIs live in capability subpaths of the sam
 - **Decode, loading, playback, mixing, recording, effects, and audio export** live in [`@webmusic/audio/play`](/audio/api/play/).
 - **Document editing, history and range processing** are part of View ([editable documents](/audio/api/view/#editable-documents)); **sequence rendering and WAV export** are part of [Play](/audio/api/play/#render-an-edited-sequence).
 - **Analysis** (peak computation, tempo/beat detection, …) lives in `@webmusic/audio/analyze`.
-- **Visualization** lives in `@webmusic/audio/view`; its Web Components and those from [`@webmusic/audio/play`](/audio/api/play/) live under each capability's `/element` subpath.
+- **Visualization** lives in `@webmusic/audio/view`; its Components and those from [`@webmusic/audio/play`](/audio/api/play/) live under each capability's `/element` subpath.
 
 Install `@webmusic/audio` once, then import the root model or a capability entry such as `@webmusic/audio/play` as needed.
 
@@ -18,7 +18,7 @@ Install `@webmusic/audio` once, then import the root model or a capability entry
 
 Every published entry of `@webmusic/audio`, grouped by capability. A
 capability root is its API; `/headless` is code-only domain objects;
-`/element` is side-effect-free Web Component classes and `/auto` registers
+`/element` is side-effect-free Component classes and `/auto` registers
 them; `/global` is the browser IIFE. This table is the package map — the
 capability pages below document what is inside each entry.
 
@@ -27,13 +27,13 @@ capability pages below document what is inside each entry.
 | `@webmusic/audio` | package root | `AudioClip`, `Region`, `BeatGrid`, `ClipEditSession`, `AudioPeaks`, events, JSON — this page. |
 | `@webmusic/audio/play` | [capability root](/audio/api/play/) | Decoding and loading, playback engines, mixing, recording, effects, clip and edited-sequence WAV export. |
 | `@webmusic/audio/play/headless` | [Headless](/audio/headless/#play) | `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, the playlist controller, `Effect`. |
-| `@webmusic/audio/play/element` | [Web Components](/audio/element/#play) | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
+| `@webmusic/audio/play/element` | [Components](/audio/element/#play) | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
 | `@webmusic/audio/play/auto` | registration | Imports the play elements and registers them on evaluation. |
 | `@webmusic/audio/play/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioPlay`. |
 | `@webmusic/audio/play/worker-client` · `@webmusic/audio/play/worker-protocol` · `@webmusic/audio/play/worker` | worker triple | Off-main-thread decoding: the client, the wire protocol, and the worker runtime. |
 | `@webmusic/audio/analyze` | [capability root](/audio/api/analyze/) | Peaks, loudness, tempo, key, onsets, pitch, chromagram, spectrogram, features, summaries. |
 | `@webmusic/audio/analyze/headless` | [Headless](/audio/headless/#analyze) | The analysis session, realtime analyzer and streaming transient detector. |
-| `@webmusic/audio/analyze/element` | [Web Components](/audio/element/#analyze) | `<audio-level-analyzer>`, `<audio-meter>`, `<audio-oscilloscope>`, `<audio-spectrum-analyzer>`, `<audio-transient-analyzer>`. |
+| `@webmusic/audio/analyze/element` | [Components](/audio/element/#analyze) | `<audio-level-analyzer>`, `<audio-meter>`, `<audio-oscilloscope>`, `<audio-spectrum-analyzer>`, `<audio-transient-analyzer>`. |
 | `@webmusic/audio/analyze/auto` | registration | Imports the analyze elements and registers them on evaluation. |
 | `@webmusic/audio/analyze/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioAnalyze`. |
 | `@webmusic/audio/analyze/transcribe` | code-only sub-entry | `transcribe()` — audio → family-neutral note events, behind an optional peer. |
@@ -41,7 +41,7 @@ capability pages below document what is inside each entry.
 | `@webmusic/audio/view` | [capability root](/audio/api/view/) | Signal projection: waveform and spectrogram surfaces, colormaps, geometry; editable-document contracts, operations and range processors. |
 | `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`, `AudioClipEditor` and `loadAudioClipEditor`. |
 | `@webmusic/audio/view/render` | code-only sub-entry | Imperative canvas renderers and the player binding. |
-| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>` and `<audio-live-view>`; also retains `<audio-meter>` as a compatibility export. |
+| `@webmusic/audio/view/element` | [Components](/audio/element/#view) | `<audio-view>` and `<audio-live-view>`; also retains `<audio-meter>` as a compatibility export. |
 | `@webmusic/audio/view/auto` | registration | Registers the View elements, including the retained meter compatibility tag. |
 | `@webmusic/audio/view/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioView`. |
 | `@webmusic/audio/react` | [capability root](/audio/api/react/) | React components and hooks over the three capabilities; React is an optional peer. |

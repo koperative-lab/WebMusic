@@ -30,7 +30,7 @@ describe('documentation navigation', () => {
       page('score/element/play/hidden', 'Hidden', {order: 0, hidden: true}),
     ]));
     const score = tree.find((entry): entry is NavGroup => entry.type === 'group' && entry.label === 'Score')!;
-    const components = score.entries.find((entry): entry is NavGroup => entry.type === 'group' && entry.label === 'Web Components')!;
+    const components = score.entries.find((entry): entry is NavGroup => entry.type === 'group' && entry.label === 'Components')!;
     const play = components.entries.find((entry): entry is NavGroup => entry.type === 'group' && entry.label === 'Play')!;
     expect(play.entries.map((entry) => entry.label)).toEqual(['First', 'B', 'score/element/play only', 'Z']);
     expect(play.collapsed).toBe(true);

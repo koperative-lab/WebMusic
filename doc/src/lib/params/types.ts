@@ -1,7 +1,7 @@
 // ============================================================================
 // The parameter catalog behind <ElementDemo> and the site checks.
 //
-// One entry per Score / Audio web component. `params` is the element's COMPLETE
+// One entry per Score / Audio component. `params` is the element's COMPLETE
 // observed-attribute surface — every name in its `static observedAttributes`,
 // including the ones no demo would normally set — so a tool can describe every
 // one of them. `properties` and `events` round out the members that have no

@@ -16,7 +16,7 @@ import {mountWorkbench} from '../src/workbench';
 afterEach(() => vi.restoreAllMocks());
 
 /**
- * A host that installs no stylesheet is the light-DOM case: a Web Component
+ * A host that installs no stylesheet is the light-DOM case: a Component
  * rendering into its own page cannot inject kit CSS without it applying to the
  * whole document. Every presenter now takes the opt-out the transport had.
  */

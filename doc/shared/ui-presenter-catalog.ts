@@ -13,6 +13,7 @@ export type UiPresenterName =
   | 'playlist'
   | 'parameter'
   | 'patch-editor'
+  | 'controls'
   | 'macro'
   | 'panel'
   | 'envelope'
@@ -127,6 +128,20 @@ export const UI_PRESENTER_CLASSES: readonly UiPresenterClass[] = [
 
 /** Shared presenter catalog with the Score and Audio Element consumers in this checkout. */
 export const UI_PRESENTER_CATALOG: readonly UiPresenterEntry[] = [
+  {
+    presenter: 'controls',
+    classSlug: 'parameters-gestures',
+    label: 'Controls',
+    summary: 'Single-value controls: button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix.',
+    api: `import {mountToggle} from '@webmusic/ui/controls';
+
+const handle = mountToggle(host, {snapshot: () => ({on}), setOn: (next) => setOn(next)});`,
+    consumerTags: [],
+    options: [
+      {name: 'label', kind: 'text', fallback: 'per control', placeholder: 'Run', note: 'Accessible name of each control.', inert: 'The name is exposed through aria-label.'},
+      {name: 'stylesheet', kind: 'boolean', fallback: 'on', note: 'Install the exported controls stylesheet into each host.'},
+    ],
+  },
   {
     presenter: 'patch-editor',
     classSlug: 'parameters-gestures',

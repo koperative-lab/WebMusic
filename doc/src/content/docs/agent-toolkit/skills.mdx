@@ -47,7 +47,7 @@ The workflow begins with your application: its framework, package manager,
 installed WebMusic versions, existing conventions and requested interaction.
 It helps the agent:
 
-1. Choose Web Components, Headless, or API + UI for the task.
+1. Choose Components, Headless, or API + UI for the task.
 2. Find the owning public reference and confirm the installed package's exports.
 3. Identify required dependencies, music files, sound resources and browser requirements.
 4. Share a player's data and time with following views and analysis where supported.
@@ -92,7 +92,7 @@ node scripts/get_component_docs.mjs element/score-player
 
 | Script | Purpose | Example |
 | --- | --- | --- |
-| `list_components.mjs` | List Web Components, Headless objects and UI presenters with stable identifiers. | `node scripts/list_components.mjs --kind headless` |
+| `list_components.mjs` | List Components, Headless classes and UI presenters with stable identifiers. | `node scripts/list_components.mjs --kind headless` |
 | `get_component_docs.mjs` | Read a selected component's public reference. | `node scripts/get_component_docs.mjs headless/score-player` |
 | `get_source.mjs` | Inspect selected implementation entry files from the verified release. | `node scripts/get_source.mjs element/score-player` |
 | `get_styles.mjs` | Read a component's documented styling contract, such as tokens, parts and visual bindings. | `node scripts/get_styles.mjs ui/transport` |
@@ -101,7 +101,7 @@ node scripts/get_component_docs.mjs element/score-player
 
 Source inspection returns selected owning files, not the complete dependency
 tree. Use the package's exported entries when developing your application.
-Styling output is reference text, not a generated stylesheet; Headless objects
+Styling output is reference text, not a generated stylesheet; Headless classes
 have no visual styling contract. Use their UI presenter's reference when adding
 custom visuals.
 

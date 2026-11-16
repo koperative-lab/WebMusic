@@ -113,11 +113,11 @@ Construction, Commands, State, Events, Lifecycle, Helpers.
 
 ## Related
 
-- [`<score-player>`](/score/element/play/score-player/) — the Web Component built on it.
+- [`<score-player>`](/score/element/play/score-player/) — the Component built on it.
 ````
 
 Order: main demo → introduction → Import → Ports and composition → optional
-topics (Ownership among them) → API → Related — the Web Component page shape
+topics (Ownership among them) → API → Related — the Component page shape
 without Styling, so both kinds of page read the same way. Every Score, Audio
 and Bridge Headless page has all of them except the optional topics, in this
 order: `npm run check:docs` fails a page that departs from it

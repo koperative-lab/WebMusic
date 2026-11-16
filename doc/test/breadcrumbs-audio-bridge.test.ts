@@ -8,7 +8,7 @@ const page = (label: string, path: string): BreadcrumbSidebarEntry => ({type: 'l
 describe('Audio and Bridge documentation breadcrumbs', () => {
   it('uses Audio capability and inventory owners with exactly one deployment prefix', () => {
     for (const form of ['element', 'headless']) {
-      const formLabel = form === 'element' ? 'Web Components' : 'Headless';
+      const formLabel = form === 'element' ? 'Components' : 'Headless';
       const sidebar = [group('Audio', [group(formLabel, [group('View', [
         page('Waveform', `/audio/${form}/view/waveform/`),
       ])])])];

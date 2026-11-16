@@ -195,7 +195,7 @@ export abstract class BaseVisualizer {
       noteSpacing: typeof config.noteSpacing === 'number' && Number.isFinite(config.noteSpacing) && config.noteSpacing >= 0 ? config.noteSpacing : 1,
       pixelsPerSecond: config.pixelsPerSecond || 30,
       // Headless renderers use deliberately neutral functional defaults. The
-      // styled Web Component supplies the WebScore palette from /element.
+      // styled Component supplies the WebScore palette from /element.
       noteRGB: config.noteRGB || '96, 96, 96',
       activeNoteRGB: config.activeNoteRGB || '32, 32, 32',
       noteColor: config.noteColor,

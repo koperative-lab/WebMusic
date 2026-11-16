@@ -5,7 +5,7 @@
 //
 // Pair with:
 //   @webmusic/score/play/api      — public data/configuration facade
-//   @webmusic/score/play/element  — styled Web Components built on these engines
+//   @webmusic/score/play/element  — styled Components built on these engines
 // ============================================================================
 
 // ---- Score Player (THE playback engine: scheduling + transport surface) ----

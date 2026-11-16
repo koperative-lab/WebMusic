@@ -11,3 +11,4 @@ export * from './tick';
 export * from './session';
 export * from './processor';
 export * from './processor-worklet';
+export * from './objects';

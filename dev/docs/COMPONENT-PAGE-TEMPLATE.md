@@ -1,4 +1,4 @@
-# Web Component page template
+# Component page template
 
 This is the authoring contract for pages under
 `doc/src/content/docs/{score,audio}/element/<capability>/`,
@@ -108,7 +108,7 @@ CSS properties, public parts and host styling.
 ````
 
 Order: main demo → introduction → Import → Ports and composition → optional
-topics → API → Styling → Related. Every Web Component page has all of them
+topics → API → Styling → Related. Every Component page has all of them
 except the optional topics, in this order, and nothing else at the top level:
 `npm run check:docs` fails a page that departs from it
 (`scripts/element-docs-policy.mjs`).
@@ -282,9 +282,9 @@ what that page adds (see the skeleton). List sibling elements a reader might
 choose instead, the companions this element composes with, and the Headless or API
 page behind it. Label an element by its tag in code and backticks.
 
-## Web Components inventory and acceptance
+## Components inventory and acceptance
 
-One Web Components inventory per family, at `/<family>/element/`, covers each
+One Components inventory per family, at `/<family>/element/`, covers each
 implemented capability in its own section: Play, Analyze and View.
 The [Site Plan](DOCS-SITE-PLAN.md) owns its responsibilities: selection,
 composition, registration, and shared theming, with no live demo.
@@ -308,7 +308,7 @@ Before shipping:
 - Reconcile attribute names/order with source; every public member and attached
   tag has a discoverable explanation.
 - Add or update this page's tag row, purpose, and `define*` entry in the family
-  Web Components inventory when a tag, job, or registration function changes.
+  Components inventory when a tag, job, or registration function changes.
 - Exercise the default interaction and composition in a browser, or state its
   limitations.
 - Place the main demo first and keep introduction, Import, topics, API,

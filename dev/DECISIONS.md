@@ -3259,6 +3259,107 @@ the development sequence.
 browser evidence; unit tests against structural fakes do not establish sound
 or timing.
 
+## DEC-074 — Objects make components; components make apps
+
+**Date / status:** 2026-11-15; accepted by the repository owner, who fixed the
+three names.
+
+**Problem:** Studio patches graphs in the manner of Max, but WebMusic had no
+names for what a patch is made of, what a finished patch becomes, or what a
+user assembles from finished patches. Max's own words (object, patch) and the
+repository's existing words (module, Element, Web Component, component
+library) overlapped, so the same thing could be called four names and one name
+could mean three things.
+
+**Decision:** WebMusic has three product layers, and maintained writing uses
+these names for them:
+
+1. **Object** — one node in a Studio graph, the counterpart of a Max object: a
+   typed box with inlets and outlets whose behavior is one Kernel module
+   created by a project plugin. Some objects show a package Component inside
+   their box; that does not make them components.
+2. **Component** — a graph of objects, the counterpart of a Max patch. A
+   component is portable code: a developer copies it into a web project,
+   installs the WebMusic packages, and it runs with no other dependency on
+   Studio, private source or a hosted service. The packages' own Components
+   are the official components; components built in Studio or
+   shared by the community meet the same contract.
+3. **App** — music software a user assembles from several components chosen
+   in the Library, official or from the community.
+
+Earlier names are retired in current writing, at the owner's request the
+same day: *Web Component* becomes *Component*, Studio's *patch* becomes
+*component*, and *Headless object* or *Headless component* becomes *Headless
+class* (the code) or *Headless instance* (one running). *Custom element* names
+the browser technology. Words that keep their technical meaning: *module* (the
+Kernel runtime unit behind an object), *project* (the serialized Kernel
+document a component's graph is saved as), *Element* (the class behind a
+Component's tag) and *presenter* (a UI Kit renderer).
+
+**Alternatives considered:** keeping Max's names, which would make "object"
+and "patch" mean Studio-only things a developer never installs; calling a
+graph a "module", which already names the Kernel runtime unit; leaving the
+layers unnamed, which lets Studio, Library and documentation drift apart.
+
+**Consequences:** documentation, Studio and Library describe the same three
+layers. A component's portability is a delivery requirement, not a label:
+until a component built from objects can be exported as runnable code that
+uses only public package entries, only the packages' own Components are
+components in the full sense (STATUS LAYER-01). Current documentation,
+comments, Studio and the private applications use the new names; dated
+records, earlier decisions and public API identifiers and URLs (`/element`,
+`define…Element`, `@webmusic/ui/patch-editor`) are not renamed.
+
+**Owner:** [Product definition](PRODUCT.md#objects-components-and-apps).
+
+**Verification:** documentation and agent instructions use the three names
+consistently; the export contract gets its own design and tests when it is
+built, including a fresh web project that installs only the packages.
+
+## DEC-075 — Messages are a Kernel port family; objects and controls build on them
+
+**Date / status:** 2026-11-15; accepted by the repository owner, who asked for
+the P0 gaps of the Max comparison to be built under the DEC-074 layers.
+Delivery: STATUS MSG-01.
+
+**Problem:** a Max patch is mostly messages — bangs, numbers, symbols and
+lists between logic objects. WebMusic's five port families carry audio, notes,
+modulation, transport and sources, but no general value, so a component
+cannot express "every 250 ms, count to eight, flash on zero". Studio had no
+objects for it and the UI Kit no single-value controls to show it.
+
+**Decision:** `message` becomes the sixth port family, in Kernel because it is
+domain-neutral. A message is a selector and typed atoms (int, float, symbol,
+dict, array) with an optional logical time in AudioContext seconds. Delivery
+is synchronous and depth first, inputs in connection order; nesting past 512
+stops with an error. Timed events come from a `MessageClock` with lookahead and
+carry their time; pointer and keyboard events are untimed and immediate. A
+`message` connection may target a parameter. Kernel `/objects` ships the
+object library as project plugins whose live state is exported in their
+config and which act only after their graph commits, which adds an optional
+`activate` hook to project module instances. UI Kit `/controls` ships ten
+single-value presenters over structural bindings.
+[Messages, objects and controls](design/MESSAGE-OBJECTS.md) owns the contract.
+
+**Alternatives considered:** passing messages as control signals, which are
+audio-rate numbers and cannot carry symbols, lists or discrete events; a
+separate message package, which would duplicate Kernel's port, lease and
+project types; delivering on microtasks, which loses Max's depth-first order
+and makes `trigger` meaningless; timers on Session position, which would stop
+a `metro` whenever the transport is paused and needs tempo the Session does
+not have yet.
+
+**Consequences:** Kernel gains a port family, a project connection kind, an
+`activate` hook and the `/objects` entry; UI Kit gains `/controls`. Existing
+families, plugins and projects are unchanged. Transport-locked timers,
+musical time values, subpatches and presets remain later work.
+
+**Owner:** [Messages, objects and controls](design/MESSAGE-OBJECTS.md).
+
+**Verification:** unit tests for message parsing, ordering, overflow, clocks,
+every object and every control; browser evidence for timing and controls; the
+owner's manual checks.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

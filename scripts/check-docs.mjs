@@ -5,7 +5,7 @@
 //
 //   1. params catalog  ==  each element's `static observedAttributes`
 //   2. catalog integrity — every tag has a page, an entry and a live href
-//   3. one Web Component page shape and type switch, shared Score Headless leaf/demo shape and exports
+//   3. one Component page shape and type switch, shared Score Headless leaf/demo shape and exports
 //   4. live demo integration — every rendered demo uses LiveDemoCanvas
 //   5. plan rules — both family form inventories exist and carry no demos, dense
 //      element order, UI Kit labels mirror the catalog, root API entry coverage
@@ -343,7 +343,7 @@ function checkCapabilityGroups(files) {
   // Both form inventories are required, and for the same reason: each is the
   // only page that lists its whole form for the family.
   for (const family of ['score', 'audio']) {
-    for (const [form, what] of [['element', 'Web Components'], ['headless', 'Headless']]) {
+    for (const [form, what] of [['element', 'Components'], ['headless', 'Headless']]) {
       const inventory = `${DOCS}/${family}/${form}/index.mdx`;
       if (!existsSync(abs(inventory))) {
         fail('plan', `${family}/${form}/index.mdx: the family ${what} inventory is missing`);

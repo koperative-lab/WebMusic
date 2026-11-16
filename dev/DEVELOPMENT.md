@@ -16,7 +16,8 @@ merge the runtime changes discussed in audit records.
 ## Choose the work and its owner
 
 1. Read [PRODUCT.md](PRODUCT.md) for the product direction and the three ways
-   to use the components: Web Component, Headless, and API + UI.
+   to use the packages — Components, Headless, and API + UI — and its three
+   product layers: object, component and app.
 2. Use [STATUS.md](STATUS.md) to understand gaps relevant to the user's task. Check
    [DECISIONS.md](DECISIONS.md) before reopening a design question.
 3. For a component change, use [COMPONENT-DESIGN.md](design/COMPONENT-DESIGN.md)
@@ -96,7 +97,7 @@ later:
    update the check in the [private manual acceptance runner](#private-manual-acceptance-runner):
    an English entry in `WebMusic-studio/apps/test/src/checks.ts` with steps and expected
    results, and a live canvas built from the packages' own Elements and
-   Headless objects with Arabesque No. 1. Before handing off, mount the changed
+   Headless classes with Arabesque No. 1. Before handing off, mount the changed
    checks yourself in a browser against the built packages and fix what you
    find; then tell the owner which checks to run.
 

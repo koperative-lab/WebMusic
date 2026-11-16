@@ -1,6 +1,6 @@
 ---
 name: webmusic
-description: Build or fix music interactions in applications using WebMusic's published Score, UI Kit and Kernel packages. Use for playback, notation, musical input, score analysis or custom interfaces with Web Components, Headless objects or API + UI composition.
+description: Build or fix music interactions in applications using WebMusic's published Score, UI Kit and Kernel packages. Use for playback, notation, musical input, score analysis or custom interfaces with Components, Headless classes or API + UI composition.
 license: MIT
 metadata:
   runtime-compatibility: "@webmusic/score 0.1.0; @webmusic/ui 0.1.0; @webmusic/kernel 0.1.0"
@@ -43,7 +43,7 @@ options with the [Audio/Bridge context reference](references/audio-bridge.md).
 
 ## Build the requested interaction
 
-- **Choose the composition:** Web Components for ready-made interaction,
+- **Choose the composition:** Components for ready-made interaction,
   Headless for custom interfaces, API + UI for explicit bindings. API-only
   parsing and analysis need no UI. Read [integration choices](references/integrations.md)
   for entries, peers and browser boundaries.
