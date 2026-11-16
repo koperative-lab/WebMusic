@@ -500,8 +500,9 @@ neutral [ModuleContext and SessionTransport](/kernel/api/#module--webmusickernel
 This entry's module runtimes are `ScorePlayerModule`, which adapts one real
 engine ([ports and Session role](/score/headless/play/score-player/#ports-and-composition));
 `ScoreRackModule`, [a hierarchical audio bus](/score/headless/play/rack/#ports-and-composition)
-without another transport registration; and the note modules `MidiNoteSource`
-and `MidiNoteSink` ([note ports](/score/headless/play/score-player/#note-sources-and-sinks)).
+without another transport registration; the note modules `MidiNoteSource`
+and `MidiNoteSink` ([note ports](/score/headless/play/score-player/#note-sources-and-sinks));
+and `MidiControlSource`, MIDI controllers as control events and messages.
 Engines, sounds, effect recipes and controllers are what those modules consume. `ScoreEffectElement` and
 `defineScoreEffectElement` are Element exports for
 [one insert declaration](/score/element/play/score-effect/).

@@ -14,6 +14,7 @@ import type {
   ModuleProject, ProjectConnectionRecord, ProjectContextRecord, ProjectDiagnostic,
   ProjectLayout, ProjectModuleInstance, ProjectModulationRecord, ProjectRestoreOptions,
   ProjectRestoreResult, ProjectRuntimeOptions, ProjectRuntimeResources, ProjectRuntimeSnapshot,
+  ProjectMappingRecord,
 } from './project-types';
 import {isProjectModuleUnavailable} from './project-types';
 
@@ -188,6 +189,12 @@ export class ModuleProjectRuntime {
   updateLayout(layout: ProjectLayout): void {
     const graph = this.#requireEditable();
     graph.project = parseModuleProject({...graph.project, layout});
+    this.#changed();
+  }
+  /** Replace the control mappings (DEC-076); mappings are data and rebuild nothing. */
+  updateMappings(mappings: readonly ProjectMappingRecord[]): void {
+    const graph = this.#requireEditable();
+    graph.project = parseModuleProject({...graph.project, mappings});
     this.#changed();
   }
   updatePresentation(options: {modules?: readonly {id: string; label?: string}[]; layout?: ProjectLayout}): void {

@@ -12,6 +12,7 @@ import {
 } from '../module/message';
 import type {ControlSignal} from '../module/param-audio';
 import type {ModuleHandle} from '../module/registry';
+import type {ModuleContext} from '../module/context';
 import {ProjectModuleUnavailableError} from '../module/project-types';
 import type {
   ProjectFactoryRequest, ProjectJson, ProjectJsonObject, ProjectModuleInstance, ProjectPluginFactory, ProjectPortDescriptor,
@@ -71,6 +72,12 @@ export interface ObjectContext {
   readonly active: boolean;
   /** Report a failure without stopping the patch. */
   fail(error: unknown): void;
+  /**
+   * The module context the object lives in, borrowed: its registry lists the
+   * other modules of the same component, and its capabilities carry what an
+   * enclosing component lends (DEC-076).
+   */
+  readonly scope: ModuleContext;
 }
 
 export interface ObjectBehavior {
@@ -175,6 +182,7 @@ export function objectPlugin(definition: ObjectDefinition, environment: ObjectEn
         changed: () => { for (const listener of [...listeners]) guard(listener); },
         get active() { return active; },
         fail,
+        scope: context,
       };
       const behavior = definition.create(objectContext);
       holder.behavior = behavior;

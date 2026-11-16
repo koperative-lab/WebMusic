@@ -608,7 +608,15 @@ duplicate IDs and invalid references reject. Contexts require exactly one root
 and no parent cycles. Managed audio routes reject cycles and multiple replacement
 claims on one output. Bounded input limits include 10,000 array items, depth 32,
 50,000 visited values and 2 MiB text/string accounting; large sample payloads
-belong in assets.
+belong in assets. Under DEC-076 the layout may also carry `presentation`
+positions, `comments` (`id`, `contextId`, `text`, `x`, `y`) and `groups` (at
+least two modules each, a module in at most one), and the project a `mappings`
+list from a `cc`, `pitchbend`, `program` or `key` source to a parameter
+endpoint with an optional `min`/`max`; `updateLayout` and `updateMappings`
+change them without a rebuild. `PresetBank` stores, recalls, `between`s and
+`interpolate`s preset values; `captureParameters`/`applyParameters` read and
+write parameters as `moduleId.parameterId`. `ControlMappings` applies
+`ControlEvent`s to `MappableParameter`s and `learn`s new mappings.
 
 | `ModuleProject` field | Contract |
 | --- | --- |
@@ -1550,6 +1558,10 @@ objectInterfaceOf(runtime.getModule('tick')); // undefined: metro shows no contr
 | | `menu`, `tab` | items | index chooses and outputs, bang, `set` → index, item |
 | | `multislider` | count (8), min, max | list sets and outputs, bang, `set` → list |
 | | `matrix` | columns (4), rows (4) | column row value, `clear`, bang, `set` → column row value |
+| Organize | `component` | config `inlets`, `outlets` (channel kinds) | owns a child context; one port per channel (DEC-076) |
+| | `inlet`, `outlet`, `inlet~`, `outlet~` | channel index | messages or audio crossing the enclosing component's boundary |
+| | `preset` | slots (16) | slot recalls, `store n`, `clear n`, `interp a b f`, `weights …` → slot |
+| | `nodes` | nodes (4) | `cursor x y`, `node i x y` → one weight per node |
 
 `set` changes an interface object's value without output, as in Max.
 `sig` and `ramp` drive a `ConstantSourceNode` with `setValueAtTime` and

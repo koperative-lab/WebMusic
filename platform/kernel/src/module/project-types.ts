@@ -73,7 +73,41 @@ export interface ProjectModuleLayout {
   readonly y: number;
   readonly collapsed?: boolean;
 }
-export interface ProjectLayout { readonly modules: readonly ProjectModuleLayout[] }
+/** A text note on the canvas of one context (DEC-076). */
+export interface ProjectComment {
+  readonly id: string;
+  readonly contextId: string;
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+}
+/** Modules selected and moved together. */
+export interface ProjectGroup { readonly id: string; readonly moduleIds: readonly string[] }
+export interface ProjectLayout {
+  readonly modules: readonly ProjectModuleLayout[];
+  /**
+   * The presentation view (DEC-076): the modules it shows and where. A module
+   * without an entry is absent from presentation.
+   */
+  readonly presentation?: readonly ProjectModuleLayout[];
+  readonly comments?: readonly ProjectComment[];
+  readonly groups?: readonly ProjectGroup[];
+}
+/** What drives a mapped parameter: a MIDI controller, pitch bend, program change or a computer key. */
+export type ProjectMappingSource =
+  | {readonly kind: 'cc'; readonly controller: number; readonly channel?: number}
+  | {readonly kind: 'pitchbend'; readonly channel?: number}
+  | {readonly kind: 'program'; readonly channel?: number}
+  | {readonly kind: 'key'; readonly key: string};
+/** One mapping from a control source to a parameter (DEC-076). */
+export interface ProjectMappingRecord {
+  readonly id: string;
+  readonly source: ProjectMappingSource;
+  readonly target: ProjectParamEndpoint;
+  /** Target range the source's 0–1 maps onto; defaults to the parameter's display range. */
+  readonly min?: number;
+  readonly max?: number;
+}
 export interface ProjectSessionState {
   /** Unwrapped Session seconds, preserving once-only automation and LFO phase across loop passes. */
   readonly positionSeconds: number;
@@ -94,6 +128,8 @@ export interface ModuleProject {
   readonly automation: readonly ProjectAutomationRecord[];
   readonly session: ProjectSessionState;
   readonly layout: ProjectLayout;
+  /** Control mappings (DEC-076); absent means none. */
+  readonly mappings?: readonly ProjectMappingRecord[];
 }
 
 export interface ProjectPortDescriptor {

@@ -115,6 +115,13 @@ notes on disposal; device timing stays external to any Session.
 `recordNoteOutput(recorder, notes)` captures a note output into a
 `ScoreRecorderSession` take and returns a lease that stops capturing.
 
+`new MidiControlSource(input, {id?, channel?})` (DEC-076) turns control change,
+pitch bend and program change into Kernel `ControlEvent`s for listeners added
+with `onControl(listener)` — for example `ControlMappings.handle` — and into
+messages on its `controls` message port: `cc controller value channel`, `bend
+value channel` (−8192…8191) and `program number channel`. `dispose()` restores
+the input's previous handler.
+
 ```ts
 import {MidiNoteSource, type MidiInputLike, type ScorePlayerModule} from '@webmusic/score/play/headless';
 

@@ -2,7 +2,7 @@
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-  formatControlNumber, mountButton, mountDial, mountMatrix, mountMenu, mountMessage, mountMultislider, mountNumber,
+  formatControlNumber, mountButton, mountMappingOverlay, mountNodes, mountPresetGrid, mountDial, mountMatrix, mountMenu, mountMessage, mountMultislider, mountNumber,
   mountSlider, mountTabs, mountToggle,
 } from '../src/controls';
 
@@ -141,7 +141,7 @@ describe('single-value controls', () => {
 
   it('multislider sets a bar from the keyboard and reports its values', () => {
     const state = store({values: [0, 5, 10], min: 0, max: 10});
-    const handle = mountMultislider(host(), {snapshot: () => state.get(), setValues: values => state.set({...state.get(), values}), subscribe: state.subscribe});
+    const handle = mountMultislider(host(), {snapshot: () => state.get(), setValues: values => state.set({...state.get(), values: [...values]}), subscribe: state.subscribe});
     const bars = [...handle.element.querySelectorAll<HTMLElement>('[role="slider"]')];
     expect(bars).toHaveLength(3);
     key(bars[0]!, 'ArrowUp');
@@ -174,5 +174,50 @@ describe('single-value controls', () => {
     const bare = host();
     mountButton(bare, {snapshot: () => ({}), press: () => {}}, {stylesheet: false});
     expect(bare.querySelector('style')).toBeNull();
+  });
+
+  it('preset grid recalls stored slots, stores with Shift and clears with Alt', () => {
+    const calls: string[] = [];
+    const handle = mountPresetGrid(host(), {snapshot: () => ({count: 4, stored: [2], current: 2}),
+      recall: slot => calls.push(`recall ${slot}`), store: slot => calls.push(`store ${slot}`), clear: slot => calls.push(`clear ${slot}`)});
+    const cells = [...handle.element.querySelectorAll('button')];
+    expect(cells.map(cell => cell.dataset.stored)).toEqual(['false', 'true', 'false', 'false']);
+    expect(cells[1]!.getAttribute('aria-pressed')).toBe('true');
+    cells[1]!.click();
+    cells[0]!.click();
+    cells[1]!.dispatchEvent(new MouseEvent('click', {shiftKey: true, bubbles: true}));
+    cells[1]!.dispatchEvent(new MouseEvent('click', {altKey: true, bubbles: true}));
+    key(cells[2]!, 'Enter', {shiftKey: true});
+    expect(calls).toEqual(['recall 2', 'store 1', 'store 2', 'clear 2', 'store 3']);
+  });
+
+  it('nodes moves the cursor from the keyboard and shows each weight', () => {
+    const state = store({nodes: [{x: 0.25, y: 0.5, radius: 0.5}, {x: 0.75, y: 0.5, radius: 0.5}], cursor: {x: 0.5, y: 0.5}, weights: [0.5, 0.5]});
+    const handle = mountNodes(host(), {snapshot: () => state.get(), subscribe: state.subscribe,
+      setCursor: (x, y) => state.set({...state.get(), cursor: {x, y}, weights: [1 - x, x]})});
+    const pad = handle.element.querySelector<HTMLElement>('[role="slider"]')!;
+    key(pad, 'ArrowLeft', {shiftKey: true});
+    expect(state.get().cursor.x).toBeCloseTo(0.4);
+    expect(pad.getAttribute('aria-valuetext')).toMatch(/node 1 60%, node 2 40%/);
+    expect(handle.element.querySelectorAll('circle')).toHaveLength(2);
+  });
+
+  it('mapping overlay outlines targets only while active and learns or unmaps them', () => {
+    const window = host();
+    const target = document.createElement('button');
+    window.append(target);
+    const state = store({active: false, targets: [{id: 'f', label: 'Cutoff', element: target, mapped: 'CC 74'}], learning: undefined as string | undefined});
+    const calls: string[] = [];
+    const handle = mountMappingOverlay(window, {snapshot: () => state.get(), subscribe: state.subscribe,
+      learn: id => { calls.push(`learn ${id}`); state.set({...state.get(), learning: id}); }, unmap: id => calls.push(`unmap ${id}`)});
+    expect(handle.element.hidden).toBe(true);
+    state.set({...state.get(), active: true});
+    const outline = handle.element.querySelector<HTMLButtonElement>('[data-target="f"]')!;
+    expect(outline.getAttribute('aria-label')).toBe('Cutoff, mapped to CC 74');
+    outline.click();
+    const learning = handle.element.querySelector<HTMLButtonElement>('[data-target="f"]')!;
+    expect(learning.getAttribute('aria-pressed')).toBe('true');
+    key(learning, 'Delete');
+    expect(calls).toEqual(['learn f', 'unmap f']);
   });
 });

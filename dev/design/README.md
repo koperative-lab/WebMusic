@@ -20,6 +20,7 @@ its original phase sequence and alternatives.
 | [EDIT-COMPONENTS.md](EDIT-COMPONENTS.md) | Document ownership, commands/history, editable Views, playback revision application and asset-backed audio editing |
 | [PLAYER-BINDING.md](PLAYER-BINDING.md) | Borrowing Play data, state and time, including ownership, standalone use and open binding choices |
 | [MODULAR-COMPOSITION.md](MODULAR-COMPOSITION.md) | Accepted modular redesign: capability contexts, typed ports, route ownership, shared effects/parameters and Session composition; the only composition model under DEC-068, with delivery recorded in STATUS |
+| [ORGANIZATION.md](ORGANIZATION.md) | Nested components with inlets and outlets, presentation, comments and groups, presets and interpolation, and control mappings |
 | [MESSAGE-OBJECTS.md](MESSAGE-OBJECTS.md) | Messages as a Kernel port family, the object library as project plugins and the UI Kit's single-value controls |
 | [PROCESSOR-MODULES.md](PROCESSOR-MODULES.md) | Authored DSP: shared processor definitions, per-context worklet preparation, the audio-thread kit and the step-by-step development sequence |
 | [ANALYZE-COMPONENTS.md](ANALYZE-COMPONENTS.md) | Score's live analysis roles, sibling composition and Headless report boundary |

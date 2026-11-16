@@ -100,6 +100,22 @@ export const controlsStyle = String.raw`
 :where(.wui-control__card-head button svg) { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 :where(.wui-control__choices) { display: grid; grid-template-columns: 1fr; }
 :where(.wui-control__choices .wui-control__cell) { justify-content: flex-start; border-width: 0 0 1px; }
+:where(.wui-control--preset) { display: inline-grid; grid-template-columns: repeat(8, auto); }
+:where(.wui-control--preset .wui-control__cell) { width: ${SIZE}; padding: 0; margin: -1px 0 0 -1px; color: ${MUTED}; font-size: .625rem; }
+:where(.wui-control--preset .wui-control__cell[data-stored="true"]) { color: ${INK}; box-shadow: inset 0 -3px 0 ${INK}; }
+:where(.wui-control--preset .wui-control__cell[aria-pressed="true"]) { color: ${ON_INK}; box-shadow: none; }
+:where(.wui-control--nodes) { width: 100%; }
+:where(.wui-control__pad) { position: relative; width: 100%; min-width: 8rem; aspect-ratio: 1; border: 1px solid ${LINE}; background: ${SURFACE}; touch-action: none; cursor: crosshair; }
+:where(.wui-control__pad svg) { display: block; width: 100%; height: 100%; overflow: hidden; }
+:where(.wui-control__pad circle) { fill: ${INK}; stroke: ${INK}; stroke-width: .5; vector-effect: non-scaling-stroke; }
+:where(.wui-control__cursor line) { stroke: ${INK}; stroke-width: 1; vector-effect: non-scaling-stroke; }
+:where(.wui-control--mapping) { position: absolute; inset: 0; z-index: 15; display: block; pointer-events: none; }
+:where(.wui-control__target) {
+  position: absolute; min-width: 0; padding: 0 .25rem; border: 1px dashed ${INK}; background: transparent; color: ${INK};
+  font-size: .625rem; align-items: flex-start; justify-content: flex-end; pointer-events: auto;
+}
+:where(.wui-control__target[data-mapped="true"]) { border-style: solid; }
+:where(.wui-control__target[aria-pressed="true"]) { border-width: 2px; }
 ${faderStyle}
 ${knobStyle}
 `;
@@ -696,6 +712,229 @@ export function mountMatrix(host: HTMLElement | ShadowRoot, binding: MatrixBindi
         button.disabled = state.disabled === true;
         button.tabIndex = index === focus ? 0 : -1;
       });
+    };
+    return {paint};
+  });
+}
+
+// --- preset grid -----------------------------------------------------------------
+
+export interface PresetGridState { count: number; stored: readonly number[]; current: number; disabled?: boolean }
+export interface PresetGridBinding extends Subscribable {
+  snapshot(): PresetGridState;
+  /** Recall a stored slot (1-based). */
+  recall(slot: number): unknown;
+  /** Store the current values in a slot. */
+  store(slot: number): unknown;
+  /** Optional: empty a slot. */
+  clear?(slot: number): unknown;
+}
+
+/**
+ * A grid of preset slots. Click recalls a stored slot; Shift-click (or
+ * Shift+Enter) stores into any slot; Alt-click (or Delete) clears one. A
+ * stored slot shows a filled mark; the current one is inverted.
+ */
+export function mountPresetGrid(host: HTMLElement | ShadowRoot, binding: PresetGridBinding, options: ControlOptions = {}): ControlHandle {
+  return mountControl('preset', host, binding, options, (root, report) => {
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-label', options.label ?? 'Presets');
+    let cells: HTMLButtonElement[] = [];
+    let focus = 0;
+    const act = (slot: number, event: {shiftKey: boolean; altKey: boolean}) => {
+      if (event.altKey) { if (binding.clear) command(report, () => binding.clear!(slot)); return; }
+      if (event.shiftKey || !binding.snapshot().stored.includes(slot)) command(report, () => binding.store(slot));
+      else command(report, () => binding.recall(slot));
+    };
+    const paint = () => {
+      const state = binding.snapshot();
+      const count = Math.max(1, Math.min(64, Math.trunc(state.count)));
+      if (cells.length !== count) {
+        cells = Array.from({length: count}, (_, index) => {
+          const slot = index + 1;
+          const button = cell(root.ownerDocument, `Preset ${slot}`);
+          button.textContent = String(slot);
+          button.addEventListener('click', event => act(slot, event));
+          button.addEventListener('focus', () => { focus = index; });
+          button.addEventListener('keydown', event => {
+            if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); act(slot, {shiftKey: false, altKey: true}); return; }
+            if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); act(slot, {shiftKey: true, altKey: false}); return; }
+            const move = {ArrowRight: 1, ArrowLeft: -1, ArrowDown: 8, ArrowUp: -8}[event.key];
+            if (move !== undefined) { event.preventDefault(); cells[Math.max(0, Math.min(cells.length - 1, index + move))]?.focus(); }
+          });
+          return button;
+        });
+        root.replaceChildren(...cells);
+      }
+      cells.forEach((button, index) => {
+        const slot = index + 1;
+        const stored = state.stored.includes(slot);
+        button.dataset.stored = String(stored);
+        button.setAttribute('aria-pressed', String(state.current === slot));
+        button.setAttribute('aria-label', `Preset ${slot}${stored ? ', stored' : ', empty'}`);
+        button.disabled = state.disabled === true;
+        button.tabIndex = index === focus ? 0 : -1;
+      });
+    };
+    return {paint};
+  });
+}
+
+// --- nodes (interpolation pad) ---------------------------------------------------
+
+export interface NodesState {
+  /** Node centres and reach on the unit square. */
+  nodes: readonly {x: number; y: number; radius: number}[];
+  cursor: {x: number; y: number};
+  /** Each node's current weight, for the readout. */
+  weights?: readonly number[];
+  disabled?: boolean;
+}
+export interface NodesBinding extends Subscribable {
+  snapshot(): NodesState;
+  setCursor(x: number, y: number): unknown;
+  /** Optional: move a node. Without it nodes stay put. */
+  moveNode?(index: number, x: number, y: number): unknown;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * An interpolation pad: circles for nodes and a crosshair cursor. Drag the
+ * cursor (or use the arrow keys) to blend; with `moveNode`, Shift-drag a node
+ * to move it. Weights are read back from the binding.
+ */
+export function mountNodes(host: HTMLElement | ShadowRoot, binding: NodesBinding, options: ControlOptions = {}): ControlHandle {
+  return mountControl('nodes', host, binding, options, (root, report) => {
+    const document = root.ownerDocument;
+    const pad = document.createElement('div');
+    pad.className = 'wui-control__pad';
+    pad.tabIndex = 0;
+    pad.setAttribute('role', 'slider');
+    pad.setAttribute('aria-label', options.label ?? 'Interpolation');
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('aria-hidden', 'true');
+    const nodeLayer = document.createElementNS(SVG_NS, 'g');
+    const cursorLayer = document.createElementNS(SVG_NS, 'g');
+    const horizontal = document.createElementNS(SVG_NS, 'line'), vertical = document.createElementNS(SVG_NS, 'line');
+    cursorLayer.append(horizontal, vertical);
+    cursorLayer.setAttribute('class', 'wui-control__cursor');
+    svg.append(nodeLayer, cursorLayer);
+    pad.append(svg);
+    root.append(pad);
+    let circles: SVGCircleElement[] = [];
+    let drag: {pointerId: number; node?: number} | undefined;
+    const point = (event: PointerEvent) => {
+      const rect = pad.getBoundingClientRect();
+      return {x: Math.min(1, Math.max(0, (event.clientX - rect.left) / (rect.width || 1))), y: Math.min(1, Math.max(0, (event.clientY - rect.top) / (rect.height || 1)))};
+    };
+    pad.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || binding.snapshot().disabled) return;
+      const at = point(event);
+      const nodes = binding.snapshot().nodes;
+      const hit = event.shiftKey && binding.moveNode ? nodes.findIndex(node => Math.hypot(node.x - at.x, node.y - at.y) < 0.06) : -1;
+      drag = {pointerId: event.pointerId, ...(hit >= 0 ? {node: hit} : {})};
+      pad.setPointerCapture?.(event.pointerId);
+      if (hit < 0) command(report, () => binding.setCursor(at.x, at.y));
+    });
+    pad.addEventListener('pointermove', event => {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const at = point(event);
+      if (drag.node !== undefined) command(report, () => binding.moveNode!(drag!.node!, at.x, at.y));
+      else command(report, () => binding.setCursor(at.x, at.y));
+    });
+    pad.addEventListener('pointerup', () => { drag = undefined; });
+    pad.addEventListener('pointercancel', () => { drag = undefined; });
+    pad.addEventListener('keydown', event => {
+      const step = event.shiftKey ? 0.1 : 0.02;
+      const move = {ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]}[event.key];
+      if (!move) return;
+      event.preventDefault();
+      const {cursor} = binding.snapshot();
+      command(report, () => binding.setCursor(Math.min(1, Math.max(0, cursor.x + move[0]!)), Math.min(1, Math.max(0, cursor.y + move[1]!))));
+    });
+    const paint = () => {
+      const state = binding.snapshot();
+      if (circles.length !== state.nodes.length) {
+        circles = state.nodes.map(() => document.createElementNS(SVG_NS, 'circle'));
+        nodeLayer.replaceChildren(...circles);
+      }
+      state.nodes.forEach((node, index) => {
+        const circle = circles[index]!;
+        circle.setAttribute('cx', String(node.x * 100));
+        circle.setAttribute('cy', String(node.y * 100));
+        circle.setAttribute('r', String(node.radius * 100));
+        circle.style.fillOpacity = String(0.08 + 0.5 * (state.weights?.[index] ?? 0));
+      });
+      const x = state.cursor.x * 100, y = state.cursor.y * 100;
+      horizontal.setAttribute('x1', '0'); horizontal.setAttribute('x2', '100'); horizontal.setAttribute('y1', String(y)); horizontal.setAttribute('y2', String(y));
+      vertical.setAttribute('y1', '0'); vertical.setAttribute('y2', '100'); vertical.setAttribute('x1', String(x)); vertical.setAttribute('x2', String(x));
+      const weights = (state.weights ?? []).map((weight, index) => `node ${index + 1} ${Math.round(weight * 100)}%`).join(', ');
+      pad.setAttribute('aria-valuetext', `x ${Math.round(state.cursor.x * 100)}%, y ${Math.round(state.cursor.y * 100)}%${weights ? `; ${weights}` : ''}`);
+      pad.setAttribute('aria-disabled', String(state.disabled === true));
+    };
+    return {paint};
+  });
+}
+
+// --- mapping overlay ----------------------------------------------------------------
+
+export interface MappingTarget {
+  /** Stable identity of the mappable control. */
+  id: string;
+  label: string;
+  /** The element the target outlines; its box is read relative to the host. */
+  element: Element;
+  /** The source mapped to it, as text (for example `CC 74`), if any. */
+  mapped?: string;
+}
+export interface MappingOverlayState { active: boolean; targets: readonly MappingTarget[]; learning?: string }
+export interface MappingOverlayBinding extends Subscribable {
+  snapshot(): MappingOverlayState;
+  /** Wait for the next control to map to this target. */
+  learn(id: string): unknown;
+  /** Remove this target's mapping. */
+  unmap(id: string): unknown;
+}
+
+/**
+ * Mapping mode: while active, an outline over each mappable control; click
+ * one (or press Enter on it) to learn its control, Delete to remove its
+ * mapping. A mapped target shows its source; the learning one is inverted.
+ * The overlay covers `host`, which must be positioned; it follows layout on
+ * `update()`.
+ */
+export function mountMappingOverlay(host: HTMLElement, binding: MappingOverlayBinding, options: ControlOptions = {}): ControlHandle {
+  return mountControl('mapping', host, binding, options, (root, report) => {
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-label', options.label ?? 'Mappings');
+    const paint = () => {
+      const state = binding.snapshot();
+      root.hidden = !state.active;
+      if (!state.active) { root.replaceChildren(); return; }
+      const origin = host.getBoundingClientRect();
+      const focused = root.ownerDocument.activeElement instanceof HTMLElement ? root.ownerDocument.activeElement.dataset.target : undefined;
+      root.replaceChildren(...state.targets.map(target => {
+        const rect = target.element.getBoundingClientRect();
+        const outline = cell(root.ownerDocument, `${target.label}${target.mapped ? `, mapped to ${target.mapped}` : ', not mapped'}`);
+        outline.className = 'wui-control__cell wui-control__target';
+        outline.dataset.target = target.id;
+        outline.dataset.mapped = String(!!target.mapped);
+        outline.setAttribute('aria-pressed', String(state.learning === target.id));
+        outline.style.left = `${rect.left - origin.left + host.scrollLeft}px`;
+        outline.style.top = `${rect.top - origin.top + host.scrollTop}px`;
+        outline.style.width = `${Math.max(16, rect.width)}px`;
+        outline.style.height = `${Math.max(16, rect.height)}px`;
+        outline.textContent = state.learning === target.id ? '…' : target.mapped ?? '';
+        outline.addEventListener('click', () => command(report, () => binding.learn(target.id)));
+        outline.addEventListener('keydown', event => {
+          if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); command(report, () => binding.unmap(target.id)); }
+        });
+        return outline;
+      }));
+      if (focused) root.querySelector<HTMLElement>(`[data-target="${CSS.escape(focused)}"]`)?.focus();
     };
     return {paint};
   });

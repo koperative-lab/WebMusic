@@ -11,6 +11,8 @@ export interface ProjectEditorPort {
 }
 export interface ProjectEditorModule {
   readonly id: string;
+  /** The context the module belongs to; nested components have their own (DEC-076). */
+  readonly contextId?: string;
   readonly label: string;
   readonly ports: readonly ProjectEditorPort[];
   readonly position?: {readonly x: number; readonly y: number};
@@ -97,7 +99,7 @@ export function createProjectEditorBinding(runtime: ModuleProjectRuntime, option
         if (available.has(parameterId) || entry.status === 'unresolved') ports.push({id, parameterId, label, direction: 'input', kind: 'control'});
       }
       const position = project?.layout.modules.find(layout => layout.moduleId === entry.record.id);
-      return {id: entry.record.id, label: entry.record.label ?? entry.record.id, ports, position, status: entry.status, diagnostic: entry.diagnostic};
+      return {id: entry.record.id, contextId: entry.record.contextId, label: entry.record.label ?? entry.record.id, ports, position, status: entry.status, diagnostic: entry.diagnostic};
     });
     const diagnostic = (kind: 'connection' | 'modulation', id: string) => state.unresolved.find(item => item.kind === kind && item.id === id)?.reason;
     const connections: ProjectEditorConnection[] = (project?.connections ?? []).map(record => ({

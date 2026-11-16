@@ -5,6 +5,12 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Nest components and organize them (DEC-076): a `component` object owns a
+  child context reached through `inlet`, `outlet`, `inlet~` and `outlet~`;
+  project layouts gain presentation positions, comments and groups, and
+  projects control mappings. Kernel adds `PresetBank`, `ControlMappings` and
+  the `preset` and `nodes` objects, Score `MidiControlSource`, and UI Kit
+  `mountPresetGrid`, `mountNodes` and `mountMappingOverlay`.
 - Add messages, objects and controls (DEC-075). Kernel gains a sixth port
   family, `message`: typed atoms with an optional logical time, delivered
   synchronously and depth first, with message clocks for timed events and

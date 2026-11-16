@@ -6,6 +6,8 @@ export * from './module/port';
 export * from './module/audio-port';
 export * from './module/note-port';
 export * from './module/message';
+export * from './module/preset';
+export * from './module/mapping';
 export * from './module/source-port';
 export * from './module/control-port';
 export * from './module/transport-port';

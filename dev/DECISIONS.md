@@ -3360,6 +3360,53 @@ musical time values, subpatches and presets remain later work.
 every object and every control; browser evidence for timing and controls; the
 owner's manual checks.
 
+## DEC-076 — Components nest; layout, presets and mappings are project data
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P1 gaps of the Max comparison (reuse, organization and parameter state).
+Delivery: STATUS ORG-01.
+
+**Problem:** a component could not contain a component, so a graph could not
+be organized or reused in parts. Its layout had one set of positions and no
+comments or groups, values could not be stored and recalled, and there was no
+way to drive a parameter from a MIDI controller or a key without patching.
+
+**Decision:** nesting uses the project's existing contexts. A `component`
+object owns a child context whose modules are its contents and lends that
+context a boundary: one channel per inlet and outlet. The `inlet`, `outlet`,
+`inlet~` and `outlet~` objects inside connect to it; nothing is flattened or
+copied. The shell's config lists its channels; editors keep it in step with
+the edge objects. Project modules may observe their context's capabilities
+through a new object-context `scope`. The project layout gains optional
+`presentation` positions, `comments` and `groups`, and the project an optional
+`mappings` list from MIDI controllers, pitch bend, program change or keys to
+parameter endpoints; the runtime updates both without rebuilding. Kernel adds
+`PresetBank` with capture, recall and interpolation over parameter surfaces,
+`ControlMappings` with learning, and the `preset` and `nodes` objects. Score adds
+`MidiControlSource`. UI Kit `/controls` adds a preset grid, an interpolation pad
+and a mapping overlay. [Organization](design/ORGANIZATION.md) owns the contract.
+
+**Alternatives considered:** flattening nested components into prefixed IDs
+before restoring, which makes the runtime's document differ from the edited
+one and loses the nested record on export; a separate nested runtime per
+component, which would give each its own Session and output gate; storing
+presets outside the project, which loses them with the file; mapping through
+patched objects only, which needs a cord for every controller.
+
+**Consequences:** the project schema gains optional fields that version-1
+readers without them reject, so documents using them need this Kernel. A
+component's inner modules are ordinary records of the same project. Presets
+cover their own component (the modules of the preset's context). Transport-
+locked time, subpatch abstractions loaded from files, and preset morphing over
+time remain later work.
+
+**Owner:** [Organization](design/ORGANIZATION.md).
+
+**Verification:** unit tests for nesting through the runtime, boundaries,
+presets, interpolation, mappings and the schema; tests for the new controls;
+Studio tests for encapsulation, clipboard, arrangement and views; browser
+evidence and the owner's manual checks.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/ui/controls'
-description: 'Ten single-value controls — button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix — over structural bindings.'
+description: 'Single-value controls — button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix — plus a preset grid, an interpolation pad and a mapping overlay, over structural bindings.'
 sidebar:
   label: 'controls'
   order: 7
@@ -11,7 +11,8 @@ import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro'
 
 `@webmusic/ui/controls` draws one value per control: a bang button, an on/off
 toggle, a number box, a slider, a dial, a clickable message box, a menu, tabs,
-a multislider and a routing matrix. Each mounts against a structural binding —
+a multislider and a routing matrix, with a preset grid, an interpolation pad
+(nodes) and a mapping-mode overlay. Each mounts against a structural binding —
 a `snapshot()`, one command and an optional `subscribe` — and imports no
 domain or Kernel type, so the same control drives a Kernel object's interface
 (`@webmusic/kernel/objects`), an application store or a framework state.
@@ -61,6 +62,9 @@ showing the binding's value.
 | Tabs | Click a cell | Arrow keys choose and move |
 | Multislider | Draw across the bars | Arrow Left/Right move between bars; Up/Down and Page Up/Down change one |
 | Matrix | Click a cell to switch it | Arrow keys move between cells; Enter or Space switches |
+| Preset grid | Click recalls a stored slot or stores into an empty one; Shift-click stores; Alt-click clears | Arrow keys move; Enter recalls; Shift+Enter stores; Delete clears |
+| Nodes | Drag the cursor; with `moveNode`, Shift-drag a node | Arrow keys move the cursor (Shift: farther) |
+| Mapping overlay | Click a target to learn its control | Enter learns; Delete removes the mapping |
 
 A button or message box flashes for `flashMs` after a press, and
 `handle.flash()` flashes it when its value arrives from elsewhere, as when a
@@ -87,6 +91,14 @@ Importing the entry needs no DOM.
 | `mountMenu`, `mountTabs` | `ChoiceState`: `items`, `index`, `disabled?` | `select(index: number)` |
 | `mountMultislider` | `MultisliderState`: `values`, `min`, `max`, `float?`, `disabled?` | `setValues(values: readonly number[])` |
 | `mountMatrix` | `MatrixState`: `columns`, `rows`, `cells` (row-major, 1 is on), `disabled?` | `setCell(column, row, on)` |
+| `mountPresetGrid` | `PresetGridState`: `count`, `stored` (slot numbers), `current`, `disabled?` | `recall(slot)`, `store(slot)`, optional `clear(slot)` |
+| `mountNodes` | `NodesState`: `nodes` (`x`, `y`, `radius` on the unit square), `cursor`, `weights?`, `disabled?` | `setCursor(x, y)`, optional `moveNode(index, x, y)` |
+| `mountMappingOverlay` | `MappingOverlayState`: `active`, `targets` (`id`, `label`, `element`, `mapped?`), `learning?` | `learn(id)`, `unmap(id)` |
+
+`mountMappingOverlay(host, …)` takes an `HTMLElement` host that is positioned;
+it outlines each target's element relative to the host while `active`, dashed
+when unmapped, solid with its source text when mapped, inverted while learning.
+It draws nothing while inactive.
 
 Every binding may add `subscribe(notify)`, returning its unsubscribe function.
 Values without `float` are whole numbers: number boxes, sliders, dials and
