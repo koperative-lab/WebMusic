@@ -50,6 +50,12 @@ bpatcher) is an editor choice stored as `config.embed`.
 `layout.presentation` lists the modules the presentation view shows and where;
 `layout.comments` holds text notes per context; `layout.groups` lists modules
 selected and moved together (a module belongs to at most one group).
+A position in `layout.modules` or `layout.presentation` may carry `width` and
+`height` in canvas pixels: the size a user gave the box, which its element
+fills; without them the box takes its natural size
+([DEC-079](../DECISIONS.md#dec-079--a-layout-records-a-resized-boxs-size)).
+Grid snapping, keeping boxes apart and arranging them by their cords are
+editor behavior, not project data.
 `ModuleProjectRuntime.updateLayout` changes any of them without rebuilding.
 
 ## Presets and interpolation

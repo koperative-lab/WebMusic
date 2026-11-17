@@ -3518,6 +3518,44 @@ against a structural fake, and the component entry in jsdom; Studio tests for
 the library, templates and debugging helpers; browser evidence in Studio and
 the private runner's checks M1–M3, and the owner's manual checks.
 
+## DEC-079 — A layout records a resized box's size
+
+**Date / status:** 2026-11-17; accepted by the repository owner, who asked
+that Studio's objects can be resized, sit on a grid without overlapping, and
+be arranged by their connections.
+Delivery: STATUS ORG-01.
+
+**Problem:** a layout position held only `x`, `y` and `collapsed`, and the
+schema rejects any other field. A box resized in an editor therefore had
+nowhere to keep its size, and a component exported from that editor would
+show its views and controls at their default sizes.
+
+**Decision:** `ProjectModuleLayout` gains optional `width` and `height`, in
+canvas pixels from 1 to 100 000, in both `layout.modules` and
+`layout.presentation`. Absent means the box's natural size. The editor
+binding reports them as `ProjectEditorModule.size` when both are present and
+keeps them when a module moves. `mountComponent` gives a presentation item
+with a size that size and lets its element fill it. Grid snapping, the
+no-overlap rule and arrangement by connections are editor behavior and stay
+out of the project.
+
+**Alternatives considered:** keeping sizes in Studio's own storage, which
+loses them with the file and in export; a size object nested in the
+position, which would break the flat shape `collapsed` already uses; storing
+grid and arrangement settings in the project, which ties the document to one
+editor's interaction.
+
+**Consequences:** documents that use the fields need this Kernel; version-1
+readers without them reject such documents, as DEC-076 already notes for its
+fields. A view element inside a sized box must follow its box's size.
+
+**Owner:** [Organization](design/ORGANIZATION.md#layout).
+
+**Verification:** Kernel editor tests for the size, its validation and its
+survival across a move; a Bridge test that a sized presentation item keeps
+its size; Studio canvas tests for resizing, grid snapping, the no-overlap
+rule and arrangement; browser evidence and the owner's manual checks.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

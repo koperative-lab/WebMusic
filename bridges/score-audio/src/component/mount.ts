@@ -52,23 +52,24 @@ const STYLE = `
 .wmc__extent { pointer-events: none; }
 .wmc__stage::-webkit-scrollbar { display: none; }
 .wmc__item { position: absolute; min-width: 32px; }
+.wmc__item[data-sized] { overflow: hidden; }
 `;
 
 const BUFFER_PLUGIN = `${OBJECT_PLUGIN_PREFIX}buffer`;
 /** Room around the presentation, so a control's edge never touches the transport. */
 const GUTTER = 8;
-type Shown = {record: ProjectModuleRecord; x: number; y: number};
+type Shown = {record: ProjectModuleRecord; x: number; y: number; width: number | undefined; height: number | undefined};
 
 /** The modules the presentation shows: placed ones, or every visible one at its editing position. */
 function shownModules(project: ModuleProject, visible: (record: ProjectModuleRecord) => boolean): Shown[] {
   const byId = new Map(project.modules.map(record => [record.id, record]));
-  const placed = (project.layout.presentation ?? []).map(item => ({record: byId.get(item.moduleId), x: item.x, y: item.y}))
+  const placed = (project.layout.presentation ?? []).map(item => ({record: byId.get(item.moduleId), x: item.x, y: item.y, width: item.width, height: item.height}))
     .filter((item): item is Shown => item.record !== undefined && visible(item.record));
   if (placed.length) return placed;
   const positions = new Map(project.layout.modules.map(item => [item.moduleId, item]));
   // Copies of a poly's voices repeat the first voice; show none of them.
   return project.modules.filter(record => visible(record) && !record.id.includes('~v'))
-    .map(record => ({record, x: positions.get(record.id)?.x ?? 0, y: positions.get(record.id)?.y ?? 0}));
+    .map(record => { const at = positions.get(record.id); return {record, x: at?.x ?? 0, y: at?.y ?? 0, width: at?.width, height: at?.height}; });
 }
 
 const nameOf = (record: ProjectModuleRecord) => record.plugin.id.startsWith(OBJECT_PLUGIN_PREFIX) ? record.plugin.id.slice(OBJECT_PLUGIN_PREFIX.length) : '';
@@ -147,33 +148,36 @@ export function mountComponent(host: HTMLElement | ShadowRoot, input: unknown, o
     extent.style.height = `${height + GUTTER}px`;
     stage.style.height = `${Math.min(height + GUTTER, 640)}px`;
   };
-  for (const {record, x, y} of shown) {
+  for (const {record, x, y, width: sizedWidth, height: sizedHeight} of shown) {
     const cell = document.createElement('div');
     cell.className = 'wmc__item';
     cell.style.left = `${x - minX}px`;
     cell.style.top = `${y - minY}px`;
+    // A box resized in Studio keeps its size here; its element fills it.
+    const sized = sizedWidth !== undefined && sizedHeight !== undefined;
+    if (sized) { cell.style.width = `${sizedWidth}px`; cell.style.height = `${sizedHeight}px`; cell.dataset.sized = 'true'; }
     stage.append(cell);
     const kind = surfaceKindOf(record.plugin.id);
     if (kind) {
       const element = createViewElement(kind, record.config, document);
-      element.style.width = '320px';
+      element.style.width = sized ? '100%' : '320px';
+      if (sized) element.style.height = '100%';
       cell.append(element);
-      cells.push({cell, x: x - minX, y: y - minY, width: 320, height: 180});
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 320, height: sizedHeight ?? 180});
       releases.push(bindViewElement(element, kind, surfaces.slot(record.id), resume));
     } else if (isBuffer(record)) {
       const element = document.createElement('audio-clip-view');
-      element.setAttribute('height', '120');
-      element.style.width = '320px';
+      element.setAttribute('height', String(sized ? Math.round(sizedHeight) : 120));
+      element.style.width = sized ? '100%' : '320px';
       cell.append(element);
-      cells.push({cell, x: x - minX, y: y - minY, width: 320, height: 150});
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 320, height: sizedHeight ?? 150});
       const name = parseArgs(record.config)[0];
       if (name?.type === 'symbol') releases.push(bindBufferView(element, name.value, sharedBuffersFor(audio.prepare()), audio.prepare(), {editable: options.editableBuffers, onError: report}));
     } else {
       const label = record.label ?? nameOf(record);
       // A control fills a cell of the size Studio gives it.
-      cell.style.width = '160px';
-      cell.style.minHeight = '60px';
-      cells.push({cell, x: x - minX, y: y - minY, width: 160, height: 60});
+      if (!sized) { cell.style.width = '160px'; cell.style.minHeight = '60px'; }
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 160, height: sizedHeight ?? 60});
       controls.set(record.id, mountObjectControl(cell, nameOf(record), {label, cardHost: root, onError: report}));
     }
   }

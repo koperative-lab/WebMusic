@@ -16,6 +16,8 @@ export interface ProjectEditorModule {
   readonly label: string;
   readonly ports: readonly ProjectEditorPort[];
   readonly position?: {readonly x: number; readonly y: number};
+  /** The box's saved size in canvas pixels, when it was resized. */
+  readonly size?: {readonly width: number; readonly height: number};
   readonly status: 'ready' | 'unresolved';
   readonly diagnostic?: string;
 }
@@ -101,7 +103,8 @@ export function createProjectEditorBinding(runtime: ModuleProjectRuntime, option
         if (available.has(parameterId) || entry.status === 'unresolved') ports.push({id, parameterId, label, direction: 'input', kind: 'control'});
       }
       const position = project?.layout.modules.find(layout => layout.moduleId === entry.record.id);
-      return {id: entry.record.id, contextId: entry.record.contextId, label: entry.record.label ?? entry.record.id, ports, position, status: entry.status, diagnostic: entry.diagnostic};
+      const size = position?.width !== undefined && position.height !== undefined ? {width: position.width, height: position.height} : undefined;
+      return {id: entry.record.id, contextId: entry.record.contextId, label: entry.record.label ?? entry.record.id, ports, position, ...(size ? {size} : {}), status: entry.status, diagnostic: entry.diagnostic};
     });
     const diagnostic = (kind: 'connection' | 'modulation', id: string) => state.unresolved.find(item => item.kind === kind && item.id === id)?.reason;
     const connections: ProjectEditorConnection[] = (project?.connections ?? []).map(record => ({

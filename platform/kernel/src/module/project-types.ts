@@ -72,6 +72,9 @@ export interface ProjectModuleLayout {
   readonly x: number;
   readonly y: number;
   readonly collapsed?: boolean;
+  /** The box's width and height in canvas pixels, when it was resized; absent means its natural size. */
+  readonly width?: number;
+  readonly height?: number;
 }
 /** A text note on the canvas of one context (DEC-076). */
 export interface ProjectComment {

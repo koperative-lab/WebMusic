@@ -165,13 +165,15 @@ function positions(value: unknown, name: string): ProjectModuleLayout[] {
   const seen = new Set<string>();
   return list(value, name).map((entry, index) => {
     const path = `${name}[${index}]`, item = object(entry, path);
-    fields(item, ['moduleId', 'x', 'y', 'collapsed'], path);
+    fields(item, ['moduleId', 'x', 'y', 'collapsed', 'width', 'height'], path);
     const moduleId = text(item.moduleId, `${path}.moduleId`);
     if (seen.has(moduleId)) throw new TypeError(`Duplicate layout module ${moduleId}.`);
     seen.add(moduleId);
     if (item.collapsed !== undefined && typeof item.collapsed !== 'boolean') throw new TypeError(`${path}.collapsed must be boolean.`);
     return {moduleId, x: number(item.x, `${path}.x`, -1e7, 1e7), y: number(item.y, `${path}.y`, -1e7, 1e7),
-      ...(item.collapsed !== undefined ? {collapsed: item.collapsed as boolean} : {})};
+      ...(item.collapsed !== undefined ? {collapsed: item.collapsed as boolean} : {}),
+      ...(item.width !== undefined ? {width: number(item.width, `${path}.width`, 1, 1e5)} : {}),
+      ...(item.height !== undefined ? {height: number(item.height, `${path}.height`, 1, 1e5)} : {})};
   });
 }
 function session(value: unknown): ProjectSessionState {

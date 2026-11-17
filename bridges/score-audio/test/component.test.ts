@@ -85,6 +85,19 @@ describe('mountComponent', () => {
     expect(host.childElementCount).toBe(0);
   });
 
+  it('gives a resized box its saved size', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const input = {...project(), layout: {...project().layout, presentation: [{moduleId: 'size', x: 0, y: 0, width: 240, height: 96}]}};
+    const handle = mountComponent(host, input, {audio: new ModuleAudioEnvironment({context: new Context() as unknown as BaseAudioContext}), onError: () => {}});
+    handles.push(handle);
+    await handle.ready;
+    const item = host.querySelector('.wmc__item') as HTMLElement;
+    expect(item.style.width).toBe('240px');
+    expect(item.style.height).toBe('96px');
+    expect((host.querySelector('.wmc__extent') as HTMLElement).style.width).toBe(`${8 + 240 + 8}px`);
+  });
+
   it('defines an element that mounts while connected', async () => {
     const audio = new ModuleAudioEnvironment({context: new Context() as unknown as BaseAudioContext});
     const Element = defineComponentElement('arabesque-test', project(), {audio, onError: () => {}});
