@@ -44,15 +44,19 @@ export interface ComponentHandle {
 }
 
 const STYLE = `
-.wmc { display: flex; flex-direction: column; color: var(--wm-foreground, light-dark(#111, #eee)); background: var(--wm-background, light-dark(#fff, #111)); border: 1px solid var(--wm-border, light-dark(#111, #eee)); font: 12px/1.4 var(--wm-font-family, ui-monospace, monospace); }
+:host { display: block; max-width: 100%; }
+.wmc { box-sizing: border-box; display: flex; flex-direction: column; width: max-content; min-width: min(100%, 320px); max-width: 100%; color: var(--wm-foreground, light-dark(#111, #eee)); background: var(--wm-background, light-dark(#fff, #111)); border: 1px solid var(--wm-border, light-dark(#111, #eee)); font: 12px/1.4 var(--wm-font-family, ui-monospace, monospace); }
 .wmc__bar { display: flex; height: 32px; border-bottom: 1px solid var(--wm-border, light-dark(#111, #eee)); }
 .wmc__bar > * { flex: 1; min-width: 0; }
 .wmc__stage { position: relative; overflow: auto; scrollbar-width: none; }
+.wmc__extent { pointer-events: none; }
 .wmc__stage::-webkit-scrollbar { display: none; }
 .wmc__item { position: absolute; min-width: 32px; }
 `;
 
 const BUFFER_PLUGIN = `${OBJECT_PLUGIN_PREFIX}buffer`;
+/** Room around the presentation, so a control's edge never touches the transport. */
+const GUTTER = 8;
 type Shown = {record: ProjectModuleRecord; x: number; y: number};
 
 /** The modules the presentation shows: placed ones, or every visible one at its editing position. */
@@ -125,27 +129,43 @@ export function mountComponent(host: HTMLElement | ShadowRoot, input: unknown, o
   const isBuffer = (record: ProjectModuleRecord) => record.plugin.id === BUFFER_PLUGIN;
   const visible = (record: ProjectModuleRecord) => surfaceKindOf(record.plugin.id) !== undefined || CONTROL_OBJECTS.includes(nameOf(record)) || isBuffer(record);
   const shown = shownModules(project, visible);
-  const minX = Math.min(0, ...shown.map(item => item.x)), minY = Math.min(0, ...shown.map(item => item.y));
-  let width = 0, height = 0;
+  const minX = Math.min(0, ...shown.map(item => item.x)) - GUTTER, minY = Math.min(0, ...shown.map(item => item.y)) - GUTTER;
+  // The stage is as large as what it holds, up to its host's width and 640 px
+  // high, and scrolls beyond that. Sizes start from each element's nominal
+  // size and follow the rendered ones.
+  const extent = document.createElement('div');
+  extent.className = 'wmc__extent';
+  stage.append(extent);
+  const cells: {cell: HTMLElement; x: number; y: number; width: number; height: number}[] = [];
+  const fit = () => {
+    let width = 0, height = 0;
+    for (const item of cells) {
+      width = Math.max(width, item.x + (item.cell.offsetWidth || item.width));
+      height = Math.max(height, item.y + (item.cell.offsetHeight || item.height));
+    }
+    extent.style.width = `${width + GUTTER}px`;
+    extent.style.height = `${height + GUTTER}px`;
+    stage.style.height = `${Math.min(height + GUTTER, 640)}px`;
+  };
   for (const {record, x, y} of shown) {
     const cell = document.createElement('div');
     cell.className = 'wmc__item';
     cell.style.left = `${x - minX}px`;
     cell.style.top = `${y - minY}px`;
     stage.append(cell);
-    width = Math.max(width, x - minX + 240);
-    height = Math.max(height, y - minY + 200);
     const kind = surfaceKindOf(record.plugin.id);
     if (kind) {
       const element = createViewElement(kind, record.config, document);
       element.style.width = '320px';
       cell.append(element);
+      cells.push({cell, x: x - minX, y: y - minY, width: 320, height: 180});
       releases.push(bindViewElement(element, kind, surfaces.slot(record.id), resume));
     } else if (isBuffer(record)) {
       const element = document.createElement('audio-clip-view');
       element.setAttribute('height', '120');
       element.style.width = '320px';
       cell.append(element);
+      cells.push({cell, x: x - minX, y: y - minY, width: 320, height: 150});
       const name = parseArgs(record.config)[0];
       if (name?.type === 'symbol') releases.push(bindBufferView(element, name.value, sharedBuffersFor(audio.prepare()), audio.prepare(), {editable: options.editableBuffers, onError: report}));
     } else {
@@ -153,11 +173,13 @@ export function mountComponent(host: HTMLElement | ShadowRoot, input: unknown, o
       // A control fills a cell of the size Studio gives it.
       cell.style.width = '160px';
       cell.style.minHeight = '60px';
+      cells.push({cell, x: x - minX, y: y - minY, width: 160, height: 60});
       controls.set(record.id, mountObjectControl(cell, nameOf(record), {label, cardHost: root, onError: report}));
     }
   }
-  stage.style.height = `${Math.min(height, 640)}px`;
-  stage.style.minWidth = `${Math.min(width, 960)}px`;
+  fit();
+  const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : undefined;
+  for (const {cell} of cells) resized?.observe(cell);
 
   const refresh = () => {
     for (const [id, control] of controls) control.refresh(objectInterfaceOf(runtime.getModule(id)));
@@ -195,6 +217,7 @@ export function mountComponent(host: HTMLElement | ShadowRoot, input: unknown, o
       if (destroyed) return;
       destroyed = true;
       cancelAnimationFrame(frame);
+      resized?.disconnect();
       stopRuntime();
       watchSession?.();
       for (const control of controls.values()) control.destroy();

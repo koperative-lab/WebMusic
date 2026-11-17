@@ -76,6 +76,11 @@ describe('mountComponent', () => {
     slider.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true}));
     expect(printed).toHaveLength(1);
     expect(Number(printed[0])).toBeGreaterThan(0);
+    // The stage takes the size of what it holds, never a width wider than its host.
+    const stage = host.querySelector('.wmc__stage') as HTMLElement;
+    expect(stage.style.minWidth).toBe('');
+    expect((stage.querySelector('.wmc__extent') as HTMLElement).style.width).toBe(`${8 + 160 + 8}px`);
+    expect(items[0]!.getAttribute('style')).toContain('left: 8px; top: 8px');
     handle.destroy();
     expect(host.childElementCount).toBe(0);
   });
