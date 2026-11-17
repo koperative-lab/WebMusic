@@ -5,6 +5,32 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Watch, script, extend and export components (DEC-078). `ModuleProjectRuntime`
+  adds `observe` (each message and note before it crosses a cord) and
+  `probeSignal`; message clocks can `hold`, `resume` and `step`, and
+  `MessageDebugger` sets trace and break watchpoints. Editor cords carry
+  `recordId`. Kernel `/objects` adds `ScriptSandbox` and the `js` object, and
+  `/module` adds `wamPlugin` for Web Audio Modules 2.0. The Bridge gains
+  `@webmusic/bridge/component` (optional peer `@webmusic/ui`):
+  `createComponentPlugins`, the view objects `webmusic.surface.*`,
+  `mountObjectControl`, `resolveComponentAsset`, `mountComponent`,
+  `defineComponentElement` and the export generators `componentModuleSource`,
+  `componentPageSource` and `componentResources`.
+
+- Add musical time, devices, voices, buffers and channels to components
+  (DEC-077). Projects may carry a Session `tempo`; objects read bars, beats and
+  ticks through `MUSICAL_TIME`, and `metro` and `makenote` accept note values
+  such as `4n` and `8nt`; a note-value `metro` locks to the beat. Kernel adds `VoiceAllocator`,
+  `poly` and `voice`, `multichannelPlugin` with `mc.pack` and `mc.unpack`, an
+  OSC codec with `oscin` and `oscout`, `transport`, `makenote`, `gamepad`, `hid`
+  and, in `/processor-worklet`, `createSpectralFrame`, `createFFT` and
+  `hannWindow`. Score adds MPE pitch, pressure and sysex input, `MidiClockSource`,
+  `MidiClockSink`, `MidiMessageSink` and MIDI device objects (`createMidiPlugins`,
+  `MidiAccessSource`). Audio adds `SharedBuffers` with the `buffer`, `groove`,
+  `record` and `adc` objects (`createSamplerPlugins`) and
+  `renderAudioClipEditor`. Message text made of one unquoted word is now that
+  selector (`stop`), not `symbol stop`.
+
 - Nest components and organize them (DEC-076): a `component` object owns a
   child context reached through `inlet`, `outlet`, `inlet~` and `outlet~`;
   project layouts gain presentation positions, comments and groups, and

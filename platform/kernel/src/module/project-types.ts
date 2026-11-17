@@ -98,6 +98,7 @@ export type ProjectMappingSource =
   | {readonly kind: 'cc'; readonly controller: number; readonly channel?: number}
   | {readonly kind: 'pitchbend'; readonly channel?: number}
   | {readonly kind: 'program'; readonly channel?: number}
+  | {readonly kind: 'pressure'; readonly channel?: number}
   | {readonly kind: 'key'; readonly key: string};
 /** One mapping from a control source to a parameter (DEC-076). */
 export interface ProjectMappingRecord {
@@ -113,6 +114,8 @@ export interface ProjectSessionState {
   readonly positionSeconds: number;
   readonly rate: number;
   readonly loop?: Readonly<{startSeconds: number; endSeconds: number}> | null;
+  /** Tempo and meter of the Session's musical time (DEC-077); 120 bpm in 4/4 when absent. */
+  readonly tempo?: Readonly<{bpm: number; beatsPerBar: number; beatUnit: number}>;
 }
 /** Serializable project state. DSP objects, DOM, storage and undo history are deliberately absent. */
 export interface ModuleProject {

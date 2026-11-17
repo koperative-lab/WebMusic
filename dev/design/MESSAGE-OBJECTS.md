@@ -32,9 +32,9 @@ Atom    = int | float | symbol | dict | array
 |---|---|---|
 | bang | `bang` | none |
 | int / float | `int` / `float` | one number atom |
-| symbol | `symbol` | one symbol atom |
+| symbol | `symbol` | one symbol atom: `symbol foo`, or one quoted word |
 | list | `list` | two or more atoms, or one leading number |
-| anything else | the first word, for example `set` | the remaining atoms |
+| anything else | the first word, for example `set` or `stop` | the remaining atoms; none for a lone word |
 
 Ints and floats stay distinct, as in Max: `3` is an int and `3.` or `3.0` is
 a float, so `expr`, `/` and `counter` behave predictably. `dict` and `array`

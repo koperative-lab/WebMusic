@@ -74,8 +74,8 @@ export function atomsOf(value: Message): readonly Atom[] {
 
 /**
  * The message a list of atoms makes, as Max forms it: nothing is a bang, one
- * number is an int or float, one symbol is a symbol, a leading number makes a
- * list, and a leading symbol becomes the selector.
+ * number is an int or float, a leading number makes a list, and a leading
+ * symbol becomes the selector — alone, it is a message with no atoms.
  */
 export function messageFromAtoms(atoms: readonly Atom[], time?: number): Message {
   if (!atoms.length) return bang(time);
@@ -83,7 +83,8 @@ export function messageFromAtoms(atoms: readonly Atom[], time?: number): Message
   if (atoms.length === 1) {
     if (first.type === 'int') return message('int', atoms, time);
     if (first.type === 'float') return message('float', atoms, time);
-    if (first.type === 'symbol') return first.value === 'bang' ? bang(time) : message('symbol', atoms, time);
+    // A lone word is its own selector, as in Max: `stop` is the message stop, not `symbol stop`.
+    if (first.type === 'symbol') return first.value === 'bang' ? bang(time) : message(first.value, [], time);
     return message('list', atoms, time);
   }
   if (first.type === 'symbol') return message(first.value, rest, time);
@@ -120,6 +121,8 @@ export function parseMessage(text: string, time?: number): Message {
     else words.push(match[2]!);
   }
   const atoms = words.map((word, index) => quoted.has(index) ? symbolAtom(word) : parseAtom(word));
+  // One quoted word stays a symbol: `"two words"` is data, not a command.
+  if (atoms.length === 1 && quoted.has(0)) return message('symbol', atoms, time);
   return messageFromAtoms(atoms, time);
 }
 
@@ -272,6 +275,9 @@ export interface MessageClock {
 
 interface ScheduledEvent { time: number; order: number; callback: (time: number) => void; cancelled: boolean }
 
+/** How deep the message being delivered now is: 0 outside delivery, 1 for a first send. */
+export function currentMessageDepth(): number { return depth; }
+
 /** Shared queue logic for clocks: events run in time order, then scheduling order. */
 abstract class QueueClock implements MessageClock {
   readonly #events: ScheduledEvent[] = [];
@@ -289,17 +295,57 @@ abstract class QueueClock implements MessageClock {
     const event: ScheduledEvent = {time, order: this.#order++, callback, cancelled: false};
     let index = this.#events.length;
     while (index > 0 && (this.#events[index - 1]!.time > time)) index--;
+    // New events keep time order while held; resume shifts them with the rest.
     this.#events.splice(index, 0, event);
     this.wake();
     return () => { event.cancelled = true; };
   }
 
+  #heldAt: number | undefined;
+
+  /** True while the clock holds its events (a debugger's break). */
+  get held(): boolean { return this.#heldAt !== undefined; }
+
+  /**
+   * Stop delivering scheduled events; they stay queued. The event running now
+   * finishes its depth-first delivery first. Untimed messages still flow.
+   */
+  hold(): void { if (this.#heldAt === undefined) this.#heldAt = this.now(); }
+
+  /**
+   * Deliver again. Held events move later by the time spent holding, so a
+   * metro resumes its rhythm instead of catching up in a burst.
+   */
+  resume(): void {
+    const heldAt = this.#heldAt;
+    if (heldAt === undefined) return;
+    this.#heldAt = undefined;
+    const shift = Math.max(0, this.now() - heldAt);
+    for (const event of this.#events) event.time += shift;
+    this.wake();
+  }
+
+  /** While held, deliver the next queued event now; false when none is queued. */
+  step(): boolean {
+    if (this.#heldAt === undefined || this.#running) return false;
+    let event: ScheduledEvent | undefined;
+    while ((event = this.#events.shift()) && event.cancelled);
+    if (!event) return false;
+    this.#running = true;
+    try { event.callback(this.now()); } catch (error) { try { this.onError?.(error); } catch { /* Keep the clock running. */ } }
+    finally { this.#running = false; }
+    // Time passes while stepping; events made since keep their places relative to now.
+    this.#heldAt = this.now();
+    return true;
+  }
+
   /** Run every event due by `horizon`, including events they schedule within it. */
   protected flush(horizon: number): void {
-    if (this.#running) return;
+    if (this.#running || this.#heldAt !== undefined) return;
     this.#running = true;
     try {
-      while (this.#events.length && this.#events[0]!.time <= horizon) {
+      // A break during delivery holds the rest of the queue.
+      while (this.#heldAt === undefined && this.#events.length && this.#events[0]!.time <= horizon) {
         const event = this.#events.shift()!;
         if (event.cancelled) continue;
         try { event.callback(event.time); } catch (error) { try { this.onError?.(error); } catch { /* Keep the clock running. */ } }

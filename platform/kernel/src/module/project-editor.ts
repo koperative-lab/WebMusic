@@ -27,6 +27,8 @@ export interface ProjectEditorConnection {
   readonly status: 'connected' | 'unresolved';
   readonly diagnostic?: string;
   readonly editable?: boolean;
+  /** The project connection this cord shows, for runtime observation (DEC-078); absent for modulations and default routes. */
+  readonly recordId?: string;
 }
 export interface ProjectEditorState {
   readonly modules: readonly ProjectEditorModule[];
@@ -103,7 +105,7 @@ export function createProjectEditorBinding(runtime: ModuleProjectRuntime, option
     });
     const diagnostic = (kind: 'connection' | 'modulation', id: string) => state.unresolved.find(item => item.kind === kind && item.id === id)?.reason;
     const connections: ProjectEditorConnection[] = (project?.connections ?? []).map(record => ({
-      id: connectionId(record.id), from: record.from, to: record.to, mode: record.mode ?? (record.kind === 'audio' ? 'replace' : 'connect'),
+      id: connectionId(record.id), recordId: record.id, from: record.from, to: record.to, mode: record.mode ?? (record.kind === 'audio' ? 'replace' : 'connect'),
       status: diagnostic('connection', record.id) ? 'unresolved' : 'connected', diagnostic: diagnostic('connection', record.id),
     }));
     for (const record of project?.modulations ?? []) connections.push({

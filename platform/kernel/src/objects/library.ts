@@ -8,6 +8,8 @@ import {
   type Atom, type JsonValue, type Message,
 } from '../module/message';
 import {compileExpr} from './expr';
+import {MUSICAL_TIME} from '../module/musical-time';
+import {nextGridTime, timeValueSeconds, timeValueTicks} from '../transport';
 import type {ObjectBehavior, ObjectContext, ObjectDefinition, PortSpec} from './core';
 
 // --- helpers ------------------------------------------------------------------
@@ -65,30 +67,64 @@ const loadbang: ObjectDefinition = {
   }),
 };
 
+/** A metro interval: milliseconds, or a time value (`4n`, `8nt`, `1.0.0`) that follows the transport. */
+type Interval = {readonly kind: 'ms'; readonly ms: number} | {readonly kind: 'musical'; readonly text: string};
+
+function intervalOf(atom: Atom | undefined, fallback: Interval): Interval {
+  if (isNumberAtom(atom)) return atom.value > 0 ? {kind: 'ms', ms: atom.value} : fallback;
+  if (atom?.type !== 'symbol') return fallback;
+  if (timeValueTicks(atom.value) !== undefined) return {kind: 'musical', text: atom.value};
+  const seconds = timeValueSeconds(atom.value);
+  return seconds > 0 ? {kind: 'ms', ms: seconds * 1000} : fallback;
+}
+
 const metro: ObjectDefinition = {
   name: 'metro',
-  inlets: () => ports('on/off, bang, stop', 'interval (ms)'),
+  inlets: () => ports('on/off, bang, stop', 'interval (ms or a time value such as 4n)'),
   outlets: () => ports('bang'),
-  check: args => { positive('metro interval', numberArg(args, 0, 500)); },
+  check: args => { const interval = intervalOf(args[0], {kind: 'ms', ms: 500}); if (interval.kind === 'ms') positive('metro interval', interval.ms); },
   create: (context) => {
-    let interval = stateNumber(context.state, 'interval') ?? numberArg(context.args, 0, 500);
+    const saved = (context.state as {interval?: unknown} | undefined)?.interval;
+    let interval: Interval = typeof saved === 'number' ? {kind: 'ms', ms: saved} : typeof saved === 'string' ? {kind: 'musical', text: saved}
+      : intervalOf(context.args[0], {kind: 'ms', ms: 500});
     let running = stateBoolean(context.state, 'running');
     let cancel: (() => void) | undefined;
+    const musical = context.scope.capabilities.get(MUSICAL_TIME);
+    // Free-running: every interval from the start, on the audio clock.
     const tick = (time: number) => {
       context.out(0, bang(time));
-      cancel = context.clock.schedule(time + interval / 1000, tick);
+      if (interval.kind === 'ms') cancel = context.clock.schedule(time + interval.ms / 1000, tick);
     };
-    const start = (time: number) => { cancel?.(); running = true; if (context.active) tick(time); };
+    // Musical: on the transport's grid, only while it plays (Max's transport-locked metro).
+    const scheduleLocked = (from?: number) => {
+      cancel?.(); cancel = undefined;
+      if (interval.kind !== 'musical' || !running || !context.active || !musical?.playing()) return;
+      const step = timeValueSeconds(interval.text, musical.tempo());
+      const position = from ?? nextGridTime(musical.position(), step);
+      const when = musical.timeAt(position);
+      if (when === undefined) return;
+      cancel = context.clock.schedule(Math.max(context.clock.now(), when), time => {
+        cancel = undefined;
+        context.out(0, bang(time));
+        scheduleLocked(position + step);
+      });
+    };
+    const begin = (time: number) => {
+      cancel?.(); cancel = undefined;
+      if (!context.active || !running) return;
+      if (interval.kind === 'ms') tick(time); else scheduleLocked();
+    };
+    const release = musical?.subscribe(() => { if (interval.kind === 'musical' && running) scheduleLocked(); });
     const stop = () => { cancel?.(); cancel = undefined; running = false; };
     return {
-      activate: () => { if (running) tick(context.clock.now()); },
+      activate: () => begin(context.clock.now()),
       receive: (index, value) => {
-        if (index === 1) { const next = numberOf(value); if (next !== undefined && next > 0) interval = next; return; }
+        if (index === 1) { interval = intervalOf(atomsOf(value)[0], interval); if (running) begin(at(value, context.clock)); return; }
         if (value.selector === 'stop' || (isNumber(value) && numberOf(value) === 0)) stop();
-        else if (isBang(value) || isNumber(value) || value.selector === 'start') start(at(value, context.clock));
+        else if (isBang(value) || isNumber(value) || value.selector === 'start') { running = true; begin(at(value, context.clock)); }
       },
-      state: () => ({running, interval}),
-      dispose: stop,
+      state: () => ({running, interval: interval.kind === 'ms' ? interval.ms : interval.text}),
+      dispose: () => { stop(); release?.(); },
     };
   },
 };

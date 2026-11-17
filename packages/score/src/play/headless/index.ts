@@ -14,6 +14,7 @@ export type {PlaybackListenerError, PlaybackOperationError} from './playback-eve
 export {SCORE_NOTE_INPUT, NoteInputController, type NoteInputControllerOptions} from './note-input';
 export {MidiNoteSource, MidiNoteSink, recordNoteOutput, type MidiNoteSourceOptions, type MidiNoteSinkOptions} from './note-modules';
 export {MidiControlSource, type MidiControlSourceOptions} from './control-source';
+export {MIDI_CLOCK_PPQ, MidiClockSink, MidiClockSource, MidiMessageSink, midiBytes, sendSysex, type MidiClockSinkOptions, type MidiClockSourceOptions, type MidiClockTransport} from './midi-clock';
 export type {NoteInputOccurrence, NoteInputTarget} from '../core/note-input-model';
 
 export {
@@ -239,3 +240,4 @@ import type {PlayerLikeKernelContract} from './playerlike-contract';
 // Keep the compile-time kernel contract reachable without emitting a bare
 // runtime import into otherwise side-effect-free bundles.
 type _PlayerLikeKernelContractAnchor = PlayerLikeKernelContract;
+export {MidiAccessSource, createMidiPlugins, type MidiAccessLike, type MidiDeviceInfo, type MidiDeviceInput, type MidiDeviceOutput, type MidiPortLike} from './midi-objects';

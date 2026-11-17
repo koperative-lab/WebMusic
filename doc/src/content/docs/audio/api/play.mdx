@@ -317,3 +317,43 @@ with one audio output and their prepared inserts; the
 functions are data operations whose clips feed those modules. `AudioEffectElement` and
 `defineAudioEffectElement` belong to the Element entry and declare
 [one realized insert](/audio/element/play/audio-effect/).
+
+### Shared buffers and sampler objects
+
+DEC-077 adds named sample memory. `sharedBuffersFor(context)` returns the
+`SharedBuffers` of an AudioContext: `get(name)`, `set(name, buffer)`,
+`revision(name)`, `names()` and `subscribe(name, listener)`; `claim` and
+`release` are what `buffer` objects use to own an entry, which goes with its
+last owner. `clipOfBuffer(buffer)` copies one into an `AudioClip` for a
+waveform view.
+
+`createSamplerPlugins()` (from `@webmusic/audio/play/headless`) returns project
+plugins for four objects:
+
+| Object | Arguments | Messages and ports |
+| --- | --- | --- |
+| `buffer` | name, seconds (1), or a `source` asset | `size seconds`, `clear`, bang → `name seconds channels` |
+| `groove` | name | number (start seconds), `play`, `stop`, `loop start end`, `looping 0/1`, `rate r`; `output` audio; bang at the end |
+| `record` | name | `start` or 1, `stop` or 0 into its `input` audio; bang when the buffer is replaced |
+| `adc` | — | the microphone on `output`, shared per AudioContext; never on the default route |
+
+A `buffer` declared the same way across a rebuild keeps its samples, so a
+recording survives graph edits. `groove` starts and stops at the message's
+time. `record` captures with a ScriptProcessor, as the recorder does; `adc`
+asks for the microphone without echo cancellation, noise suppression or gain
+control and leaves the object unresolved if it is refused.
+
+`renderAudioClipEditor(editor)` (from `@webmusic/audio/view/headless`) renders
+an `AudioClipEditor`'s current sound to a new clip, so an edit made in
+[`<audio-clip-view>`](/audio/element/view/audio-clip-view/) can be written back:
+
+```ts
+import {clipOfBuffer, sharedBuffersFor} from '@webmusic/audio/play/headless';
+import {createAudioClipEditor, renderAudioClipEditor} from '@webmusic/audio/view/headless';
+
+declare const context: AudioContext;
+const buffers = sharedBuffersFor(context);
+const editor = createAudioClipEditor(clipOfBuffer(buffers.get('arabesque')!));
+// …after the view commits an edit:
+buffers.set('arabesque', (await renderAudioClipEditor(editor)).toAudioBuffer(context));
+```

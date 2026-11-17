@@ -6,18 +6,19 @@ sidebar:
   order: 2
 ---
 
-`@webmusic/bridge` is a **single-entry package**: the root is the whole API.
-It is the only package allowed to import both families, and both are peer
-dependencies alongside `@webmusic/kernel`. Bridge can coordinate supplied
+`@webmusic/bridge` has two entries: the root, which needs no UI, and
+`@webmusic/bridge/component`, which runs a component as a page element and
+needs `@webmusic/ui`. It is the only package allowed to import both families,
+and both are peer dependencies alongside `@webmusic/kernel`. Bridge can coordinate supplied
 players or construct explicitly owned instances through its factories.
 
-It does not decode audio, parse notation, or draw anything. Those live in
+The root does not decode audio, parse notation, or draw anything. Those live in
 [`@webmusic/audio`](/audio/api/) and [`@webmusic/score`](/score/api/); what is
 here is only the work that needs *both*.
 
 ## Install
 
-`npm install @webmusic/bridge` — use an available published version or the local workspace. It has no optional peers of its own; it inherits whatever the two families need.
+`npm install @webmusic/bridge` — use an available published version or the local workspace. Its one optional peer is `@webmusic/ui`, needed only by `/component`; otherwise it inherits whatever the two families need.
 
 ## Entry map
 
@@ -25,9 +26,10 @@ here is only the work that needs *both*.
 | --- | --- | --- |
 | `@webmusic/bridge` | root · the whole API | Everything below. |
 | — | [Headless](/bridge/headless/) | `createScoreAudioSession` and `registerAudioParticipant` are root exports, documented under the headless contract because the composition is constructed and disposed rather than called. |
+| `@webmusic/bridge/component` | element and code generators | [Components as page elements](#components-as-page-elements): a saved project running as a custom element, and its exported code. |
 
-There is no `/headless` subpath, no `/element`, and no `/auto`: the bridge
-ships no Components. It gets none until it has one to ship.
+There is no `/headless`, `/element` or `/auto` subpath: the Bridge ships no
+Components of its own; `/component` defines the element a project asks for.
 
 ## Session composition
 
@@ -200,6 +202,66 @@ resolved domain object; it does not fetch URLs, decode arbitrary files, persist
 sample data or install missing code. A saved plugin reference without a matching
 registry entry remains unresolved until an explicit registration and retry.
 See [the complete project example](/bridge/modular-composition/#save-and-edit-a-project).
+
+## Components as page elements
+
+`@webmusic/bridge/component` runs a component made of objects (DEC-074) outside
+Studio, from public entries only (DEC-078). It needs `@webmusic/ui`.
+
+`mountComponent(host, project, options?)` runs the project in a
+`ModuleProjectRuntime` over `createComponentPlugins` and shows its
+presentation under a UI Kit transport: the modules placed in
+`layout.presentation`, or every view, interface object and buffer at its
+editing position when nothing is placed. It returns `{runtime, ready, play(),
+pause(), destroy()}`; `destroy` releases the runtime, the audio environment it
+made, the elements and their bindings. Options: `extra` (more factories, such
+as a prepared `processorPlugin`), `midi`, `wam`, `objects` (the object
+environment), `plugins` (replace the set), `resolveAsset` and `base` (assets,
+by default `resolveComponentAsset` relative to the page), `audio` (lend an
+environment), `editableBuffers`, `label` and `onError`. The first pointer or
+key in the component resumes its AudioContext.
+
+`defineComponentElement(tag, project, options?)` defines a custom element that
+mounts the project in its shadow root while connected (its `component`
+property is the handle) and returns the class; a defined tag is left as it is.
+
+```ts
+import {defineComponentElement} from '@webmusic/bridge/component';
+
+const project = {
+  schema: 'webmusic.module-project', version: 1, id: 'arabesque-filter', contexts: [{id: 'root'}],
+  assets: [{id: 'midi', uri: 'midi/Arabesque%20No.1.mid', mediaType: 'audio/midi'}],
+  modules: [
+    {id: 'piano', contextId: 'root', plugin: {id: 'webmusic.score-player', version: '1.0.0'}, config: {waveform: 'sawtooth'}, assets: {source: 'midi'}},
+    {id: 'filter', contextId: 'root', plugin: {id: 'webmusic.effect', version: '1.0.0'}, config: {type: 'filter', options: {type: 'lowpass', frequency: 900}}},
+    {id: 'cutoff', contextId: 'root', label: 'dial 200. 4000.', plugin: {id: 'webmusic.object.dial', version: '1.0.0'}, config: {args: '200. 4000.'}},
+  ],
+  connections: [
+    {id: 'a', kind: 'audio', from: {moduleId: 'piano', port: 'output'}, to: {moduleId: 'filter', port: 'input'}, mode: 'replace'},
+    {id: 'b', kind: 'message', from: {moduleId: 'cutoff', port: 'out0'}, to: {moduleId: 'filter', port: 'param:frequency'}},
+  ],
+};
+defineComponentElement('arabesque-filter', project);
+// <arabesque-filter></arabesque-filter> now plays Arabesque No. 1 through a filter its dial controls.
+```
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `mountComponent` · `defineComponentElement` | function · element factory | Run a project in a host or as a custom element. |
+| `createComponentPlugins` | function | Every plugin a component may use: Bridge players and effects (the score player with a `source` outlet), `webmusic.mc.effect`, Kernel objects, sampler and MIDI objects, view objects, `webmusic.wam` when `wam` is given, and `extra`. |
+| `resolveComponentAsset` | function | Load an asset by URI: MIDI and MusicXML as a Score, audio files as an AudioClip. |
+| `ComponentSurfaces` · `SurfaceSlot` · `SURFACE_PLUGINS` · `KEYS_PLUGIN` · `SCOPE_PLUGIN` · `METER_PLUGIN` · `SPECTRUM_PLUGIN` · `ROLL_PLUGIN` · `surfaceKindOf` · `isListener` | class · constants · functions | The view objects `webmusic.surface.keys`, `scope`, `meter`, `spectrum` and `roll`: plugins and the slots their elements borrow. |
+| `createViewElement` · `configureViewElement` · `bindViewElement` · `bindBufferView` · `defineViewElements` | functions | The packages' Elements for view objects and named buffers, bound to their slots. |
+| `mountObjectControl` · `CONTROL_OBJECTS` | function · constant | The UI Kit control of an interface object, following its rebuilt instances. |
+| `componentModuleSource` · `componentPageSource` · `componentResources` · `standardPluginIds` | functions | Exported code: a module that defines the element, a standalone page, and the assets and plugins either needs beyond the packages. |
+
+An exported module imports `@webmusic/bridge/component`, so a project that
+installs `@webmusic/kernel`, `@webmusic/ui`, `@webmusic/score`, `@webmusic/audio`
+and `@webmusic/bridge` imports it and writes the element. An exported page
+imports the published entry from jsDelivr's ESM build (`version` defaults to
+0.3.0, or pass `moduleUrl`), so it works once that version is published. Both
+list, as comments, the asset URIs and the plugins outside the standard set
+(such as a DSP processor) that must be supplied through `extra`.
 
 ## API Reference
 

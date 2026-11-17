@@ -92,3 +92,4 @@ import type {PlayerLikeKernelContract} from './playerlike-contract';
 // Keep the compile-time kernel contract reachable without emitting a bare
 // runtime import into otherwise side-effect-free bundles.
 type _PlayerLikeKernelContractAnchor = PlayerLikeKernelContract;
+export {SharedBuffers, clipOfBuffer, createSamplerPlugins, sharedBuffersFor} from './buffers';

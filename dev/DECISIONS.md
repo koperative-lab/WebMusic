@@ -3407,6 +3407,117 @@ presets, interpolation, mappings and the schema; tests for the new controls;
 Studio tests for encapsulation, clipboard, arrangement and views; browser
 evidence and the owner's manual checks.
 
+## DEC-077 — Musical time, devices, voices, buffers and channels in components
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P2 gaps of the Max comparison (music and audio capabilities).
+Delivery: STATUS MUS-01.
+
+**Problem:** components had seconds but no bars or beats, so a timer could not
+follow a tempo; MIDI covered notes and controllers only; there was no voice
+allocation, no named sample memory, no frame-based spectral processing, no
+multichannel cord and no microphone, game controller, HID or OSC input.
+
+**Decision:** a project's Session carries an optional `tempo` (BPM and meter)
+and the runtime lends its root context a `MusicalTimeSource` under the
+`MUSICAL_TIME` capability, so objects read bars, beats and ticks (480 per
+quarter) and schedule on the beat grid; tempo changes rebuild nothing. Message
+objects accept note values (`4n`, `8nt`, `4nd`, `1.2.0`, ms, Hz). A lone word in
+message text is its own selector (`stop`, as in Max); a quoted word stays a
+`symbol`. Kernel adds `VoiceAllocator`, a `poly` shell that owns one child
+context per voice with a `voice` object, `multichannelPlugin` and `mc.pack` /
+`mc.unpack` over ordinary multichannel Web Audio connections, an OSC 1.0 codec
+with `oscin` / `oscout` over a WebSocket bridge, `transport`, `makenote`,
+`gamepad` and `hid`, and a worklet-side spectral frame (FFT, Hann window,
+overlap-add). Score adds MPE pitch, pressure and sysex input, MIDI clock in and
+out, a message-to-MIDI sink and MIDI device objects over one shared access
+whose device inputs fan out to every object. Audio adds named `SharedBuffers`
+per AudioContext with `buffer`, `groove`, `record` and `adc` objects, and
+renders an edited clip back to samples. [Music and audio objects](design/MUSIC-AUDIO-OBJECTS.md)
+owns the contract.
+
+**Alternatives considered:** a tempo map in the Session clock itself, which
+would change every scheduler and is not needed for one tempo and meter; a
+flattened `poly` that copies voices into prefixed IDs inside the runtime,
+which makes the exported document differ from the restored one; one buffer
+store per runtime, which would hide a recording from another runtime on the
+same AudioContext; a WebSocket OSC server in the packages, which a browser
+cannot open; each MIDI object owning the device's handler, which lets the
+last one silence the others.
+
+**Consequences:** documents using `session.tempo` need this Kernel. `poly`
+voices are ordinary contexts of the same project; editors that show one voice
+must write the others (Studio copies the first). A buffer outlives a rebuild
+when it is declared the same way, and goes with its last `buffer` object.
+Message text `stop` now arrives as selector `stop` rather than `symbol stop`.
+Tempo maps, time signature changes, an `mc.` form of processors and an OSC
+bridge program remain later work.
+
+**Owner:** [Music and audio objects](design/MUSIC-AUDIO-OBJECTS.md).
+
+**Verification:** unit tests for musical time, voices, OSC, the FFT and
+overlap-add, transport-locked metro, makenote, poly, multichannel, MIDI device
+objects and fan-out, MPE, clock and sysex, shared buffers, recording and
+rendering an edit; Studio tests for the new objects and voice copies; browser
+evidence in Studio and the private runner's checks L1–L6, and the owner's
+manual checks.
+
+## DEC-078 — Observing, scripting, plugins and exporting components
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P3 gaps of the Max comparison (developer experience).
+Delivery: STATUS DEVX-01; it also delivers the first export path of LAYER-01.
+
+**Problem:** a running component could not be watched without patching
+`print` objects into it; there was no way to run user code, to script the
+editor, or to host the web's plugin format; and a component made in Studio
+could not leave Studio, because its view objects were Studio's own plugins.
+
+**Decision:** `ModuleProjectRuntime` gains `observe(listener)`, which reports
+each message and note just before it crosses a cord, in delivery order and
+depth, without changing delivery, and `probeSignal(endpoint)`, an analyser on
+an audio or control output that follows it across rebuilds. Message clocks
+can `hold`, `resume` (shifting held events by the time held) and `step`, and
+`MessageDebugger` sets trace and break watchpoints with conditions. Editor
+cords carry their project `recordId`. Kernel `/objects` adds `ScriptSandbox`,
+user code in a Worker that reaches its host only through messages and offered
+functions, and the `js` object over it. Kernel `/module` adds `wamPlugin`, a
+structural adapter for Web Audio Modules 2.0 whose host group and URL policy
+the application supplies. A new Bridge entry, `@webmusic/bridge/component`,
+holds what a component needs outside Studio: the standard plugin set, the view
+objects (`webmusic.surface.*`, moved from Studio), the controls of interface
+objects, an asset resolver, `mountComponent`, `defineComponentElement`, and
+generators of an exported module and a standalone page. Studio uses the same
+entry. [Developer tools](design/DEVELOPER-TOOLS.md) owns the contract.
+
+**Alternatives considered:** a global message tracer in the Kernel, which
+would mix every runtime's traffic; slowing delivery for illustration, which
+would change the timing the user is debugging; running scripts on the main
+thread with `new Function`, which lets a loop freeze the page and gives code
+the whole page; bundling a WAM SDK in the packages, which ties a release to it;
+exporting components as a flattened script, which loses the project the user
+can open again; keeping view objects in Studio, which makes exported
+components lose their keyboards and scopes.
+
+**Consequences:** the Bridge gains `@webmusic/ui` as an optional peer, used
+only by `/component`. Documents with Studio's `studio.keys`, `studio.scope`,
+`studio.meter`, `studio.spectrum` or `studio.roll` are migrated by Studio to
+`webmusic.surface.*`. A break holds the message clock of its AudioContext for
+every runtime on it; audio keeps playing. The Worker isolation keeps scripts
+off the page but is not a security boundary: a dynamic `import()` still
+reaches the network. A standalone page loads the published packages from a
+CDN and so works only once the release it names is published; DSP processors
+outside the packages are declared as resources the page must supply.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md).
+
+**Verification:** unit tests for observation order and depth, observers
+across rebuilds, signal probes, watchpoints with hold, step and resume,
+the script sandbox and `js` object in a VM-run Worker prelude, the WAM adapter
+against a structural fake, and the component entry in jsdom; Studio tests for
+the library, templates and debugging helpers; browser evidence in Studio and
+the private runner's checks M1–M3, and the owner's manual checks.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

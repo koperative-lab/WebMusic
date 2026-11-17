@@ -506,3 +506,39 @@ and `MidiControlSource`, MIDI controllers as control events and messages.
 Engines, sounds, effect recipes and controllers are what those modules consume. `ScoreEffectElement` and
 `defineScoreEffectElement` are Element exports for
 [one insert declaration](/score/element/play/score-effect/).
+
+### MIDI devices, clock and MPE
+
+DEC-077 completes MIDI. `MidiNoteSource` takes `mpe: {bendRange}` (48
+semitones by default): a member channel's bend before a note-on detunes that
+note as `pitch.cents`. `MidiControlSource` also reports channel pressure (a
+`pressure` control event and message), `polypressure note value channel` and
+`sysex bytes…`. `MidiClockSource(input)` turns 24-pulse clock into `start`,
+`stop`, `continue`, `position sixteenths`, `beat n` and `tempo bpm` messages on
+`clock`; `MidiClockSink(output, transport)` sends Start or Continue, Stop, Song
+Position and clock pulses from any `MidiClockTransport` (`tempo()`, `playing()`,
+`position()`, `subscribe()`), which the Kernel's `MusicalTimeSource` satisfies;
+its pulses come from a main-thread timer and jitter by about its period.
+`MidiMessageSink(output)` sends `cc`, `bend`, `program`, `note`, `pressure`,
+`sysex` and byte-list messages from its `midi` port; `midiBytes(message)` and
+`sendSysex(output, bytes)` are its parts. Channels are 0–15 throughout.
+
+`createMidiPlugins(access?)` returns project plugins for the objects `notein
+[channel] [mpe]`, `ctlin [channel]`, `midiclock`, `noteout [channel]`, `midiout`
+and `midiclockout`, each choosing a device by `config.device` (a name or ID; the
+first device when absent). One `MidiAccessSource` asks for Web MIDI once,
+lists `devices()` for a picker and fans each device input out to every object
+using it, restoring the device's own handler with the last one. A refused
+permission or a missing device leaves the object unresolved with the reason.
+
+```ts
+import {MidiAccessSource, createMidiPlugins} from '@webmusic/score/play/headless';
+import {ProjectPluginRegistry} from '@webmusic/kernel/module';
+
+const midi = new MidiAccessSource();
+const plugins = new ProjectPluginRegistry();
+for (const plugin of createMidiPlugins(midi)) plugins.register(plugin);
+const inputs = (await midi.devices()).filter(device => device.direction === 'input');
+// A record such as {plugin: {id: 'webmusic.object.notein', version: '1.0.0'},
+// config: {args: '0 mpe', device: inputs[0]?.name}} now plays that keyboard.
+```

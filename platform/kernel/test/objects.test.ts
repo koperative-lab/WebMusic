@@ -71,7 +71,7 @@ describe('object library', () => {
   it('lists every planned object as a plugin', () => {
     expect(OBJECT_NAMES).toEqual(['loadbang', 'metro', 'delay', 'pipe', 'line', 'counter', 'select', 'route', 'gate', 'switch',
       'trigger', 'pack', 'unpack', 'expr', 'scale', 'random', 'print', 'sig', 'ramp', 'button', 'toggle', 'number', 'slider',
-      'dial', 'message', 'menu', 'tab', 'multislider', 'matrix', 'preset', 'nodes', 'component', 'inlet', 'outlet', 'inlet~', 'outlet~']);
+      'dial', 'message', 'menu', 'tab', 'multislider', 'matrix', 'preset', 'nodes', 'transport', 'gamepad', 'hid', 'oscin', 'oscout', 'js', 'component', 'inlet', 'outlet', 'inlet~', 'outlet~', 'poly', 'voice', 'makenote', 'mc.pack', 'mc.unpack']);
     expect(createObjectPlugins().map(plugin => plugin.id)).toContain('webmusic.object.metro');
   });
 

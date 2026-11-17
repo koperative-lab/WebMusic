@@ -13,12 +13,13 @@ export type ControlEvent =
   | {readonly kind: 'cc'; readonly controller: number; readonly value: number; readonly channel: number}
   | {readonly kind: 'pitchbend'; readonly value: number; readonly channel: number}
   | {readonly kind: 'program'; readonly value: number; readonly channel: number}
+  | {readonly kind: 'pressure'; readonly value: number; readonly channel: number}
   | {readonly kind: 'key'; readonly key: string; readonly down: boolean};
 
 /** The 0–1 position of an event, or undefined for one that sets nothing (a key release). */
 export function controlFraction(event: ControlEvent): number | undefined {
   switch (event.kind) {
-    case 'cc': case 'program': return Math.min(1, Math.max(0, event.value / 127));
+    case 'cc': case 'program': case 'pressure': return Math.min(1, Math.max(0, event.value / 127));
     case 'pitchbend': return Math.min(1, Math.max(0, (event.value + 8192) / 16383));
     case 'key': return event.down ? 1 : undefined;
   }
@@ -30,6 +31,7 @@ export function controlSource(event: ControlEvent): ProjectMappingSource {
     case 'cc': return {kind: 'cc', controller: event.controller, channel: event.channel};
     case 'pitchbend': return {kind: 'pitchbend', channel: event.channel};
     case 'program': return {kind: 'program', channel: event.channel};
+    case 'pressure': return {kind: 'pressure', channel: event.channel};
     case 'key': return {kind: 'key', key: event.key};
   }
 }
@@ -49,6 +51,7 @@ export function describeSource(source: ProjectMappingSource): string {
     case 'cc': return `CC ${source.controller}${channel}`;
     case 'pitchbend': return `Bend${channel}`;
     case 'program': return `Program${channel}`;
+    case 'pressure': return `Pressure${channel}`;
     case 'key': return `Key ${source.key.length === 1 ? source.key.toUpperCase() : source.key}`;
   }
 }

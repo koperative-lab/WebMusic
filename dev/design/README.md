@@ -21,6 +21,8 @@ its original phase sequence and alternatives.
 | [PLAYER-BINDING.md](PLAYER-BINDING.md) | Borrowing Play data, state and time, including ownership, standalone use and open binding choices |
 | [MODULAR-COMPOSITION.md](MODULAR-COMPOSITION.md) | Accepted modular redesign: capability contexts, typed ports, route ownership, shared effects/parameters and Session composition; the only composition model under DEC-068, with delivery recorded in STATUS |
 | [ORGANIZATION.md](ORGANIZATION.md) | Nested components with inlets and outlets, presentation, comments and groups, presets and interpolation, and control mappings |
+| [DEVELOPER-TOOLS.md](DEVELOPER-TOOLS.md) | Observing a running project, probes and watchpoints, scripts in a Worker, Web Audio Modules, and components as elements and exported code |
+| [MUSIC-AUDIO-OBJECTS.md](MUSIC-AUDIO-OBJECTS.md) | Musical time and tempo, MIDI devices and clock, voices, shared buffers and sampling, spectral frames, multichannel cords, and device and network input |
 | [MESSAGE-OBJECTS.md](MESSAGE-OBJECTS.md) | Messages as a Kernel port family, the object library as project plugins and the UI Kit's single-value controls |
 | [PROCESSOR-MODULES.md](PROCESSOR-MODULES.md) | Authored DSP: shared processor definitions, per-context worklet preparation, the audio-thread kit and the step-by-step development sequence |
 | [ANALYZE-COMPONENTS.md](ANALYZE-COMPONENTS.md) | Score's live analysis roles, sibling composition and Headless report boundary |

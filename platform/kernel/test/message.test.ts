@@ -21,7 +21,9 @@ describe('message values', () => {
     expect(atomsOf(bang())).toEqual([]);
     expect(atomsOf(parseMessage('set 3'))).toEqual([symbolAtom('set'), intAtom(3)]);
     expect(messageFromAtoms([intAtom(1)]).selector).toBe('int');
-    expect(messageFromAtoms([symbolAtom('stop')]).selector).toBe('symbol');
+    expect(messageFromAtoms([symbolAtom('stop')])).toEqual({selector: 'stop', atoms: []});
+    expect(parseMessage('stop')).toEqual({selector: 'stop', atoms: []});
+    expect(atomsOf(parseMessage('stop'))).toEqual([symbolAtom('stop')]);
     expect(messageFromAtoms([symbolAtom('stop'), intAtom(1)]).selector).toBe('stop');
     expect(messageFromAtoms([floatAtom(1), symbolAtom('x')]).selector).toBe('list');
     expect(numberOf(parseMessage('foo 7 8'))).toBe(7);

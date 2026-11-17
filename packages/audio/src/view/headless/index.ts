@@ -117,3 +117,4 @@ export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} fro
 export {
   loadAudioClipEditor, type LoadAudioClipEditorOptions, type AudioClipEditorLoader, type AudioClipEditorLoadLimits,
 } from './load-audio-clip-editor';
+export {renderAudioClipEditor} from './buffer-editor';

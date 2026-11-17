@@ -144,7 +144,7 @@ function mappings(value: unknown): ProjectMappingRecord[] | undefined {
     if (ids.has(id)) throw new TypeError(`Duplicate mapping ${id}.`);
     ids.add(id);
     const sourceData = object(item.source, `${path}.source`);
-    const kind = enumeration(sourceData.kind, ['cc', 'pitchbend', 'program', 'key'], `${path}.source.kind`);
+    const kind = enumeration(sourceData.kind, ['cc', 'pitchbend', 'program', 'pressure', 'key'], `${path}.source.kind`);
     const channel = () => sourceData.channel === undefined ? {} : {channel: number(sourceData.channel, `${path}.source.channel`, 0, 15)};
     let source: ProjectMappingSource;
     if (kind === 'cc') {
@@ -176,7 +176,17 @@ function positions(value: unknown, name: string): ProjectModuleLayout[] {
 }
 function session(value: unknown): ProjectSessionState {
   const data = object(value ?? {}, 'session');
-  fields(data, ['positionSeconds', 'rate', 'loop'], 'session');
+  fields(data, ['positionSeconds', 'rate', 'loop', 'tempo'], 'session');
+  let tempo: ProjectSessionState['tempo'];
+  if (data.tempo !== undefined) {
+    const value = object(data.tempo, 'session.tempo');
+    fields(value, ['bpm', 'beatsPerBar', 'beatUnit'], 'session.tempo');
+    const beatUnit = number(value.beatUnit ?? 4, 'session.tempo.beatUnit', 1, 32);
+    if (![1, 2, 4, 8, 16, 32].includes(beatUnit)) throw new TypeError('session.tempo.beatUnit must be 1, 2, 4, 8, 16 or 32.');
+    const beatsPerBar = number(value.beatsPerBar ?? 4, 'session.tempo.beatsPerBar', 1, 64);
+    if (!Number.isInteger(beatsPerBar)) throw new TypeError('session.tempo.beatsPerBar must be an integer.');
+    tempo = {bpm: number(value.bpm, 'session.tempo.bpm', Number.MIN_VALUE, 1000), beatsPerBar, beatUnit};
+  }
   let loop: ProjectSessionState['loop'];
   if (data.loop === null) loop = null;
   else if (data.loop !== undefined) {
@@ -188,7 +198,7 @@ function session(value: unknown): ProjectSessionState {
     loop = {startSeconds, endSeconds};
   }
   return {positionSeconds: number(data.positionSeconds ?? 0, 'session.positionSeconds', 0),
-    rate: number(data.rate ?? 1, 'session.rate', Number.MIN_VALUE), ...(loop !== undefined ? {loop} : {})};
+    rate: number(data.rate ?? 1, 'session.rate', Number.MIN_VALUE), ...(loop !== undefined ? {loop} : {}), ...(tempo ? {tempo} : {})};
 }
 
 /** Validate schema/version, exact references and topology before creating any runtime resources. */

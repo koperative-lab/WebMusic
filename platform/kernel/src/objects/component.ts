@@ -12,6 +12,8 @@ import {createCapabilityKey, type CapabilityKey} from '../module/capability';
 import {AudioOutputPort} from '../module/audio-port';
 import {createConnectionLease, type ConnectionLease} from '../module/lease';
 import {MessageInputPort, MessageOutputPort, isNumberAtom, type Atom, type Message} from '../module/message';
+import {NoteInputPort, NoteOutputPort, type NoteEvent} from '../module/note-port';
+import {VoiceAllocator} from '../module/voices';
 import type {ModuleHandle} from '../module/registry';
 import {routeModuleOutput} from '../module/context';
 import {
@@ -46,6 +48,15 @@ export interface ComponentBoundary {
 
 export const COMPONENT_BOUNDARY: CapabilityKey<ComponentBoundary> = createCapabilityKey<ComponentBoundary>('webmusic.component-boundary');
 export const COMPONENT_PLUGIN = `${OBJECT_PLUGIN_PREFIX}component`;
+export const POLY_PLUGIN = `${OBJECT_PLUGIN_PREFIX}poly`;
+
+/** What a `poly` lends each voice's context (DEC-077): its index and the notes allocated to it. */
+export interface PolyVoice {
+  readonly index: number;
+  readonly voices: number;
+  readonly notes: NoteOutputPort;
+}
+export const POLY_VOICE: CapabilityKey<PolyVoice> = createCapabilityKey<PolyVoice>('webmusic.poly-voice');
 
 function kinds(value: unknown, name: string): BoundaryKind[] {
   if (value === undefined) return [];
@@ -61,13 +72,41 @@ function kinds(value: unknown, name: string): BoundaryKind[] {
  * and `outlet` objects inside. The record that owns the child context is the
  * component; its contents are the modules of that context.
  */
-export function componentPlugin(): ProjectPluginFactory {
+export function componentPlugin(options: {poly?: boolean} = {}): ProjectPluginFactory {
   return Object.freeze({
-    id: COMPONENT_PLUGIN,
+    id: options.poly ? POLY_PLUGIN : COMPONENT_PLUGIN,
     version: OBJECT_PLUGIN_VERSION,
     create({record, context}: ProjectFactoryRequest): ProjectModuleInstance {
       const inletKinds = kinds(record.config.inlets, 'inlets');
       const outletKinds = kinds(record.config.outlets, 'outlets');
+      // A poly owns one child context per voice, each a copy of the same contents;
+      // notes into its `notes` inlet go to one voice at a time.
+      const voiceCount = options.poly ? Math.trunc(Number(record.config.voices ?? 4)) : 0;
+      if (options.poly && !(voiceCount >= 1 && voiceCount <= 64)) throw new ProjectModuleUnavailableError('poly needs 1 to 64 voices.');
+      const voicePorts = Array.from({length: voiceCount}, (_, index) => new NoteOutputPort({id: `voice-${index}`}));
+      const allocator = options.poly ? new VoiceAllocator(voiceCount) : undefined;
+      const heldEvents = new Map<string, NoteEvent>();
+      const notesIn = options.poly ? new NoteInputPort({accept: event => {
+        if (!allocator) return;
+        if (event.gate === 'on') {
+          const {voice, stolen} = allocator.noteOn(event.occurrenceId);
+          if (voice === undefined) return;
+          if (stolen) {
+            const previous = heldEvents.get(stolen);
+            heldEvents.delete(stolen);
+            const port = voicePorts[voice]!;
+            if (previous && port.held.some(held => held.occurrenceId === stolen)) port.emit({...previous, gate: 'cancel', time: event.time, axis: event.axis});
+          }
+          heldEvents.set(event.occurrenceId, event);
+          voicePorts[voice]!.emit(event);
+          return;
+        }
+        const voice = allocator.noteOff(event.occurrenceId);
+        heldEvents.delete(event.occurrenceId);
+        const port = voice === undefined ? undefined : voicePorts[voice];
+        if (port?.held.some(held => held.occurrenceId === event.occurrenceId)) port.emit(event);
+      }}, {id: 'notes'}) : undefined;
+      let voicesLent = 0;
       const leases: ConnectionLease[] = [];
       const disposers: (() => void)[] = [];
       let audioContext: BaseAudioContext | undefined;
@@ -101,6 +140,7 @@ export function componentPlugin(): ProjectPluginFactory {
         outlet: (index: number) => outlets[index]?.channel,
       });
       const ports = [
+        ...(notesIn ? [notesIn] : []),
         ...inlets.flatMap(item => 'port' in item && item.port ? [item.port] : []),
         ...outlets.flatMap(item => item.kind === 'message' && 'port' in item ? [item.port as MessageOutputPort] : []),
       ];
@@ -118,6 +158,7 @@ export function componentPlugin(): ProjectPluginFactory {
       };
       const registration = context.registry.register(module);
       const descriptors: ProjectPortDescriptor[] = [
+        ...(notesIn ? [{id: 'notes', label: 'notes, one voice each', kind: 'note' as const, direction: 'input' as const}] : []),
         ...inletKinds.map((kind, index) => ({id: inletId(index), label: `${kind} in ${index + 1}`, kind, direction: 'input' as const})),
         ...outletKinds.map((kind, index) => ({id: outletId(index), label: `${kind} out ${index + 1}`, kind, direction: 'output' as const})),
       ];
@@ -127,13 +168,25 @@ export function componentPlugin(): ProjectPluginFactory {
         getInput: name => inlets.find((item, index) => item.kind === 'audio' && inletId(index) === name)?.node,
         // Inner modules keep the parent's destination and admission, so an
         // object not wired to an outlet~ sounds through the parent's default route.
-        childContext: child => child.derive({id: child.id, registry: child.registry, capabilities: child.capabilities.with(COMPONENT_BOUNDARY, boundary)}),
+        childContext: child => {
+          let capabilities = child.capabilities.with(COMPONENT_BOUNDARY, boundary);
+          if (options.poly) {
+            // Child contexts are prepared in document order: the first is voice 0.
+            const index = voicesLent++;
+            const port = voicePorts[index];
+            // A context beyond the voice count gets no notes.
+            if (port) capabilities = capabilities.with(POLY_VOICE, Object.freeze({index, voices: voiceCount, notes: port}));
+          }
+          return child.derive({id: child.id, registry: child.registry, capabilities});
+        },
         exportConfig: () => record.config,
         dispose: () => {
           if (disposed) return;
           disposed = true;
           for (const lease of leases.splice(0)) lease.release();
           registration.release();
+          notesIn?.dispose();
+          for (const port of voicePorts) port.dispose();
           for (const dispose of disposers.splice(0)) dispose();
         },
       };
@@ -204,10 +257,38 @@ function audioBoundary(direction: 'inlet' | 'outlet'): ProjectPluginFactory {
 
 export const BOUNDARY_DEFINITIONS: readonly ObjectDefinition[] = Object.freeze([inlet, outlet]);
 
+/** `voice`: inside a poly, the notes allocated to this voice, on its `notes` port. */
+function voicePlugin(): ProjectPluginFactory {
+  return Object.freeze({
+    id: `${OBJECT_PLUGIN_PREFIX}voice`,
+    version: OBJECT_PLUGIN_VERSION,
+    create({record, context}: ProjectFactoryRequest): ProjectModuleInstance {
+      const notes = new NoteOutputPort({id: 'notes'});
+      const voice = context.capabilities.get(POLY_VOICE);
+      // Forward this voice's notes; a release the port never started is dropped.
+      const release = voice?.notes.subscribe(event => {
+        if (notes.disposed) return;
+        if (event.gate !== 'on' && !notes.held.some(held => held.occurrenceId === event.occurrenceId)) return;
+        notes.emit(event);
+      });
+      const module: ModuleHandle = {id: record.id, ports: () => [notes]};
+      const registration = context.registry.register(module);
+      return {
+        module,
+        ports: [{id: 'notes', label: `notes for voice ${voice ? voice.index + 1 : '—'}`, kind: 'note', direction: 'output'}],
+        exportConfig: () => record.config,
+        dispose: () => { release?.(); notes.dispose(); registration.release(); },
+      };
+    },
+  });
+}
+
 /** The component shell, its message and audio boundary objects. */
 export function createComponentPlugins(environment: ObjectEnvironment = {}): readonly ProjectPluginFactory[] {
   return Object.freeze([
     componentPlugin(),
+    componentPlugin({poly: true}),
+    voicePlugin(),
     ...BOUNDARY_DEFINITIONS.map(definition => objectPlugin(definition, environment)),
     audioBoundary('inlet'),
     audioBoundary('outlet'),

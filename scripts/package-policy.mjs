@@ -126,7 +126,7 @@ export const expectedPublicEntries = Object.freeze({
     "./react",
     "./package.json",
   ],
-  "@webmusic/bridge": [".", "./package.json"],
+  "@webmusic/bridge": [".", "./component", "./package.json"],
 });
 
 /**
@@ -268,7 +268,7 @@ export const expectedWorkspaceDependencies = Object.freeze({
   },
   "@webmusic/bridge": {
     dependencies: [],
-    optionalPeers: [],
+    optionalPeers: ["@webmusic/ui"],
     requiredPeers: ["@webmusic/audio", "@webmusic/kernel", "@webmusic/score"],
   },
 });
@@ -314,6 +314,9 @@ export const staticOptionalPeerEntries = Object.freeze({
     "analyze/element/index.ts": ["@webmusic/ui"],
     "analyze/element/auto.ts": ["@webmusic/ui"],
     "react/index.tsx": ["react", "@webmusic/ui"],
+  }),
+  "@webmusic/bridge": Object.freeze({
+    "component.ts": ["@webmusic/ui"],
   }),
 });
 

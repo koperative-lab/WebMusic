@@ -1,9 +1,13 @@
 import type {NoteInputPort, NoteOutputPort} from './note-port';
-import {connectMessageToParameter, type MessageInputPort, type MessageOutputPort} from './message';
+import {connectMessageToParameter, currentMessageDepth, type MessageInputPort, type MessageOutputPort} from './message';
+import type {ProbeEvent, SignalProbe} from './observe';
 import {attachSessionAutomation, SessionTransport, type SessionAutomationLease} from '../session';
 import type {TransportCommit} from '../sync';
 import type {AudioOutputPort} from './audio-port';
 import {ModuleContext} from './context';
+import {ModuleCapabilities} from './capability';
+import {MUSICAL_TIME, createMusicalTimeSource} from './musical-time';
+import {createMusicalTempo, type MusicalTempo} from '../transport';
 import {createConnectionLease, type ConnectionLease} from './lease';
 import {ParamMacro} from './param-macro';
 import type {ParamMapping} from './param-audio';
@@ -35,8 +39,16 @@ interface Graph {
   readonly automationLeases: Map<string, SessionAutomationLease>;
   readonly diagnostics: ProjectDiagnostic[];
   disposed: boolean;
+  musicalListeners?: Set<() => void>;
 }
 interface Pending { readonly controller: AbortController; readonly generation: number }
+
+/** A connection lease that also removes its observation tap. */
+function tapped(untap: () => void, connect: () => ConnectionLease): ConnectionLease {
+  let lease: ConnectionLease;
+  try { lease = connect(); } catch (error) { untap(); throw error; }
+  return createConnectionLease(() => { try { lease.release(); } finally { untap(); } });
+}
 
 function aborted(): Error { const error = new Error('Project restoration was cancelled.'); error.name = 'AbortError'; return error; }
 function assertSignal(signal: AbortSignal): void { if (signal.aborted) throw aborted(); }
@@ -83,8 +95,81 @@ export class ModuleProjectRuntime {
   #editObserved = false;
   #preparedEdit?: {graph: Graph; project: ModuleProject};
   #committing = false;
+  readonly #observers = new Set<(event: ProbeEvent) => void>();
+  #sequence = 0;
+  readonly #signalProbes = new Set<{endpoint: {moduleId: string; port: string}; analyser: AnalyserNode; lease?: ConnectionLease; graph?: Graph}>();
 
   constructor(options: ProjectRuntimeOptions) { this.#options = options; }
+
+  /**
+   * Observe every message and note as it is about to cross a cord of the
+   * active graph (DEC-078). Delivery is unchanged: listeners run first, in
+   * delivery order, and cannot stop or alter it; a throwing listener is
+   * reported, not propagated. Returns an unsubscribe function.
+   */
+  observe(listener: (event: ProbeEvent) => void): () => void {
+    this.#assertActive();
+    if (typeof listener !== 'function') throw new TypeError('An observer must be a function.');
+    this.#observers.add(listener);
+    return () => { this.#observers.delete(listener); };
+  }
+
+  /**
+   * Listen to an audio or control output with an analyser that follows the
+   * endpoint across rebuilds; it never changes the output's routes. The probe
+   * owns the analyser; release it to disconnect.
+   */
+  probeSignal(endpoint: {moduleId: string; port: string}, options: {fftSize?: number} = {}): SignalProbe {
+    this.#assertActive();
+    const analyser = this.#options.audio.prepare().createAnalyser();
+    analyser.fftSize = options.fftSize ?? 2048;
+    const entry: {endpoint: {moduleId: string; port: string}; analyser: AnalyserNode; lease?: ConnectionLease; graph?: Graph} = {endpoint: {...endpoint}, analyser};
+    this.#signalProbes.add(entry);
+    this.#wireProbe(entry);
+    let released = false;
+    return Object.freeze({
+      analyser,
+      get connected() { return !released && entry.lease !== undefined; },
+      release: () => {
+        if (released) return;
+        released = true;
+        this.#signalProbes.delete(entry);
+        if (entry.lease) this.#retire(entry.lease);
+        entry.lease = undefined;
+        this.#cleanup(() => analyser.disconnect());
+      },
+    });
+  }
+
+  #wireProbe(entry: {endpoint: {moduleId: string; port: string}; analyser: AnalyserNode; lease?: ConnectionLease; graph?: Graph}): void {
+    const graph = this.#graph;
+    if (entry.lease && entry.graph === graph) return;
+    if (entry.lease) { this.#retire(entry.lease); entry.lease = undefined; }
+    entry.graph = graph;
+    const instance = graph?.instances.get(entry.endpoint.moduleId);
+    if (!instance) return;
+    const port = instance.module.getPort?.(entry.endpoint.port) as AudioOutputPort | undefined;
+    if (port && typeof port.send === 'function') { this.#cleanup(() => { entry.lease = port.send(entry.analyser); }); return; }
+    const control = instance.getControl?.(entry.endpoint.port);
+    if (control) {
+      this.#cleanup(() => {
+        control.output.connect(entry.analyser);
+        entry.lease = createConnectionLease(() => { try { control.output.disconnect(entry.analyser); } catch { /* Already gone. */ } });
+      });
+    }
+  }
+
+  /** A tap that reports a delivery along `connection` before it happens. */
+  #tap(connection: ProjectConnectionRecord, kind: 'message' | 'note'): (value: unknown) => void {
+    return value => {
+      if (!this.#observers.size) return;
+      const base = {connectionId: connection.id, from: connection.from, to: connection.to, sequence: ++this.#sequence};
+      const event: ProbeEvent = kind === 'message'
+        ? Object.freeze({...base, kind, message: value as never, depth: currentMessageDepth()})
+        : Object.freeze({...base, kind, event: value as never});
+      for (const observer of [...this.#observers]) { try { observer(event); } catch (error) { this.#report(error); } }
+    };
+  }
   get context(): ModuleContext | undefined { return this.#graph?.context; }
   get session(): SessionTransport | undefined { return this.#graph?.session; }
   get resources(): ProjectRuntimeResources | undefined {
@@ -132,7 +217,8 @@ export class ModuleProjectRuntime {
       macros: graph.project.macros.map(record => ({...record, value: graph.macros.get(record.id)?.value ?? record.value})),
       modulations: graph.project.modulations.map(record => ({...record, depth: graph.modulationLeases.get(record.id)?.depth ?? record.depth})),
       automation: graph.project.automation.map(record => ({...record, ...(graph.automationLeases.has(record.id) ? {enabled: graph.automationLeases.get(record.id)!.active, initialValue: graph.automationLeases.get(record.id)!.initialValue} : {})})),
-      session: {positionSeconds: graph.session.clock.positionAt(transport.referenceTime), rate: transport.rate, loop: transport.loop},
+      session: {positionSeconds: graph.session.clock.positionAt(transport.referenceTime), rate: transport.rate, loop: transport.loop,
+        ...(graph.project.session.tempo ? {tempo: graph.project.session.tempo} : {})},
     });
   }
 
@@ -191,6 +277,18 @@ export class ModuleProjectRuntime {
     graph.project = parseModuleProject({...graph.project, layout});
     this.#changed();
   }
+  /** Change the Session's tempo and meter (DEC-077) without rebuilding; timers that follow musical time adjust. */
+  updateTempo(tempo: Partial<MusicalTempo>): void {
+    const graph = this.#requireEditable();
+    const next = createMusicalTempo({...this.#graphTempo(graph), ...tempo});
+    graph.project = parseModuleProject({...graph.project, session: {...graph.project.session, tempo: {...next}}});
+    graph.musicalListeners?.forEach(listener => { try { listener(); } catch (error) { this.#report(error); } });
+    this.#changed();
+  }
+  #graphTempo(graph: Graph): MusicalTempo {
+    return createMusicalTempo(graph.project.session.tempo ?? {});
+  }
+
   /** Replace the control mappings (DEC-076); mappings are data and rebuild nothing. */
   updateMappings(mappings: readonly ProjectMappingRecord[]): void {
     const graph = this.#requireEditable();
@@ -345,6 +443,8 @@ export class ModuleProjectRuntime {
     this.#pending = undefined; this.#graph = undefined; ++this.#generation;
     pending?.controller.abort();
     if (graph) this.#disposeGraph(graph);
+    for (const probe of this.#signalProbes) { if (probe.lease) this.#retire(probe.lease); probe.lease = undefined; this.#cleanup(() => probe.analyser.disconnect()); }
+    this.#signalProbes.clear(); this.#observers.clear();
     this.#changed(); this.#listeners.clear();
   }
 
@@ -357,9 +457,13 @@ export class ModuleProjectRuntime {
     gate.gain.value = 0;
     const root = project.contexts.find(context => !context.parentId)!;
     const session = new SessionTransport(() => audio.currentTime);
-    const context = new ModuleContext({id: root.id, audio: this.#options.audio, session, destination: () => gate});
+    // Every module may read the Session's musical time (DEC-077); it follows updateTempo.
+    const musical = createMusicalTimeSource(session, () => this.#graphTempo(graph));
+    const context = new ModuleContext({id: root.id, audio: this.#options.audio, session, destination: () => gate,
+      capabilities: new ModuleCapabilities().with(MUSICAL_TIME, musical)});
     const graph: Graph = {project, controller, gate, session, context, contexts: new Map([[root.id, context]]), defaultOwners: new Map([[root.id, undefined]]),
       instances: new Map(), handles: new Map(), macros: new Map(), leases: [], connectionLeases: new Map(), modulationLeases: new Map(), automationLeases: new Map(), diagnostics: [], disposed: false};
+    graph.musicalListeners = new Set([() => musical.notify()]);
     try {
       const destination = this.#options.destination?.() ?? audio.destination;
       if (destination.context !== audio || destination === gate) throw new Error('Project output destination must belong to its AudioContext.');
@@ -513,7 +617,7 @@ export class ModuleProjectRuntime {
       // only the occurrences it delivered.
       const source = getModulePort(from.module, connection.from.port, 'note', 'output') as NoteOutputPort | undefined;
       const target = getModulePort(to.module, connection.to.port, 'note', 'input') as NoteInputPort | undefined;
-      if (source && target) return target.connect(source);
+      if (source && target) return tapped(source.subscribe(this.#tap(connection, 'note')), () => target.connect(source));
     }
     if (connection.kind === 'message' && from && to) {
       // Message edges are native Kernel ports (DEC-075). A `param:<id>` target
@@ -524,7 +628,9 @@ export class ModuleProjectRuntime {
         if (handle) return connectMessageToParameter(source, handle, graph.gate.context);
       }
       const target = getModulePort(to.module, connection.to.port, 'message', 'input') as MessageInputPort | undefined;
-      if (source && target) return target.connect(source);
+      // The tap subscribes just before the cord, so it reports each delivery
+      // first and in order, even among several cords from one outlet.
+      if (source && target) return tapped(source.subscribe(this.#tap(connection, 'message')), () => target.connect(source));
     }
     if (from && to && this.#options.connect) {
       const lease = await abortable(this.#options.connect({connection, from, to, context: graph.context, signal: graph.controller.signal}), graph.controller.signal, value => this.#retire(value));
@@ -602,6 +708,7 @@ export class ModuleProjectRuntime {
       throw error;
     } finally { this.#committing = false; }
     if (previous) this.#disposeGraph(previous);
+    for (const probe of this.#signalProbes) this.#wireProbe(probe);
     // Only a committed graph acts: timers start and loadbangs fire after the
     // previous graph has stopped, in creation order.
     for (const instance of candidate.instances.values()) {

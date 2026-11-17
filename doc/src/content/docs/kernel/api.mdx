@@ -330,7 +330,9 @@ Timed message objects schedule on a `MessageClock` (`now()`,
 returns the shared `AudioMessageClock` of an AudioContext, which delivers
 events in time order up to `lookahead` (50 ms) early while it has any;
 `ManualMessageClock` runs due events on `advance(time)` for tests and offline
-work. A project connection of kind `message` joins two message ports; to a
+work. Both can `hold()` scheduled events (the event being delivered finishes
+first; untimed messages still flow), `resume()` them shifted later by the time
+held, and `step()` one held event now; `held` reports it (DEC-078). A project connection of kind `message` joins two message ports; to a
 `param:<id>` endpoint it sets that parameter's base value from each message's
 first number, clamped to its range, at the message's time on the main thread
 (`connectMessageToParameter(output, handle, context)` does the same directly).
@@ -678,6 +680,9 @@ creates no UI, storage service, network fetch or device permission request.
 | `connectModulation(record)` / `disconnectModulation(id)` | Add/remove one native parameter mapping without recreating modules; return the resulting snapshot. |
 | `updateLayout(layout)` | Replace presentation coordinates without recreating modules, routes or Session. |
 | `updatePresentation({modules?, layout?})` | Update module labels/order and optional layout. A supplied module list must retain every stable ID. |
+| `observe(listener)` | Report each message and note about to cross a cord of the active graph as a `ProbeEvent` (`kind`, `connectionId`, `from`, `to`, `message` with `depth` or note `event`, `sequence`), before the receiver and in delivery order; returns unsubscribe. Delivery is unchanged; observers survive rebuilds (DEC-078). |
+| `probeSignal({moduleId, port}, {fftSize?}?)` | A `SignalProbe`: an owned `analyser` that listens to an audio output (as a send) or a control output, reconnected after each rebuild; `connected` and `release()`. |
+| `updateTempo(partial)` | Change `session.tempo` (BPM and meter) without recreating anything; objects locked to the beat re-arm at once (DEC-077). |
 | `dispose()` | Cancel pending work and release owned graphs, Sessions, mappings and leases; never close the borrowed audio environment. |
 
 Live connection edits hold their edit guard during plugin topology and export
@@ -717,6 +722,77 @@ resolution must honor cancellation and decide integrity/version policy. See
 [Bridge's standard factories](/bridge/api/#project-module-factories) and
 [the runnable project](/bridge/modular-composition/#save-and-edit-a-project).
 
+### Musical time, voices, OSC and channels
+
+A committed graph lends its root context a `MusicalTimeSource` under the
+`MUSICAL_TIME` capability (DEC-077), made from its Session and
+`project.session.tempo` with `createMusicalTimeSource(session, () => tempo)`:
+`tempo()`, `playing()`, `position()` (Session seconds), `barsBeatsTicks()`,
+`timeAt(position)` (the AudioContext time the Session reaches a position) and
+`subscribe(listener)` for tempo, play, pause and seek. A module reads it from
+`request.context.capabilities.get(MUSICAL_TIME)`.
+
+`new VoiceAllocator(voices, steal = 'oldest')` assigns voices to note keys:
+`noteOn(key)` returns `{voice, stolen?}` (`voice` undefined when every voice is
+held and `steal` is `'none'`), `noteOff(key)` the freed voice, and `voiceOf`, `held`
+and `clear` read and reset it.
+
+`encodeOsc(packet)` and `decodeOsc(bytes)` read and write OSC 1.0 messages
+(`{address, args}`, with `i`, `f`, `s`, `b`, `T`, `F` and `N` arguments) and
+bundles (`{timetag, elements}`, the time tag a `bigint`); `isOscBundle` tells them apart. Decoding
+rejects malformed packets.
+
+`multichannelPlugin(inner, id?)` wraps an audio plugin with one `input` and
+`output` as `mc.<id>`: `config.channels` (1–`MAX_MC_CHANNELS`, 32) instances,
+each given `config.config`, process one channel each between a splitter and a
+merger; the first instance's parameters are the module's and setting one sets
+it on every channel. `multichannelPackPlugins()` returns `mc.pack` and
+`mc.unpack`.
+
+```ts
+import {VoiceAllocator, decodeOsc, encodeOsc} from '@webmusic/kernel/module';
+
+const voices = new VoiceAllocator(2);
+voices.noteOn('a'); voices.noteOn('b');
+voices.noteOn('c'); // {voice: 0, stolen: 'a'}
+decodeOsc(encodeOsc({address: '/gain', args: [{type: 'f', value: 0.5}]}));
+```
+
+### Watchpoints and Web Audio Modules
+
+`new MessageDebugger(runtime, clock)` observes a runtime and borrows the
+message clock its objects use (`messageClockFor(context)` by default). `set({id,
+connectionId, mode, condition?})` adds a watchpoint: `trace` reports each hit
+to `onHit(listener)`, `break` also holds the clock after the delivery in
+progress, so timed objects stop while audio plays on. `paused`, `continue()`,
+`step()`, `lastHit`, `remove(id)` and `dispose()` (which resumes a held clock)
+drive a debugger view.
+
+```ts
+import {MessageDebugger, messageClockFor, type ModuleProjectRuntime} from '@webmusic/kernel/module';
+
+declare const runtime: ModuleProjectRuntime;
+declare const context: AudioContext;
+const debug = new MessageDebugger(runtime, messageClockFor(context));
+debug.set({id: 'loud', connectionId: 'velocity', mode: 'break',
+  condition: event => event.kind === 'message' && event.message.atoms[0]?.type === 'int' && event.message.atoms[0].value > 100});
+debug.onHit(hit => console.log('stopped at', hit.event.connectionId));
+// Later: debug.step() delivers one held event; debug.continue() resumes.
+```
+
+`wamPlugin({hostGroup, load?, allow?, id?})` returns a project plugin
+(`webmusic.wam` by default) for Web Audio Modules 2.0, written against the WAM
+API structurally. A record names its plugin in `config.url`; `hostGroup(context)`
+supplies the group ID from `initializeWamHost` of `@webaudiomodules/sdk`, once
+per AudioContext; `load(url)` defaults to a dynamic import and `allow(url)` to
+http(s) and same-site paths. The module has `input` and `output` when the WAM
+declares audio, a `notes` input when it takes MIDI (sent as `wam-midi` events at
+each note's time), one parameter per WAM parameter, and lends `WAM_MODULE`
+(`instance`, `name`, `createGui()`, `destroyGui(gui)`). `config.state` is passed to
+`createInstance` and refreshed after parameter changes. A WAM that fails to
+load, or a refused URL, leaves the module unresolved with the reason. A WAM's
+code runs in the page; load only plugins you trust.
+
 ### Project editor binding
 
 `createProjectEditorBinding(runtime, {modulationDepth?}?)` borrows a runtime and
@@ -738,7 +814,9 @@ runtime's validated route or modulation command; new CV mappings use
 `modulationDepth` in the destination's native unit (default 1, finite). Layout
 commands preserve stable module identity. Generated editor connection/parameter
 port IDs are adapter identities; callers pass returned IDs back rather than
-constructing them from labels. Presentation subscriptions never own the graph.
+constructing them from labels; a cord that shows a project connection also
+carries that connection's `recordId`, for matching runtime observations to
+cords. Presentation subscriptions never own the graph.
 
 ## session — @webmusic/kernel/session
 
@@ -1165,6 +1243,31 @@ An Audio player exposes the same pairing for its applied document as
 [`<audio-clip-view>`](/audio/element/view/audio-clip-view/#beat-grid).
 The Session still coordinates positions, not beats.
 
+### Musical tempo and positions
+
+A `MusicalTempo` is `{bpm, beatsPerBar, beatUnit}`; `createMusicalTempo(init)`
+validates one (`beatUnit` 1, 2, 4, 8, 16 or 32) and `DEFAULT_MUSICAL_TEMPO` is
+120 BPM in 4/4. Positions are `BarsBeatsTicks` `{bar, beat, tick}`, bar and
+beat from 1, with `TICKS_PER_QUARTER` = 480 (DEC-077).
+
+| Function | Returns |
+| --- | --- |
+| `tickSeconds(tempo)`, `ticksPerBeat(tempo)`, `ticksPerBar(tempo)` | The length of a tick in seconds, and ticks per beat and per bar |
+| `timeValueTicks(text, tempo?)` | Ticks for `4n`, `8nt` (triplet), `4nd` (dotted), `1.2.0` or `480 ticks`; undefined for other text |
+| `timeValueSeconds(text, tempo?)` | Seconds for any time value, plus `250ms`, `2s`, `4hz` and a plain number of milliseconds; throws on other text |
+| `barsBeatsTicksAt(seconds, tempo, anchor = 0)` | The position at Session seconds |
+| `secondsAtBarsBeatsTicks(position, tempo, anchor = 0)` | The Session seconds of a position |
+| `formatBarsBeatsTicks(position)` | `bar.beat.tick`, as Max shows it |
+| `nextGridTime(position, interval, anchor = 0)` | The next multiple of `interval` seconds at or after `position` |
+
+```ts
+import {barsBeatsTicksAt, createMusicalTempo, formatBarsBeatsTicks, timeValueSeconds} from '@webmusic/kernel/transport';
+
+const tempo = createMusicalTempo({bpm: 90, beatsPerBar: 3, beatUnit: 4});
+timeValueSeconds('8nt', tempo); // one eighth-note triplet: 0.222… s
+formatBarsBeatsTicks(barsBeatsTicksAt(4, tempo)); // '3.1.0'
+```
+
 ## tick — @webmusic/kernel/tick
 
 `createTickSource(options)` delivers ticks on a cadence that survives
@@ -1499,6 +1602,36 @@ defineProcessor(voice, {
 declare const sampleRate: number; // an AudioWorkletGlobalScope global
 ```
 
+### Spectral frames
+
+`createSpectralFrame({size, hop = size / 4})` does overlap-add spectral
+processing for one channel (DEC-077). `process(input, output, onFrame)` takes
+blocks of any length; every `hop` samples a Hann-windowed frame is transformed
+and handed to `onFrame(real, imag)` to change in place, then inverted, windowed
+again and added to the output, scaled so an unchanged frame passes unchanged.
+The output lags the input by `latency` (= `size`) samples; `reset()` clears it.
+`hop` must divide `size` and be at most half of it. `createFFT(size)` (a power
+of two; `forward` and `inverse` in place, `inverse` scaled by 1/N) and
+`hannWindow(size)` are the parts it uses. Everything is allocated on creation.
+
+```ts
+import {createSpectralFrame, defineProcessor} from '@webmusic/kernel/processor-worklet';
+import type {ProcessorDefinition} from '@webmusic/kernel/processor';
+
+declare const brickwall: ProcessorDefinition; // one input, one output, mono
+
+defineProcessor(brickwall, {
+  create: () => ({frame: createSpectralFrame({size: 1024}), cut: (real: Float32Array, imag: Float32Array) => {
+    // Keep the lowest 64 bins and their mirror images.
+    for (let bin = 64; bin < real.length - 64; bin++) { real[bin] = 0; imag[bin] = 0; }
+  }}),
+  process(state, block) {
+    const input = block.inputs[0][0];
+    if (input) state.frame.process(input, block.outputs[0][0], state.cut);
+  },
+});
+```
+
 ## objects — @webmusic/kernel/objects
 
 Max-style message objects as project plugins (DEC-075). Each object is the
@@ -1533,7 +1666,8 @@ objectInterfaceOf(runtime.getModule('tick')); // undefined: metro shows no contr
 | Group | Object | Arguments | Inlets → outlets |
 | --- | --- | --- | --- |
 | Time | `loadbang` | — | bang → bang when the graph commits |
-| | `metro` | interval ms (500) | on/off, bang, `stop`; interval → bang every interval |
+| | `metro` | interval: ms (500) or a note value such as `4n` | on/off, bang, `stop`; interval → bang every interval; a note value locks to the beat while the Session plays |
+| | `transport` | — | bang → `bar beat tick`, BPM, seconds, playing (0 or 1) |
 | | `delay` | ms (0) | bang, `stop`, ms to start; ms → bang after the delay |
 | | `pipe` | ms (0) | any value, `clear`; ms → the value after the delay |
 | | `line` | start (`0.` for floats), grain ms (20) | target or target and ms, `stop`, `set`; ms; grain → values, bang at the end |
@@ -1549,6 +1683,9 @@ objectInterfaceOf(runtime.getModule('tick')); // undefined: metro shows no contr
 | | `scale` | in low, in high, out low, out high, exponent (1) | value; the four bounds → scaled value |
 | | `random` | range (2), seed | bang, `seed`; range → int from 0 |
 | | `print` | name (`print`) | any → nothing; writes `name: message` |
+| Notes | `makenote` | velocity (100), duration (ms or a time value, 250) | pitch, or pitch velocity duration; velocity; duration → `notes` (note output) |
+| | `poly` | config `voices` (1–64), `inlets`, `outlets` | `notes` input allocates a voice per note; owns one child context per voice |
+| | `voice` | — | inside a `poly` voice → `notes`, that voice's notes |
 | Sound | `sig` | initial value (0) | number → control output `output` set on the message's sample |
 | | `ramp` | initial value (0) | target, or target and ms pairs, `stop` → control output; bang at the end |
 | Interface | `button` | — | any → bang; flashes |
@@ -1562,15 +1699,48 @@ objectInterfaceOf(runtime.getModule('tick')); // undefined: metro shows no contr
 | | `inlet`, `outlet`, `inlet~`, `outlet~` | channel index | messages or audio crossing the enclosing component's boundary |
 | | `preset` | slots (16) | slot recalls, `store n`, `clear n`, `interp a b f`, `weights …` → slot |
 | | `nodes` | nodes (4) | `cursor x y`, `node i x y` → one weight per node |
+| Script | `js` | inlets (1), outlets (1); code in `config.state.code` | each message calls the script's function of its selector (`bang`, `msg_int`, `msg_float`, `list`, any word) or `anything`; `outlet(i, …)` sends, untimed (DEC-078) |
+| Channels | `mc.pack`, `mc.unpack` | config `channels` (2) | N single-channel audio inlets → one N-channel outlet, and back |
+| Input | `gamepad` | index (0) | → `button i value`, `axis i value` on change |
+| | `hid` | — | `open` (in a gesture) → `report id bytes…`; device name |
+| | `oscin` | `ws://` bridge address | → `/address args…`; `open`, `closed`, `error` |
+| | `oscout` | `ws://` bridge address | `/address args…` → sent as OSC; `open`, `closed`, `error` |
 
+One unquoted word of message text is a message with that selector: typed
+`stop` is `stop`, as in Max, and `"stop"` or `symbol stop` is a `symbol`.
 `set` changes an interface object's value without output, as in Max.
 `sig` and `ramp` drive a `ConstantSourceNode` with `setValueAtTime` and
 `linearRampToValueAtTime`, so their control output changes on the scheduled
 sample; connect it to a parameter as a modulation. A message cord to a
 parameter applies on the main thread, accurate to a scheduler period.
 
+`gamepad` polls every 16 ms; `hid` and `oscin`/`oscout` need the browser's
+WebHID and a WebSocket bridge the application runs (a page cannot open UDP).
+They reconnect every 2 s.
+
+`ScriptSandbox` runs user code in a Worker made from a Blob URL. Options:
+`api` (host functions the script calls as `<namespace>.<name>(…)`, answered with
+promises), `namespace` (`host`), `onPost`, `onOutlet`, `onError` and
+`createWorker`. `load(code)` compiles an object script, `deliver(inlet,
+message)` hands it a message, `evaluate(code)` runs REPL input in the Worker's
+global scope (with `await`, as a browser console runs it) and resolves with
+`{value, text}`, and `terminate()` stops the thread. A script cannot reach the
+page except through `api`, and a loop stalls only its thread; `fetch`,
+`XMLHttpRequest`, `WebSocket`, `EventSource` and `importScripts` are removed,
+but a dynamic `import()` still reaches the network, so it is not a security
+boundary for untrusted code. `scriptMessage(values)` turns `outlet` values into
+a message.
+
+```ts
+import {ScriptSandbox} from '@webmusic/kernel/objects';
+
+const sandbox = new ScriptSandbox({namespace: 'app', api: {tempo: () => 96}, onPost: text => console.log(text)});
+await sandbox.evaluate('const bpm = await app.tempo(); post("quarter is", 60 / bpm, "s")');
+sandbox.terminate();
+```
+
 `createObjectPlugins(environment?)` returns every plugin; `environment` may
-supply `clock(context)` (defaults to `messageClockFor`), `print(name, text,
+supply `createScriptWorker(source)` for `js` objects, `clock(context)` (defaults to `messageClockFor`), `print(name, text,
 moduleId)` (defaults to `console.log`), `random()` (defaults to `Math.random`)
 and `onError(error, moduleId)`. `OBJECT_NAMES` lists the names in palette order
 and `OBJECT_DEFINITIONS` the definitions. An interface object offers an

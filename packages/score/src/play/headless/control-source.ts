@@ -12,7 +12,8 @@ export interface MidiControlSourceOptions {
 
 /**
  * A Web MIDI input as a control source (DEC-076): control changes, pitch
- * bend and program changes. Each arrives as a Kernel `ControlEvent` for
+ * bend, program changes and channel pressure, plus polyphonic pressure and
+ * system exclusive as messages only (DEC-077). Each arrives as a Kernel `ControlEvent` for
  * listeners such as `ControlMappings`, and as a message on the `controls`
  * port: `cc controller value channel`, `bend value channel` (−8192…8191) or
  * `program number channel`, so a patch can use it too. Disposal restores the
@@ -62,6 +63,8 @@ export class MidiControlSource implements ModuleHandle {
 
   #receive(data: Uint8Array | number[]): void {
     if (this.#disposed || data.length < 2) return;
+    // System exclusive (DEC-077): the whole message as bytes, when the input allows it.
+    if (data[0] === 0xf0) { this.controls.send(message('sysex', Array.from(data, byte => intAtom(byte)))); return; }
     const status = data[0]! & 0xf0;
     const channel = data[0]! & 0x0f;
     if (this.#channel !== undefined && channel !== this.#channel) return;
@@ -69,6 +72,12 @@ export class MidiControlSource implements ModuleHandle {
     if (status === 0xb0 && data.length >= 3) event = {kind: 'cc', controller: data[1]! & 0x7f, value: data[2]! & 0x7f, channel};
     else if (status === 0xe0 && data.length >= 3) event = {kind: 'pitchbend', value: ((data[2]! & 0x7f) << 7 | (data[1]! & 0x7f)) - 8192, channel};
     else if (status === 0xc0) event = {kind: 'program', value: data[1]! & 0x7f, channel};
+    else if (status === 0xd0) event = {kind: 'pressure', value: data[1]! & 0x7f, channel};
+    else if (status === 0xa0 && data.length >= 3) {
+      // Polyphonic pressure names a note, which a control mapping cannot; it arrives as a message only.
+      this.controls.send(message('polypressure', [intAtom(data[1]! & 0x7f), intAtom(data[2]! & 0x7f), intAtom(channel)]));
+      return;
+    }
     if (!event) return;
     for (const listener of [...this.#listeners]) {
       try { listener(event); } catch { /* One listener cannot stop the others. */ }
@@ -76,5 +85,6 @@ export class MidiControlSource implements ModuleHandle {
     if (event.kind === 'cc') this.controls.send(message('cc', [intAtom(event.controller), intAtom(event.value), intAtom(channel)]));
     else if (event.kind === 'pitchbend') this.controls.send(message('bend', [intAtom(event.value), intAtom(channel)]));
     else if (event.kind === 'program') this.controls.send(message('program', [intAtom(event.value), intAtom(channel)]));
+    else if (event.kind === 'pressure') this.controls.send(message('pressure', [intAtom(event.value), intAtom(channel)]));
   }
 }

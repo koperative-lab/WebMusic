@@ -51,6 +51,8 @@ export interface ObjectEnvironment {
   readonly random?: () => number;
   /** Receives failures inside object behavior and message delivery. */
   readonly onError?: (error: unknown, moduleId: string) => void;
+  /** Creates the Worker a `js` object runs in, from its source text. Defaults to a Worker from a Blob URL (DEC-078). */
+  readonly createScriptWorker?: (source: string) => import('./script').ScriptWorkerLike;
 }
 
 /** What a behavior can do; given to {@link ObjectDefinition.create}. */
