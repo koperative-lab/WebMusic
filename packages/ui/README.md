@@ -554,7 +554,7 @@ verification workflow.
 
 ## License
 
-MIT
+Apache-2.0
 
 [docs]: ../../apps/doc/webmusic/src/content/docs/uikit/index.mdx
 [docs-presenters]: ../../apps/doc/webmusic/src/content/docs/uikit/catalog.mdx

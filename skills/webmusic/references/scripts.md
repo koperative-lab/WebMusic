@@ -26,7 +26,7 @@ files, not every imported file, and does not grant a public import path. Use
 installed `exports` and declarations for application imports. Styling output is
 reference text, not an installable stylesheet. Headless objects have no visual
 styling contract; choose a UI presenter or Element when styling the interface.
-Source and theme command output includes the bundled MIT license notice so it
+Source and theme command output includes the bundled Apache-2.0 license notice so it
 stays with source excerpts saved or passed to another tool.
 
 ## Start with an index or task bundle

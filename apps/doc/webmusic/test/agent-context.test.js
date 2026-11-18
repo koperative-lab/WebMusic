@@ -341,7 +341,7 @@ describe('agent context release and output contracts', () => {
   it('links stable component IDs to verified owning sources and contracts', async () => {
     const {files, manifest} = await generateAgentContext({root, extension: audioBridgeContext});
     const catalog = JSON.parse(files.get(manifest.catalog));
-    expect(catalog.license).toEqual({id: 'MIT', output: 'agent-context/LICENSE.txt'});
+    expect(catalog.license).toEqual({id: 'Apache-2.0', output: 'agent-context/LICENSE.txt'});
     expect(files.get(catalog.license.output)).toBe(await readFile(path.join(root, 'LICENSE'), 'utf8'));
     expect(catalog.stylesFormat).toBe('public-documentation');
     const player = catalog.components.find(({id}) => id === 'element/score-player');

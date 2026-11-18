@@ -62,7 +62,7 @@ export function componentCatalog(pages, presenters, composition, extension) {
   return {
     schemaVersion: 1,
     sourceScope: extension?.sourceScope ?? 'Selected owning implementation files at the verified release; imports and internal selectors are not public entry points.',
-    license: {id: 'MIT', output: licenseOutput},
+    license: {id: 'Apache-2.0', output: licenseOutput},
     stylesFormat: 'public-documentation',
     components,
     theme: {docs: ['agent-context/uikit/index.md'], source: themeSources.map(sourceOutput)},

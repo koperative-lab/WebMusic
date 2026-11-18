@@ -5,6 +5,11 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Relicense the source tree and its five packages from MIT to the Apache
+  License 2.0, with the copyright notice in `NOTICE`. Versions already
+  published under MIT keep that license. Contributions now require a
+  `Signed-off-by` trailer under the Developer Certificate of Origin 1.1 (`DCO`).
+
 - Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
   and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
   foundations do not contain the new module, Session and patch-editor entries.

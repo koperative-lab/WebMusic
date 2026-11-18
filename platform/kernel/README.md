@@ -465,4 +465,4 @@ what deliberately stayed per-family — lives in
 
 ## License
 
-MIT
+Apache-2.0

@@ -269,7 +269,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs && node scripts/check-cjs-worker-client.mjs && node ../../scripts/bundle-notices.mjs && node ../../scripts/package-artifacts.mjs --write",
@@ -320,7 +321,7 @@
     "typescript": "^5.4.0",
     "vitest": "^5.1.0"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },

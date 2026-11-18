@@ -73,4 +73,4 @@ duration; detach the binding before disposing the renderer. `<audio-view>` owns
 a private timeline that no adapter can borrow, so pair standalone chrome with a
 standalone renderer and keep one player/follow owner per composition.
 
-MIT.
+Apache-2.0

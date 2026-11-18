@@ -512,4 +512,4 @@ Register one at a time with `define*` or the whole set with `defineAllElements()
 [Web Component docs](https://github.com/mrsteamedbun/WebMusic/tree/main/apps/doc/webmusic-score/src/content/docs/web-component/play.mdx)
 for attribute / event tables.
 
-MIT
+Apache-2.0
