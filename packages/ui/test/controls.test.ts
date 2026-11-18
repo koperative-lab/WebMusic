@@ -92,6 +92,82 @@ describe('single-value controls', () => {
     expect(state.get().value).toBe(0);
   });
 
+  it('a dial turns by dragging: up raises the value, and a press alone sends nothing', () => {
+    const state = store({value: 0, min: 0, max: 160});
+    const setValue = vi.fn((value: number) => state.set({...state.get(), value}));
+    const dial = mountDial(host(), {snapshot: () => state.get(), setValue, subscribe: state.subscribe});
+    const knob = dial.element.querySelector<HTMLElement>('.wui-knob')!;
+    const pointer = (type: string, clientX: number, clientY: number) => {
+      const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX, clientY});
+      Object.defineProperty(event, 'pointerId', {configurable: true, value: 1});
+      knob.dispatchEvent(event);
+    };
+    pointer('pointerdown', 10, 100);
+    pointer('pointerup', 10, 100);
+    expect(setValue).not.toHaveBeenCalled();
+    // Forty pixels up is a quarter of the range: the whole range takes 160 px.
+    pointer('pointerdown', 10, 100);
+    pointer('pointermove', 10, 60);
+    expect(state.get().value).toBe(40);
+    pointer('pointermove', 10, 120);
+    expect(state.get().value).toBe(0);
+    pointer('pointerup', 10, 120);
+    expect(dial.element.querySelector('.wui-control__readout')!.textContent).toBe('0');
+  });
+
+  it('fills its host when asked to, and keeps its natural size otherwise', () => {
+    const state = store({value: 0, min: 0, max: 127});
+    const range = {snapshot: () => state.get(), setValue: (value: number) => state.set({...state.get(), value}), subscribe: state.subscribe};
+    const natural = mountToggle(host(), {snapshot: () => ({on: false}), setOn: () => {}});
+    expect(natural.element.dataset.fill).toBeUndefined();
+    const filling = [
+      mountToggle(host(), {snapshot: () => ({on: true}), setOn: () => {}}, {fill: true}),
+      mountSlider(host(), range, {fill: true}),
+      mountDial(host(), range, {fill: true}),
+      mountMatrix(host(), {snapshot: () => ({columns: 3, rows: 2, cells: [0, 0, 0, 0, 0, 0]}), setCell: () => {}}, {fill: true}),
+      mountPresetGrid(host(), {snapshot: () => ({count: 4, stored: [], current: 0}), recall: () => {}, store: () => {}}, {fill: true}),
+    ];
+    for (const control of filling) expect(control.element.dataset.fill).toBe('true');
+    // The knob gives up its own size; a matrix and a short preset grid share the host between their cells.
+    const knob = filling[2]!.element.querySelector<HTMLElement>('.wui-knob')!;
+    expect([knob.style.width, knob.style.height, knob.style.flexGrow]).toEqual(['100%', 'auto', '1']);
+    expect(filling[3]!.element.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+    expect(filling[4]!.element.style.getPropertyValue('--wui-preset-columns')).toBe('4');
+    expect(mountMatrix(host(), {snapshot: () => ({columns: 3, rows: 2, cells: []}), setCell: () => {}}).element.style.gridTemplateColumns).toBe('repeat(3, auto)');
+  });
+
+  it('an automatic slider stands upright when it is taller than wide, and keeps the value', () => {
+    let observed: (() => void) | undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { observed = callback; } observe(): void {} disconnect = disconnect; });
+    try {
+      const state = store({value: 32, min: 0, max: 127});
+      const slider = mountSlider(host(), {snapshot: () => state.get(), setValue: (value: number) => state.set({...state.get(), value}), subscribe: state.subscribe}, {fill: true, orientation: 'auto'});
+      const size = (width: number, height: number) => {
+        Object.defineProperty(slider.element, 'clientWidth', {configurable: true, value: width});
+        Object.defineProperty(slider.element, 'clientHeight', {configurable: true, value: height});
+        observed!();
+      };
+      expect(slider.element.querySelector('.wui-fader--horizontal')).not.toBeNull();
+      size(48, 160);
+      const upright = slider.element.querySelector<HTMLElement>('.wui-fader')!;
+      expect(upright.classList.contains('wui-fader--horizontal')).toBe(false);
+      expect(slider.element.dataset.orientation).toBe('vertical');
+      expect(slider.element.querySelectorAll('.wui-fader')).toHaveLength(1);
+      expect(upright.getAttribute('aria-valuetext')).toBe('32');
+      key(upright, 'End');
+      expect(state.get().value).toBe(127);
+      // An empty size, before layout, turns nothing.
+      size(0, 0);
+      expect(slider.element.dataset.orientation).toBe('vertical');
+      size(160, 48);
+      expect(slider.element.querySelector('.wui-fader--horizontal')).not.toBeNull();
+      expect(slider.element.dataset.orientation).toBeUndefined();
+      slider.destroy();
+      expect(disconnect).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it('message box shows its text and presses', () => {
     const press = vi.fn();
     const handle = mountMessage(host(), {snapshot: () => ({text: 'set 3, 440'}), press});

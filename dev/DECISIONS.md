@@ -3556,6 +3556,62 @@ survival across a move; a Bridge test that a sized presentation item keeps
 its size; Studio canvas tests for resizing, grid snapping, the no-overlap
 rule and arrangement; browser evidence and the owner's manual checks.
 
+## DEC-080 — A box sizes what it holds
+
+**Date / status:** 2026-11-18; accepted by the repository owner, who asked
+that every object adapt to the size of its box and reported that dials and
+buttons on the canvas could not change the values cabled to them.
+Delivery: STATUS ORG-01.
+
+**Problem:** DEC-079 recorded a box's size, but only the box followed it. A
+control kept its one-row size in a corner of a larger box, so most of the box
+did nothing when pressed; a keyboard, a scope, a meter, a spectrum, a roll and
+a buffer kept their own heights and left the rest of a taller box empty. The
+dial was read by the angle of the pointer from its centre, which on a control
+24 px across turns a vertical drag — the usual way to turn a small dial —
+into one jump to the middle and nothing after it. Studio and the exported
+component also disagreed about the natural size of a control.
+
+**Decision:**
+
+- UI Kit controls accept `fill`: the control takes its host's whole width and
+  height, and its glyph, track, knob or cells scale with it. A slider accepts
+  `orientation: 'auto'` and stands upright while it is taller than it is wide.
+- `createKnob` accepts `gesture: 'drag'`: the value changes by the distance
+  dragged from the press (up or right raises it; `dragDistance` pixels for the
+  whole range, 160 by default) and a press without a drag changes nothing.
+  `'angle'` stays the default for `createKnob`. `mountDial` uses `'drag'`.
+- The Bridge's `mountObjectControl` always fills its host. `controlSize(name,
+  text)` gives each control's natural size in CSS pixels, in cells of 32 px,
+  and `viewWidth(kind)` each view's natural width; a box without a recorded
+  size takes these, in Studio and in `mountComponent` alike.
+- `fitViewElement(element, kind, box)` makes a view as tall as its box: the
+  drawing takes the height its readouts and tools leave, through the element's
+  public height token or `height` attribute, and follows the box when it is
+  resized. `mountComponent` uses it for every item with a recorded size.
+
+**Alternatives considered:** scaling a box's content with a CSS transform,
+which blurs canvases and scales text and hit targets with the box; container
+query units inside the controls, which need size containment and so give a
+control no natural size at all; keeping the angle-read dial and enlarging it,
+which leaves a small dial unusable; a relative drag on `createKnob` by
+default, which would change the transport's shipped volume knob.
+
+**Consequences:** a control's host must have a size: `fill` gives a control
+no size of its own. An exported component's unsized controls change from a
+160 × 60 cell to their natural size, matching what Studio's interface shows.
+A view in a box too short for its tools is clipped by the box. Elements other
+than the six view kinds need a fitting of their own before they can follow a
+box.
+
+**Owner:** [Organization](design/ORGANIZATION.md#layout); the control
+contract is in the [controls reference](../doc/src/content/docs/uikit/parameters-gestures/controls.mdx).
+
+**Verification:** UI Kit tests for the drag gesture, `fill` and the automatic
+slider; Bridge tests for natural sizes, an unsized cell and view fitting;
+Studio tests for the box frames; browser evidence and the owner's manual
+checks for every object at its natural, an enlarged and a reduced size.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

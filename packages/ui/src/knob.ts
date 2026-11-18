@@ -12,6 +12,10 @@ import {neutralColor} from './internal/palette';
  * installs no stylesheet still gets a correct, themeable control. Pointer,
  * keyboard and ARIA come from {@link mountSurfaceSlider}.
  *
+ * The pointer reads the dial one of two ways ({@link KnobOptions.gesture}):
+ * by the angle from its centre, or by how far a drag has travelled. Angle
+ * suits a dial large enough to aim at; a small dial is turned by dragging.
+ *
  * `mountParameterRack` draws its own knobs and keeps doing so. Theirs is a
  * different mechanism — an invisible native `<input type="range">` under an
  * SVG, with the geometry in the rack's stylesheet — and it works there because
@@ -38,6 +42,15 @@ export interface KnobOptions {
   disabled?: boolean;
   /** Arrow-key step, as a fraction of the range. Defaults to `0.05`. */
   keyboardStep?: number;
+  /**
+   * How the pointer turns the dial. `'angle'` (the default) sets the value
+   * under the pointer, measured round the centre. `'drag'` changes the value
+   * by the distance dragged from where the press began: up or right raises
+   * it, down or left lowers it, and a press without a drag changes nothing.
+   */
+  gesture?: 'angle' | 'drag';
+  /** With `gesture: 'drag'`, the pixels a drag travels for the whole range. Defaults to `160`. */
+  dragDistance?: number;
   /** Compatibility classes added alongside the canonical `wui-knob*` names. */
   classNames?: KnobClassNames;
   /** Additional CSS part tokens added alongside the canonical part names. */
@@ -136,8 +149,8 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
   element.style.position = 'relative';
   element.style.boxSizing = 'border-box';
   element.style.flex = '0 0 auto';
-  // The shared control height, not a private literal. The dial is read by
-  // angle from its centre, so its size never changes the drag geometry.
+  // The shared control height, not a private literal. Neither gesture reads
+  // the dial's size: an angle has none and a drag is measured in pixels.
   const size = `var(--wm-knob-size, ${controlHeight('knob')})`;
   element.style.width = size;
   element.style.height = size;
@@ -203,16 +216,22 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
     slider?.update();
   };
 
+  const dragged = options.gesture === 'drag';
+  const distance = Math.max(1, options.dragDistance ?? 160);
+  if (dragged) element.style.cursor = 'ns-resize';
   paintPixels();
   slider = mountSurfaceSlider(
     element,
     {
       snapshot: () => ({minimum: 0, maximum: 1, value: level, disabled}),
-      // A dial is read by ANGLE, not by how far down the box the pointer is:
-      // over a 36px control an absolute vertical mapping gives the whole range
-      // in a couple of finger-widths. Angle needs no relative-drag mode in
-      // `mountSurfaceSlider`, which has no concept of one.
       valueAt: (point) => {
+        // A drag is relative: the value the press began at, moved by the
+        // distance travelled. Up and right raise it.
+        const travel = point.gesture;
+        if (dragged && travel) return travel.startValue + (travel.deltaX - travel.deltaY) / distance;
+        // Otherwise the dial is read by ANGLE, not by how far down the box the
+        // pointer is: over a 36px control an absolute vertical mapping gives
+        // the whole range in a couple of finger-widths.
         const cx = point.rect.width / 2;
         const cy = point.rect.height / 2;
         const degrees = (Math.atan2(point.x - cx, cy - point.y) * 180) / Math.PI;
@@ -224,6 +243,8 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
       },
       commit: (value) => {
         const next = clamp01(value);
+        // A press that never became a drag leaves the value, and its owner, alone.
+        if (dragged && next === level) return;
         paint(next);
         options.onInput?.(next);
       },
@@ -231,6 +252,7 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
     {
       label: options.label,
       orientation: 'vertical',
+      ...(dragged ? {pointerMode: 'drag' as const} : {}),
       keyboardStep: options.keyboardStep ?? 0.05,
       formatValue: options.formatValue ?? ((value) => `${Math.round(value * 100)}%`),
       onError: options.onError,

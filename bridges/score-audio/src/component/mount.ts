@@ -12,10 +12,10 @@ import {ModuleAudioEnvironment, ModuleProjectRuntime, ProjectPluginRegistry, par
   type ModuleProject, type ProjectAssetReference, type ProjectModuleRecord, type ProjectPluginFactory} from '@webmusic/kernel/module';
 import {objectInterfaceOf, parseArgs, OBJECT_PLUGIN_PREFIX} from '@webmusic/kernel/objects';
 import {mountTransport, type TransportHandle} from '@webmusic/ui/transport';
-import {CONTROL_OBJECTS, mountObjectControl, type ObjectControl} from './controls';
+import {CONTROL_OBJECTS, controlSize, mountObjectControl, type ObjectControl} from './controls';
 import {createComponentPlugins, resolveComponentAsset, type ComponentPluginOptions} from './plugins';
 import {ComponentSurfaces, surfaceKindOf} from './surfaces';
-import {bindBufferView, bindViewElement, createViewElement, defineViewElements} from './views';
+import {bindBufferView, bindViewElement, createViewElement, defineViewElements, fitViewElement, viewWidth} from './views';
 
 export interface MountComponentOptions extends Omit<ComponentPluginOptions, 'surfaces'> {
   /** Replace the standard plugins entirely; `extra`, `midi`, `wam` and `objects` are then ignored. */
@@ -51,8 +51,11 @@ const STYLE = `
 .wmc__stage { position: relative; overflow: auto; scrollbar-width: none; }
 .wmc__extent { pointer-events: none; }
 .wmc__stage::-webkit-scrollbar { display: none; }
-.wmc__item { position: absolute; min-width: 32px; }
+.wmc__item { position: absolute; box-sizing: border-box; }
 .wmc__item[data-sized] { overflow: hidden; }
+.wmc__item[data-sized] > * { box-sizing: border-box; width: 100%; }
+/* A drawing in a resized box may be shorter than it would choose to be. */
+.wmc__item[data-sized] [part~="plot"] { min-height: 32px; }
 `;
 
 const BUFFER_PLUGIN = `${OBJECT_PLUGIN_PREFIX}buffer`;
@@ -160,25 +163,29 @@ export function mountComponent(host: HTMLElement | ShadowRoot, input: unknown, o
     const kind = surfaceKindOf(record.plugin.id);
     if (kind) {
       const element = createViewElement(kind, record.config, document);
-      element.style.width = sized ? '100%' : '320px';
-      if (sized) element.style.height = '100%';
+      if (!sized) element.style.width = `${viewWidth(kind)}px`;
       cell.append(element);
-      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 320, height: sizedHeight ?? 180});
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? viewWidth(kind), height: sizedHeight ?? 180});
       releases.push(bindViewElement(element, kind, surfaces.slot(record.id), resume));
+      // In a resized box the view draws as tall as the box.
+      if (sized) releases.push(fitViewElement(element, kind, cell));
     } else if (isBuffer(record)) {
       const element = document.createElement('audio-clip-view');
-      element.setAttribute('height', String(sized ? Math.round(sizedHeight) : 120));
-      element.style.width = sized ? '100%' : '320px';
+      element.setAttribute('height', '120');
+      if (!sized) element.style.width = `${viewWidth('buffer')}px`;
       cell.append(element);
-      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 320, height: sizedHeight ?? 150});
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? viewWidth('buffer'), height: sizedHeight ?? 150});
       const name = parseArgs(record.config)[0];
       if (name?.type === 'symbol') releases.push(bindBufferView(element, name.value, sharedBuffersFor(audio.prepare()), audio.prepare(), {editable: options.editableBuffers, onError: report}));
+      if (sized) releases.push(fitViewElement(element, 'buffer', cell));
     } else {
-      const label = record.label ?? nameOf(record);
-      // A control fills a cell of the size Studio gives it.
-      if (!sized) { cell.style.width = '160px'; cell.style.minHeight = '60px'; }
-      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? 160, height: sizedHeight ?? 60});
-      controls.set(record.id, mountObjectControl(cell, nameOf(record), {label, cardHost: root, onError: report}));
+      const name = nameOf(record);
+      const label = record.label ?? name;
+      // A control fills its cell: the size Studio gave it, or its natural one.
+      const natural = controlSize(name, label);
+      if (!sized) { cell.style.width = `${natural.width}px`; cell.style.height = `${natural.height}px`; }
+      cells.push({cell, x: x - minX, y: y - minY, width: sizedWidth ?? natural.width, height: sizedHeight ?? natural.height});
+      controls.set(record.id, mountObjectControl(cell, name, {label, cardHost: root, onError: report}));
     }
   }
   fit();

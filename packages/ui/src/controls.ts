@@ -25,6 +25,12 @@ export interface ControlOptions {
   part?: string;
   /** Install the controls stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
+  /**
+   * Fill the host instead of keeping the control's natural size: the control
+   * takes the host's whole width and height and has no size of its own, so
+   * the host must have one, as a resizable box does.
+   */
+  fill?: boolean;
   /** Receives binding, command and subscription failures. */
   onError?: (error: unknown) => void;
 }
@@ -116,6 +122,23 @@ export const controlsStyle = String.raw`
 }
 :where(.wui-control__target[data-mapped="true"]) { border-style: solid; }
 :where(.wui-control__target[aria-pressed="true"]) { border-width: 2px; }
+/* Fill: the control takes its host's whole size; the host decides what that is. */
+:where(.wui-control[data-fill="true"]) {
+  display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  --wm-fader-length: 100%; --wm-fader-thickness: 100%; --wm-fader-width: 100%; --wm-fader-height: 100%;
+}
+:where(.wui-control[data-fill="true"] > .wui-control__cell) { position: relative; flex: 1 1 0; width: auto; min-width: 0; height: auto; overflow: hidden; }
+:where(.wui-control--button[data-fill="true"] svg, .wui-control--toggle[data-fill="true"] svg) { position: absolute; inset: 15%; width: 70%; height: 70%; }
+:where(.wui-control[data-fill="true"] .wui-control__field) { min-width: 0; height: auto; }
+:where(.wui-control--slider[data-fill="true"]) { align-items: stretch; }
+:where(.wui-control--dial[data-fill="true"]) { align-items: stretch; gap: 0; }
+:where(.wui-control--dial[data-fill="true"] .wui-control__readout) { flex: none; padding: .125rem 0; overflow: hidden; text-align: center; text-overflow: ellipsis; }
+:where(.wui-control--tabs[data-fill="true"] .wui-control__cell) { padding: 0 .25rem; white-space: nowrap; }
+:where(.wui-control--multislider[data-fill="true"]) { height: 100%; }
+:where(.wui-control--matrix[data-fill="true"], .wui-control--preset[data-fill="true"]) { display: grid; grid-auto-rows: minmax(0, 1fr); padding: 1px 0 0 1px; }
+:where(.wui-control--preset[data-fill="true"]) { grid-template-columns: repeat(var(--wui-preset-columns, 8), minmax(0, 1fr)); }
+:where(.wui-control--matrix[data-fill="true"] .wui-control__cell, .wui-control--preset[data-fill="true"] .wui-control__cell) { width: auto; min-width: 0; height: auto; }
+:where(.wui-control--nodes[data-fill="true"] .wui-control__pad) { min-width: 0; height: 100%; aspect-ratio: auto; }
 ${faderStyle}
 ${knobStyle}
 `;
@@ -142,6 +165,7 @@ function mountControl<B extends Subscribable>(
   root.className = `wui-control wui-control--${name}`;
   addClassNames(root, options.className);
   setParts(root, name, options.part);
+  if (options.fill) root.dataset.fill = 'true';
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
   // Assigned once the host is claimed; closures above read it through the holder.
@@ -344,7 +368,14 @@ export function mountNumber(host: HTMLElement | ShadowRoot, binding: NumberBindi
 
 export interface RangeState { value: number; min: number; max: number; step?: number; float?: boolean; disabled?: boolean }
 export interface RangeBinding extends Subscribable { snapshot(): RangeState; setValue(value: number): unknown }
-export interface SliderOptions extends ControlOptions { orientation?: 'horizontal' | 'vertical' }
+export interface SliderOptions extends ControlOptions {
+  /**
+   * Track direction. `'auto'` follows the control's own shape: upright when it
+   * is taller than it is wide, level otherwise, and again whenever its size
+   * changes. Meant for use with `fill`.
+   */
+  orientation?: 'horizontal' | 'vertical' | 'auto';
+}
 
 const fraction = (state: RangeState) => state.max === state.min ? 0 : (finite(state.value) - state.min) / (state.max - state.min);
 const fromFraction = (state: RangeState, level: number) => {
@@ -357,31 +388,62 @@ const fromFraction = (state: RangeState, level: number) => {
 /** A fader over a value range, horizontal by default. */
 export function mountSlider(host: HTMLElement | ShadowRoot, binding: RangeBinding, options: SliderOptions = {}): ControlHandle {
   return mountControl('slider', host, binding, options, (root, report) => {
-    const fader = createFader(root.ownerDocument, {
-      label: options.label ?? 'Slider',
-      orientation: options.orientation ?? 'horizontal',
-      formatValue: level => formatControlNumber(fromFraction(binding.snapshot(), level), binding.snapshot().float),
-      onInput: level => command(report, () => binding.setValue(fromFraction(binding.snapshot(), level))),
-      onError: report,
-    });
-    if (options.orientation === 'vertical') root.dataset.orientation = 'vertical';
-    root.append(fader.element);
+    const make = (orientation: 'horizontal' | 'vertical') => {
+      const made = createFader(root.ownerDocument, {
+        label: options.label ?? 'Slider',
+        orientation,
+        formatValue: level => formatControlNumber(fromFraction(binding.snapshot(), level), binding.snapshot().float),
+        onInput: level => command(report, () => binding.setValue(fromFraction(binding.snapshot(), level))),
+        onError: report,
+      });
+      if (orientation === 'vertical') root.dataset.orientation = 'vertical'; else delete root.dataset.orientation;
+      root.replaceChildren(made.element);
+      return made;
+    };
+    const paint = () => { const state = binding.snapshot(); fader.paint(fraction(state), state.disabled === true); };
+    let upright = options.orientation === 'vertical';
+    let fader = make(upright ? 'vertical' : 'horizontal');
+    // An automatic slider turns to follow its shape; the fader is rebuilt, the value is the binding's.
+    const view = root.ownerDocument.defaultView;
+    const observer = options.orientation === 'auto' && view && typeof view.ResizeObserver === 'function'
+      ? new view.ResizeObserver(() => {
+        const next = root.clientHeight > root.clientWidth;
+        if (next === upright || !root.clientWidth || !root.clientHeight) return;
+        upright = next;
+        const focused = root.contains(root.ownerDocument.activeElement);
+        fader.destroy();
+        fader = make(upright ? 'vertical' : 'horizontal');
+        paint();
+        if (focused) fader.element.focus();
+      }) : undefined;
+    observer?.observe(root);
     return {
-      paint: () => { const state = binding.snapshot(); fader.paint(fraction(state), state.disabled === true); },
-      destroy: () => fader.destroy(),
+      paint,
+      destroy: () => { observer?.disconnect(); fader.destroy(); },
     };
   });
 }
 
-/** A rotary knob with its value under it. */
+/**
+ * A rotary knob with its value under it. A drag turns it: up or right raises
+ * the value, down or left lowers it.
+ */
 export function mountDial(host: HTMLElement | ShadowRoot, binding: RangeBinding, options: ControlOptions = {}): ControlHandle {
   return mountControl('dial', host, binding, options, (root, report) => {
     const knob = createKnob(root.ownerDocument, {
       label: options.label ?? 'Dial',
+      gesture: 'drag',
       formatValue: level => formatControlNumber(fromFraction(binding.snapshot(), level), binding.snapshot().float),
       onInput: level => command(report, () => binding.setValue(fromFraction(binding.snapshot(), level))),
       onError: report,
     });
+    if (options.fill) {
+      // The knob takes the room its readout leaves; its drawing keeps its shape inside it.
+      knob.element.style.flex = '1 1 0';
+      knob.element.style.width = '100%';
+      knob.element.style.height = 'auto';
+      knob.element.style.minHeight = '0';
+    }
     const readout = root.ownerDocument.createElement('span');
     readout.className = 'wui-control__readout';
     readout.setAttribute('aria-hidden', 'true');
@@ -689,7 +751,7 @@ export function mountMatrix(host: HTMLElement | ShadowRoot, binding: MatrixBindi
       const columns = Math.max(1, Math.trunc(state.columns)), rows = Math.max(1, Math.trunc(state.rows));
       if (shape !== `${columns}x${rows}`) {
         shape = `${columns}x${rows}`;
-        root.style.gridTemplateColumns = `repeat(${columns}, auto)`;
+        root.style.gridTemplateColumns = options.fill ? `repeat(${columns}, minmax(0, 1fr))` : `repeat(${columns}, auto)`;
         buttons = Array.from({length: columns * rows}, (_, index) => {
           const column = index % columns, row = Math.floor(index / columns);
           const button = cell(root.ownerDocument, `Column ${column + 1}, row ${row + 1}`);
@@ -764,6 +826,8 @@ export function mountPresetGrid(host: HTMLElement | ShadowRoot, binding: PresetG
           });
           return button;
         });
+        // Fewer than eight slots share the width between them when the grid fills its host.
+        root.style.setProperty('--wui-preset-columns', String(Math.min(8, count)));
         root.replaceChildren(...cells);
       }
       cells.forEach((button, index) => {

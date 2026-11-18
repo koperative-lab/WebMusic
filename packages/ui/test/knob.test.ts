@@ -103,6 +103,40 @@ describe('createKnob', () => {
     knob.destroy();
   });
 
+  it('turns by the distance dragged when asked to, and leaves the value alone on a press', () => {
+    const onInput = vi.fn();
+    const knob = createKnob(document, {label: 'Cutoff', value: 0.25, gesture: 'drag', dragDistance: 200, onInput});
+    withRect(knob.element, 24);
+
+    // A press alone changes nothing, wherever on the dial it lands.
+    knob.element.dispatchEvent(pointerEvent('pointerdown', 12, 2, 1));
+    knob.element.dispatchEvent(pointerEvent('pointerup', 12, 2, 1));
+    expect(onInput).not.toHaveBeenCalled();
+    expect(knob.value).toBe(0.25);
+
+    // Fifty pixels up is a quarter of a 200 px range; the pointer may leave the dial.
+    knob.element.dispatchEvent(pointerEvent('pointerdown', 12, 12, 2));
+    knob.element.dispatchEvent(pointerEvent('pointermove', 12, -38, 2));
+    expect(onInput).toHaveBeenLastCalledWith(0.5);
+    // Down again past where it began: lower than the start. Right raises as up does.
+    knob.element.dispatchEvent(pointerEvent('pointermove', 12, 32, 2));
+    expect(onInput).toHaveBeenLastCalledWith(expect.closeTo(0.15, 5));
+    knob.element.dispatchEvent(pointerEvent('pointermove', 52, 32, 2));
+    expect(onInput).toHaveBeenLastCalledWith(expect.closeTo(0.35, 5));
+    // The range ends at its ends.
+    knob.element.dispatchEvent(pointerEvent('pointermove', 12, 900, 2));
+    expect(onInput).toHaveBeenLastCalledWith(0);
+    knob.element.dispatchEvent(pointerEvent('pointerup', 12, 900, 2));
+    expect(knob.value).toBe(0);
+
+    // The next drag starts from the value it finds.
+    knob.paint(0.5);
+    knob.element.dispatchEvent(pointerEvent('pointerdown', 12, 12, 3));
+    knob.element.dispatchEvent(pointerEvent('pointermove', 12, -8, 3));
+    expect(onInput).toHaveBeenLastCalledWith(0.6);
+    knob.destroy();
+  });
+
   it('sizes from the shared control height and focuses inside the dial', () => {
     const knob = createKnob(document, {label: 'Volume'});
     expect(knob.element.style.width).toBe('var(--wm-knob-size, var(--wm-knob-height, var(--wm-control-size, var(--wui-row-h, 2rem))))');

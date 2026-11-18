@@ -95,6 +95,108 @@ export function bindViewElement(element: HTMLElement, kind: SurfaceKind, slot: S
   return slot.analyser.subscribe(apply);
 }
 
+const WIDTHS: Readonly<Record<SurfaceKind | 'buffer', number>> = Object.freeze({keys: 320, roll: 320, buffer: 320, scope: 288, spectrum: 288, meter: 224});
+
+/**
+ * The natural width of a view object's element, in CSS pixels: the width of
+ * its box until the author resizes it. Its natural height is its own.
+ */
+export function viewWidth(kind: SurfaceKind | 'buffer'): number { return WIDTHS[kind]; }
+
+/** How a view's drawing takes a height: which part is measured and what is written. */
+interface Fitting {
+  /** The whole of what the element draws, and the part of it whose height is set. */
+  parts?(root: ParentNode): {content: HTMLElement | null; surface: HTMLElement | null};
+  write(element: HTMLElement, pixels: number): void;
+  /** Give the element its own height back. `initial` is its `height` attribute before fitting. */
+  clear(element: HTMLElement, initial: string | null): void;
+  /** The least height written, in CSS pixels. */
+  readonly least: number;
+}
+
+const token = (name: string, content: string, surface: string, least: number): Fitting => ({
+  parts: root => ({content: root.querySelector<HTMLElement>(content), surface: root.querySelector<HTMLElement>(surface)}),
+  write: (element, pixels) => element.style.setProperty(name, `${pixels}px`),
+  clear: element => element.style.removeProperty(name),
+  least,
+});
+const attribute = (least: number, parts?: Fitting['parts']): Fitting => ({
+  ...(parts ? {parts} : {}),
+  write: (element, pixels) => { if (element.getAttribute('height') !== String(pixels)) element.setAttribute('height', String(pixels)); },
+  clear: (element, initial) => { if (initial === null) element.removeAttribute('height'); else element.setAttribute('height', initial); },
+  least,
+});
+
+// Parts are the presenters' public names for their pieces; their classes are not.
+const FITTINGS: Readonly<Record<SurfaceKind | 'buffer', Fitting>> = Object.freeze({
+  keys: token('--wm-note-height', '[part~="root"]', '[part~="viewport"]', 24),
+  scope: token('--wm-oscilloscope-height', '[part~="root"]', '[part~="plot"]', 32),
+  spectrum: token('--wm-spectrum-height', '[part~="root"]', '[part~="plot"]', 32),
+  // The meter and the roll take their whole height as an attribute.
+  meter: attribute(32),
+  roll: attribute(48),
+  // A clip view's attribute counts its tools and ruler; what it draws is measured.
+  buffer: attribute(96, root => { const section = root.querySelector<HTMLElement>('section'); return {content: section, surface: null}; }),
+});
+
+/**
+ * Make a view element as tall as its box (DEC-080): the part that draws takes
+ * the height its tools and readouts leave, and follows the box when it is
+ * resized. The element must already be inside the box, which sets its width.
+ * Returns the release function, which gives the element its own height back.
+ */
+export function fitViewElement(element: HTMLElement, kind: SurfaceKind | 'buffer', box: HTMLElement | null = element.parentElement): () => void {
+  const fitting = FITTINGS[kind];
+  const view = element.ownerDocument.defaultView;
+  if (!box || !view || typeof view.ResizeObserver !== 'function') return () => {};
+  const initial = element.getAttribute('height');
+  let written: number | undefined;
+  let watched: HTMLElement | undefined;
+  let frame = 0;
+  let tries = 0;
+  let released = false;
+  const apply = () => {
+    frame = 0;
+    if (released) return;
+    const available = box.clientHeight;
+    if (available <= 0) return;
+    let next = available;
+    if (fitting.parts) {
+      const {content, surface} = fitting.parts(element.shadowRoot ?? element);
+      // The element draws itself after it is connected, a clip view only once it has samples.
+      if (!content || (!surface && written === undefined)) {
+        if (written === undefined) { written = Math.max(fitting.least, available); fitting.write(element, written); }
+        if (tries++ < 120) schedule();
+        return;
+      }
+      // A readout that wraps or a tool row that appears changes what is left for the drawing.
+      if (content !== watched) {
+        if (watched) observer.unobserve(watched);
+        observer.observe(content);
+        watched = content;
+      }
+      const drawn = surface ? surface.offsetHeight : written!;
+      next = drawn + available - content.offsetHeight;
+    }
+    next = Math.max(fitting.least, Math.round(next));
+    if (next === written) return;
+    written = next;
+    fitting.write(element, next);
+    // What surrounds the drawing can change with its size: measure once more.
+    if (fitting.parts && tries++ < 120) schedule();
+  };
+  const schedule = () => { if (!frame && !released) frame = view.requestAnimationFrame(apply); };
+  const observer = new view.ResizeObserver(() => { tries = 0; schedule(); });
+  observer.observe(box);
+  schedule();
+  return () => {
+    released = true;
+    observer.disconnect();
+    if (frame) view.cancelAnimationFrame(frame);
+    if (written !== undefined) fitting.clear(element, initial);
+  };
+}
+
 export interface BufferViewOptions {
   /** Allow editing; each committed edit is rendered and written back to the buffer. */
   readonly editable?: boolean;

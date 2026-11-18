@@ -150,7 +150,7 @@ The entry also exports the shared controls used by the volume slider.
 | `transportStateStyle` | `string` | Transport, fader and knob focus/disabled feedback, without host or layout rules. Included in `transportStyle`; useful alongside inline geometry. |
 | `createFader(document, options)` | `(Document, FaderOptions) => FaderHandle` | The kit's shared level control: a painted track, fill and handle on a `0…1` scale, in either orientation. Pointer, keyboard and ARIA come from `mountSurfaceSlider`. |
 | `faderStyle` | `string` | The fader's focus ring and disabled affordance — the two things its inline geometry cannot express. |
-| `createKnob(document, options)` | `(Document, KnobOptions) => KnobHandle` | The knob to the fader's fader: a painted arc and pointer on a `0…1` scale, read by angle. Same inline geometry, same `mountSurfaceSlider` behaviour. |
+| `createKnob(document, options)` | `(Document, KnobOptions) => KnobHandle` | The knob to the fader's fader: a painted arc and pointer on a `0…1` scale, read by angle; `gesture: 'drag'` reads the distance dragged instead (`dragDistance` pixels for the range, `160` by default). Same inline geometry, same `mountSurfaceSlider` behaviour. |
 | `knobStyle` | `string` | The knob's focus ring and disabled affordance. |
 
 **Utility**

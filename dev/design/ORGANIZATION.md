@@ -56,6 +56,15 @@ fills; without them the box takes its natural size
 ([DEC-079](../DECISIONS.md#dec-079--a-layout-records-a-resized-boxs-size)).
 Grid snapping, keeping boxes apart and arranging them by their cords are
 editor behavior, not project data.
+
+A box sizes what it holds
+([DEC-080](../DECISIONS.md#dec-080--a-box-sizes-what-it-holds)). A control
+fills its box: the whole box is the button, the track or the dial. A view is
+as wide as its box and, in a box with a recorded size, draws as tall as the
+box, with its readouts and tools kept. The Bridge's `controlSize` and
+`viewWidth` give the natural sizes an editor and `mountComponent` both use,
+so an interface looks the same where it is designed and where it runs. A dial
+turns by dragging: up or right raises the value.
 `ModuleProjectRuntime.updateLayout` changes any of them without rebuilding.
 
 ## Presets and interpolation

@@ -5,6 +5,15 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- A box sizes what it holds (DEC-080). UI Kit controls accept `fill` and take
+  their host's whole size; `mountSlider` accepts `orientation: 'auto'`;
+  `createKnob` accepts `gesture: 'drag'` and `dragDistance`, and `mountDial`
+  now turns by dragging up or down instead of by the pointer's angle. The
+  Bridge adds `controlSize`, `viewWidth` and `fitViewElement`;
+  `mountObjectControl` fills its host, and `mountComponent` gives an unsized
+  control its natural size (it was a 160 × 60 cell) and makes a view in a
+  resized box as tall as the box.
+
 - Watch, script, extend and export components (DEC-078). `ModuleProjectRuntime`
   adds `observe` (each message and note before it crosses a cord) and
   `probeSignal`; message clocks can `hold`, `resume` and `step`, and

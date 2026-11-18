@@ -104,7 +104,8 @@ you trust.
 | `createComponentPlugins(options)` | Every plugin a component may use: Bridge players and effects (the score player with its `source` outlet), `mc.` effects, Kernel objects, sampler and MIDI objects, view objects, WAMs when configured, and `extra` |
 | `ComponentSurfaces`, `webmusic.surface.keys`/`scope`/`meter`/`spectrum`/`roll` | View objects: their plugins and the slots their elements borrow |
 | `createViewElement`, `bindViewElement`, `bindBufferView` | The packages' Elements for views and buffers, bound to their slots |
-| `mountObjectControl` | The UI Kit control of an interface object |
+| `fitViewElement`, `viewWidth` | A view as tall as its box, and its natural width (DEC-080) |
+| `mountObjectControl`, `controlSize` | The UI Kit control of an interface object, filling its host, and its natural size |
 | `resolveComponentAsset` | MIDI and MusicXML as a Score, audio files as an AudioClip, by URI |
 | `mountComponent(host, project, options)` | Run a project and show its presentation under a UI Kit transport |
 | `defineComponentElement(tag, project, options)` | A custom element that mounts the project in its shadow root while connected |

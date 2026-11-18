@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ModuleAudioEnvironment, parseModuleProject} from '@webmusic/kernel/module';
-import {componentModuleSource, componentPageSource, componentResources, defineComponentElement, mountComponent, type ComponentHandle} from '../src/component';
+import {componentModuleSource, componentPageSource, componentResources, controlSize, defineComponentElement, fitViewElement, mountComponent, viewWidth, type ComponentHandle} from '../src/component';
 
 class Node {
   readonly connections = new Set<Node>();
@@ -79,8 +79,11 @@ describe('mountComponent', () => {
     // The stage takes the size of what it holds, never a width wider than its host.
     const stage = host.querySelector('.wmc__stage') as HTMLElement;
     expect(stage.style.minWidth).toBe('');
-    expect((stage.querySelector('.wmc__extent') as HTMLElement).style.width).toBe(`${8 + 160 + 8}px`);
+    // An unsized control has its natural size, and fills it.
+    expect((stage.querySelector('.wmc__extent') as HTMLElement).style.width).toBe(`${8 + 48 + 8}px`);
     expect(items[0]!.getAttribute('style')).toContain('left: 8px; top: 8px');
+    expect([(items[0] as HTMLElement).style.width, (items[0] as HTMLElement).style.height]).toEqual(['48px', '64px']);
+    expect((items[0]!.querySelector('.wui-control') as HTMLElement).dataset.fill).toBe('true');
     handle.destroy();
     expect(host.childElementCount).toBe(0);
   });
@@ -96,6 +99,95 @@ describe('mountComponent', () => {
     expect(item.style.width).toBe('240px');
     expect(item.style.height).toBe('96px');
     expect((host.querySelector('.wmc__extent') as HTMLElement).style.width).toBe(`${8 + 240 + 8}px`);
+  });
+
+  it('gives each control a natural size from its text', () => {
+    expect(controlSize('toggle')).toEqual({width: 32, height: 32});
+    expect(controlSize('button', 'button')).toEqual({width: 32, height: 32});
+    expect(controlSize('dial', 'dial 200. 4000.')).toEqual({width: 48, height: 64});
+    expect(controlSize('slider', 'slider')).toEqual({width: 128, height: 32});
+    // A matrix and a preset grid have one cell per column and row; arguments that are not counts fall back.
+    expect(controlSize('matrix', 'matrix 3 2')).toEqual({width: 96, height: 64});
+    expect(controlSize('matrix', 'matrix')).toEqual({width: 128, height: 128});
+    expect(controlSize('preset', 'preset 20')).toEqual({width: 256, height: 96});
+    expect(controlSize('preset', 'preset 4')).toEqual({width: 128, height: 32});
+    // Text decides how wide a message box and tabs are, within limits.
+    expect(controlSize('message', 'message 42').width).toBe(48);
+    expect(controlSize('message', 'message loop 2 4').width).toBeGreaterThan(48);
+    expect(controlSize('tab', 'tab one two three').width).toBeGreaterThan(controlSize('tab', 'tab one two').width);
+    expect(controlSize('message', `message ${'x'.repeat(400)}`).width).toBe(320);
+    expect(viewWidth('keys')).toBe(320);
+    expect(viewWidth('meter')).toBeLessThan(viewWidth('scope'));
+  });
+
+  it('makes a view as tall as its box and follows the box', () => {
+    const frames: (() => void)[] = [];
+    let resized: (() => void) | undefined;
+    const disconnect = vi.fn();
+    const observed: Element[] = [];
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resized = callback; } observe(target: Element): void { observed.push(target); } unobserve(): void {} disconnect = disconnect; });
+    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => { frames.push(callback); return frames.length; });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const run = () => { for (const frame of frames.splice(0)) frame(); };
+    const sized = (element: HTMLElement, name: 'clientHeight' | 'offsetHeight', read: () => number) => Object.defineProperty(element, name, {configurable: true, get: read});
+    try {
+      // A scope: readouts and tools take 70 px, whatever the plot's height.
+      let height = 300;
+      const box = document.createElement('div');
+      const scope = document.createElement('div');
+      const body = document.createElement('div');
+      body.setAttribute('part', 'root surface');
+      const plot = document.createElement('canvas');
+      plot.setAttribute('part', 'plot');
+      body.append(plot);
+      scope.append(body);
+      box.append(scope);
+      document.body.append(box);
+      const plotHeight = () => Number.parseFloat(scope.style.getPropertyValue('--wm-oscilloscope-height')) || 176;
+      sized(box, 'clientHeight', () => height);
+      sized(plot, 'offsetHeight', plotHeight);
+      sized(body, 'offsetHeight', () => plotHeight() + 70);
+      const release = fitViewElement(scope, 'scope');
+      run();
+      expect(scope.style.getPropertyValue('--wm-oscilloscope-height')).toBe('230px');
+      // Measured again, it has what it needs and writes nothing more.
+      run();
+      expect(frames).toHaveLength(0);
+      // It follows the box, and what it draws: a readout that wraps leaves the plot less room.
+      expect(observed).toEqual([box, body]);
+      sized(body, 'offsetHeight', () => plotHeight() + 90);
+      resized!();
+      run();
+      expect(scope.style.getPropertyValue('--wm-oscilloscope-height')).toBe('210px');
+      sized(body, 'offsetHeight', () => plotHeight() + 70);
+      height = 120;
+      resized!();
+      run();
+      expect(scope.style.getPropertyValue('--wm-oscilloscope-height')).toBe('50px');
+      // Never shorter than the least the drawing can be.
+      height = 40;
+      resized!();
+      run();
+      expect(scope.style.getPropertyValue('--wm-oscilloscope-height')).toBe('32px');
+      release();
+      expect(scope.style.getPropertyValue('--wm-oscilloscope-height')).toBe('');
+      expect(disconnect).toHaveBeenCalledTimes(1);
+
+      // A roll takes its whole height as an attribute, and gets its own back.
+      const frame = document.createElement('div');
+      const roll = document.createElement('div');
+      roll.setAttribute('height', '176');
+      frame.append(roll);
+      document.body.append(frame);
+      sized(frame, 'clientHeight', () => 256);
+      const releaseRoll = fitViewElement(roll, 'roll');
+      run();
+      expect(roll.getAttribute('height')).toBe('256');
+      releaseRoll();
+      expect(roll.getAttribute('height')).toBe('176');
+      // Without a box there is nothing to follow.
+      expect(() => fitViewElement(document.createElement('div'), 'keys')()).not.toThrow();
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it('defines an element that mounts while connected', async () => {

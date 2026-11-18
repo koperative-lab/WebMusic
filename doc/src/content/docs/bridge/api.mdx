@@ -252,7 +252,8 @@ defineComponentElement('arabesque-filter', project);
 | `resolveComponentAsset` | function | Load an asset by URI: MIDI and MusicXML as a Score, audio files as an AudioClip. |
 | `ComponentSurfaces` · `SurfaceSlot` · `SURFACE_PLUGINS` · `KEYS_PLUGIN` · `SCOPE_PLUGIN` · `METER_PLUGIN` · `SPECTRUM_PLUGIN` · `ROLL_PLUGIN` · `surfaceKindOf` · `isListener` | class · constants · functions | The view objects `webmusic.surface.keys`, `scope`, `meter`, `spectrum` and `roll`: plugins and the slots their elements borrow. |
 | `createViewElement` · `configureViewElement` · `bindViewElement` · `bindBufferView` · `defineViewElements` | functions | The packages' Elements for view objects and named buffers, bound to their slots. |
-| `mountObjectControl` · `CONTROL_OBJECTS` | function · constant | The UI Kit control of an interface object, following its rebuilt instances. |
+| `fitViewElement` · `viewWidth` | functions | `fitViewElement(element, kind, box?)` makes a view as tall as its box and follows the box's size; it returns the release function. `viewWidth(kind)` is a view's natural width in CSS pixels. |
+| `mountObjectControl` · `CONTROL_OBJECTS` · `controlSize` | functions · constant | The UI Kit control of an interface object, following its rebuilt instances; it fills its host, so the host needs a size. `controlSize(name, text)` is the control's natural size in CSS pixels. |
 | `componentModuleSource` · `componentPageSource` · `componentResources` · `standardPluginIds` | functions | Exported code: a module that defines the element, a standalone page, and the assets and plugins either needs beyond the packages. |
 
 An exported module imports `@webmusic/bridge/component`, so a project that

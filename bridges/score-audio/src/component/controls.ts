@@ -2,6 +2,9 @@
 // interface from the Kernel (`objectInterfaceOf`). A rebuild of the graph
 // creates a new object instance; `refresh` moves the binding to it without
 // remounting the control, so a value being dragged is never replaced.
+//
+// A control fills its host (DEC-080): the host is a box of the size the
+// author gave it, or of the control's natural size from `controlSize`.
 
 import {bang, floatAtom, floatMessage, intAtom, intMessage, message, parseMessage, type Message} from '@webmusic/kernel/module';
 import type {ObjectInterface} from '@webmusic/kernel/objects';
@@ -26,7 +29,38 @@ const numberMessage = (value: number, float: boolean): Message => float ? floatM
 /** The interface objects that have a control. */
 export const CONTROL_OBJECTS: readonly string[] = Object.freeze(['button', 'toggle', 'number', 'slider', 'dial', 'message', 'menu', 'tab', 'multislider', 'matrix', 'preset', 'nodes']);
 
-/** Mount the control for object `name` into `host`. */
+/** One cell of a control's natural size, in CSS pixels. */
+const CELL = 32;
+
+/**
+ * The natural size of the control of object `name`, in CSS pixels: the size
+ * of its box until the author resizes it. `text` is the box text, whose
+ * arguments decide how many cells a matrix, a preset grid or tabs have.
+ */
+export function controlSize(name: string, text: string = name): {width: number; height: number} {
+  const words = text.trim().split(/\s+/).slice(1);
+  const count = (index: number, fallback: number, most: number) => {
+    const value = Number(words[index]);
+    return Number.isInteger(value) && value >= 1 ? Math.min(most, value) : fallback;
+  };
+  // The controls draw text in a small monospace face: about 7.5 px a character.
+  const wide = (characters: number) => Math.ceil(characters * 7.5) + 18;
+  const within = (value: number, least: number, most: number) => Math.min(most, Math.max(least, value));
+  switch (name) {
+    case 'number': return {width: 96, height: CELL};
+    case 'slider': case 'menu': return {width: 128, height: CELL};
+    case 'dial': return {width: 48, height: 64};
+    case 'message': return {width: within(wide(words.join(' ').length), 48, 320), height: CELL};
+    case 'tab': return {width: within(words.reduce((sum, word) => sum + wide(word.length), 0), 64, 480), height: CELL};
+    case 'multislider': return {width: 128, height: 96};
+    case 'matrix': return {width: count(0, 4, 32) * CELL, height: count(1, 4, 32) * CELL};
+    case 'preset': { const slots = count(0, 16, 64); return {width: Math.min(8, slots) * CELL, height: Math.ceil(slots / 8) * CELL}; }
+    case 'nodes': return {width: 160, height: 160};
+    default: return {width: CELL, height: CELL};
+  }
+}
+
+/** Mount the control for object `name` into `host`; the control fills the host. */
 export function mountObjectControl(host: HTMLElement, name: string, options: {cardHost?: HTMLElement; label: string; onError?: (error: unknown) => void}): ObjectControl {
   let iface: ObjectInterface | undefined;
   let release: (() => void) | undefined;
@@ -38,7 +72,7 @@ export function mountObjectControl(host: HTMLElement, name: string, options: {ca
   const send = (value: Message) => iface?.interact(value);
   const subscribe = (notify: () => void) => { listeners.add(notify); return () => { listeners.delete(notify); }; };
   const disabled = () => !iface;
-  const common = {label: options.label, onError: options.onError ?? ((error: unknown) => console.error(error))};
+  const common = {label: options.label, fill: true, onError: options.onError ?? ((error: unknown) => console.error(error))};
   let flashes = 0;
   let handle: ControlHandle;
 
@@ -57,11 +91,12 @@ export function mountObjectControl(host: HTMLElement, name: string, options: {ca
       break;
     case 'slider':
     case 'dial': {
-      const mount = name === 'slider' ? mountSlider : mountDial;
-      handle = mount(host, {snapshot: () => {
+      const binding = {snapshot: () => {
         const state = snapshot();
         return {value: number(state.value), min: number(state.min), max: number(state.max, 127), float: state.float === true, disabled: disabled()};
-      }, setValue: value => send(numberMessage(value, snapshot().float === true)), subscribe}, common);
+      }, setValue: (value: number) => send(numberMessage(value, snapshot().float === true)), subscribe};
+      // A slider stands upright in a box taller than it is wide.
+      handle = name === 'slider' ? mountSlider(host, binding, {...common, orientation: 'auto'}) : mountDial(host, binding, common);
       break;
     }
     case 'message':

@@ -57,7 +57,8 @@ showing the binding's value.
 | Button, message | Click presses and flashes | Enter or Space |
 | Toggle | Click flips | Enter or Space |
 | Number | Drag up or down (Shift: finer); click to type | Arrow keys and Page Up/Down step; type, then Enter; Escape cancels |
-| Slider, dial | Drag | Arrow keys, Page Up/Down, Home and End |
+| Slider | Press or drag along the track | Arrow keys, Page Up/Down, Home and End |
+| Dial | Drag: up or right raises the value, down or left lowers it; a press alone changes nothing | Arrow keys, Page Up/Down, Home and End |
 | Menu | Click opens the choices as a card over a scrim in `cardHost`, or steps to the next item without one | Arrow keys step; in the card, arrows move, Tab cycles, Escape closes |
 | Tabs | Click a cell | Arrow keys choose and move |
 | Multislider | Draw across the bars | Arrow Left/Right move between bars; Up/Down and Page Up/Down change one |
@@ -113,8 +114,9 @@ multisliders round what they send. `step` defaults to 1 for whole numbers and
 | `className`, `part` | — | Extra class and part token on the root. |
 | `stylesheet` | `true` | Install `controlsStyle`; false leaves styling to the host. |
 | `onError` | — | Receives command, snapshot and subscription failures. |
+| `fill` | `false` | The control takes its host's whole width and height instead of its natural size: the cell, track, knob or grid stretches and a button's or toggle's glyph scales with it. The host must have a size of its own. |
 | `flashMs` (button, message) | `120` | How long a press shows inverted. |
-| `orientation` (slider) | `'horizontal'` | `'vertical'` draws an upright fader. |
+| `orientation` (slider) | `'horizontal'` | `'vertical'` draws an upright fader. `'auto'` follows the control's shape: upright while it is taller than it is wide, and again when its size changes; use it with `fill`. |
 | `cardHost` (menu) | — | The component window the choice card covers. |
 
 `formatControlNumber(value, float)` formats a value as the controls show it.
@@ -151,7 +153,8 @@ Canonical classes are `.wui-control` plus one modifier class per control —
 `.wui-control--matrix` — and `.wui-control__cell`, `.wui-control__field`,
 `.wui-control__bar`, `.wui-control__readout`, `.wui-control__card` and
 `.wui-control__scrim` inside. The root's part name is the
-control's name.
+control's name. A control mounted with `fill` carries `data-fill="true"` on
+its root.
 
 </details>
 
