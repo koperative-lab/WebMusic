@@ -1,8 +1,11 @@
 /**
  * Page chrome behaviour: the narrow-screen navigation toggle, the navigation's
  * scroll offset across page loads, copy buttons on code blocks and the current
- * heading in the contents column. Each part works without the others.
+ * heading in the contents column, and the name of every icon button in an
+ * ink box on hover. Each part works without the others.
  */
+
+import {mountTooltips} from '@webmusic/ui/controls';
 
 const SCROLL_KEY = 'webmusic:nav-scroll';
 
@@ -100,4 +103,6 @@ export function mountSite(document: Document): void {
   mountNavigationToggle(document);
   mountCodeCopy(document);
   mountContentsTracking(document);
+  // Every icon button on the page, the demos' included, names itself on hover.
+  mountTooltips(document);
 }

@@ -3612,6 +3612,73 @@ slider; Bridge tests for natural sizes, an unsized cell and view fitting;
 Studio tests for the box frames; browser evidence and the owner's manual
 checks for every object at its natural, an enlarged and a reduced size.
 
+## DEC-083 — Icon buttons name themselves at once; Help explains objects, not components
+
+**Date / status:** 2026-11-18; accepted by the repository owner, who asked
+that every icon button on the site show its name in a black box the moment
+the pointer rests on it, and that the Library and Studio menus end in a Help
+toggle that, while pressed, shows what the hovered thing does, as an
+instrument's info view does. The owner then narrowed both the same day:
+only buttons without text are named, and Help explains small controls and
+the basic layers, not everything.
+
+**Problem:** icon buttons named themselves only through the platform's
+`title` tooltip: a system-styled box that appears after about a second, in
+the platform's font and colours, and not at all for keyboard focus. A
+toolbar of icons read as a row of guesses. Studio crammed a sentence of
+purpose into each menu tab's title, where it could only be read slowly.
+
+**Decision:**
+
+- The UI Kit's `controls` entry exports `mountTooltips(document, options)`.
+  It is one delegated tooltip per document: the name of the element under the
+  pointer, in an ink box (`--wm-foreground` fill, `--wm-accent-foreground`
+  mono text, square, no shadow) just below and right of the pointer, shown at
+  once and following it, in the top layer above modal cards. Keyboard focus
+  shows the same box under the focused control. It reaches open shadow roots,
+  so it serves every component on the page without each drawing its own.
+- Only an element that shows no words (no letter or digit) is named: its
+  `title`, or the `aria-label` of a control (button, link, tab, slider and the
+  like) — every icon button. A card, a tab, a chip, a readout or a component
+  shows its own text and gets no box. While a box is shown, the element's
+  `title` waits beside it, so the platform's tooltip never follows; an icon
+  control whose title was its only name keeps that name meanwhile.
+- Help mode is one per document (`setHelp`, `help: true`). In it, an element's
+  `aria-description` joins its name in the box, including on elements that
+  show text. The description is the same text assistive technology reads.
+- Help explains only small things and the basic layers (DEC-074).
+  Icon tools, chips, filters and parameters say what they do in one plain
+  sentence. An object says what an object is and then what this one does. A
+  component — a Library card, a component box or cell in Studio — says only
+  what a component is: no line can tell what a whole component does. Pages,
+  page names and other text navigation carry no description.
+- Components keep naming icon buttons in `aria-label` and `title`, so a
+  component on a page without tooltips still names itself through the
+  platform. A page opts in once: the documentation site and every closed-source
+  application mount the tooltips; the Library and Studio menus end in a Help
+  toggle (`?` key), remembered per viewer.
+
+**Alternatives considered:** a tooltip inside each component, which an
+overflowing frame clips and which repeats across every presenter; removing
+`title` from the components, which leaves a component pasted into another
+project with no visible names; and a docked info panel, which takes a corner
+of Studio's canvas permanently for text that matters only while help is on.
+
+**Consequences:** a page that mounts tooltips changes an element's `title`
+attribute while that element's box is shown. A text element that keeps a
+`title` still gets the platform's own delayed tooltip, so the applications
+drop titles that repeat or expand shown text. Descriptions are authored only
+where help should explain something; an element without one shows only its
+name in help mode. Touch input shows no box.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md#icons); the API is in the
+[controls reference](../doc/src/content/docs/uikit/parameters-gestures/controls.mdx).
+
+**Verification:** UI Kit tests for naming only what shows no text, the lifted
+title, shadow roots, press, touch, help mode and release; application tests
+for the object and component help; browser evidence and the owner's manual
+checks on the documentation site, the Library and Studio.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

@@ -7,6 +7,8 @@ import {iconMarkup, visuallyHiddenDeclarations} from './internal/icons';
 import {createFader, faderStyle} from './fader';
 import {createKnob, knobStyle} from './knob';
 
+export {mountTooltips, tooltipContent, tooltipStyle, type TooltipContent, type TooltipHandle, type TooltipOptions} from './tooltip';
+
 // ============================================================================
 // Single-value controls (DEC-075): button, toggle, number, slider, dial,
 // message, menu, tabs, multislider and matrix. Each draws one caller-owned

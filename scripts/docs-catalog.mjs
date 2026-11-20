@@ -236,7 +236,7 @@ const DECISION_TOPICS = [
   ['Editing', [53, 55, 57, 58, 60, 61]],
   ['Score components', [12, 13, 14, 15, 16, 19, 24, 32, 34, 38, 39, 40, 41, 42, 43, 47, 48, 49, 50, 54, 56, 67]],
   ['Audio components', [25, 26, 27, 28, 29, 30, 31, 35, 36, 37, 44, 51, 62]],
-  ['Visual language and UI Kit', [23, 52, 59]],
+  ['Visual language and UI Kit', [23, 52, 59, 83]],
   ['Documentation and demos', [10, 20, 22, 33, 66, 70, 71, 72]],
   ['Packaging and release scope', [21, 45, 46]],
 ];

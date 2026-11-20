@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/ui/controls'
-description: 'Single-value controls — button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix — plus a preset grid, an interpolation pad and a mapping overlay, over structural bindings.'
+description: 'Single-value controls — button, toggle, number, slider, dial, message, menu, tabs, multislider and matrix — plus a preset grid, an interpolation pad, a mapping overlay and page tooltips, over structural bindings.'
 sidebar:
   label: 'controls'
   order: 7
@@ -72,6 +72,35 @@ A button or message box flashes for `flashMs` after a press, and
 patch sends it a bang. Re-mounting any control on the same host destroys the
 previous one.
 
+## Tooltips
+
+`mountTooltips(document)` names the icon button the pointer rests on in a
+small ink box beside the pointer, at once, in place of the platform's delayed
+`title` tooltip. Only an element that shows no words is named — its `title`, or
+a control's `aria-label`; text, cards and components get no box. It serves the
+whole document — every component's icon buttons, including those inside open
+shadow roots — so a page mounts it once. In help mode an element's
+`aria-description` joins its name, whether or not it shows text.
+
+```ts
+import {mountTooltips} from '@webmusic/ui/controls';
+
+const tooltips = mountTooltips(document);
+helpButton.addEventListener('click', () => {
+  tooltips.setHelp(!tooltips.help);
+  helpButton.setAttribute('aria-pressed', String(tooltips.help));
+});
+// When the page no longer wants them:
+tooltips.dispose();
+```
+
+An element's name is its `title`, or the `aria-label` of a control (button,
+link, tab, slider and the like), and only when the element shows no letter or
+digit: an icon, or a glyph such as `×`. Keyboard focus
+shows the box under the focused control; a press hides it until the pointer
+leaves; touch shows none. In help mode the box adds the element's
+`aria-description`, so a described element explains itself on hover.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -121,6 +150,22 @@ multisliders round what they send. `step` defaults to 1 for whole numbers and
 
 `formatControlNumber(value, float)` formats a value as the controls show it.
 
+**Tooltips**
+
+| Member | Contract |
+| --- | --- |
+| `mountTooltips(document?, {help?})` | Mounts the document's tooltips, or shares the ones already mounted, and returns a `TooltipHandle`. `document` defaults to the global one; `help` sets help mode. |
+| `handle.help`, `handle.setHelp(on)` | Help mode, one per document and shared by every handle. While on, `<html>` carries `data-wm-help`. |
+| `handle.dispose()` | Releases this handle; the last release removes the box, its stylesheet and its listeners, and turns help off. Repeated calls do nothing. |
+| `tooltipContent(element, help?)` | The `{name, description}` a tooltip would show for an element, or `undefined`. |
+
+While its box is shown, an element's `title` is lifted off it, so the
+platform's own tooltip never follows, and put back when the box hides; a
+title changed meanwhile is followed and the new one put back. An icon control
+whose title was its only name carries it as `aria-label` meanwhile. The box is
+`aria-hidden`: names and descriptions already reach assistive technology from
+the element.
+
 **Accessibility.** Buttons, toggles and matrix cells are native buttons with
 `aria-pressed`; the number box is a `spinbutton`; sliders, dials and
 multislider bars are `slider`s that speak their value; tabs are a `radiogroup`;
@@ -145,6 +190,8 @@ disabled. The slider and dial are the kit's fader and knob, with their tokens.
 | `--wm-surface`, `--wm-surface-muted` | `#fff`, `#f3f3f3` | Cell fill and hover fill. |
 | `--wm-control-scrim` | `rgb(0 0 0 / 45%)` | The menu card's scrim. |
 | `--wm-focus-ring` | `2px solid` ink | Focus outline. |
+| `--wm-tooltip-background`, `--wm-tooltip-foreground` | `--wm-foreground`, `--wm-accent-foreground` | The tooltip's fill and text. |
+| `--wm-tooltip-font`, `--wm-tooltip-max-width`, `--wm-tooltip-radius` | `--wm-font-mono`, `20rem`, `--wm-control-radius` | The name's font, the box's widest, its corners. |
 
 Canonical classes are `.wui-control` plus one modifier class per control —
 `.wui-control--button`, `.wui-control--toggle`, `.wui-control--number`,
@@ -152,7 +199,9 @@ Canonical classes are `.wui-control` plus one modifier class per control —
 `.wui-control--menu`, `.wui-control--tabs`, `.wui-control--multislider` or
 `.wui-control--matrix` — and `.wui-control__cell`, `.wui-control__field`,
 `.wui-control__bar`, `.wui-control__readout`, `.wui-control__card` and
-`.wui-control__scrim` inside. The root's part name is the
+`.wui-control__scrim` inside. The tooltip is `[data-wm-tooltip]` (a `[data-help]`
+box carries a description), with `[data-part="name"]` and
+`[data-part="description"]` inside; `tooltipStyle` is its stylesheet. The root's part name is the
 control's name. A control mounted with `fill` carries `data-fill="true"` on
 its root.
 

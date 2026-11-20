@@ -86,6 +86,18 @@ is ink, not colour.
 - One meaning per icon. The name goes in `aria-label` and `title`; the icon is
   `aria-hidden`. Toolbars show icons only; a value readout (such as `1/16`) may
   sit beside its icon in mono type.
+- On a page that mounts the UI Kit's tooltips (DEC-083), the name shows the
+  moment the pointer rests on an icon: an ink box with on-ink mono text, square
+  and without shadow, just below and right of the pointer, following it; under
+  the control for keyboard focus. Never on touch. Only what shows no text gets
+  a box: cards, tabs, chips, readouts and components already say what they are,
+  so give them no `title` that repeats or expands their text.
+- Help is a pressed-state `?` icon at the right end of an application's menu.
+  While it is on, the box adds the hovered element's `aria-description`, in the
+  UI font. Describe only small things and the basic layers: a tool, chip,
+  filter or parameter in one plain sentence of purpose; an object as an object,
+  then what this one does; a component only as a component, never with a
+  summary of what it does. Pages and text navigation carry no description.
 
 ## Toolbars
 
@@ -166,7 +178,8 @@ inversion.
 
 - [ ] Only neutral tokens are used; colour appears only for meaning.
 - [ ] Corners are square, controls share one height and lines are hairlines.
-- [ ] Toolbars are one icon row with names in `aria-label` and `title`.
+- [ ] Toolbars are one icon row with names in `aria-label` and `title`; on the
+      site each name shows at once in the ink tooltip.
 - [ ] Pressed and selected states invert ink; focus outlines are visible.
 - [ ] Adjustments open as an in-component card over a scrim, with modal focus.
 - [ ] No scrollbars are visible; labels of scrolling content are sticky.
