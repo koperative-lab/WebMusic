@@ -632,8 +632,16 @@ export class ModuleProjectRuntime {
       // first and in order, even among several cords from one outlet.
       if (source && target) return tapped(source.subscribe(this.#tap(connection, 'message')), () => target.connect(source));
     }
-    if (from && to && this.#options.connect) {
-      const lease = await abortable(this.#options.connect({connection, from, to, context: graph.context, signal: graph.controller.signal}), graph.controller.signal, value => this.#retire(value));
+    // A source cord carries the module its outlet names, and a box that accepts sources follows it itself (DEC-089).
+    let source = from;
+    if (connection.kind === 'source' && from && to) {
+      const carried = from.sourceOutput?.(connection.from.port) ?? from.module;
+      if (carried !== from.module) source = {...from, module: carried};
+      const accepted = to.connectSource?.(connection.to.port, carried);
+      if (accepted) return accepted;
+    }
+    if (source && to && this.#options.connect) {
+      const lease = await abortable(this.#options.connect({connection, from: source, to, context: graph.context, signal: graph.controller.signal}), graph.controller.signal, value => this.#retire(value));
       if (lease !== undefined) {
         if (!lease || lease.active !== true || typeof lease.release !== 'function') {
           this.#retire(lease);

@@ -3,6 +3,7 @@ import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
 import {bufferedScrollRange} from '../../core/windowing';
 import {horizontalDirection, viewDirection} from './direction';
 import {
+  EMPTY_PITCH_RANGE,
   MAX_MIDI_PITCH,
   MIN_MIDI_PITCH,
   MIN_NOTE_LENGTH,
@@ -224,8 +225,9 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     let automatic = {min: 21, max: 108};
     if (this.config.showOnlyOctavesUsed) {
       if (!this.inferredPitchRange) {
-        let min = MAX_MIDI_PITCH;
-        let max = MIN_MIDI_PITCH;
+        // With no notes, the octave from middle C (DEC-082).
+        let min = this.noteSequence.notes.length ? MAX_MIDI_PITCH : EMPTY_PITCH_RANGE.min;
+        let max = this.noteSequence.notes.length ? MIN_MIDI_PITCH : EMPTY_PITCH_RANGE.max;
         for (const note of this.noteSequence.notes) {
           min = Math.min(min, note.pitch);
           max = Math.max(max, note.pitch);

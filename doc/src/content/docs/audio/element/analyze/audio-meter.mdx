@@ -131,8 +131,9 @@ effect without reloading.
 With module input the meter reads its own analyser on the tapped port and
 never owns the source's transport. `.player` instead borrows a nonvisual
 `AudioMeterPlayer` directly and takes precedence over module input. A missing,
-ambiguous or invalid input, or a port that is not yet prepared, shows the shared
-outlined-square waiting animation. Loading on a borrowed `.player` shows the
+ambiguous or invalid input, or a port that is not yet prepared, draws the meter
+at rest, as for silence, under the shared outlined-square waiting animation;
+`.snapshot` stays `undefined` because nothing is read. Loading on a borrowed `.player` shows the
 shared four-square indicator and its load failures remain visible. A connected
 silent analyser is ready and continues its normal display. Descriptions remain
 available to screen readers, and both animations honor reduced-motion preferences.
@@ -245,8 +246,8 @@ reduction and painters are also available without the Element from
 [View render entry](/audio/api/view/#paint-meter-displays).
 
 **Accessibility.** The stage root has `role="img"` and the accessible name
-above; the canvas itself is `aria-hidden`. Without a source the stage shows a
-live status message instead of an empty surface. The meter is read-only and
+above; the canvas itself is `aria-hidden`. Without a source the meter is drawn
+at rest and the stage's live status says it is waiting. The meter is read-only and
 has no keyboard interaction; the surrounding application controls its
 attributes, and its readout never seeks or alters audio.
 

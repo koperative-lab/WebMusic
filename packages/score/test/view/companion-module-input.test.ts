@@ -2,7 +2,8 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 vi.mock('@webmusic/ui/pitch', () => import('../../../ui/src/pitch'));
 import {createModuleHandle, SOURCE_SCHEMAS, SourcePublisher, type ModuleHandle, type ModulePort} from '@webmusic/kernel/module';
-import type {ScorePlaybackNote, ScorePlaybackSnapshot, ScorePlaybackSource} from '../../src/core';
+import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score, type ScorePlaybackNote, type ScorePlaybackSnapshot,
+  type ScorePlaybackSource} from '../../src/core';
 import {definePitchViewElement, type PitchViewElement} from '../../src/view/element/score-pitch-view';
 import {defineChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 
@@ -107,5 +108,22 @@ describe('Score companions bound to a module source port (DEC-068)', () => {
     expect(analysis.getAttribute('data-player-state')).toBe('ready');
     analysis.remove();
     expect(source.listeners).toBe(0);
+  });
+
+  it('lets an analysis element analyse the score of the module it is bound to', async () => {
+    const builder = new ScoreBuilder();
+    const part = builder.newPartId();
+    builder.addPart({id: part, name: 'Melody'});
+    ['C4', 'E4', 'G4', 'C5'].forEach((pitch, index) => builder.addNote(part, {id: builder.newNoteId(), voice: VoiceId('v1'),
+      pitch: Pitch.parse(pitch), onsetQuarters: new Rational(index), duration: Duration.quarter()}));
+    const score: Score = builder.build();
+    const source = playbackSource(snapshot({score}));
+    const {module, port} = sourceModule('lead');
+    port.ready(source.playback);
+    const analysis = document.createElement('score-chord-analysis') as HTMLElement & {inputModule?: ModuleHandle | null};
+    analysis.inputModule = module;
+    document.body.append(analysis);
+    await vi.waitFor(() => expect(analysis.querySelector('.wui-workbench')?.getAttribute('data-phase')).not.toBe('waiting'));
+    expect(analysis.querySelectorAll('.wui-harmony-flow__band').length).toBeGreaterThan(0);
   });
 });

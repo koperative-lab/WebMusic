@@ -29,7 +29,8 @@ export const ALL_OBJECT_DEFINITIONS: readonly ObjectDefinition[] = Object.freeze
 /**
  * Project plugins for every object, sharing one environment: the library,
  * `preset` and `nodes`, and the nested `component` with its `inlet`,
- * `outlet`, `inlet~` and `outlet~`.
+ * `outlet`, `inlet~`, `outlet~`, `inlet.note`, `outlet.note`, `inlet.source`
+ * and `outlet.source`.
  */
 export function createObjectPlugins(environment: ObjectEnvironment = {}): readonly ProjectPluginFactory[] {
   return Object.freeze([...ALL_OBJECT_DEFINITIONS.map(definition => objectPlugin(definition, environment)), ...componentPlugins(environment),
@@ -38,4 +39,5 @@ export function createObjectPlugins(environment: ObjectEnvironment = {}): readon
 
 /** The object names, in palette order (boundary objects and `component` last). */
 export const OBJECT_NAMES: readonly string[] = Object.freeze([...ALL_OBJECT_DEFINITIONS.map(definition => definition.name),
-  'component', 'inlet', 'outlet', 'inlet~', 'outlet~', 'poly', 'voice', 'makenote', 'mc.pack', 'mc.unpack']);
+  'component', 'inlet', 'outlet', 'inlet~', 'outlet~', 'inlet.note', 'outlet.note', 'inlet.source', 'outlet.source',
+  'poly', 'voice', 'makenote', 'mc.pack', 'mc.unpack']);

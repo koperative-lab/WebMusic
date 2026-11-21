@@ -31,6 +31,7 @@ export {
   playScore,
   playScoreFromUrl,
   type ScorePlayerOptions,
+  type ScoreSessionRequests,
   type ScorePlayerEvents,
   type PlayerOptions,
   type PlayerEvents,

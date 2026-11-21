@@ -138,7 +138,7 @@ ${componentSurfaceCss('timeline')}
   position: absolute;
   inset-block: 0;
   width: 0;
-  border-inline-start: 1px solid var(--wm-grid-major, #c8c8c8);
+  border-inline-start: 1px solid var(--wm-grid-major, var(--wm-border, #c8c8c8));
 }
 
 .wui-timeline__tick[data-level="minor"] {
@@ -149,7 +149,7 @@ ${componentSurfaceCss('timeline')}
   content: '';
   position: absolute;
   inset-block: 50% 0;
-  border-inline-start: 1px solid var(--wm-grid-minor, #dedede);
+  border-inline-start: 1px solid var(--wm-grid-minor, var(--wm-border, #dedede));
 }
 
 .wui-timeline__tick-label {
@@ -169,7 +169,7 @@ ${componentSurfaceCss('timeline')}
   border: 1px solid var(--wm-timeline-border, ${controlBorderFallback});
   border-radius: 0 0 var(--wm-timeline-radius, var(--wm-control-radius, 0)) var(--wm-timeline-radius, var(--wm-control-radius, 0));
   background-color: var(--wm-timeline-background, var(--wm-surface, #fff));
-  background-image: linear-gradient(90deg, var(--wm-grid-minor, rgba(0, 0, 0, .06)) 1px, transparent 1px);
+  background-image: linear-gradient(90deg, var(--wm-grid-minor, var(--wm-border, rgba(0, 0, 0, .06))) 1px, transparent 1px);
   background-size: var(--wm-timeline-grid-size, 2rem) 100%;
   touch-action: manipulation;
 }

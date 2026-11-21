@@ -97,7 +97,7 @@ export const controlsStyle = String.raw`
 :where(.wui-control__bar-fill) { position: absolute; left: 0; right: 0; bottom: 0; background: ${INK}; pointer-events: none; }
 :where(.wui-control--matrix) { display: inline-grid; gap: 0; }
 :where(.wui-control--matrix .wui-control__cell) { width: ${SIZE}; padding: 0; margin: -1px 0 0 -1px; }
-:where(.wui-control__scrim) { display: block; position: absolute; inset: 0; z-index: 20; background: var(--wm-control-scrim, rgb(0 0 0 / 45%)); }
+:where(.wui-control__scrim) { display: block; position: absolute; inset: 0; z-index: 20; background: var(--wm-control-scrim, var(--wm-scrim, rgb(0 0 0 / 45%))); }
 :where(.wui-control__card) {
   position: absolute; display: block; z-index: 21; top: 0; left: 50%; transform: translateX(-50%); width: min(20rem, 100%); max-height: 100%; overflow: auto;
   border: 1px solid ${LINE}; background: ${SURFACE}; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); color: ${INK}; font: 500 .75rem/1 ${MONO}; scrollbar-width: none;

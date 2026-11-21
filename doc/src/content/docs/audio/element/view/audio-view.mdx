@@ -339,6 +339,11 @@ the following descriptions remain available to assistive technology:
 | `spectrogram` | `No spectrogram to draw — assign .spectrogram` |
 | `meter` | `No analyser to meter — bind a player with an analyser` |
 
+A `waveform` view that is only waiting for audio — nothing loading, nothing
+failed — draws an empty waveform lane and puts the waiting animation over it,
+in a `waiting` part that takes no pointer input (DEC-082). `.clip` and `.peaks`
+stay `undefined` meanwhile, and the lane is replaced when audio arrives.
+
 ### Application-owned preparation
 
 When the application decodes a clip or computes a spectrogram outside the
@@ -504,7 +509,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
-| `wave-color` | attribute | `--wm-waveform` → `#999` | **Waveform only.** Min/max column colour (`static` mode). |
+| `wave-color` | attribute | `--wm-waveform` → `--wm-foreground-muted` → `#999` | **Waveform only.** Min/max column colour (`static` mode). |
 | `progress-color` | attribute | `--wm-waveform-progress` → `--wm-foreground` → `#444` | **Waveform only.** Played portion, left of the playhead (`static` mode). |
 | `playhead-color` | attribute | `--wm-playhead` → `#c0392b` | Playhead line colour (waveform · spectrogram). |
 | `background-color` | attribute | transparent | Canvas background fill. |
@@ -589,7 +594,7 @@ view.options = {
 
 | Attribute (`.options` field) | Default | Controls |
 | --- | --- | --- |
-| `wave-color` (`waveColor`) | `--wm-waveform` → `#999` | **Waveform.** Min/max column colour (`static` mode) |
+| `wave-color` (`waveColor`) | `--wm-waveform` → `--wm-foreground-muted` → `#999` | **Waveform.** Min/max column colour (`static` mode) |
 | `progress-color` (`progressColor`) | `--wm-waveform-progress` → `--wm-foreground` → `#444` | **Waveform.** Played portion, left of the playhead |
 | `playhead-color` (`playheadColor`) | `--wm-playhead` → `#c0392b` | **Waveform · spectrogram.** Playhead line |
 | `background-color` (`backgroundColor`) | transparent | Internal canvas background fill; it does not change the shared component surface |

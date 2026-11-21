@@ -150,9 +150,10 @@ nothing. `empty` and `error` additionally write `status.message` into the stage 
 message is one visible line, while an `empty` message is visually hidden and stays in the
 accessibility tree.
 
-`loading` and `waiting` temporarily hide the stage without rebuilding its nodes and show the
-shared [status animation](/uikit/layout-feedback/status/): four square cells for loading, or a
-slow square-outline pulse while waiting. `status.message` remains screen-reader text in this
+`loading` temporarily hides the stage without rebuilding its nodes and shows the shared
+[status animation](/uikit/layout-feedback/status/): four square cells. `waiting` shows a slow
+square-outline pulse: over the stage when the stage already holds the caller's surface, which
+stays visible, or in its place when the stage is empty. `status.message` remains screen-reader text in this
 feedback region, with no duplicate status-bar announcement. Loading sets `aria-busy`; waiting
 does not. These phases never start the frame clock. Motion preferences can make both static.
 The feedback exposes `feedback`, `feedback-indicator`, and `feedback-message` parts, and uses

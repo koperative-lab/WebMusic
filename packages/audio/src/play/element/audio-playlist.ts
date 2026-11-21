@@ -19,7 +19,8 @@ import {
 } from '../headless/playlist';
 import type {AudioClipPlayer, PlayerEngineKind} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
-import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
+import {AUDIO_PLAYER_OWNER, AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
+import {observeModuleContext} from '@webmusic/kernel/element';
 import {loadClipFromUrl} from '../api/load';
 import {formatTime} from '../core/format';
 import {browserMediaAdapterFactory} from './internal/browser-media-adapter';
@@ -114,11 +115,25 @@ export class AudioPlaylistElement extends WebMusicElement {
   private announcedClip?: AudioClip;
   private announcedPlayer?: AudioClipPlayer;
   private sourceRevision = 0;
+  /**
+   * The context and node a lent scope gives the queue to play into: a scope
+   * that is not a player's and names a default destination, as a graph's box
+   * lends (DEC-084). Nested in a player, or alone, the queue keeps its own.
+   */
+  private lent?: {context: AudioContext; destination: AudioNode};
 
   protected override onMount(): void {
     this.own(() => { this.connection.disconnect(); this.teardown(); });
     upgradeProperties(this, ['entries', 'player']);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
+    this.own(observeModuleContext(this, (scope) => {
+      const destination = scope && !scope.capabilities.get(AUDIO_PLAYER_OWNER) ? scope.destination?.() : undefined;
+      const next = destination ? {context: destination.context as AudioContext, destination} : undefined;
+      if (next?.destination === this.lent?.destination) return;
+      this.lent = next;
+      // The queue is built on its context: a new one rebuilds it, stopped.
+      if (this.queue) this.build();
+    }));
     this.build();
     this.connection.connect();
     if (boolAttr(this, 'autoplay')) this.startAutoplay();
@@ -261,6 +276,7 @@ export class AudioPlaylistElement extends WebMusicElement {
       rate: numAttr(this, 'rate', 1),
       ...(engineAttr && ENGINES.has(engineAttr) ? {engine: engineAttr as PlayerEngineKind} : {}),
       mediaAdapterFactory: browserMediaAdapterFactory,
+      ...(this.lent ? {audioContext: this.lent.context, destination: this.lent.destination} : {}),
       // The controller may not reach `play/api`, so the element supplies the
       // loader — and threads the queue's own context into it, which is what
       // keeps native decodeAudioData available to every entry.

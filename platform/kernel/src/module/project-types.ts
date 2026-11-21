@@ -95,6 +95,19 @@ export interface ProjectLayout {
   readonly presentation?: readonly ProjectModuleLayout[];
   readonly comments?: readonly ProjectComment[];
   readonly groups?: readonly ProjectGroup[];
+  /**
+   * Custom properties of the presentation as a whole (DEC-088): their names
+   * and the CSS values they are given. Kernel only keeps them; a host that
+   * shows the presentation decides which it applies.
+   */
+  readonly style?: Readonly<Record<string, string>>;
+  /**
+   * The page a host lays the presentation out in (DEC-092): a tree of its
+   * own design that says where each shown module sits among whatever else
+   * the page holds. Kernel keeps it as plain data, under the project's
+   * limits; what it means, and what of it is safe to show, is the host's.
+   */
+  readonly page?: ProjectJsonObject;
 }
 /** What drives a mapped parameter: a MIDI controller, pitch bend, program change or a computer key. */
 export type ProjectMappingSource =
@@ -159,6 +172,17 @@ export interface ProjectModuleInstance {
   getControl?(port: string): ControlSignal | undefined;
   /** Enrich a fresh child scope; keep its ID, registry and shared AudioEnvironment. */
   childContext?(context: ModuleContext): ModuleContext;
+  /**
+   * The module a `source` cord from `port` carries (DEC-089). Without it, or
+   * when it returns undefined, the cord carries this instance's module.
+   */
+  sourceOutput?(port: string): ModuleHandle | undefined;
+  /**
+   * Accept a `source` cord on `port`: follow `module` until the lease is
+   * released (DEC-089). Return undefined to leave the cord to the runtime's
+   * connector.
+   */
+  connectSource?(port: string, module: ModuleHandle): ConnectionLease | undefined;
   /** Capture live serializable configuration such as oscillator waveform. */
   exportConfig?(): ProjectJsonObject;
   /**

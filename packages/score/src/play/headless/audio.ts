@@ -19,6 +19,7 @@ export type {
   ReverbOptions,
   ScorePlayerEvents,
   ScorePlayerOptions,
+  ScoreSessionRequests,
   ScoreSchedulingCapabilities,
   PreloadableHeadlessSynth,
   SoundfontSample,

@@ -35,6 +35,19 @@ Defaults are neutral greys. Each value is a fallback behind a public token, and
 | Surface | `--wm-<component>-background` → `--wm-surface` | `#fff` / `#111` |
 | Raised: hover fill | `--wm-surface-muted` | `#f3f3f3` / `#1c1c1c` |
 | On ink: content over a pressed fill | `--wm-accent-foreground` | `#fff` / `#111` |
+| Emphasis: values, fills that are on, sounding notes | `--wm-<component>-…` → `--wm-accent` | the component's own |
+| Danger: errors, clipping | `--wm-<component>-error` → `--wm-danger` | `#b42318` / `#f97066` |
+| Recording | `--wm-recording` | `#c62828` / `#ef5350` |
+| Playhead | `--wm-<component>-playhead` → `--wm-playhead` | the component's own red |
+| Scrim behind an adjustment card | `--wm-<component>-scrim` → `--wm-scrim` | 45% black |
+
+These roles, with the geometry and type tokens below, are the theme
+vocabulary (DEC-088): `THEME_TOKENS` in `@webmusic/bridge/component` lists
+them for editors. A part's own token always falls back to one of them before
+its literal, so setting the roles on a component, or on an app's root,
+restyles every display part at once. A colour that is meaning in itself — a
+piano's black keys, a loop region, a spectral map — keeps its own token and
+no shared role.
 
 Colour is reserved for meaning: a sounding note, recording, clipping, an error,
 or musical data with its own palette (pitch classes, spectral maps). Do not add
@@ -156,7 +169,9 @@ external Parameters for configuration.
 ## Styling mechanics
 
 - Resolve every value through `--wm-<component>-<role>` → shared `--wm-<role>`
-  → the fallback above. Hard-code a literal only as the final fallback.
+  → the fallback above. Hard-code a literal only as the final fallback, and
+  never as the only one: a token that ends in a literal without a shared role
+  is a part a theme cannot reach.
 - A presenter's own stylesheet, or a scoped one injected by a renderer, keeps
   rules at zero specificity with `:where()` so application CSS wins. Inline
   styles are for geometry that changes with data.

@@ -11,8 +11,8 @@ import PitchViewPlayground from '../../../../../components/elements/PitchViewPla
 
 `<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources. Use the type switch above the demo to see each one while the piece plays.
 
-Without a resolved input, the view shows the shared outlined-square waiting
-animation. A native source that is loading shows the four-square loading animation;
+Without a resolved input, the view draws its keyboard, staff or fretboard
+with nothing sounding, under the shared outlined-square waiting animation. A native source that is loading shows the four-square loading animation;
 source errors remain visible. A ready source with no held notes keeps its normal pitch
 surface; on the staff and fretboard its empty sentence (such as “No sounding notes”) is a
 polite status that is visually hidden, so the empty drawing is the visible state. These states borrow the existing source subscription

@@ -15,6 +15,7 @@ export * from './module/wam';
 export * from './module/osc';
 export * from './module/multichannel';
 export * from './module/source-port';
+export * from './module/source-relay';
 export * from './module/control-port';
 export * from './module/transport-port';
 export * from './module/conformance';

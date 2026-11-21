@@ -179,7 +179,7 @@ const STYLE = `
   --ac-raised: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
   --ac-on-ink: var(--wm-accent-foreground, light-dark(#fff, #111));
   --ac-wave: var(--wm-audio-clip-wave, var(--wm-foreground, light-dark(#111, #eee)));
-  --ac-active: var(--wm-audio-clip-playhead, rgb(240, 84, 119));
+  --ac-active: var(--wm-audio-clip-playhead, var(--wm-playhead, rgb(240, 84, 119)));
   --ac-control: var(--wm-control-size, 2rem);
   --ac-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
@@ -231,7 +231,7 @@ const STYLE = `
 :where([data-audio-clip] [part~="hud"]::before) { content: ""; width: .625rem; height: .625rem; border: 1px solid currentColor; border-radius: 50%; }
 :where([data-audio-clip] [part~="overlay"]) {
   position: absolute; inset: var(--ac-control) 0 0 0; display: flex; justify-content: center; align-items: flex-start; padding: .75rem;
-  background: var(--wm-audio-clip-scrim, rgb(0 0 0 / .45)); z-index: 2;
+  background: var(--wm-audio-clip-scrim, var(--wm-scrim, rgb(0 0 0 / .45))); z-index: 2;
 }
 :where([data-audio-clip] [part~="card"]) { width: min(100%, 20rem); background: var(--ac-surface); border: 1px solid var(--ac-line); box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
 :where([data-audio-clip] [part~="card-header"]) { display: flex; align-items: center; justify-content: space-between; height: var(--ac-control); padding-left: .5rem; border-bottom: 1px solid var(--ac-line); }

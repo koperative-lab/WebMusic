@@ -9,6 +9,7 @@ import type {
   AudioMeterController,
   AudioMeterControllerOptions,
 } from '../../src/view/headless/meter';
+import type {AudioMeterPainter} from '../../src/view/render/meter-display';
 
 /** Records the options the element hands to the controller factory hook. */
 class ProbeAudioMeterElement extends AudioMeterElement {
@@ -183,12 +184,23 @@ describe('<audio-meter> shared UI composition', () => {
 
   it('shows waiting feedback without a source and clears it once one arrives', () => {
     stubFrames();
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    const painted = vi.fn();
+    class PaintingMeter extends AudioMeterElement {
+      protected override createMeterPainter(): AudioMeterPainter {
+        const painter = super.createMeterPainter();
+        return {paint: (...args: Parameters<AudioMeterPainter['paint']>) => { painted(...args); painter.paint(...args); }};
+      }
+    }
+    if (!customElements.get('painting-audio-meter')) customElements.define('painting-audio-meter', PaintingMeter);
+    const element = document.createElement('painting-audio-meter') as AudioMeterElement;
     document.body.append(element);
     const status = element.shadowRoot?.querySelector<HTMLElement>('.wui-stage__status');
     expect(status?.hidden).toBe(false);
     expect(status?.querySelector<HTMLElement>('.wui-status')?.dataset.kind).toBe('waiting');
     expect(element.snapshot).toBeUndefined();
+    // The meter is drawn at rest under the indicator, not left blank (DEC-082).
+    expect(painted).toHaveBeenCalled();
+    expect(painted.mock.calls.at(-1)![1]).toMatchObject({type: 'vu', silent: true});
 
     element.context = ownedContext().context;
     expect(element.shadowRoot?.querySelector<HTMLElement>('.wui-stage__status')?.hidden).toBe(true);

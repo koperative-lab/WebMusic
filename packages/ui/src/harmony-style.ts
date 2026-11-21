@@ -91,7 +91,7 @@ const BORDER = 'var(--wui-harmony-border, var(--wm-harmony-border, var(--wm-anal
 const PAD = 'var(--wui-harmony-pad, var(--wm-analysis-padding, var(--webscore-analyze-padding, .75rem)))';
 const ACCENT = 'var(--wui-harmony-accent, var(--wm-harmony-accent, var(--wm-analysis-accent, var(--webscore-analyze-accent, var(--wm-accent, #111)))))';
 const TRACK = 'var(--wui-harmony-track, var(--wm-harmony-track, var(--wm-analysis-track, var(--webscore-analyze-track, var(--wm-surface-muted, #eee)))))';
-const DANGER = 'var(--wui-harmony-danger, var(--wm-analysis-error, var(--wm-error, #c0392b)))';
+const DANGER = 'var(--wui-harmony-danger, var(--wm-analysis-error, var(--wm-error, var(--wm-danger, #c0392b))))';
 
 const FONT = 'var(--wui-harmony-font, inherit)';
 const FONT_MONO = 'var(--wui-harmony-font-mono, ui-monospace, monospace)';
@@ -436,13 +436,13 @@ export const harmonyTokens: Declarations = {
   '--wui-harmony-track':
     `var(--cp-track, var(--wm-harmony-track, var(--wm-analysis-track, var(--webscore-analyze-track, var(--wm-surface-muted, ${neutralColor('surfaceMuted')})))))`,
   '--wui-harmony-danger':
-    'var(--wm-harmony-danger, var(--wm-analysis-error, var(--wm-error, light-dark(#c0392b, #f87171))))',
+    'var(--wm-harmony-danger, var(--wm-analysis-error, var(--wm-error, var(--wm-danger, light-dark(#c0392b, #f87171)))))',
   // Amber at #d98c00 is 2.73:1 on white — under the 3:1 floor for a graphic,
   // and this colour IS the graphic: the severity bead is the only thing
   // distinguishing a warning row from an error one. Darkened to 4.44:1.
   '--wui-harmony-warning': 'var(--wm-harmony-warning, light-dark(#a86a00, #fbbf24))',
   // 3.54:1 on white — enough for the bead it paints, not enough for text.
-  '--wui-harmony-info': 'var(--wm-harmony-info, light-dark(#888, #aaa))',
+  '--wui-harmony-info': 'var(--wm-harmony-info, var(--wm-foreground-muted, light-dark(#888, #aaa)))',
   '--wui-harmony-focus': 'var(--wm-harmony-focus, var(--wm-focus, var(--wui-focus, currentColor)))',
   '--wui-harmony-radius': 'var(--wm-harmony-radius, var(--wm-control-radius, 0))',
 

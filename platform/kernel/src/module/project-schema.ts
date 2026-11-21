@@ -103,7 +103,7 @@ function parameter(value: unknown, path: string): ProjectParamEndpoint {
 }
 function layout(value: unknown): ProjectLayout {
   const data = object(value ?? {}, 'layout');
-  fields(data, ['modules', 'presentation', 'comments', 'groups'], 'layout');
+  fields(data, ['modules', 'presentation', 'comments', 'groups', 'style', 'page'], 'layout');
   const modules = positions(data.modules, 'layout.modules');
   const presentation = data.presentation === undefined ? undefined : positions(data.presentation, 'layout.presentation');
   const commentIds = new Set<string>();
@@ -132,7 +132,26 @@ function layout(value: unknown): ProjectLayout {
     }
     return {id, moduleIds};
   });
-  return {modules, ...(presentation ? {presentation} : {}), ...(comments ? {comments} : {}), ...(groups ? {groups} : {})};
+  const style = data.style === undefined ? undefined : customProperties(data.style, 'layout.style');
+  // A page is the host's own design: kept whole, as the plain data the project's limits already bound.
+  const page = data.page === undefined ? undefined : object(data.page, 'layout.page') as ProjectJsonObject;
+  return {modules, ...(presentation ? {presentation} : {}), ...(comments ? {comments} : {}), ...(groups ? {groups} : {}),
+    ...(style && Object.keys(style).length ? {style} : {}), ...(page ? {page} : {})};
+}
+
+const CUSTOM_PROPERTY = /^--[a-z0-9][a-z0-9-]{0,126}$/;
+
+/** Custom property names and the text each is given; what the text means is the host's to decide. */
+function customProperties(value: unknown, path: string): Record<string, string> {
+  const entries = Object.entries(object(value, path));
+  if (entries.length > 256) throw new RangeError(`${path} holds at most 256 properties.`);
+  const out: Record<string, string> = {};
+  for (const [name, item] of entries) {
+    if (!CUSTOM_PROPERTY.test(name)) throw new TypeError(`${path} names must be custom properties: two hyphens, then lowercase letters, digits and hyphens.`);
+    if (typeof item !== 'string' || !item.trim() || item.length > 256) throw new TypeError(`${path}.${name} must be a nonempty string of at most 256 characters.`);
+    out[name] = item;
+  }
+  return out;
 }
 function mappings(value: unknown): ProjectMappingRecord[] | undefined {
   if (value === undefined) return undefined;

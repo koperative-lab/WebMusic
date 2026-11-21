@@ -72,19 +72,33 @@ review; only the owner's explicit request in the current conversation changes it
 
 ## Product layers: object, component, app
 
-This vocabulary is fixed by the repository owner (DEC-074). Use it in code
+This vocabulary is fixed by the repository owner (DEC-074, refined by
+DEC-081). Use it in code
 comments, documentation, Studio and Library; do not substitute Max's or
 another tool's names for the layers.
 
 | Layer | Max counterpart | Definition |
 | --- | --- | --- |
-| **Object** | object | One node in a Studio graph: a typed box with inlets and outlets, backed by one Kernel module from a project plugin. |
-| **Component** | patch | A graph of objects delivered as portable code. A developer copies it into a web project, installs the WebMusic packages, and it runs. The packages' own Components are the official components. |
-| **App** | — | Music software a user assembles from several components chosen in the Library, official or from the community. |
+| **Object** | object | A typed box with inlets and outlets that runs only inside a graph, backed by one Kernel module from a project plugin. |
+| **Component** | patch, or a hosted plugin | Self-contained, portable code with its own interface. A developer copies it into a web project, installs the WebMusic packages, and it runs alone on a page. It is authored in code (the packages' own Components, the official components) or as a graph of objects in Studio. |
+| **App** | — | Music software a user designs as a web page (DEC-092): boxes that lay out text, images and the components chosen in the Library, official or from the community. Its components are one project sharing one Session; what each follows or hears is chosen, not cabled. |
 
-- Each layer is built only from the one below it. An object behaves the same
-  in every component; a component behaves the same pasted into a project or
-  placed in an app.
+- A layer is the contract a thing meets, not its origin or size. The test
+  between an object and a component is whether it is useful alone on a page:
+  interface objects such as `slider` and `dial` are objects.
+- Only components run in an app: its page also holds boxes, text and images,
+  which play nothing (DEC-092). A graph-authored component is made of objects
+  and other components; a code-authored component of public package entries.
+  An object behaves the same in every component; a component behaves the same
+  pasted into a project, placed in a graph or placed in an app.
+- Any component can be placed in a graph, where it is a box with ports.
+  `keys`, `scope`, `meter`, `spectrum` and `roll` are official components in
+  a graph, not another kind of object; a `buffer` holds data and its
+  waveform is `<audio-clip-view>`, a separate component. The
+  [component manifest](dev/design/DEVELOPER-TOOLS.md#component-manifest) that
+  places them, and the split `buffer`, are implemented in Bridge
+  `/component`; the Library's project-based apps are not (STATUS LAYER-01),
+  so do not describe them as delivered.
 - A component depends only on public package entries: never on Studio, private
   source or a hosted service. Its resources are declared. Anything that would
   break this is not a component.

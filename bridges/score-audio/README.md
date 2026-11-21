@@ -51,10 +51,16 @@ shows save/load, missing-plugin recovery and keyboard-accessible patch editing.
 
 `@webmusic/bridge/component` (DEC-078) runs a component made of objects outside
 Studio: `createComponentPlugins` registers everything such a project may use,
-including the view objects `webmusic.surface.*`; `mountComponent` shows its
+including the official Components a graph can hold, placed by their
+manifests (DEC-081); `mountComponent` shows its
 presentation under a transport; `defineComponentElement` makes it a custom
 element; `componentModuleSource` and `componentPageSource` write exported code
-and list what it needs beyond the packages. This entry needs `@webmusic/ui`;
+and list what it needs beyond the packages. A placed component is set by its
+Element's own attributes and `--wm-` tokens, kept in its module's config and
+checked against what the Element observes (DEC-085). A score a view edits in
+a graph is saved in the config of the box that plays it, as the Score's JSON
+gzipped into base64 text, and `ComponentHandle.save()` resolves to the
+project that holds it (DEC-087). This entry needs `@webmusic/ui`;
 the root entry does not. The [component reference](../../doc/src/content/docs/bridge/api.mdx#components-as-page-elements)
 owns the contract.
 

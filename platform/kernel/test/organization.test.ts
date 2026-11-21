@@ -2,7 +2,8 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {
   ControlMappings, ManualMessageClock, ModuleAudioEnvironment, ModuleProjectRuntime, ParamHandle, ParamSurface, PresetBank,
   ProjectPluginRegistry, applyParameters, captureParameters, describeSource, parseMessage, parseModuleProject,
-  type Message, type ModuleProject, type ProjectPluginFactory,
+  NoteInputPort, NoteOutputPort, createConnectionLease, sourceOrigin,
+  type Message, type ModuleHandle, type ModuleProject, type ProjectPluginFactory,
 } from '../src/module';
 import {createObjectPlugins, nodeWeights, objectInterfaceOf} from '../src/objects';
 import {FakeContext} from './processor-fakes';
@@ -67,6 +68,69 @@ describe('nested components', () => {
     expect(shellIn!.targets()).toContain(inletNode);
     expect(inletNode!.targets()).toContain(outletNode);
     expect(outletNode!.targets()).toContain(shellOut);
+  });
+
+  it('passes notes in through inlet.note and out through outlet.note (DEC-089)', async () => {
+    const played = new NoteOutputPort({id: 'notes'});
+    const heard: string[] = [];
+    const keys: ProjectPluginFactory = {id: 'test.keys', version: '1.0.0', create: ({record}) => ({module: {id: record.id, ports: () => [played]},
+      ports: [{id: 'notes', kind: 'note', direction: 'output'}], dispose: () => {}})};
+    const sink: ProjectPluginFactory = {id: 'test.sink', version: '1.0.0', create: ({record}) => {
+      const port = new NoteInputPort({accept: event => heard.push(`${event.gate} ${event.pitch.midi}`)}, {id: 'notes'});
+      return {module: {id: record.id, ports: () => [port]}, ports: [{id: 'notes', kind: 'note', direction: 'input'}], dispose: () => port.dispose()};
+    }};
+    const {runtime} = setup([keys, sink]);
+    const result = await runtime.restore(parseModuleProject({schema: 'webmusic.module-project', version: 1, id: 'notes',
+      contexts: [{id: 'root'}, {id: 'inside', parentId: 'root', ownerModuleId: 'sub'}],
+      modules: [
+        {id: 'keys', contextId: 'root', plugin: {id: 'test.keys', version: '1.0.0'}, config: {}},
+        {id: 'sub', contextId: 'root', plugin: {id: 'webmusic.object.component', version: '1.0.0'}, config: {inlets: ['note'], outlets: ['note']}},
+        {id: 'sink', contextId: 'root', plugin: {id: 'test.sink', version: '1.0.0'}, config: {}},
+        object('in', 'inside', 'inlet.note', '0'), object('out', 'inside', 'outlet.note', '0'),
+      ],
+      connections: [cord('a', 'keys', 'sub', 'notes', 'in0', 'note'), cord('b', 'in', 'out', 'out0', 'in0', 'note'), cord('c', 'sub', 'sink', 'out0', 'notes', 'note')],
+    }));
+    expect(result.status).toBe('committed');
+    expect(runtime.snapshot().modules.find(module => module.record.id === 'sub')!.ports.map(port => `${port.kind}/${port.direction}/${port.id}`))
+      .toEqual(['note/input/in0', 'note/output/out0']);
+    const note = (gate: 'on' | 'off') => played.emit({occurrenceId: 'n1', sourceId: 'keys', pitch: {midi: 60}, velocity: 0.8, gate, axis: 'audio-context-seconds', time: 0, epoch: 0});
+    note('on'); note('off');
+    expect(heard).toEqual(['on 60', 'off 60']);
+  });
+
+  it('carries a source in through inlet.source and out through outlet.source, following its replacement (DEC-089)', async () => {
+    const followed: (ModuleHandle | undefined)[] = [];
+    const player: ProjectPluginFactory = {id: 'test.player', version: '1.0.0', create: ({record}) => ({module: {id: record.id},
+      ports: [{id: 'source', kind: 'source', direction: 'output'}], dispose: () => {}})};
+    const view: ProjectPluginFactory = {id: 'test.view', version: '1.0.0', create: ({record}) => {
+      const releases: (() => void)[] = [];
+      return {module: {id: record.id}, ports: [{id: 'source', kind: 'source', direction: 'input'}], dispose: () => { for (const release of releases) release(); },
+        // Follow what the cord carries, through every relay, as a companion's inputModule would.
+        connectSource: (_port, module) => {
+          const read = () => followed.push(sourceOrigin(module));
+          read();
+          const stop = module.subscribe?.(read);
+          return createConnectionLease(() => stop?.());
+        }};
+    }};
+    const {runtime} = setup([player, view]);
+    const project = (playerId: string) => parseModuleProject({schema: 'webmusic.module-project', version: 1, id: 'sources',
+      contexts: [{id: 'root'}, {id: 'inside', parentId: 'root', ownerModuleId: 'sub'}],
+      modules: [
+        {id: playerId, contextId: 'root', plugin: {id: 'test.player', version: '1.0.0'}, config: {}},
+        {id: 'sub', contextId: 'root', plugin: {id: 'webmusic.object.component', version: '1.0.0'}, config: {inlets: ['source'], outlets: ['source']}},
+        {id: 'view', contextId: 'root', plugin: {id: 'test.view', version: '1.0.0'}, config: {}},
+        object('in', 'inside', 'inlet.source', '0'), object('out', 'inside', 'outlet.source', '0'),
+      ],
+      connections: [cord('a', playerId, 'sub', 'source', 'in0', 'source'), cord('b', 'in', 'out', 'out0', 'in0', 'source'),
+        cord('c', 'sub', 'view', 'out0', 'source', 'source')],
+    });
+    expect((await runtime.restore(project('p1'))).status).toBe('committed');
+    expect(runtime.snapshot().unresolved).toEqual([]);
+    expect(followed.at(-1)?.id).toBe('p1');
+    // A rebuilt graph with another player: the view outside follows the new one through both edges.
+    await runtime.restore(project('p2'));
+    expect(followed.at(-1)?.id).toBe('p2');
   });
 
   it('keeps an inlet with no enclosing component harmless', async () => {

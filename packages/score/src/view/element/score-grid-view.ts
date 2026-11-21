@@ -1,5 +1,5 @@
 import type {ViewPlayerSnapshot} from './internal/player-binding';
-import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase} from './internal/score-view-base';
+import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase, emptyScore} from './internal/score-view-base';
 import {
   SCORE_GRID_FEATURES, SCORE_GRID_SNAPS, mountScoreGrid, parseScoreGridFeatures,
   type ScoreGridFeature, type ScoreGridHandle, type ScoreGridOptions, type ScoreGridPlayback,
@@ -108,6 +108,7 @@ export class ScoreGridViewElement extends ScoreViewElementBase {
   /** Current position on the nominal score timeline, in seconds. */
   get currentTime(): number { return this.playheadSeconds; }
 
+  protected drawsEmptySurface(): boolean { return true; }
   protected editingRequested(): boolean { return this.editable; }
   protected hasEditingSurface(): boolean { return this.surface !== undefined && this.editing !== undefined && this.surfaceEditing === this.editing; }
 
@@ -150,15 +151,19 @@ export class ScoreGridViewElement extends ScoreViewElementBase {
     if (revision !== this.presentationRevision || generation !== this.editorGeneration) return;
     const prepared = this.prepareRender();
     if (!prepared?.owner) return;
-    if (this.hasEditorIntent() && !this.editing) {
+    let waiting = prepared.waiting;
+    if (!waiting && this.hasEditorIntent() && !this.editing) {
       const blocked = this.blockedEditorState();
-      this.showStatus(blocked ? 'error' : 'waiting', blocked ? `Editor unavailable: ${blocked}` : 'Waiting for the editor');
-      return;
+      if (blocked) { this.showStatus('error', `Editor unavailable: ${blocked}`); return; }
+      waiting = 'Waiting for the editor';
     }
+    // Waiting, the grid is drawn empty and borrows no editor (DEC-082).
+    const editing = waiting ? undefined : this.editing;
     try {
-      this.surface = mountScoreGrid(this, this.editing ? {editing: this.editing} : {score: prepared.score}, this.gridOptions());
-      this.surfaceEditing = this.editing;
+      this.surface = mountScoreGrid(this, editing ? {editing} : {score: waiting ? emptyScore() : prepared.score}, this.gridOptions());
+      this.surfaceEditing = editing;
       this.surface.updatePlayback(this.gridPlayback());
+      if (waiting) this.showWaitingOver(waiting);
     } catch (error) {
       if (this.hasEditorIntent()) this.setAttribute('data-editable-state', 'unavailable');
       this.showStatus('error', this.errorMessage(error));
@@ -205,7 +210,7 @@ export class ScoreGridViewElement extends ScoreViewElementBase {
   private gridOptions(): ScoreGridOptions {
     const options: ScoreGridOptions = {...this.attributeSettings(), features: this.tools,
       noteColor: 'var(--wm-score-view-note, var(--wm-foreground, light-dark(#333, #ddd)))',
-      activeNoteColor: 'var(--wm-score-view-active-note, rgb(240, 84, 119))',
+      activeNoteColor: 'var(--wm-score-view-active-note, var(--wm-accent, rgb(240, 84, 119)))',
       onPreview: (result) => this.dispatchEvent(new CustomEvent('editpreview', {detail: result, bubbles: true, composed: true})),
       onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),
       onError: (error) => this.dispatchEvent(new CustomEvent('editerror', {detail: {error}, bubbles: true, composed: true})),

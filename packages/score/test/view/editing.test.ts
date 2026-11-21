@@ -795,7 +795,11 @@ describe('score-grid-view editor composition', () => {
     expect(editingSurface(view)).not.toBeNull();
     editor.dispose();
     expect(view.getAttribute('data-editor-state')).toBe('unavailable');
-    expect(view.querySelector('[part="grid"]')).toBeNull();
+    // The editing surface goes; the grid stays, empty, under the waiting indicator (DEC-082).
+    expect(editingSurface(view)).toBeNull();
+    expect(view.querySelector('[part="grid"]')).not.toBeNull();
+    expect(view.querySelectorAll('rect[data-note-id]')).toHaveLength(0);
+    expect(view.querySelector('[part="waiting"] .wui-status')?.getAttribute('data-kind')).toBe('waiting');
     expect(view.textContent).toContain('Waiting for a score');
     expect(view.editor).toBe(editor);
     view.remove();

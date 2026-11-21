@@ -10,6 +10,123 @@ work and does not establish npm publication, a release tag or a deployment.
   published under MIT keep that license. Contributions now require a
   `Signed-off-by` trailer under the Developer Certificate of Origin 1.1 (`DCO`).
 
+- Place the packages' Components in a graph by their manifests (DEC-081).
+  Bridge `/component` adds `ComponentManifest`, `OFFICIAL_COMPONENTS`,
+  `projectManifest`, `migrateBufferViews` and manifest-based
+  `createComponentElement`, `bindComponentElement` and `fitComponentElement`,
+  which replace `createViewElement`, `configureViewElement`,
+  `bindViewElement`, `fitViewElement`, `viewWidth`, `SurfaceKind`,
+  `SURFACE_PLUGINS` and `surfaceKindOf`. Two components join the five view
+  objects: `level` (`<audio-level-analyzer>`) and `clip`
+  (`<audio-clip-view>` bound to a named buffer). A `buffer` no longer shows
+  its samples; `mountComponent` moves a presented buffer into a `clip`.
+
+- A component without its data still shows itself (DEC-082). Until data
+  arrives, `<score-grid-view>`, `<score-sheet-view>` and `<score-view>` draw a
+  blank score, `<audio-clip-view>` an empty clip, `<score-pitch-view>` its
+  instrument with nothing sounding, the Score analyses an empty lane, and
+  `<audio-meter>` and `<audio-live-view>` their display at rest, with the
+  waiting indicator over them (a `waiting` part, the stage status, or UI Kit
+  Workbench's feedback over its stage) instead of in their place. `.score`,
+  `.clip` and `.snapshot` stay `undefined` meanwhile. A Score analysis bound
+  through `.inputModule` now analyses that module's score.
+- Nine more official components are placed in a graph by manifest: `sheet`,
+  `view`, `pitch`, `chords`, `intervals`, `rhythm`, `degrees`, `transients`
+  and `live`. `ComponentParameter` gains `choices` for word arguments.
+- Players and desks are components in a graph (DEC-084): `player`
+  (`<score-player>`), `track` (`<audio-player>`), `rack`
+  (`<score-rack-control>`) and `mixer` (`<audio-mixer>`). A placed player
+  borrows the graph's Session through the module context its box lends, so its
+  transport and the graph's are one; a desk admits each of its four inputs as a
+  numbered channel; a player's `source` cord carries its own module to a
+  companion. Manifests gain `asset` and the `context` and `admit` port
+  bindings; `<audio-mixer>`'s `module` gains `admit(module, port)`.
+  `mountComponent` shows each Element as a block and binds it before showing it.
+- A component in a graph takes its own settings (DEC-085): `attributes` and
+  `style` in its module's config are written to its Element, in Studio and in
+  an exported component. An attribute is written only when the Element
+  observes it and neither the graph, a box argument nor the manifest's new
+  `locked` list owns it; a custom property only under `--wm-` with a value
+  that loads nothing. `@webmusic/bridge/component` gains `componentSettings`,
+  `settableAttributes`, `withComponentSetting`, `isStyleSetting` and
+  `GRAPH_ATTRIBUTES`.
+- A `roll` or `sheet` in a graph edits the score its source plays (DEC-086):
+  with its `editable` setting on, its box is lent one document made from the
+  score of the box its `source` cord comes from, which that box then plays.
+  A `ScorePlayer` that follows a Session now applies a document revision
+  instead of throwing: its member pauses the Session, which keeps its
+  position and schedules the edited timeline from there. `ScorePlayer` gains
+  `setSessionRequests`; `ComponentManifest` gains `edits`; `ComponentSurfaces`
+  gains `document`. `<score-grid-view>` and `<score-sheet-view>` with a
+  `height` attribute keep their toolbar in place and scroll in their viewport.
+- A score edited in a graph is saved with the box that plays it (DEC-087):
+  the box's exported config holds the Score's JSON, gzipped as base64 text,
+  under `document`, and a `score` object or `player` made from such a config
+  plays it. The asset is never written. A document now lasts as long as its
+  box, not as long as the surfaces. `@webmusic/bridge/component` gains
+  `encodeScore`, `decodeScore`, `canSaveScores`, `SAVED_SCORE_FORMAT` and
+  `SAVED_SCORE_ENCODING`; `ComponentSurfaces` gains `withDocument`, `revive`,
+  `revert`, `forget`, `enter`, `documentState`, `subscribe` and `settled`;
+  `ComponentHandle` gains `save()`. Loading a project with a saved score
+  needs `DecompressionStream`.
+- Every display part answers to shared roles, and a component has a theme
+  (DEC-088). A project's `layout.style` holds custom properties for the whole
+  presentation; `mountComponent` writes those under `--wm-` whose values load
+  nothing on its root, or at `:host` of a defined element, and an interface
+  object's `style` on its box. `@webmusic/bridge/component` gains
+  `THEME_TOKENS`, `componentTheme`, `withComponentTheme`, `styleSettings`,
+  `styleDeclarations` and `applyComponentStyle`. Tokens that ended in a
+  literal now pass a shared role first: errors `--wm-danger`, scrims the new
+  `--wm-scrim`, a clip's playhead `--wm-playhead`, sounding notes in the grid
+  and the sheet `--wm-accent`, range thumbs `--wm-foreground`, tracks and
+  subtle surfaces `--wm-surface-muted`, grid lines `--wm-border`, secondary
+  marks `--wm-foreground-muted`. Defaults are unchanged; a page that sets
+  those roles now restyles these parts too.
+- Whose style is shown is chosen (DEC-090): a box with `styling: 'inherit'`
+  in its config sets its own style aside for its component's theme, and a
+  component mounted with `styling: 'inherit'`, or defined and given
+  `styling="inherit"`, sets its theme and its boxes' styles aside for those
+  of what holds it. `@webmusic/bridge/component` gains `styleSource`,
+  `withStyleSource`, `ownStyle` and `StyleSource`; `ComponentHandle` gains
+  `setStyling`. The default, `own`, is unchanged.
+- `keepComponentSessionPreloaded` asks again while a member's document is
+  still being applied, instead of reporting it: a player whose score a view
+  edits no longer logs a failed preload when the graph is built (DEC-091).
+- An app is designed as a web page (DEC-092). A project's `layout.page`
+  holds a host's own tree of where its modules sit, kept by Kernel as plain
+  data. `mountComponent` gains `place`: given, it draws no frame, transport
+  or stage, puts each shown box's Element in the element the host returns
+  for its record, and writes the theme on the host.
+- Two more: `recorder` (`<score-recorder>`, recording the notes cabled to it)
+  and `panel` (`<score-synth-panel>`, editing the player its cord comes from).
+  `mountComponent` now preloads the Session it owns as members join (DEC-069),
+  so a placed player's parameters exist before the first play;
+  `keepComponentSessionPreloaded` does the same for a host with its own runtime.
+- The last three: `wave` (`<audio-view>`, a named buffer's waveform), `take`
+  (`<audio-recorder>`, each take written to a named buffer) and `playlist`
+  (`<audio-playlist>`, its asset entries queued through the `track` cabled to
+  it). `track` gains a `source` output. Manifests gain the `player` binding,
+  `scope`, the `entries` asset kind and buffer uses `'clip'` and `'take'`.
+  `<audio-playlist>` in a lent scope that is not a player's plays into that
+  scope's destination on its AudioContext. `<audio-view>` draws an empty
+  waveform under the waiting indicator until its audio arrives (DEC-082).
+  `mountComponent` gives a component's natural width to its box, which the
+  Element fills.
+- A component made of objects meets the same contract as an official one
+  (DEC-089). Kernel adds the edge objects `inlet.note`, `outlet.note`,
+  `inlet.source` and `outlet.source`, `SourceRelay` and `sourceOrigin`, and the
+  project instance members `sourceOutput` and `connectSource`; the runtime
+  carries a source cord through them. Bridge adds `componentContents`, and
+  `mountComponent` shows a nested component set to show its contents as a
+  framed cell, its official components included. The declarations are placed:
+  `effect`, `audio-effect` and `part` (in a desk of its own, through a
+  manifest's `container`). `eq` takes an `effects` list and plays it before
+  its EQ; manifests gain list parameters and `configure`.
+- `wave` follows the `track` cabled to it (its playhead, and its audio when it
+  names no buffer) and draws a spectrogram the host computes. `eq` places
+  `<score-synth-panel>` in insert mode with its EQ section. Manifests gain the
+  `owner` and `insert` port bindings and `spectrogram`.
+
 - A box sizes what it holds (DEC-080). UI Kit controls accept `fill` and take
   their host's whole size; `mountSlider` accepts `orientation: 'auto'`;
   `createKnob` accepts `gesture: 'drag'` and `dragDistance`, and `mountDial`

@@ -73,6 +73,12 @@ into one queue bus, so the queue has a stable `output` port that survives entry
 changes; the player lists it as its own `output` (alias `main`) for taps, such
 as an Audio analyser with `input="#player"`, without rerouting it.
 
+Inside a module scope that is not a player's and names a default destination —
+the box of a `playlist` component in a graph (DEC-084) — the queue is built on
+that scope's AudioContext and its bus plays into that destination, not the
+speakers. A new destination rebuilds the queue, stopped. Nested in a player,
+or alone on a page, the queue keeps its own context as described above.
+
 In a Session the linked queue is one **queue source**: the player registers it
 once (axis `queue-entry-seconds`), not once per entry. Session time is the
 selected entry's time; an entry change re-anchors the Session at 0 in one

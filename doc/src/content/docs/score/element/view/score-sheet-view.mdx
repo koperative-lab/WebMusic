@@ -79,7 +79,9 @@ Data comes from `.score`, `src`, the input player's score, or a borrowed
 `.editor`, with the same precedence and conflicts as
 [`<score-view>`](/score/element/view/score-view/). MusicXML or MXL gives the
 best notation: MIDI carries no key signature, staff assignment or spelling, so
-those are inferred.
+those are inferred. Until data arrives — or while an assigned editor is not
+ready — the sheet draws a blank staff, one empty 4/4 bar, under the waiting
+indicator in the `waiting` part; `.score` stays `undefined`.
 
 | Layout | Drawing |
 | --- | --- |
@@ -234,11 +236,11 @@ The sheet part reflects `data-layout` and, while editable, `data-editable`.
 | Property | Effect |
 | --- | --- |
 | `--wm-score-sheet-note` | Notation ink, then `--wm-foreground`. |
-| `--wm-score-sheet-active-note` | Ink of sounding notes, then `--wm-score-view-active-note`, default `rgb(240, 84, 119)`. |
+| `--wm-score-sheet-active-note` | Ink of sounding notes, then `--wm-score-view-active-note`, then the shared `--wm-accent`, default `rgb(240, 84, 119)`. |
 | `--wm-score-sheet-paper` | Page background, then `--wm-surface`. |
 | `--wm-score-sheet-background` | The desk around pages, then `--wm-surface-muted`. |
 | `--wm-score-sheet-max-height` | Maximum viewport height before it scrolls; default `40rem`. |
-| `--wm-score-sheet-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-score-sheet-scrim` | Backdrop behind an open card; then the shared `--wm-scrim`, default 45% black. |
 | `--wm-score-sheet-text-font` | Title and composer font; default a serif stack. |
 | `--wm-foreground`, `--wm-foreground-muted`, `--wm-accent-foreground`, `--wm-surface-muted` | Icons, pressed fills, selection frames and hover fills. |
 | `--wm-control-border`, `--wm-border` | Window, toolbar, page and card lines. |

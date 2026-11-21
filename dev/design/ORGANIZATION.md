@@ -4,7 +4,8 @@ Status: accepted direction, in delivery
 ([DEC-076](../DECISIONS.md#dec-076--components-nest-layout-presets-and-mappings-are-project-data)).
 Layers and public entries: Kernel `/module` (project schema, `PresetBank`,
 `ControlMappings`), Kernel `/objects` (`component`, `inlet`, `outlet`, `inlet~`,
-`outlet~`, `preset`, `nodes`), Score `/play/headless` (`MidiControlSource`) and
+`outlet~`, `inlet.note`, `outlet.note`, `inlet.source`, `outlet.source`,
+`preset`, `nodes`), Score `/play/headless` (`MidiControlSource`) and
 UI Kit `/controls` (`mountPresetGrid`, `mountNodes`, `mountMappingOverlay`).
 Source: [platform/kernel/src/objects/component.ts](../../platform/kernel/src/objects/component.ts),
 [preset.ts](../../platform/kernel/src/module/preset.ts),
@@ -15,7 +16,7 @@ Owning references: [Kernel API](../../doc/src/content/docs/kernel/api.mdx) and
 Delivery owner: [STATUS](../STATUS.md), ORG-01.
 
 This builds the second group of Max features on the message family of
-[DEC-075](MESSAGE-OBJECTS.md) and the layers of DEC-074: a component made of
+[DEC-075](MESSAGE-OBJECTS.md) and the layers of DEC-074 and DEC-081: a component made of
 components, a presentation of its controls, stored and blended values, and
 controllers mapped straight to parameters.
 
@@ -36,14 +37,27 @@ outer cord → component in0 ──▶ boundary inlet 0 ──▶ inlet 0 → co
 | `outlet n` | Messages to send out of outlet n | message `in0` |
 | `inlet~ n` | Audio arriving at inlet n | audio `out0` |
 | `outlet~ n` | Audio to send out of outlet n | audio `in0` |
+| `inlet.note n` | Notes arriving at inlet n (DEC-089) | note `out0` |
+| `outlet.note n` | Notes to play out of outlet n | note `in0` |
+| `inlet.source n` | The module cabled into inlet n, as a `SourceRelay` | source `out0` |
+| `outlet.source n` | Hands whatever is cabled into it out of outlet n | source `in0` |
 
 The shell's `config.inlets` and `config.outlets` list each channel's kind in
-order, and its ports follow them. An editor keeps the config, the edge objects'
+order — `message`, `audio`, `note` or `source` — and its ports follow them. A
+source channel is a relay: what reaches the component's inlet, or what is
+cabled to `outlet.source` inside, is what a cord from the other side carries,
+so a companion inside follows a player outside, and the reverse. The runtime
+carries a source cord through a module instance's `sourceOutput` and
+`connectSource` before the host's connector. An editor keeps the config, the edge objects'
 indexes and the outer cords in step. Contents keep the parent's destination
 and admission, so an audio object not wired to an `outlet~` sounds through the
 parent's default route, as every Studio object does. An edge object with no
 enclosing component does nothing. A component shown inside its box (Max's
-bpatcher) is an editor choice stored as `config.embed`.
+bpatcher) is an editor choice stored as `config.embed`; what it shows —
+interface objects, official components and nested components set to show
+theirs — is Bridge `componentContents`, the same in Studio and an exported
+page. A nested component placed from a file follows the file in Studio
+(`config.link`, DEC-089).
 
 ## Layout
 
@@ -61,8 +75,8 @@ A box sizes what it holds
 ([DEC-080](../DECISIONS.md#dec-080--a-box-sizes-what-it-holds)). A control
 fills its box: the whole box is the button, the track or the dial. A view is
 as wide as its box and, in a box with a recorded size, draws as tall as the
-box, with its readouts and tools kept. The Bridge's `controlSize` and
-`viewWidth` give the natural sizes an editor and `mountComponent` both use,
+box, with its readouts and tools kept. The Bridge's `controlSize` and each
+component manifest's `width` give the natural sizes an editor and `mountComponent` both use,
 so an interface looks the same where it is designed and where it runs. A dial
 turns by dragging: up or right raises the value.
 `ModuleProjectRuntime.updateLayout` changes any of them without rebuilding.
@@ -100,7 +114,9 @@ and into `cc`, `bend` and `program` messages on its `controls` port.
 |---|---|
 | ORG-A1 | A number into a component's inlet, doubled inside and sent out of its outlet, arrives doubled |
 | ORG-A2 | Audio passes through `inlet~` and `outlet~`; an unwired object inside still sounds |
-| ORG-A3 | Encapsulating three objects keeps every message and audio path working |
+| ORG-A3 | Encapsulating three objects keeps every message, audio, note and source path working |
+| ORG-A8 | Notes and a source cross a component's edge both ways; a view inside follows a player outside (DEC-089) |
+| ORG-A9 | A nested component set to show its contents shows its official components in Studio and an exported page |
 | ORG-A4 | Presentation shows only the placed controls, operable, without ports or cords |
 | ORG-A5 | Two stored presets recall their values and output; `interp` and `nodes` blend them |
 | ORG-A6 | Learning a controller or key and moving it drives the parameter across its range |

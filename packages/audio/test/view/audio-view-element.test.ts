@@ -25,7 +25,7 @@ vi.mock('../../src/view/render/meter', () => ({renderLoudnessMeter: mocks.meter}
 vi.mock('../../src/play/api', () => ({loadClipFromUrl: mocks.loadClip}));
 
 import {AudioViewElement, defineAudioViewElement} from '../../src/view/element/audio-view';
-import {computeClipPeaks} from '../../src/view/headless/peaks';
+import {computeClipPeaks, peaksDuration} from '../../src/view/headless/peaks';
 
 beforeAll(() => defineAudioViewElement('probe-audio-view'));
 
@@ -67,11 +67,17 @@ describe('<audio-view> empty states', () => {
     const empty = view.querySelector<HTMLElement>('[role="status"]');
     expect(empty?.textContent).toContain('assign .clip or .peaks');
     expect(empty?.classList.contains('wui-status--embedded')).toBe(true);
-    expect(mocks.waveform).not.toHaveBeenCalled();
+    // The view is there before its audio (DEC-082): an empty waveform under the waiting layer.
+    expect(view.querySelector('[part="waiting"] [role="status"]')).toBe(empty);
+    expect(mocks.waveform).toHaveBeenCalledOnce();
+    expect(peaksDuration(mocks.waveform.mock.calls[0]![1] as AudioPeaks)).toBe(0);
+    expect(view.clip).toBeUndefined();
 
     view.clip = toneClip(4);
-    expect(mocks.waveform).toHaveBeenCalledOnce();
+    expect(mocks.waveform).toHaveBeenCalledTimes(2);
+    expect(peaksDuration(mocks.waveform.mock.calls[1]![1] as AudioPeaks)).toBeGreaterThan(0);
     expect(view.querySelector('[role="status"]')).toBeNull();
+    expect(view.querySelector('[part="waiting"]')).toBeNull();
   });
 
   it('says a spectrogram needs data and still renders once it arrives', () => {

@@ -91,6 +91,9 @@ for active loading and a slower square-outline pulse while awaiting input. Keep 
 text available to assistive technology without displaying source-binding instructions as
 placeholder copy. Respect reduced motion, reveal content when ready, and retain visible
 errors and meaningful empty results. The animation owns no playback clock (DEC-052).
+Missing data is not a missing interface: a component waiting for its input draws its
+empty surface — keys and grid lines, a ruler and lane, a meter at rest — with the
+waiting indicator over it, never the indicator alone (DEC-082).
 
 Usable defaults do not impose one brand. A workstation may need dense controls; an installation may need one visual surface mapped to sound. They reuse interaction and timing contracts while expressing different aesthetics.
 

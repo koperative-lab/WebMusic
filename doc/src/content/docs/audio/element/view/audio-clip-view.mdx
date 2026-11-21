@@ -60,6 +60,12 @@ and **grid-edit** on the element. Reloading the page discards edits.
 `@webmusic/audio/view/auto` registers it on import. A read-only clip view needs
 no editor: `src` decodes a file and `.clip` takes a decoded `AudioClip`.
 
+Until audio arrives — no `src`, `.clip` or editor yet, or an editor that is
+not ready — the view draws an empty clip, its ruler and lane, under the
+waiting indicator in the `waiting` part; `.clip` stays `undefined`. Loading
+and a failed load show their status instead, and a blocked editor
+(`invalid` or `source-conflict`) shows its error.
+
 ## Ports and composition
 
 `<audio-clip-view>` is a **View** module and, with `editable`, an editor
@@ -315,13 +321,14 @@ The clip view is light DOM, so style its parts with attribute selectors such as
 | `hud` | The gain control button. |
 | `overlay` / `card` | The scrim and the open card, with `card-header`, `choices`, `fields` and `actions`. |
 | `offscreen` | Instructions and live status read by assistive technology only. |
+| `waiting` | The layer over the empty clip holding the waiting indicator; present only until audio arrives, and it takes no pointer input. |
 
 | Property | Effect |
 | --- | --- |
 | `--wm-audio-clip-background` | Window, lane and card background, then `--wm-surface`. |
 | `--wm-audio-clip-wave` | Waveform fill, then `--wm-foreground`. |
-| `--wm-audio-clip-playhead` | Playhead color; default `rgb(240, 84, 119)`. |
-| `--wm-audio-clip-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-audio-clip-playhead` | Playhead color; then the shared `--wm-playhead`, default `rgb(240, 84, 119)`. |
+| `--wm-audio-clip-scrim` | Backdrop behind an open card; then the shared `--wm-scrim`, default 45% black. |
 | `--wm-foreground`, `--wm-foreground-muted` | Icons, text, lines and handles. |
 | `--wm-accent-foreground` | Icon color on a pressed tool and the primary card action. |
 | `--wm-surface-muted` | Hover fill for toolbar and card buttons. |

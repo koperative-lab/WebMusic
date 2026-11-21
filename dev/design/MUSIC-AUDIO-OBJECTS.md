@@ -160,6 +160,11 @@ and never follows the default route, which would feed back.
 renders the editor's current sound back to a clip, which the caller writes to
 the store.
 
+DEC-081 splits the buffer's data from its view: the `buffer` object shows
+nothing, and its waveform is the `clip name` component, an `<audio-clip-view>`
+bound to the buffer by name; editing it writes back to the store
+([component manifest](DEVELOPER-TOOLS.md#component-manifest)).
+
 ## Device and network input
 
 `gamepad [index]` polls a game controller every 16 ms and sends `button i

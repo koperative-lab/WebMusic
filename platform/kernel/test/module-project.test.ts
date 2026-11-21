@@ -89,6 +89,31 @@ describe('versioned module project data', () => {
     expect(project.modules[0].plugin.version).toBe('2.4');
   });
 
+  it('keeps the presentation\'s custom properties and refuses what is not one (DEC-088)', () => {
+    const themed = document({layout: {modules: [], style: {'--wm-foreground': '#204060', '--wm-control-radius': '4px'}}});
+    expect(themed.layout.style).toEqual({'--wm-foreground': '#204060', '--wm-control-radius': '4px'});
+    expect(parseModuleProject(serializeModuleProject(themed))).toEqual(themed);
+    // No style is no key, so a project without one is the project it was.
+    expect('style' in document({layout: {modules: [], style: {}}}).layout).toBe(false);
+    expect(() => document({layout: {modules: [], style: {color: 'red'}}})).toThrow(/custom properties/);
+    expect(() => document({layout: {modules: [], style: {'--WM-x': 'red'}}})).toThrow(/custom properties/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': 3} as never}})).toThrow(/nonempty string/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': ' '}}})).toThrow(/nonempty string/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': 'x'.repeat(257)}}})).toThrow(/256 characters/);
+    expect(() => document({layout: {modules: [], style: ['--wm-foreground'] as never}})).toThrow();
+  });
+
+  it('keeps a host\'s page with the layout as plain data (DEC-092)', () => {
+    const page = {id: 'page', type: 'box', children: [{id: 'title', type: 'text', text: 'Arabesque'}, {id: 'c1', type: 'component', module: 'voice'}]};
+    const paged = document({layout: {modules: [], page: page as never}});
+    expect(paged.layout.page).toEqual(page);
+    expect(parseModuleProject(serializeModuleProject(paged))).toEqual(paged);
+    expect('page' in document({layout: {modules: []}}).layout).toBe(false);
+    // A page is an object; what is in it is the host's to read, and the project's limits still bound it.
+    expect(() => document({layout: {modules: [], page: ['box'] as never}})).toThrow();
+    expect(() => document({layout: {modules: [], page: {text: 'x'.repeat(70000)}}})).toThrow(/limits/);
+  });
+
   it('rejects accessors without invoking them and rejects native/prototype data', () => {
     const read = vi.fn(() => 'value');
     const data = {...document(), config: {}};

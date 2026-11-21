@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {createAudioClip, type AudioClip} from '../../src/core';
+import {createAudioClip, type AudioClip, type AudioPeaks} from '../../src/core';
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -553,7 +553,8 @@ describe('<audio-view> src loading', () => {
     request.resolve(toneClip(1));
     await vi.waitFor(() => expect(view.hasAttribute('aria-busy')).toBe(false));
     expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
-    expect(mocks.waveform).not.toHaveBeenCalled();
+    // Only the empty waveform a waiting view draws (DEC-082); the late clip is never drawn.
+    for (const [, peaks] of mocks.waveform.mock.calls) expect(peakHelpers.peaksDuration(peaks as AudioPeaks)).toBe(0);
   });
 
   it.each(['src', 'peaks-src'] as const)('shows a failed %s load and recovers through removal and retry', async (attribute) => {
@@ -583,7 +584,8 @@ describe('<audio-view> src loading', () => {
       bits: 8, length: 2, data: [-10, 10, -20, 20],
     }));
     second.resolve(result as AudioClip & Response);
-    await vi.waitFor(() => expect(mocks.waveform).toHaveBeenCalledOnce());
+    // The loaded audio replaces the empty waveform the waiting view drew (DEC-082).
+    await vi.waitFor(() => expect(peakHelpers.peaksDuration(mocks.waveform.mock.lastCall![1] as AudioPeaks)).toBeGreaterThan(0));
     expect(view.querySelector('.wui-status')).toBeNull();
     expect(view.hasAttribute('aria-busy')).toBe(false);
   });

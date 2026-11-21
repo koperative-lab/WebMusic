@@ -242,7 +242,7 @@ const SYNTH_LFO_COMPATIBILITY_STYLE = `
   color: var(--synth-label, var(--wm-lfo-label, ${MUTED}));
 }
 .lfo [part~="input"] {
-  background: var(--synth-track, var(--wm-lfo-track, var(--wm-control-track, light-dark(#dcdcdc, #333))));
+  background: var(--synth-track, var(--wm-lfo-track, var(--wm-control-track, var(--wm-surface-muted, light-dark(#dcdcdc, #333)))));
 }
 .lfo [part~="input"]::-webkit-slider-thumb {
   background: var(--synth-thumb, var(--wm-lfo-thumb, var(--wm-control-thumb, ${INK})));

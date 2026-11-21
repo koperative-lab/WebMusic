@@ -172,7 +172,8 @@ export class PitchViewElement extends HTMLElementBase {
     const style = this.ownerDocument.createElement('style');
     // Layout belongs to the host; the shared presenters own all visual styles.
     // No inline sizing or display means application CSS and [hidden] still win.
-    style.textContent = `:where(${selector}) { box-sizing: border-box; inline-size: 100%; min-inline-size: 0; }
+    style.textContent = `:where(${selector}) { position: relative; box-sizing: border-box; inline-size: 100%; min-inline-size: 0; }
+:where(${selector}) > [data-over] { position: absolute; inset: 0; pointer-events: none; }
 :where(${selector}:not([hidden])) { display: block; }
 :where(${selector}) > [hidden] { display: none !important; }`;
     this.append(style);
@@ -237,7 +238,15 @@ export class PitchViewElement extends HTMLElementBase {
 
   #paintStatus(): void {
     this.#status?.update();
-    if (this.#handle) this.#handle.element.hidden = this.#statusState.kind !== 'ready';
+    const kind = this.#statusState.kind;
+    // Waiting, the presenter is drawn with nothing sounding and the indicator
+    // over it (DEC-082); loading and failure replace it (DEC-052).
+    if (this.#handle) this.#handle.element.hidden = kind !== 'ready' && kind !== 'waiting';
+    const status = this.#status?.element;
+    if (status) {
+      status.toggleAttribute('data-over', kind === 'waiting');
+      status.classList.toggle('wui-status--embedded', kind === 'waiting');
+    }
   }
 
   #bindPlayer(): void {

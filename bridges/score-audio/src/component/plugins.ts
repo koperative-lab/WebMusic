@@ -4,17 +4,21 @@
 
 import {loadClipFromUrl} from '@webmusic/audio/play';
 import {createSamplerPlugins} from '@webmusic/audio/play/headless';
-import {multichannelPlugin, wamPlugin, type ProjectAssetReference, type ProjectPluginFactory, type WamPluginOptions} from '@webmusic/kernel/module';
+import {
+  multichannelPlugin, wamPlugin,
+  type ProjectAssetReference, type ProjectFactoryRequest, type ProjectModuleInstance, type ProjectPluginFactory, type WamPluginOptions,
+} from '@webmusic/kernel/module';
 import {createObjectPlugins, type ObjectEnvironment} from '@webmusic/kernel/objects';
 import {loadScoreFromUrl} from '@webmusic/score/io';
-import {MidiAccessSource, createMidiPlugins} from '@webmusic/score/play/headless';
+import {MidiAccessSource, createMidiPlugins, type ScorePlayerModule} from '@webmusic/score/play/headless';
+import type {ScoreEditor} from '@webmusic/score/view/headless';
 import {createWebMusicProjectPlugins} from '../project';
 import type {ComponentSurfaces} from './surfaces';
 
 export interface ComponentPluginOptions {
   /** Where `print`, `js` output and object failures go; see `ObjectEnvironment`. */
   readonly objects?: ObjectEnvironment;
-  /** The view objects' slots; omit for a component without views. */
+  /** The slots of the official components placed in a graph; omit for a component without them. */
   readonly surfaces?: ComponentSurfaces;
   /** Web MIDI for the MIDI objects; one is made when omitted. */
   readonly midi?: MidiAccessSource;
@@ -27,11 +31,11 @@ export interface ComponentPluginOptions {
 /**
  * Every plugin a component may use: the Bridge's players, racks, effects and
  * LFO; `mc.` effects; the Kernel's objects; the sampler and MIDI objects;
- * the view objects; Web Audio Modules when configured; and `extra`.
+ * the official components (DEC-081); Web Audio Modules when configured; and `extra`.
  */
 export function createComponentPlugins(options: ComponentPluginOptions = {}): readonly ProjectPluginFactory[] {
   // A score player also offers its playback source, for a roll that follows it.
-  const bridge = createWebMusicProjectPlugins().map(factory => factory.id === 'webmusic.score-player' ? withSourceOutlet(factory) : factory);
+  const bridge = createWebMusicProjectPlugins().map(factory => factory.id === 'webmusic.score-player' ? withSourceOutlet(factory, options.surfaces) : factory);
   const effect = bridge.find(factory => factory.id === 'webmusic.effect')!;
   return Object.freeze([
     ...bridge,
@@ -45,10 +49,51 @@ export function createComponentPlugins(options: ComponentPluginOptions = {}): re
   ]);
 }
 
-function withSourceOutlet(factory: ProjectPluginFactory): ProjectPluginFactory {
-  return Object.freeze({...factory, create: async (request: Parameters<ProjectPluginFactory['create']>[0]) => {
+/**
+ * The score player with its `source` outlet. With `surfaces`, its box also
+ * says which score it plays and plays the document that score becomes once a
+ * view edits it (DEC-086): the engine, clock and route stay. The edited
+ * score is saved in the box's config and read from it (DEC-087).
+ */
+function withSourceOutlet(factory: ProjectPluginFactory, surfaces?: ComponentSurfaces): ProjectPluginFactory {
+  const source = {id: 'source', kind: 'source' as const, direction: 'output' as const};
+  if (!surfaces) return Object.freeze({...factory, create: async (request: ProjectFactoryRequest) => {
     const instance = await factory.create(request);
-    return {...instance, ports: [...(instance.ports ?? []), {id: 'source', kind: 'source' as const, direction: 'output' as const}]};
+    return {...instance, ports: [...(instance.ports ?? []), source]};
+  }});
+  return Object.freeze({...factory, create: async (request: ProjectFactoryRequest) => {
+    const {id, config} = request.record;
+    const leave = surfaces.enter(id);
+    let instance: ProjectModuleInstance | undefined;
+    try {
+      await surfaces.revive(id, config, request.signal);
+      instance = await factory.create(request);
+      const created = instance;
+      const ports = [...(created.ports ?? []), source];
+      const module = created.module as Partial<ScorePlayerModule>;
+      const score = module.player?.playback.snapshot().score;
+      if (!score || typeof module.setDocumentSource !== 'function') return {...created, ports, dispose: () => { leave(); return created.dispose(); }};
+      const slot = surfaces.slot(id);
+      let playing: ScoreEditor | undefined;
+      // The document when there is one; the constructed score again once it is let go.
+      const play = () => {
+        const document = slot.document.current;
+        if (document === playing) return;
+        playing = document;
+        module.setDocumentSource!(document);
+      };
+      const releaseScore = slot.score.provide(score);
+      // A box rebuilt after its score was edited, or made from a saved one, plays the document at once.
+      play();
+      const unsubscribe = slot.document.subscribe(play);
+      return {...created, ports,
+        exportConfig: () => surfaces.withDocument(id, created.exportConfig?.() ?? config),
+        dispose: () => { unsubscribe(); releaseScore(); leave(); return created.dispose(); }};
+    } catch (error) {
+      leave();
+      try { instance?.dispose(); } catch { /* The creation failure is the one to report. */ }
+      throw error;
+    }
   }});
 }
 

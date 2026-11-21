@@ -55,6 +55,10 @@ transport registration: each child's Session passes through unchanged.
 Tap the mixed output with `input="#desk" port="master"` on an Audio analyzer,
 or one strip with `port="channel:piano"`.
 Reading `.module` does not prepare an AudioContext.
+`.module.admit(module, port)` gives an output that is not a nested element its
+own channel, keyed by `module.id`, and returns the lease that removes it, as a
+Rack's `admit` does; a graph admits each cord into the `mixer` component this
+way (DEC-084).
 
 An outermost desk owns the Session its children join; a desk inside a player or
 another provider borrows that Session. Members declared through `.members` play

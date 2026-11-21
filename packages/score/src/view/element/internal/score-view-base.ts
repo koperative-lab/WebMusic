@@ -10,6 +10,9 @@ import {createScoreViewEditing, scoreDocumentPlaybackCompatible, type ScoreViewE
 import {HTMLElementBase, cssSizeAttr} from '../base';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
+export {emptyScore} from '../../../core/model/empty-score';
+import {emptyScore} from '../../../core/model/empty-score';
+
 /** Attributes every score View Element observes for its data, playback and size. */
 export const SCORE_VIEW_BASE_ATTRIBUTES = Object.freeze(['src', 'format', 'input', 'port', 'width', 'height']);
 
@@ -64,6 +67,12 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
   protected releaseEditingSurface(): () => void { return () => {}; }
   /** Editor attachment, availability or editability changed. */
   protected editingStatusChanged(): void {}
+  /**
+   * Whether this presentation draws its empty surface while its data has not
+   * arrived (DEC-082), with the waiting indicator over it, instead of the
+   * indicator alone.
+   */
+  protected drawsEmptySurface(): boolean { return false; }
   /** An event-only note source without a readable snapshot. */
   protected followEventNote(_note: ViewPlayerNote, _on: boolean): void {}
   /** The editor's visible content or availability changed. */
@@ -181,16 +190,18 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
   /**
    * Shared render prelude: host size and style, then loading, error and
    * waiting states. Returns the score to draw, or undefined when a status
-   * presenter now fills the element.
+   * presenter now fills the element. `waiting` is set when the score is the
+   * empty one a view drawing its empty surface shows until its data arrives;
+   * the caller then puts the indicator over it with {@link showWaitingOver}.
    */
-  protected prepareRender(): {score: Score; owner?: Document} | undefined {
+  protected prepareRender(): {score: Score; owner?: Document; waiting?: string} | undefined {
     this.applyHostSize();
     const score = this.resolvedScore;
     const owner = (this as {ownerDocument?: Document}).ownerDocument;
     if (owner) {
       const style = owner.createElement('style');
       const selector = this.localName.replace(/[^a-z0-9-]/gi, (char) => `\\${char.codePointAt(0)!.toString(16)} `);
-      style.textContent = `:where(${selector}) { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
+      style.textContent = `:where(${selector}) { position: relative; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
 :where(${selector}:not([hidden])) { display: block; }`;
       this.append(style);
     }
@@ -210,6 +221,10 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
     if (!score) {
       // A missing, loading or disposed editor is pending; only an unusable selection is an error.
       const blocked = this.hasEditorIntent() ? this.blockedEditorState() : undefined;
+      // The data has not arrived, but the view has: draw it empty (DEC-082).
+      if (owner && !blocked && this.loadError === undefined && this.drawsEmptySurface()) {
+        return {score: emptyScore(), owner, waiting: 'Waiting for a score'};
+      }
       if (owner) this.showStatus(this.loadError === undefined && !blocked ? 'waiting' : 'error',
         this.loadError !== undefined ? this.errorMessage(this.loadError) : blocked ? `Editor unavailable: ${blocked}` : 'Waiting for a score');
       return undefined;
@@ -262,6 +277,29 @@ export abstract class ScoreViewElementBase extends HTMLElementBase {
   protected showStatus(kind: StatusKind, message: string): void {
     this.status?.destroy();
     this.status = mountStatus(this, {snapshot: () => ({kind, message})});
+  }
+
+  /**
+   * The waiting indicator over an empty surface already drawn: the view stays
+   * usable and the indicator says only that its data has not arrived (DEC-052,
+   * DEC-082). The layer takes no pointer input and goes with the presentation.
+   */
+  protected showWaitingOver(message: string): void { this.showStatusOver('waiting', message); }
+
+  /**
+   * A waiting or empty state over the surface already drawn, in a layer whose
+   * part names the state. It takes no pointer input and goes with the
+   * presentation; an empty state shows nothing and speaks its message.
+   */
+  protected showStatusOver(kind: 'waiting' | 'empty', message: string): void {
+    const owner = (this as {ownerDocument?: Document}).ownerDocument;
+    if (!owner) return;
+    const layer = owner.createElement('div');
+    layer.setAttribute('part', kind);
+    layer.style.cssText = 'position: absolute; inset: 0; display: grid; pointer-events: none;';
+    this.append(layer);
+    this.status?.destroy();
+    this.status = mountStatus(layer, {snapshot: () => ({kind, message})}, {classNames: {root: 'wui-status--embedded'}});
   }
 
   protected errorMessage(error: unknown): string {

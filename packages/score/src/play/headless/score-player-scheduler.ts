@@ -212,6 +212,8 @@ export class ScorePlayerScheduler {
     const now = this.host.getContext()?.currentTime ?? 0;
     this.transport.pause(now);
     this.transport.seekTo(Math.min(duration, nominalSeconds), now);
+    // A Session keeps its own position: its scheduler takes the timeline where the Session is (DEC-086).
+    this.sessionScheduler?.adoptTimeline(timeline);
   }
 
   /** Publish the current position once, e.g. after an adoption moved it without a transport command. */

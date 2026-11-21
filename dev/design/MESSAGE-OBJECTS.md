@@ -17,7 +17,8 @@ and lists, and logic objects such as `metro`, `counter`, `select` and
 `trigger` decide what happens next. WebMusic's five port families carried
 audio, notes, parameter modulation, transport and data sources, but no
 general value. This contract adds that family, the objects that use it, and
-the UI controls a component's objects show (DEC-074 names the layers).
+the UI controls a component's objects show (DEC-074 names the layers; under
+DEC-081 these controls are objects, since none is useful alone on a page).
 
 ## Message values
 

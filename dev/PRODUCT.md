@@ -68,26 +68,58 @@ Staff and notation editing are not part of the current contract (DEC-058).
 ## Objects, components and apps
 
 WebMusic has three product layers (DEC-074). Every maintained document, Studio
-and the Library use these names for them.
+and the Library use these names for them. A layer is the contract a thing
+meets, not where it came from or how large it is (DEC-081).
 
-| Layer | Max counterpart | What it is | Who makes it | Where it runs |
-|---|---|---|---|---|
-| Object | Object | One node in a Studio graph: a typed box with inlets and outlets, backed by one Kernel module from a project plugin | The packages and Studio | Inside a component |
-| Component | Patch | A graph of objects delivered as portable code: copy it into a web project, install the WebMusic packages, and it runs | The packages (official components), Studio users and the community | Any web project |
-| App | — | Music software assembled from several components chosen in the Library | Users | The browser, as a page or an installation |
+| Layer | Max counterpart | Contract | Package counterpart | Who makes it | Where it runs |
+|---|---|---|---|---|---|
+| Object | Object | A typed box with inlets and outlets that runs only inside a graph, backed by one Kernel module from a project plugin | API functions, Headless classes and UI Kit presenters | The packages and Studio | Inside a component |
+| Component | Patch, or a hosted plugin | Self-contained, portable code with its own interface: copy it into a web project, install the WebMusic packages, and it runs alone on a page | Components | The packages (official components), Studio users and the community | Any web project; inside a graph, as a box with ports |
+| App | — | A web page of boxes, text, images and components chosen in the Library; its components share one Session and are connected by choice (DEC-092) | — | Users | The browser, as a page or an installation |
 
-Each layer is made only from the one below it, and each keeps its
-contract when it moves up: an object behaves the same in every component, and
-a component behaves the same whether it is pasted into a web project or
-placed in an app.
+The test between an object and a component is whether the thing is useful
+alone on a page. A slider, a dial or a button is not, so interface objects
+are objects; a keyboard, an oscilloscope or a piano roll is, so each is a
+component. `score` and `sample` are Headless players with no interface and
+are objects. A `buffer` holds named samples and shows nothing; its waveform is
+the official component `<audio-clip-view>`, bound to the buffer by name.
+
+A component is authored in one of two ways under the same contract. The
+packages' Components are written in code from a Headless class and
+presenters; they are sealed and cannot be opened in Studio. A component built
+in Studio is a graph of objects and can be opened. Only components run in an
+app, whose page also holds boxes, text and images (DEC-092); a graph-authored
+component is made of objects and of other
+components; a code-authored component is made of the packages' public
+entries.
+
+Any component can be placed in a graph, where it is a box with ports. The
+`component` object does this for graph-authored components. The official
+components — `keys`, `roll`, `scope`, `meter`, `spectrum`, `level` and
+`clip` so far — are placed by their
+[component manifests](design/DEVELOPER-TOOLS.md#component-manifest), which
+declare their ports, parameters and size, so a graph holds any component
+that has one ([STATUS](STATUS.md), LAYER-01). An app's components are a project
+whose boxes are all components, with the same ports and Session as any
+graph; its page is designed as a web page is, in boxes that lay out text,
+images and those components, and what a component follows or hears is chosen
+in its inspector (DEC-092). The App editor builds apps this way, from the
+same listing of official and the user's own components as Studio's
+libraries; community components have no place that holds them yet.
+
+Each layer keeps its contract when it moves up: an object behaves the same in
+every component, and a component behaves the same whether it is pasted into a
+web project, placed in a graph or placed in an app.
 
 A component's portability is its defining requirement. Its code depends only
 on public package entries: no Studio runtime, private source or hosted
 service. Its media and other resources are declared, so the receiving project
 knows what to serve. The packages' own Components — `<score-player>`,
 `<audio-oscilloscope>` and the rest — are the official components. A
-component built from objects in Studio must meet the same contract;
-exporting one is not yet implemented ([STATUS](STATUS.md), LAYER-01).
+component built from objects in Studio meets the same contract: Studio
+exports it as a module or a standalone page over `@webmusic/bridge/component`
+(DEC-078). Running one in a fresh project that installs only the packages is
+not yet verified ([STATUS](STATUS.md), LAYER-01).
 
 Earlier names are retired in current writing. The packages' tags are
 *Components*, not *Web Components*; a graph of objects is a *component*, not a

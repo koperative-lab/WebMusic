@@ -2,7 +2,7 @@ import {bindPlayerToVisualizer, type PlayerBindingHandlers} from '../render/bind
 import {validateScoreViewConfiguration} from '../core/configuration';
 import {findSequenceNote} from '../core/note-sequence';
 import {type ViewPlayerNote, type ViewPlayerSnapshot} from './internal/player-binding';
-import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase} from './internal/score-view-base';
+import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase, emptyScore} from './internal/score-view-base';
 import {NoteId, type Score} from '../../core';
 import {createScoreView, type ScoreView} from '../headless/score-view';
 import {renderScoreVisualizer, type ScoreVisualizerHandle} from '../render/score-visualizer';
@@ -232,6 +232,8 @@ export class ScoreViewElement extends ScoreViewElementBase {
     this.setAttribute('direction', direction);
   }
 
+  protected drawsEmptySurface(): boolean { return true; }
+
   protected disposePresentation(): number {
     const revision = ++this.presentationRevision;
     const binding = this.renderedUnbind;
@@ -264,20 +266,24 @@ export class ScoreViewElement extends ScoreViewElementBase {
     if (revision !== this.presentationRevision || generation !== this.editorGeneration) return;
     const prepared = this.prepareRender();
     if (!prepared) return;
-    const {score, owner} = prepared;
+    const {score, owner, waiting} = prepared;
     const type = this.type;
     const blocked = this.hasEditorIntent() && !this.editing ? this.blockedEditorState() : undefined;
     if (blocked && owner) this.showStatus('error', `Editor unavailable: ${blocked}`);
     this.view = createScoreView(score, {type});
-    if (owner && !this.view.sequence.notes.length) {
+    // Waiting or empty, the view still draws its surface — a blank staff, roll
+    // or waterfall — with the state over it (DEC-082). A score with no length
+    // has nothing to draw against, so its surface is the blank score's.
+    const over = waiting !== undefined ? {kind: 'waiting' as const, message: waiting}
+      : owner && !blocked && !this.view.sequence.notes.length ? {kind: 'empty' as const, message: 'No notes to display'} : undefined;
+    if (over && !(this.view.sequence.totalTime > 0)) {
       this.view.dispose();
-      this.view = undefined;
-      this.showStatus('empty', 'No notes to display');
-      return;
+      this.view = createScoreView(emptyScore(), {type});
     }
+    const drawn = this.view.score;
     if (!owner) {
       this.replaceChildren();
-      this.rendered = this.renderScore(score, this as unknown as HTMLElement, type);
+      this.rendered = this.renderScore(drawn, this as unknown as HTMLElement, type);
       this.rebindRendered(this.rendered);
       return;
     }
@@ -285,7 +291,7 @@ export class ScoreViewElement extends ScoreViewElementBase {
     let failure: unknown;
     this.stage = mountStage(
       this,
-      {render: (surface) => { this.rendered = this.renderScore(score, surface, type); }},
+      {render: (surface) => { this.rendered = this.renderScore(drawn, surface, type); }},
       {
         label: 'Score visualization', fill: true, overflow: 'auto',
         onError: (error) => { failed = true; failure = error; },
@@ -306,6 +312,7 @@ export class ScoreViewElement extends ScoreViewElementBase {
       return;
     }
     this.rebindRendered(this.rendered);
+    if (over) this.showStatusOver(over.kind, over.message);
   }
 
   private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): ScoreVisualizerHandle {

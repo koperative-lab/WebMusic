@@ -1,4 +1,5 @@
 import {Rational, Pitch, type Score} from '../../../core';
+import {emptyScore} from '../../../core/model/empty-score';
 import {
   spellChord,
   inspectChordPitches,
@@ -30,7 +31,7 @@ import {
   type ViewRecipe,
 } from './index';
 import {HTMLElementBase, upgradeProperties} from '../base';
-import {seekAnalysisPlayer, type AnalysisPlayerOwner, type AnalysisTimeUpdate} from './player-binding';
+import {readAnalysisPlayerScore, seekAnalysisPlayer, type AnalysisPlayerOwner, type AnalysisTimeUpdate} from './player-binding';
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import {
   mountFlowLane,
@@ -659,6 +660,10 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#loading = !this.#source.score && Boolean(this.getAttribute('src'));
     this.#error = undefined;
     this.#apply();
+    // Borrow the bound target's score — an explicit `inputModule`'s source
+    // port as much as a discovered player (DEC-068); without a bound target,
+    // the source still discovers one itself.
+    if (!this.#source.score && !this.getAttribute('src')) this.#source.borrowed = this.#player ? readAnalysisPlayerScore(this.#player) : undefined;
     const {score, stale, error} = await this.#source.load();
     if (stale || !this.isConnected) return;
     this.#loading = false;
@@ -737,9 +742,12 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const recipe = this.#recipe();
     this.#moving = this.#animating(this.#now());
     const score = recipe.needsScore ? this.#score : undefined;
-    const material = this.#material(score);
+    // Waiting for a score, the lane is drawn empty — its axis and beat lines
+    // with no bands — under the waiting indicator (DEC-082); `score` stays unset.
+    const material = this.#material(score ?? (recipe.needsScore && !this.#loading && this.#error === undefined ? emptyScore() : undefined));
     const result = material.result;
-    const lane = material.lane;
+    // The empty lane drawn while waiting has nothing to navigate.
+    const lane = material.score !== score ? {...material.lane, disabled: true} : material.lane;
     this.#syncSelection(lane, score);
     const selectedBand = lane.bands.find((band) => band.id === this.#selection?.id);
     const index = material.index;

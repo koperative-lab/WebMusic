@@ -220,6 +220,15 @@ Missing mapping or expanded repeats report `reset-origin`, reset to zero and
 clear the loop; repeat playback reports `documentCoordinates: false` so an
 editor-bound view can suppress incompatible overlays.
 
+A player that follows a Session does not own the transport a revision pauses.
+It then asks the Session member that supplied `setSessionRequests(requests)`:
+`requests.pause()` before the revision is prepared and `requests.refresh()`
+once it is adopted. `ScorePlayerModule` supplies both for the Session it
+joins: the Session pauses when it is playing, keeps its position, schedules
+the adopted timeline from there, and reads the member's new length. The
+position is the Session's and is not mapped through the edit. Without
+requests a followed player adopts the revision without a pause.
+
 `setDocumentSource(undefined)` unsubscribes and makes the last applied Score a
 static source. It never restores an older constructor input. Disposing the
 borrowed document disables playback until a usable source is attached.
@@ -328,6 +337,7 @@ remaining live voices.
 | `setDocumentSource(source \| undefined)` | `void` | Attach/detach a borrowed Core document; see [revision application](#apply-document-revisions). |
 | `replaceScore(score)` | `Promise<void>` | Stop, then play another score on the same context, synth, output and inserts from 0, preloading its notes first when the synth preloads. Rejects while a document is bound; a later replacement or disposal supersedes it. |
 | `replaceSynth(synth, ownership?)` | `boolean` | Swap the instrument in place; the next attack plays on it. A supplied synth is `borrowed` unless `ownership` transfers it; `undefined` restores the owned oscillator. Returns `false`, changing nothing, when the new synth would change the Session timing class. |
+| `setSessionRequests(requests \| undefined)` | `void` | What the player may ask of the Session it follows, as `ScoreSessionRequests` (`pause()`, `refresh()`); its Session member supplies it and takes it back. See [revision application](#apply-document-revisions). |
 | `waitForDocumentRevision(target)` | `Promise<ScoreDocumentApplicationResult>` | Wait for a known document ID/revision and attempt outcome. |
 | `retryDocumentApplication()` | `Promise<ScoreDocumentApplicationResult>` | Retry the latest source snapshot with a fresh attempt. |
 | `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |

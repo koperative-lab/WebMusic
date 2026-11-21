@@ -148,6 +148,10 @@ const GRID_STYLE = `
 :where([data-score-grid] [part~="viewport"]) {
   overflow: auto; max-height: var(--wm-score-grid-max-height, 32rem); min-width: 0; flex: 1 1 auto; scrollbar-width: none;
 }
+/* In a host of fixed height the grid is as tall as the host, so its toolbar stays in place and the viewport scrolls under the sticky ruler. */
+:where([height] > [data-score-grid]) { box-sizing: border-box; height: 100%; }
+:where([height] > [data-score-grid] [part~="viewport"]) { max-height: none; min-height: 0; }
+:where([height] > [data-score-grid] [part~="toolbar"]) { flex: none; }
 :where([data-score-grid] [part~="toolbar"], [data-score-grid] [part~="viewport"], [data-score-grid] [part~="card"])::-webkit-scrollbar { display: none; }
 :where([data-score-grid] [data-grid-group]) { display: flex; align-items: stretch; flex: none; }
 :where([data-score-grid] [data-grid-divider]) { flex: none; width: 1px; background: var(--sg-line); }
@@ -169,7 +173,7 @@ const GRID_STYLE = `
 :where([data-score-grid] [part~="overlay"]) {
   position: absolute; inset: 0; z-index: 10; display: flex; align-items: flex-start; justify-content: center;
   padding: calc(var(--sg-control) + 12px) 12px 12px; box-sizing: border-box;
-  background: var(--wm-score-grid-scrim, color-mix(in srgb, #000 45%, transparent));
+  background: var(--wm-score-grid-scrim, var(--wm-scrim, color-mix(in srgb, #000 45%, transparent)));
 }
 :where([data-score-grid] [part~="card"]) {
   box-sizing: border-box; width: min(100%, 20rem); max-height: 100%; overflow: auto; scrollbar-width: none;

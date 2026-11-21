@@ -48,7 +48,7 @@ export class SessionScoreScheduler {
 
   constructor(
     readonly binding: SessionSchedulingBinding,
-    private readonly timeline: ScoreTimeline,
+    private timeline: ScoreTimeline,
     private readonly host: ScorePlayerSchedulerHost,
     private readonly options: ScorePlayerSchedulerOptions,
     private readonly changed: () => void,
@@ -67,6 +67,18 @@ export class SessionScoreScheduler {
   get position(): number {
     const now = this.host.getContext()?.currentTime ?? this.binding.snapshot.referenceTime;
     return Math.max(0, Math.min(this.timeline.duration, this.binding.positionAt(now)));
+  }
+
+  /**
+   * Schedule another timeline from the Session's position (DEC-086): what the
+   * old one scheduled is cancelled and, while the Session runs, the new notes
+   * are armed from where it is. The Session's clock and position are read,
+   * never written.
+   */
+  adoptTimeline(timeline: ScoreTimeline): void {
+    if (this.disposed) return;
+    this.timeline = timeline;
+    this.update(this.binding.snapshot, 'timeline');
   }
 
   dispose(): void {

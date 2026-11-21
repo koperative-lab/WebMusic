@@ -27,6 +27,7 @@ import type {ScoreFormat as ImportedScoreFormat} from '../../io/load';
 import {resolveEffect, type Effect} from './effects';
 import {emitPlaybackEvent, emitPlaybackOperationError} from './playback-events';
 import type {
+  ScoreSessionRequests,
   HeadlessSynth,
   PreloadableHeadlessSynth,
   ScorePlayerEvents,
@@ -102,6 +103,7 @@ export class ScorePlayer {
   private readonly options: ScorePlayerOptions;
   private readonly scheduler: ScorePlayerScheduler;
   private readonly documents: ScoreDocumentBinding;
+  private sessionRequests?: ScoreSessionRequests;
   private sourceRevision = 1;
   private _context?: AudioContext;
   private output?: GainNode;
@@ -230,6 +232,13 @@ export class ScorePlayer {
     this.documents = new ScoreDocumentBinding({
       expanded: options.expandRepeats === true,
       pause: () => {
+        // A Session owns the transport of a player that follows it (DEC-086): the
+        // player asks its member to pause the Session and writes no transport itself.
+        if (this.scheduler.followsSession) {
+          this.activeNotes.clear();
+          try { this.sessionRequests?.pause(); } catch (error) { this.reportOperationError('session pause request', error); }
+          return;
+        }
         // A stopped or ended transport keeps that state: only a playing one pauses.
         if (this.scheduler.isPlaying || this.playbackState === 'playing' || this.playbackState === 'starting') this.playbackState = 'paused';
         this.scheduler.pause();
@@ -238,11 +247,14 @@ export class ScorePlayer {
       prepare: (content) => this.prepareDocument(content),
       transport: () => ({score: this.score, nominalSeconds: this.scheduler.nominalSeconds, loop: this.scheduler.nominalLoop}),
       adopt: (candidate, position, loop) => {
+        const followed = this.scheduler.followsSession;
         this.scheduler.adoptTimeline(candidate.score, candidate.timeline, position, loop);
         this.score = candidate.score;
         this.preloadPromise = candidate.preload;
         this.sourceRevision++;
         this.activeNotes.clear();
+        // The Session reads this member's new length and end.
+        if (followed) { try { this.sessionRequests?.refresh(); } catch (error) { this.reportOperationError('session refresh request', error); } }
       },
       notify: () => this.playbackPublisher.notify(),
       publishPosition: () => this.scheduler.publishCursor(),
@@ -279,6 +291,12 @@ export class ScorePlayer {
 
   /** Borrow a document; revisions apply while paused, without replacing this player or clock. */
   setDocumentSource(source: ScoreDocumentSource | undefined): void { this.documents.setSource(source); }
+  /**
+   * What this player may ask of the Session it follows (DEC-086); its Session
+   * member supplies it and takes it back. Without it a followed player applies
+   * a document revision without pausing the Session.
+   */
+  setSessionRequests(requests: ScoreSessionRequests | undefined): void { this.sessionRequests = requests; }
   get documentSource(): ScoreDocumentSource | undefined { return this.documents.getSource(); }
   get documentBinding(): ScoreDocumentPlaybackBinding { return this.documents.getState(); }
   waitForDocumentRevision(target: ScoreDocumentRevision): Promise<ScoreDocumentApplicationResult> { return this.documents.wait(target); }

@@ -330,6 +330,15 @@ keeps eventual content at origin while it remains the latest position intent;
 a later valid seek supersedes it. Applying content never creates/resumes an
 AudioContext just to edit. Playback readiness and resource preload remain explicit.
 
+A player that follows a Session does not own the transport the protocol
+pauses (DEC-086). Step 1 is then the Session's pause: the player asks the
+member that joined the Session (`setSessionRequests`), which pauses it when it
+is playing, and writes no transport itself. Step 3 adopts the candidate in the
+Session's scheduler at the Session's own position, which is not mapped through
+the edit, and has the member read again for its length. `play()` on the
+player still belongs to the Session. Without a member's requests the revision
+is adopted without a pause.
+
 The existing native single-ScorePlayer gains paused timeline adoption, preserving
 player, publisher, scheduler/clock reader, synth and graph identity. Scope preload
 work by content generation. Replacing the scheduler would strand existing clock

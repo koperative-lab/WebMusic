@@ -129,7 +129,7 @@ ${componentSurfaceCss('patch-editor')}
 .wui-patch-editor :focus-visible { outline: 2px solid var(--wm-focus, var(--wm-focus-ring, #486ce6)); outline-offset: 2px; }
 .wui-patch-editor__viewport {
   position: relative; min-width: 0; width: 100%; max-width: 100%; height: var(--wm-patch-editor-height, 25rem); overflow: auto;
-  border: 1px solid ${controlBorderFallback}; background: var(--wm-patch-editor-canvas, var(--wm-surface-subtle, #f6f6f6));
+  border: 1px solid ${controlBorderFallback}; background: var(--wm-patch-editor-canvas, var(--wm-surface-subtle, var(--wm-surface-muted, #f6f6f6)));
   overscroll-behavior: contain;
 }
 .wui-patch-editor__canvas { position: relative; min-width: 100%; min-height: 100%; }

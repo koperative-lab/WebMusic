@@ -65,7 +65,7 @@ ${analysisControlStyle}
   gap: 1px; border: 0; background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)); }
 :where(.wui-level-analyzer__column) { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
 :where(.wui-level-analyzer__rms, .wui-level-analyzer__peak) { position: absolute; bottom: 0; left: 0; right: 0; }
-:where(.wui-level-analyzer__rms) { background: var(--wm-level-analyzer-rms, light-dark(#999, #666)); }
+:where(.wui-level-analyzer__rms) { background: var(--wm-level-analyzer-rms, var(--wm-foreground-muted, light-dark(#999, #666))); }
 :where(.wui-level-analyzer__peak) { height: 2px; background: var(--wm-level-analyzer-peak, var(--wm-foreground, ${neutralColor('foreground')})); }
 :where(.wui-level-analyzer__threshold) { position: absolute; left: 0; right: 0; pointer-events: none;
   border-top: 1px dashed var(--wm-level-analyzer-threshold, var(--wm-foreground-muted, ${neutralColor('muted')})); }

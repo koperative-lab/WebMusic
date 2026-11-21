@@ -91,6 +91,13 @@ load through [`@webmusic/score/io`](/score/api/io/). An editor cannot be
 combined with `.score` or `src`: the setters throw, and a `src` attribute added
 later reports `source-conflict` until removed. There is no `editor` attribute.
 
+Until data arrives — no source yet, `.inputModule = null`, a player without a
+score, or an editor that is not ready — the grid is drawn empty: keys, ruler
+and grid lines, with no notes, under the waiting indicator in the `waiting`
+part. `.score` stays `undefined`. Loading and a failed load show their status
+instead, and a blocked editor (`invalid`, `ambiguous` or `source-conflict`)
+shows its error.
+
 The grid borrows the editor and never disposes it; assigning `undefined`
 detaches it. When you replace a document, assign the new editor first, then
 dispose the previous one. Editing needs both a ready editor and `editable`.
@@ -324,6 +331,7 @@ block filling its container; `width` and `height` size it.
 | `velocity-lane` | The velocity lane, sticky at the bottom. |
 | `editing-instructions` | The gesture and key summary, read by assistive technology only. |
 | `editing-status` | The live status, read by assistive technology only. |
+| `waiting` | The layer over the empty grid holding the waiting indicator; present only until data arrives, and it takes no pointer input. |
 
 The `grid` part reflects `data-edit-state` (`static`, `readonly`, `ready`,
 `draft` or `unavailable`), `data-tool` and `data-playback-state`.
@@ -331,9 +339,9 @@ The `grid` part reflects `data-edit-state` (`static`, `readonly`, `ready`,
 | Property | Effect |
 | --- | --- |
 | `--wm-score-grid-max-height` | Maximum viewport height before it scrolls; default `32rem`. |
-| `--wm-score-grid-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-score-grid-scrim` | Backdrop behind an open card; then the shared `--wm-scrim`, default 45% black. |
 | `--wm-score-view-note` | Idle note fill, then `--wm-foreground`, then `#333` / `#ddd` for light / dark schemes. |
-| `--wm-score-view-active-note` | Sounding note fill; default `rgb(240, 84, 119)`. |
+| `--wm-score-view-active-note` | Sounding note fill; then the shared `--wm-accent`, default `rgb(240, 84, 119)`. |
 | `--wm-score-view-background` | Window, keys, ruler and card background, then `--wm-surface`. Selection rings and the resize handle reuse it to contrast with note fills. |
 | `--wm-foreground` | Icons, text, pressed-tool fill, selected velocity stems, grid lines and outlines; default `#111` / `#eee`. |
 | `--wm-foreground-muted` | Idle icons, ruler and key labels, idle velocity stems; default `#777` / `#aaa`. |

@@ -22,6 +22,7 @@ import type {HeadlessSynth} from './audio-contracts';
 import type {NoteInputTarget} from '../core/note-input-model';
 import type {ScorePlayerOptions} from './audio-contracts';
 import {ScorePlayer} from './score-player';
+import type {ScoreSessionRequests} from './audio-contracts';
 import {SCORE_NOTE_INPUT} from './note-input';
 
 let nextModuleId = 0;
@@ -62,6 +63,7 @@ export class ScorePlayerModule implements ModuleHandle {
   private readonly listeners = new Set<() => void>();
   private readonly registration: ConnectionLease;
   private participant?: ReturnType<ModuleSession['register']>;
+  private sessionRequests?: ScoreSessionRequests;
   private sessionUnsubscribe?: () => void;
   private route?: ConnectionLease;
   private preparing?: Promise<void>;
@@ -148,6 +150,12 @@ export class ScorePlayerModule implements ModuleHandle {
             if (this.disposed || audio.state !== 'running') throw new Error('Score Session activation was cancelled or the AudioContext is not running.');
           },
         });
+        // A document revision pauses the transport that plays it (DEC-053); here that is the Session (DEC-086).
+        this.sessionRequests = {
+          pause: () => { if (!session.snapshot.paused) void session.pause().catch((error) => this.onError?.(error)); },
+          refresh: () => this.participant?.refresh(),
+        };
+        player.setSessionRequests(this.sessionRequests);
       }
     } catch (error) {
       this.sessionUnsubscribe?.();
@@ -320,6 +328,8 @@ export class ScorePlayerModule implements ModuleHandle {
     clean(() => this.notes.dispose());
     clean(() => this.source.dispose());
     clean(() => this.sessionUnsubscribe?.());
+    // A borrowed player outlives this member: it must not ask a Session it has left.
+    if (this.sessionRequests) clean(() => this.player.setSessionRequests(undefined));
     clean(() => this.participant?.release());
     clean(() => this.route?.release());
     clean(() => this.registration.release());

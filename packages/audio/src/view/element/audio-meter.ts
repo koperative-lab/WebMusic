@@ -31,6 +31,7 @@ import {
   AUDIO_METER_DISPLAY_TYPES,
   AudioMeterDisplay,
   type AudioMeterDisplayOptions,
+  type AudioMeterDisplaySource,
   type AudioMeterDisplaySnapshot,
   type AudioMeterDisplayType,
 } from '../headless/meter-display';
@@ -47,6 +48,15 @@ import {WebMusicElement, cssSizeAttr, numAttr, upgradeProperties} from './intern
 import type {ModuleHandle} from '@webmusic/kernel/module';
 import {bindModuleAudioInput} from '../../play/element/internal/module-input';
 import {observeCompanionTarget} from '../../play/element/internal/companion-target';
+
+/** What a meter without a source reads: silence, so it is drawn at rest (DEC-082). */
+const SILENCE: AudioMeterDisplaySource = (() => {
+  const time = new Float32Array(2048);
+  const frequency = new Float32Array(1024);
+  const decibels = new Float32Array(1024).fill(-Infinity);
+  return {frequencyInfo: undefined, readTimeDomain: () => time, readFrequency: () => frequency,
+    readFrequencyDecibels: () => decibels, readStereo: () => undefined};
+})();
 
 /** Borrowed nonvisual player capability; monitoring never owns its transport. */
 export interface AudioMeterPlayer {
@@ -427,12 +437,19 @@ export class AudioMeterElement extends WebMusicElement {
     const controller = this.meter;
     const display = this.display;
     const painter = this.painter;
-    if (!controller?.analyser || !display || !painter) {
+    if (!display || !painter) {
       this.latest = undefined;
       return;
     }
     const time = 'time' in frame && Number.isFinite(frame.time) ? frame.time : nowMs();
     this.refreshPalette(time);
+    if (!controller?.analyser) {
+      // No source yet: the meter is drawn at rest, under the waiting
+      // indicator (DEC-052, DEC-082). Nothing is read, so there is no snapshot.
+      this.latest = undefined;
+      painter.paint(frame, display.capture(SILENCE, time), this.palette);
+      return;
+    }
     const snapshot = display.capture(controller, time);
     this.latest = snapshot;
     painter.paint(frame, snapshot, this.palette);

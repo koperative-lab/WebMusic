@@ -2,7 +2,7 @@ import {observeCompanionTarget} from '../../play/element/internal/companion-targ
 import {observeElementSource} from '@webmusic/kernel/element';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 import {tempoGridJump} from '@webmusic/kernel/transport';
-import {audioSequenceTempoGrid, isAudioClipEditorPort, type AudioClip, type AudioClipEditorPort, type AudioDocumentPlaybackBinding,
+import {audioSequenceTempoGrid, createAudioClip, isAudioClipEditorPort, type AudioClip, type AudioClipEditorPort, type AudioDocumentPlaybackBinding,
   type AudioInteractionSession} from '../../core';
 import {audioDocumentPlaybackCompatible, createAudioViewEditing, type AudioViewEditing} from '../headless/audio-editing';
 import {AUDIO_FADE_CURVES, type AudioFadeCurve} from '../core/clip-edits';
@@ -19,6 +19,10 @@ export interface AudioClipSettingsChangeDetail {
   readonly settings: AudioClipSettings;
   readonly changed: keyof AudioClipSettings;
 }
+
+let empty: AudioClip | undefined;
+/** A clip with no samples: what the view draws before its audio arrives (DEC-082). */
+function emptyClip(): AudioClip { return empty ??= createAudioClip({sampleRate: 48_000, channelData: [new Float32Array(0)]}); }
 
 interface PlayerFacade {
   readonly documentBinding?: AudioDocumentPlaybackBinding;
@@ -277,8 +281,8 @@ export class AudioClipViewElement extends HTMLElementBase {
             if (!current() || editing !== this.editing) return;
             this.setAttribute('data-editor-state', state.available ? 'ready' : 'unavailable');
             this.updatePlayback();
-            // A mounted surface follows the controller itself; only an unavailable one remounts.
-            if (!state.available || !this.surface) this.render();
+            // A surface on this controller follows it itself; an unavailable one, or the empty surface drawn while waiting, remounts.
+            if (!state.available || this.surfaceEditing !== editing) this.render();
           });
         } catch (error) {
           this.setAttribute('data-editor-state', 'invalid');
@@ -369,13 +373,14 @@ export class AudioClipViewElement extends HTMLElementBase {
     const owner = (this as {ownerDocument?: Document}).ownerDocument;
     if (!owner) return;
     const style = owner.createElement('style');
-    style.textContent = ':where(audio-clip-view) { display: block; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }';
+    style.textContent = ':where(audio-clip-view) { position: relative; display: block; box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }';
     this.append(style);
     if (this.hasEditorIntent()) {
       const blocked = this.getAttribute('data-editor-state');
       if (!this.editing?.state.available) {
-        this.showStatus(blocked === 'invalid' || blocked === 'source-conflict' ? 'error' : 'waiting',
-          blocked === 'source-conflict' ? 'Editor unavailable: source-conflict' : blocked === 'invalid' ? `Editor unavailable: ${this.errorText(this.loadError)}` : 'Waiting for the editor');
+        if (blocked === 'invalid' || blocked === 'source-conflict') {
+          this.showStatus('error', blocked === 'source-conflict' ? 'Editor unavailable: source-conflict' : `Editor unavailable: ${this.errorText(this.loadError)}`);
+        } else this.mountWaiting('Waiting for the editor');
         return;
       }
       this.mount({editing: this.editing});
@@ -385,8 +390,23 @@ export class AudioClipViewElement extends HTMLElementBase {
     if (this.loading) { this.showStatus('loading', 'Loading audio'); return; }
     if (this.loadError !== undefined) { this.showStatus('error', this.errorText(this.loadError)); return; }
     const clip = this.clip;
-    if (!clip) { this.showStatus('waiting', 'Waiting for audio'); return; }
+    if (!clip) { this.mountWaiting('Waiting for audio'); return; }
     this.mount({clip});
+  }
+
+  /**
+   * The audio has not arrived, but the view has (DEC-082): draw an empty clip
+   * — ruler and lane — with the waiting indicator over it (DEC-052). The
+   * layer takes no pointer input and goes with the presentation.
+   */
+  private mountWaiting(message: string): void {
+    this.mount({clip: emptyClip()});
+    if (!this.surface) return;
+    const layer = this.ownerDocument.createElement('div');
+    layer.setAttribute('part', 'waiting');
+    layer.style.cssText = 'position: absolute; inset: 0; display: grid; pointer-events: none;';
+    this.append(layer);
+    this.status = mountStatus(layer, {snapshot: () => ({kind: 'waiting', message})}, {classNames: {root: 'wui-status--embedded'}});
   }
 
   private mount(content: {clip: AudioClip} | {editing: AudioViewEditing}): void {
