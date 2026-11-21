@@ -853,7 +853,7 @@ sounds, Headless views and analysis — works without optional peers.
 
 ## License
 
-MIT
+Apache-2.0
 
 For source contributions and release verification, see the
 [contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

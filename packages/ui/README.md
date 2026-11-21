@@ -554,7 +554,7 @@ verification workflow.
 
 ## License
 
-MIT
+Apache-2.0
 
 [docs]: ../../doc/src/content/docs/uikit/index.mdx
 [docs-presenters]: ../../doc/src/content/docs/uikit/catalog.mdx

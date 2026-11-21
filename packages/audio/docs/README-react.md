@@ -46,4 +46,4 @@ function Player({src}: {src: string}) {
 }
 ```
 
-MIT.
+Apache-2.0

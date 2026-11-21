@@ -96,7 +96,8 @@ and reviewed policies, not copied prose inventories.
 
 ## License
 
-The project source is available under the [MIT License](LICENSE). Optional
+The project source is available under the [Apache License 2.0](LICENSE);
+see [NOTICE](NOTICE) for the copyright notice. Optional
 engines have their own licensing and installation requirements;
 the [license gate](scripts/license-gate.mjs) checks the repository's declared
 restricted-package policy. It is not a comprehensive legal audit.

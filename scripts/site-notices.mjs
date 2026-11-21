@@ -221,7 +221,7 @@ export function createSiteNoticeCollector({root = repository, appDirectory = pat
       await addOwner(await sitePackageOwner(require.resolve('astro')));
     }
     const projectLicense = await readFile(path.join(root, 'LICENSE'), 'utf8');
-    records.set('WebMusic website', {key: 'WebMusic website', license: 'MIT', text: `WebMusic website\n\n${projectLicense.trim()}`});
+    records.set('WebMusic website', {key: 'WebMusic website', license: 'Apache-2.0', text: `WebMusic website\n\n${projectLicense.trim()}`});
     const ordered = [...records.values()].sort((a, b) => a.key.localeCompare(b.key));
     const text = noticeText(ordered);
     const artifacts = [];

@@ -129,4 +129,4 @@ Full API docs live in the monorepo's documentation site
 
 ## License
 
-MIT
+Apache-2.0

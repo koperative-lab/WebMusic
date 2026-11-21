@@ -5,6 +5,11 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Relicense the source tree and its five packages from MIT to the Apache
+  License 2.0, with the copyright notice in `NOTICE`. Versions already
+  published under MIT keep that license. Contributions now require a
+  `Signed-off-by` trailer under the Developer Certificate of Origin 1.1 (`DCO`).
+
 - A box sizes what it holds (DEC-080). UI Kit controls accept `fill` and take
   their host's whole size; `mountSlider` accepts `orientation: 'auto'`;
   `createKnob` accepts `gesture: 'drag'` and `dragDistance`, and `mountDial`

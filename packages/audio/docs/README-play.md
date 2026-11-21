@@ -49,4 +49,4 @@ uses a host-supplied `mediaAdapterFactory`; the styled Web Component installs
 its browser adapter automatically. This keeps the headless package independent
 of any particular UI runtime while preserving long-file streaming.
 
-Heavy decoders, metadata and time-stretch engines remain optional peers. MIT.
+Heavy decoders, metadata and time-stretch engines remain optional peers. Apache-2.0.

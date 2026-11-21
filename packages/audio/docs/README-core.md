@@ -40,4 +40,4 @@ const clip = new AudioClip({sampleRate: 44100, channelData: [left, right]});
 const trimmed = createClipEditSession(clip).cut(0, 2).fadeOut(1).normalize(0.98).apply();
 ```
 
-MIT.
+Apache-2.0

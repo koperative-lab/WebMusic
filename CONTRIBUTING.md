@@ -206,8 +206,27 @@ remain separate operations.
 
 ## Contribution rights and resources
 
-Submit only work you have the right to contribute under the project's
-[MIT License](LICENSE). Retain applicable third-party notices. For demo music,
+WebMusic is licensed under the [Apache License 2.0](LICENSE); Koperative LLC
+holds the project copyright recorded in [NOTICE](NOTICE). Contributions are
+accepted under that same license, as its section 5 states, and you keep the
+copyright in your own work.
+
+Every commit must be signed off under the
+[Developer Certificate of Origin 1.1](DCO). The sign-off certifies that you
+wrote the change or otherwise have the right to submit it under the project
+license. Add it with `git commit -s`, which appends this trailer using your
+Git name and email:
+
+```text
+Signed-off-by: Your Name <you@example.com>
+```
+
+Use your real name and an email address you can be reached at. Amend a commit
+that lacks the trailer with `git commit --amend -s`, or a series with
+`git rebase --signoff <base>`. A pull request with an unsigned commit is not
+merged.
+
+Retain applicable third-party notices. For demo music,
 fonts, images, recordings or sound banks, record the source and redistribution
 terms beside the owning demo asset or reference and include required
 notices. Being downloadable or publicly playable does not establish permission

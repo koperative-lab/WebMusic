@@ -1,7 +1,7 @@
 ---
 name: webmusic
 description: Build or fix music interactions in applications using WebMusic's published Score, UI Kit and Kernel packages. Use for playback, notation, musical input, score analysis or custom interfaces with Components, Headless classes or API + UI composition.
-license: MIT
+license: Apache-2.0
 metadata:
   runtime-compatibility: "@webmusic/score 0.1.0; @webmusic/ui 0.1.0; @webmusic/kernel 0.1.0"
 ---

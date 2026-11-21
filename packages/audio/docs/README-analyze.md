@@ -48,4 +48,4 @@ console.log(result.tempo?.bpm, result.key, result.loudness.integratedLufs);
 ```
 
 High-precision MIR, transcription and alternate engines remain optional peer
-dependencies. MIT.
+dependencies. Apache-2.0.

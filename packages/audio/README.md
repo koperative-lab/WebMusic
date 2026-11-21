@@ -542,4 +542,4 @@ The design buys its properties with real costs. The honest list:
 | `@webmusic/audio` | This package. |
 | [`@webmusic/bridge`](https://github.com/koperative-lab/WebMusic) | Score ↔ audio: synchronized playback, score→clip rendering, transcription assembly. |
 
-MIT.
+Apache-2.0
