@@ -89,11 +89,24 @@ describe('WebAssembly reference processor', () => {
       render(second, block * QUANTUM);
       if (block % 64 === 0) ring.read(reader);
     };
-    for (let block = 0; block < 2000; block++) step(block);
-    gc();
-    const start = v8.getHeapStatistics().used_heap_size;
-    for (let block = 2000; block < 42000; block++) step(block);
-    // A fixed tens of kilobytes is measurement overhead; 16 bytes a block would add 640 kB.
-    expect(v8.getHeapStatistics().used_heap_size - start).toBeLessThan(128 * 1024);
+    let block = 0;
+    for (; block < 2000; block++) step(block);
+    // A block that allocates does so in every span: 16 bytes a block would add
+    // 640 kB to each. What a span holds besides is the reports the second node
+    // posts four times a second and the cost of measuring (tens of kilobytes
+    // together) and, in the first spans after warm-up, whatever the engine
+    // allocates once as it optimizes what has just become hot. That last part
+    // varies with the Node version and the machine and is not repeated, so the
+    // smallest of a few spans, each from a collected heap, is the cost that
+    // recurs.
+    const limit = 128 * 1024;
+    let growth = Infinity;
+    for (let span = 0; span < 5 && growth >= limit; span++) {
+      gc();
+      const start = v8.getHeapStatistics().used_heap_size;
+      for (const end = block + 40000; block < end; block++) step(block);
+      growth = Math.min(growth, v8.getHeapStatistics().used_heap_size - start);
+    }
+    expect(growth).toBeLessThan(limit);
   }, 30_000);
 });
