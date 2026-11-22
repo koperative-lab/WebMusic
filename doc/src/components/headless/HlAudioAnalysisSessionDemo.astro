@@ -1,0 +1,74 @@
+---
+// createAudioAnalysisSession over the opening of Arabesque No. 1: Analyze runs
+// every task; Trim ½ hands the session an edited clip and update() recomputes
+// only what the edit touched.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/analyze/headless"
+  name="createAudioAnalysisSession"
+  rootAttrs={{'data-hl-analysis-session': true}}
+>
+  <div class="wui-row">
+    <button class="wui-btn" data-analyze type="button" disabled>Analyze</button>
+    <button class="wui-btn" data-variant="ghost" data-trim type="button" disabled>Trim ½ and update</button>
+    <span class="wui-readout" data-elapsed>—</span>
+  </div>
+  <div class="hl-results" data-results>
+    <span class="wui-readout" data-row="clip">clip —</span>
+    <span class="wui-readout" data-row="loudness">loudness —</span>
+    <span class="wui-readout" data-row="tempo">tempo —</span>
+    <span class="wui-readout" data-row="key">key —</span>
+    <span class="wui-readout" data-row="onsets">onsets —</span>
+  </div>
+</HeadlessDemoFrame>
+
+<style>
+  .hl-results { display: grid; gap: .25rem; margin-top: .5rem; }
+</style>
+
+<script>
+  import type {AudioClip} from '@webmusic/audio';
+  import type {AudioAnalysisResult} from '@webmusic/audio/analyze';
+  import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+
+  mountProgrammaticDemo('[data-hl-analysis-session]', async (root, scope) => {
+    const analyze = root.querySelector<HTMLButtonElement>('[data-analyze]')!;
+    const trim = root.querySelector<HTMLButtonElement>('[data-trim]')!;
+    const elapsed = root.querySelector<HTMLElement>('[data-elapsed]')!;
+    const row = (name: string) => root.querySelector<HTMLElement>(`[data-row="${name}"]`)!;
+    const render = (result: AudioAnalysisResult, source: AudioClip, label: string): void => {
+      row('clip').textContent = `clip ${source.duration.toFixed(1)} s · ${source.sampleRate} Hz · ${label}`;
+      row('loudness').textContent = `loudness ${result.loudness.integratedLufs.toFixed(1)} LUFS · true peak ${result.loudness.truePeakDb.toFixed(1)} dB`;
+      row('tempo').textContent = result.tempo ? `tempo ${result.tempo.bpm.toFixed(1)} BPM · ${(result.tempo.confidence * 100).toFixed(0)}%` : 'tempo —';
+      row('key').textContent = result.key ? `key ${result.key.tonic} ${result.key.mode} · ${(result.key.confidence * 100).toFixed(0)}%` : 'key —';
+      row('onsets').textContent = result.onsets ? `onsets ${result.onsets.length}` : 'onsets —';
+    };
+    const run = async (work: () => Promise<void>): Promise<void> => {
+      analyze.disabled = trim.disabled = true;
+      const start = performance.now();
+      try {
+        await work();
+        if (scope.active) elapsed.textContent = `${Math.round(performance.now() - start)} ms`;
+      } finally {
+        if (scope.active) analyze.disabled = trim.disabled = false;
+      }
+    };
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    const session = createAudioAnalysisSession(clip, {tasks: ['peaks', 'loudness', 'tempo', 'key', 'onsets']});
+    analyze.disabled = trim.disabled = false;
+    scope.listen(analyze, 'click', () => run(async () => {
+      const result = await session.analyze();
+      if (scope.active) render(result, session.clip, 'whole excerpt');
+    }));
+    scope.listen(trim, 'click', () => run(async () => {
+      await session.analyze();
+      const trimmed = session.clip.slice(0, session.clip.duration / 2);
+      const result = await session.update(trimmed);
+      if (scope.active) render(result, trimmed, 'first half, updated');
+    }));
+  });
+</script>

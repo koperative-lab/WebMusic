@@ -80,6 +80,20 @@ export class Effect {
     return this.factory(context);
   }
 
+  /**
+   * Adopt any Kernel `Effect` recipe — for example `processorEffect(definition)`
+   * — so it can go wherever Score takes an `Effect`: a player's `effect`, a
+   * Rack channel or master, or a `<score-effect>`. Its label and parameter
+   * descriptors carry over; each realization calls its `createAudioNodes`.
+   */
+  static from(recipe: KernelEffect): Effect {
+    if (recipe instanceof Effect) return recipe;
+    if (!recipe || typeof recipe.createAudioNodes !== 'function') throw new TypeError('Effect.from needs a recipe with createAudioNodes(context).');
+    const effect = new Effect((context) => recipe.createAudioNodes(context), recipe.parameterDescriptors);
+    if (recipe.label !== undefined) effect.label = recipe.label;
+    return effect;
+  }
+
   /** Bring your own sub-graph. */
   static custom(implementation: EffectFactory | EffectNode): Effect {
     // The public EffectFactory stays AudioContext-typed (narrowing it would

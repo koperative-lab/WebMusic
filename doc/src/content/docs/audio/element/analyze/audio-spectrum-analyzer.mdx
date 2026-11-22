@@ -1,0 +1,152 @@
+---
+title: '<audio-spectrum-analyzer>'
+description: 'Probe a live log-frequency FFT spectrum, freeze a frame and hold peaks.'
+sidebar:
+  order: 3
+---
+
+import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
+
+<AudioAnalyzeFeaturePlayground tag="audio-spectrum-analyzer" />
+
+`<audio-spectrum-analyzer>` is an inspectable live frequency plot beside one
+[`<audio-player>`](/audio/element/play/audio-player/). Hover or use the
+keyboard to probe a frequency, freeze the visual frame, or compare held
+per-bin peaks. For a
+time-axis spectrogram of a decoded clip, use
+[`computeSpectrogram`](/audio/api/analyze/#spectrogram) with
+[`<audio-view type="spectrogram">`](/audio/element/view/audio-view/).
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioSpectrumAnalyzerElement} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAudioSpectrumAnalyzerElement();
+</script>
+
+<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-spectrum-analyzer input="#session" min-frequency="20" max-frequency="20000" peak-hold></audio-spectrum-analyzer>
+```
+
+The demo pairs one player with the plot. Start playback for live frames;
+Freeze, Peak hold, Reset peaks and the focusable frequency probe act on the
+real tool.
+The probe accepts pointer movement, Arrow keys, Home/End for range ends, and
+Shift+Arrow for octave steps.
+
+## Ports and composition
+
+`<audio-spectrum-analyzer>` is an **Analyzer** module. It consumes one `audio`
+output and keeps its observations in its own presentation, so it exposes no
+ports of its own and provides no context to children. It resolves its input in this order:
+
+1. `.analyser`: a caller-owned `AnalyserNode`, sampled directly.
+2. `.inputModule`: a `ModuleHandle`; `null` explicitly unbinds and `undefined`
+   resumes discovery.
+3. `input="#id"`: one same-root element exposing `.module`, such as an
+   `<audio-player>`, `<audio-mixer>` or `<audio-recorder>`. `port` names its
+   audio output; the default `output` is answered by all three, and a mixer
+   also answers `master`.
+4. Containment: nested in an `<audio-player>` or `<audio-mixer>`, the plot
+   taps the nearest provider's output.
+
+An invalid, ambiguous or missing explicit input stays unbound and never falls
+back to containment; late insertion, upgrade and replacement are observed. The
+plot adds its own side tap on the port's context and never reroutes, prepares or
+schedules the source: a player's port appears once it prepares on play or
+preload. It registers no Session participant. Inside a provider it follows that
+scope's Session; linked through `input`, it follows the linked module's
+Session transport. Either way seek, pause and end reset its readings, and the
+linked player's loading and load errors appear in its status.
+
+```html
+<audio-player src="/mp3/Arabesque%20No.1.mp3" controls>
+  <audio-spectrum-analyzer></audio-spectrum-analyzer>
+</audio-player>
+```
+
+## Signal and lifetime
+
+The element samples the analyser on its tapped input while signal flows, or
+uses a caller-supplied `.analyser` in preference to it. It samples about every
+50 ms and maps that node's existing FFT bins onto a logarithmic frequency
+axis. The display ranges do not change the borrowed node's `fftSize`,
+`smoothingTimeConstant` or other FFT settings. Its values are
+`getByteFrequencyData()` bins converted through the borrowed node's current
+`minDecibels`/`maxDecibels` range; they are not calibrated sound-pressure
+levels.
+
+Freezing stops frame polling and keeps the inspected frame until unfreeze
+or a transport/source change. Peak hold retains the largest displayed bin
+values until Reset peaks or a source change. Pause, seek, source replacement
+and missing input clear the current frame (pause and seek come from the
+enclosing provider's Session); a stalled frame source is reported as
+unavailable. Disconnect stops only this element's polling, tap and
+subscriptions, not the player or its graph.
+
+The monochrome surface keeps Frequency and Level in fixed readout slots.
+Freeze, Peak hold and Reset peaks are icon buttons in one non-wrapping toolbar
+row. Freeze and Peak hold use pressed states without changing their names, and
+Reset peaks clears the held trace. Routine Live, Paused and Frozen messages
+are cleared; unavailable feedback remains visible. A dashed held
+trace distinguishes maxima without relying on color.
+
+While waiting for an input, its prepared port or playback, the shared
+outlined-square animation keeps its description accessible to assistive
+technology and respects reduced motion. Input failures dispatch
+`webaudio:error`. Controls and retained readings stay available.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Behavior |
+| --- | --- | --- |
+| `input` | attribute | Same-root selector of one module element whose audio output is tapped; default absent, which uses containment. |
+| `port` | attribute | Audio output name on the input module; default `output`. |
+| `.inputModule` | property | `ModuleHandle` preferred over `input`; `null` unbinds and `undefined` restores selector or containment discovery. |
+| `frozen` | boolean attribute | Hold the current frame and stop this tool's polling; default absent. |
+| `peak-hold` | boolean attribute | Show held spectrum peaks alongside the live bins; default absent. |
+| `min-frequency` | attribute | Lower displayed frequency in Hz; default `20`. Invalid or below-1 values use `20`. |
+| `max-frequency` | attribute | Upper displayed frequency in Hz; default `20000`. Invalid or at-most-1 values use `20000`. Display is limited by the input's Nyquist frequency. |
+| `aria-label` | attribute | Accessible group name; default `Spectrum analyzer`. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode` takes precedence over module input. |
+| `.frozen`, `.peakHold` | properties | Reflected booleans for frame freeze and peak hold. |
+| `.minFrequency`, `.maxFrequency` | properties | Reflected displayed frequency limits in Hz. |
+| `.selectedFrequency` | read-only property | Last probed frequency in Hz; initial value `1000`. |
+| `.frame` | read-only property | Latest `{bins, sampleRate, fftSize, minDb, maxDb}` frame, or `undefined` when unavailable. |
+| `.resetPeaks()` | method | Clear held spectrum peaks without changing the audio source. |
+| `webaudio:spectrumprobe` | event | `{frequency, decibels?}` after a pointer or keyboard probe; bubbles and is composed. |
+| `webaudio:error` | event | `{error: Error}` for an input, frame or presenter failure; bubbles and is composed. |
+
+**Accessibility.** The frequency plot is a labelled slider with Hz bounds and
+a frequency/dB `aria-valuetext`. Arrow keys move by a semitone, Shift by an
+octave, and Home/End select the bounds. Freeze and Peak hold are native
+`aria-pressed` icon buttons named in `aria-label` and `title`. Fixed Frequency and Level outputs use `aria-live="off"`;
+waiting and unavailable feedback remains outside the plot.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The full-width host honors native `hidden`. Its outer surface uses the
+`--wm-component-*` tokens, with `--wm-audio-spectrum-analyzer-surface-*`
+overrides for this tag. The [spectrum presenter](/uikit/views-analysis/spectrum-analyzer/) exposes
+`--wm-spectrum-height`, `--wm-spectrum-plot-background` and related
+`--wm-spectrum-*` colors for the plot and controls. Defaults are gray and ink;
+the live trace uses foreground and the dashed held trace uses muted ink.
+`--wm-analysis-control-height` (then `--wm-control-size`, then `2rem`) sets the
+icon-button height. Public
+parts are `root surface`, `toolbar`, `freeze`, `peak-hold`, `reset-peaks`,
+`readout`, `plot` and `status`.
+
+</details>
+
+## Related
+
+- [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/) — the same signal in the time domain.
+- [`<audio-meter>`](/audio/element/analyze/audio-meter/) — its spectrum and spectrogram types.
+- [`RealtimeAnalyzer`](/audio/headless/analyze/realtime-analyzer/) — the Headless analyzer behind live readouts.

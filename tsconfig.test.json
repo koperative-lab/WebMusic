@@ -29,7 +29,7 @@
     "packages/score/test/**/*.tsx",
     "bridges/score-audio/test/**/*.ts",
     "bridges/score-audio/test/**/*.tsx",
-    "apps/doc/webmusic/test/**/*.ts",
+    "doc/test/**/*.ts",
     "packages/audio/src/analyze/shims.d.ts"
   ],
   "exclude": [

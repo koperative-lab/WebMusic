@@ -27,6 +27,8 @@ import type {
   WavetableOptions,
 } from './sounds/contracts';
 import {MidiOutBackend} from './sounds/midi-out';
+import {ProcessorSoundBackend, type ProcessorSoundOptions} from './sounds/processor';
+import {resolveProcessorDefinition, type ProcessorDefinition, type ResolvedProcessorDefinition} from '@webmusic/kernel/processor';
 import {RangeSampler} from './sounds/range-sampler';
 import {SpessaSoundBackend} from './sounds/spessa';
 import {FmBackend, NoiseBackend, WavetableBackend} from './sounds/synthesis';
@@ -55,6 +57,7 @@ type OrderedTeardownBackend = SoundBackend & {
 };
 
 export {RangeSampler, chooseZone, playbackRateFor} from './sounds/range-sampler';
+export type {ProcessorSoundOptions} from './sounds/processor';
 export type {
   FmOptions,
   MidiOutOptions,
@@ -312,6 +315,30 @@ export class Sound implements HeadlessSynth {
   static noise(options: NoiseOptions = {}): Sound {
     const params = createEnvelopeParameters(options, 0.001, 0.12);
     return new Sound((context) => new NoiseBackend(context, options, params), options, params, true);
+  }
+
+  /**
+   * An authored DSP processor with note input as this Sound's instrument. The
+   * processor must be prepared in the player's context before it connects, or
+   * `options.source` names where to load it (readiness then waits for it).
+   * Attacks, durations, releases and cancellations land on their exact sample;
+   * `params` holds the bus gain followed by the definition's parameters.
+   */
+  static processor(
+    definition: ProcessorDefinition | ResolvedProcessorDefinition,
+    options: ProcessorSoundOptions = {},
+  ): Sound {
+    const resolved = resolveProcessorDefinition(definition);
+    if (!resolved.noteInput) throw new TypeError(`Sound.processor: ${resolved.name} has no note input.`);
+    const values = options.values ?? {};
+    for (const key of Object.keys(values)) {
+      if (!resolved.params.some((param) => param.id === key)) throw new TypeError(`Sound.processor: ${resolved.name} has no parameter ${key}.`);
+    }
+    const params = new ParamSurface(resolved.params.map((descriptor) => new ParamHandle(descriptor, {baseValue: values[descriptor.id]})));
+    return new Sound(
+      (context) => new ProcessorSoundBackend(context, resolved, params, options),
+      options, params, true,
+    );
   }
 
   /** Route note events to Web MIDI instead of producing audio. */

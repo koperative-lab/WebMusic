@@ -1,0 +1,334 @@
+/* ============================================================================
+   Demo panels — the live stage of every demo, and the Parameters strip that
+   Headless and UI Kit presenter demos keep under theirs.
+
+   Element demos show the stage only (DEC-071). The strip is documentation
+   chrome, so it follows the site tokens; the stage keeps the light
+   `--wui-panel` canvas the widgets are drawn for.
+   ========================================================================= */
+
+.wm-pg {
+  min-width: 0;
+  /* Keep focus rings and controls visible; wide musical canvases and markup
+     manage their own scrolling inside the demo. */
+  overflow: visible;
+}
+
+.wm-pg__stage {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The one type switch of an Element demo: the attribute name, then one square
+   toggle per value, edge to edge. It never wraps; a long list (the effect
+   recipes) scrolls sideways without a visible scrollbar. */
+.wm-pg__types {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  margin-bottom: 0.75rem;
+}
+
+.wm-pg__types-name {
+  flex: none;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wm-pg__types-seg {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wm-pg__types-seg::-webkit-scrollbar {
+  display: none;
+}
+
+.wm-pg__types-seg .wui-btn {
+  flex: none;
+}
+
+/* One spacing rule for every Element demo: 0.5rem between component
+   surfaces. Siblings get it from ElementComposition's gap; components nested in
+   a player get it here, below the player's own transport. Nonvisual
+   declarations (effects, Rack parts) render nothing and take no space. */
+.wm-pg__stage :where(score-player, audio-player) {
+  display: block;
+}
+
+.wm-pg__stage :where(score-player, audio-player) > :where(:not(div, span, p, section, template, script, style)) {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.wm-pg__stage :where(score-effect, audio-effect, score-rack-part) {
+  display: none;
+}
+
+/* Explicit demo siblings retain independent component surfaces. */
+.wm-play-composition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .85rem;
+  min-width: 0;
+}
+
+.wm-pg__params {
+  container: wm-parameters / inline-size;
+  min-width: 0;
+  margin-top: 0.85rem;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-surface);
+  color: var(--wui-ink);
+}
+
+.wm-pg__params > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-ui);
+  font-size: var(--wui-size-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.wm-pg__params > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wm-pg__params > summary::before {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: '';
+  opacity: 0.6;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.wm-pg__params[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.wm-pg__params[open] > summary {
+  border-bottom: 1px solid var(--wui-line-mid);
+}
+
+.wm-pg__count {
+  margin-left: auto;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.wm-pg__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0.6rem 0.2rem;
+}
+
+/* One attribute per row, read left to right: what it is called, the control
+   that sets it, then what it does. A two-column masonry made the reader hop
+   between columns to pair a control with its own description. */
+.wm-pg__param {
+  display: grid;
+  /* The name column clears the longest attribute in the catalog
+     (`smoothing-time-constant`, 151px) without wrapping; the width it takes
+     comes out of the control, not out of the note a reader is here to read. */
+  grid-template-columns: minmax(0, 10.5rem) minmax(0, 11rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.2rem 0.9rem;
+  min-width: 0;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--wui-line);
+}
+
+.wm-pg__param:last-child {
+  border-bottom: 0;
+}
+
+.wm-pg__param[hidden] {
+  display: none;
+}
+
+.wm-pg__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.35rem;
+  min-width: 0;
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-label);
+  overflow-wrap: anywhere;
+}
+
+.wm-pg__name em {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-ui);
+  font-size: 0.62rem;
+  font-style: normal;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.wm-pg__note {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--wui-ink-mute);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.wm-pg__param .wui-select,
+.wm-pg__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wm-pg__input {
+  height: var(--wui-row-h);
+  padding: 0 0.45rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-control);
+}
+
+.wm-pg__input:focus-visible {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: 1px;
+}
+
+/* How to operate the demo, directly under its title — an instruction, not a
+   footnote, so it is read before the controls rather than after them. */
+.wm-pg__hint {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--wui-ink-mute);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+/* The markup readout: the panel's output, and the thing a reader takes away.
+   Sized to be read and copied rather than squinted at. */
+.wm-pg__output {
+  min-width: 0;
+  padding: 0 0.6rem 0.6rem;
+}
+
+.wm-pg__code-stack,
+.wm-pg__code-extra {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.wm-pg__markup {
+  box-sizing: border-box;
+  display: block;
+  margin: 0;
+  min-height: 4.5rem;
+  max-height: 18rem;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  tab-size: 2;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wm-pg__markup::selection,
+.wm-pg__markup *::selection {
+  background: var(--wui-track);
+}
+
+.wm-pg__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+/* Measure the assigned demo width, including a narrow desktop column. */
+@container wm-parameters (max-width: 640px) {
+  .wm-pg__param {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: start;
+    gap: 0.35rem 0.75rem;
+  }
+  .wm-pg__note { grid-column: 1 / -1; }
+}
+
+@container wm-parameters (max-width: 400px) {
+  .wm-pg__param {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.25rem;
+  }
+
+
+
+
+
+
+
+
+
+
+}
+
+@supports not (container-type: inline-size) {
+  @media (max-width: 640px) {
+    .wm-pg__param { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+    .wm-pg__note { grid-column: 1 / -1; }
+  }
+}
+
+/*
+ * Demo canvases carry no explanatory prose (Visual design → Documentation
+ * demos): help and progress lines stay available to assistive technology but
+ * are not drawn. A failed load shows one error line (`data-error`).
+ */
+.wm-demo-help,
+.wm-demo-status:not([data-error]) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.wm-demo-status[data-error] {
+  margin: 0;
+  color: var(--wm-danger, light-dark(#b42318, #f97066));
+  font: 0.75rem/1.4 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}

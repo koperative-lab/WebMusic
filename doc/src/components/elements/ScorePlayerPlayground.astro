@@ -1,0 +1,17 @@
+---
+// <score-player> — the transport widget on its own, loading Arabesque No. 1
+// from `src`.
+import ElementDemo from '../ElementDemo.astro';
+
+const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+---
+
+<ElementDemo tag="score-player">
+  <score-player src={SRC}></score-player>
+</ElementDemo>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+
+  defineScorePlayerElement();
+</script>

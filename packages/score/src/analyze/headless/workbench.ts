@@ -3,7 +3,7 @@
 // can draw, without ever touching a surface.
 //
 // This module is the hinge the redesign turns on. Listing a result is data's
-// job; a Web Component's job is the performance. So every shape a workbench
+// job; a Component's job is the performance. So every shape a workbench
 // stage or dock renders is computed HERE, in plain objects, and the element
 // hands them straight to a presenter. Nothing below imports `@webmusic/ui` —
 // it is an optional peer, and this layer is checked for DOM-freedom down to

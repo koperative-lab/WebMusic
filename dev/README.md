@@ -5,7 +5,7 @@ This is the entry point for repository-wide guidance. Start with
 the task, then follow their links to source, public types and tests.
 
 WebMusic is a toolkit for music software and installations, usable through
-Web Components, Headless objects, and API + UI composition. Accepted design
+Components, Headless classes, and API + UI composition. Accepted design
 describes the intended contracts; [STATUS.md](STATUS.md) describes this
 checkout's delivery and verification gaps. Sharing guidance between branches
 does not merge implementations or transfer old verification results. This
@@ -37,7 +37,7 @@ indexes all repository Markdown/MDX files, including historical material.
 |---|---|
 | Who uses the toolkit and what should it enable? | [PRODUCT.md](PRODUCT.md) |
 | How should logic, interaction, visuals and resource use behave? | [DESIGN-PRINCIPLES.md](DESIGN-PRINCIPLES.md) |
-| Which choices are accepted and why? | [DECISIONS.md](DECISIONS.md) |
+| Which choices are accepted and why? | [DECISIONS.md](DECISIONS.md), found by topic through the generated [decision index](DECISION-INDEX.md) |
 | What are the package, layer, time and ownership boundaries? | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | What is implemented, incomplete or unverified in this checkout? | [STATUS.md](STATUS.md) |
 | How do I prepare, develop and verify a change? | [DEVELOPMENT.md](DEVELOPMENT.md) |
@@ -50,6 +50,7 @@ indexes all repository Markdown/MDX files, including historical material.
 | Add, combine or change a component | [Component design](design/COMPONENT-DESIGN.md), then the applicable [family contract](design/README.md) |
 | Attach analysis or a view to playback | [Player binding](design/PLAYER-BINDING.md), Architecture and the owning source/reference |
 | Implement nested modules, Rack routing or shared effect controls | [Modular composition](design/MODULAR-COMPOSITION.md), DEC-063 and the MOD work items in STATUS |
+| Write per-sample DSP as a module, or continue its delivery | [Processor modules](design/PROCESSOR-MODULES.md), DEC-073 and STATUS DSP-01 |
 | Add document editing, local history or playback revision application | [Editing contracts](design/EDIT-COMPONENTS.md), DEC-053 and STATUS EDIT-01 |
 | Audit algorithms, architecture and frontend behavior | [Score review workflow and Audio starting brief](log/2026-09-09-score-review-workflow.md), then current design and STATUS; record each phase's actual evidence |
 | Write a public reference or demo | [Documentation authoring](docs/README.md), site plan, conventions and the template for that public surface |
@@ -66,7 +67,10 @@ indexes all repository Markdown/MDX files, including historical material.
 - Manifests, barrels and reviewed policies own entries, dependencies and
   versions. Script calls own check coverage. Public leaf pages explain actual
   members, defaults, units, errors and cleanup using the relevant page template.
-- STATUS is the current work queue. Plans, audits and logs retain dated
+- STATUS is the current work queue and stays short: a closed item's
+  verification narrative moves to a dated audit or log record, as the
+  [status history record](log/2026-11-12-status-history.md) did for earlier
+  deliveries. Plans, audits and logs retain dated
   evidence; their counts and acceptance results describe their stated baseline.
   Their directory READMEs remain current navigation. Prototypes demonstrate an
   idea and do not establish implemented behavior.
@@ -89,5 +93,6 @@ indexes all repository Markdown/MDX files, including historical material.
 | Presentation | [UI README](../packages/ui/README.md) |
 | Neutral infrastructure | [Platform ledger](../platform/README.md), [Kernel README](../platform/kernel/README.md) and [shared-clock design](../platform/shared-clock-injection.md) |
 | Cross-domain coordination | [Bridge contracts](../bridges/README.md) and [Bridge README](../bridges/score-audio/README.md) |
-| Public documentation and demos | [Apps README](../apps/README.md) and [site sources](../apps/doc/webmusic/src/content/docs/index.mdx) |
+| Public documentation and demos | [Doc README](../doc/README.md) and [site sources](../doc/src/content/docs/index.mdx) |
+| Private applications and manual device acceptance | [Application boundary](ARCHITECTURE.md#packages-and-deployment-boundaries) and [private runner workflow](DEVELOPMENT.md#private-manual-acceptance-runner) |
 | Historical release implementation | [Release pipeline archive](../scripts/release-pipeline/README.md) |

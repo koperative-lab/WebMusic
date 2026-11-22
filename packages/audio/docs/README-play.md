@@ -14,7 +14,7 @@ This document preserves its original package-era evidence. See the
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current play API reference](../../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx); [Current play Web Components](../../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#play); [Current play Headless reference](../../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx#play).
+> Current references: [Current play API reference](../../../doc/src/content/docs/audio/api/play.mdx); [Current play Web Components](../../../doc/src/content/docs/audio/element/index.mdx#play); [Current play Headless reference](../../../doc/src/content/docs/audio/headless/index.mdx#play).
 > See the [archive index](README.md) for scope, the
 > [contributor index](../../../dev/README.md) for current rules, and
 > [STATUS.md](../../../dev/STATUS.md) for active work.

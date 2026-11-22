@@ -1,0 +1,38 @@
+---
+// AudioMixer with two members over the same Arabesque excerpt, the second at
+// a lower volume: one transport starts both, aligned on the mixer's context.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="AudioMixer"
+  rootAttrs={{'data-hl-mixer': true}}
+>
+  <HeadlessTransport />
+</HeadlessDemoFrame>
+
+<script>
+  import {AudioClipPlayer, createAudioMixer} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-mixer]', async (root, scope) => {
+    const mixer = createAudioMixer({masterVolume: 1});
+    scope.add(() => mixer.dispose());
+    scope.add(mixer.on('error', (error) => programmaticFeedback(root, error.message)));
+    let ready = false;
+    const transport = bindTransport(root, scope, () => ready ? mixer : undefined);
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    for (const [id, volume] of [['piano', 1], ['double', 0.4]] as const) {
+      // Members play on the mixer's context, so the mix starts aligned.
+      const player = new AudioClipPlayer(clip, {audioContext: mixer.audioContext});
+      scope.add(() => player.dispose());
+      mixer.add({id, player, volume});
+    }
+    ready = true;
+    transport.paint();
+  });
+</script>

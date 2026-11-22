@@ -1,0 +1,71 @@
+---
+title: Bridge
+description: "The only package allowed to import both families: what @webmusic/bridge is for, the rule that defines it, and where its sync object and stateless functions are documented."
+---
+
+`@webmusic/bridge` is the one package in the repository allowed to import
+**both** domain families. That is not a convenience — it is the rule that
+defines it. `@webmusic/score` and `@webmusic/audio` never depend on each
+other, so anything that must know a `Score` _and_ an `AudioClip` at the same
+time has exactly one home, and this is it.
+
+## When you need it
+
+These jobs need both domains:
+
+- **Play a score and a recording together** under one Session, the single
+  command authority of modular composition — `createScoreAudioSession`. Each
+  engine is a Session participant with an explicit mapping onto its own axis.
+- **Restore a mixed modular project**, with trusted Score, Audio, Rack, effect
+  and Session-LFO factories — `createWebMusicProjectPlugins`. Kernel owns the
+  shared scheduling/project protocol; your application supplies assets and storage.
+- **Turn a score into audio**, offline — `renderScoreToClip`.
+- **Convert between the two notions of time** — a Score `TimeMap` and an
+  Audio `BeatGrid`, in either direction.
+- **Assemble a transcription into a `Score`** — `scoreFromTranscription`
+  over the family-neutral note events `@webmusic/audio/analyze/transcribe`
+  emits. Transcription itself stays in Audio precisely so that Audio never
+  needs to know what a `Score` is.
+
+## Where it sits
+
+```text
+@webmusic/score ─┐
+                 ├─▶ @webmusic/bridge
+@webmusic/audio ─┘
+```
+
+Both families are **peer dependencies**, along with `@webmusic/kernel`.
+The application selects compatible package instances. Runtime factories declare
+which players they create and own; supplied resources retain their documented
+borrowed lifetime. Bridge publishes after both families.
+
+## The smallest example
+
+```ts
+import { createScoreAudioSession } from "@webmusic/bridge";
+
+const { session, dispose } = createScoreAudioSession(score, clip);
+await session.play();
+// … session.seek(seconds), session.setLoop({startSeconds, endSeconds})
+dispose();
+```
+
+One call builds both engines in one module scope and returns the Session that
+conducts them. What each option does, and what `dispose()` releases, is on the
+pages below.
+
+## Documentation
+
+|                                                        |                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| [Playback composition](/bridge/composition/)           | A runnable score/audio session, borrowed views, source replacement and independent native loops.             |
+| [Modular composition and projects](/bridge/modular-composition/) | Shared Session scheduling, nested buses, parameters, recoverable project files and accessible patch editing. |
+| [`createScoreAudioSession`](/bridge/headless/score-audio-session/) | One Session over a Score engine and an Audio clip: construction, mappings, ownership and the shared participant adapter. |
+| [`@webmusic/bridge`](/bridge/api/)                     | The entry reference — every root export, including the stateless conversion and rendering functions.         |
+
+## What's next here
+
+Event and element bindings, so a `<score-view>` can follow an
+`<audio-player>` declaratively rather than through code. The bridge
+gets no Components group until it ships an element.

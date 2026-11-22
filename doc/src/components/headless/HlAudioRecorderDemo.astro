@@ -1,0 +1,71 @@
+---
+// AudioRecorder: Record asks for the microphone and captures a take; the take
+// then plays through an AudioClipPlayer.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="AudioRecorder"
+  rootAttrs={{'data-hl-recorder': true}}
+>
+  <div class="wui-row">
+    <button class="wui-btn" data-record type="button">● Record</button>
+    <div class="wui-track"><div class="wui-track__fill" data-level></div></div>
+    <span class="wui-readout" data-take>no take</span>
+  </div>
+  <HeadlessTransport />
+</HeadlessDemoFrame>
+
+<script>
+  import {AudioClipPlayer, AudioRecorder} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-recorder]', (root, scope) => {
+    const record = root.querySelector<HTMLButtonElement>('[data-record]')!;
+    const level = root.querySelector<HTMLElement>('[data-level]')!;
+    const take = root.querySelector<HTMLElement>('[data-take]')!;
+    let recorder: AudioRecorder | undefined = undefined;
+    let player: AudioClipPlayer | undefined = undefined;
+    let recording = false;
+    const transport = bindTransport(root, scope, () => player);
+    scope.add(() => { recorder?.dispose(); player?.dispose(); });
+    scope.listen(record, 'click', async () => {
+      // One request at a time: the button waits for permission and for a take to finish.
+      record.disabled = true;
+      try {
+        if (recording && recorder) {
+          recording = false;
+          const clip = await recorder.stop();
+          if (!scope.active) return;
+          record.textContent = '● Record';
+          level.style.width = '0%';
+          take.textContent = `${clip.duration.toFixed(1)} s take`;
+          player = new AudioClipPlayer(clip);
+          transport.paint();
+          return;
+        }
+        // A new take releases the previous one's playback and recorder first.
+        player?.dispose();
+        player = undefined;
+        transport.paint();
+        recorder?.dispose();
+        recorder = new AudioRecorder();
+        recorder.on('level', (rms) => { level.style.width = `${Math.min(100, rms * 320)}%`; });
+        try {
+          await recorder.start();
+        } catch (error) {
+          programmaticFeedback(root, error instanceof Error ? `Microphone unavailable: ${error.message}` : 'Microphone unavailable.');
+          return;
+        }
+        if (!scope.active) return;
+        recording = true;
+        record.textContent = '■ Stop';
+        take.textContent = 'recording';
+      } finally {
+        if (scope.active) record.disabled = false;
+      }
+    });
+  });
+</script>

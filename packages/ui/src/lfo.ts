@@ -227,7 +227,7 @@ ${componentSurfaceCss('lfo', {
   margin: 0;
   border: 0;
   border-radius: ${controlRadius('lfo')};
-  background: var(--wm-lfo-track, var(--wm-control-track, #f3f3f3));
+  background: var(--wm-lfo-track, var(--wm-control-track, var(--wm-surface-muted, #f3f3f3)));
   cursor: pointer;
 }
 /* The runnable track carries the UA's own height; without these the rail keeps
@@ -241,14 +241,14 @@ ${componentSurfaceCss('lfo', {
   margin: 0;
   border: 0;
   border-radius: ${controlThumbRadius('lfo')};
-  background: var(--wm-lfo-thumb, var(--wm-control-thumb, #111));
+  background: var(--wm-lfo-thumb, var(--wm-control-thumb, var(--wm-foreground, #111)));
 }
 .wui-lfo__input::-moz-range-thumb {
   width: var(--wm-lfo-handle-size, .7rem);
   height: ${controlHeight('lfo')};
   border: 0;
   border-radius: ${controlThumbRadius('lfo')};
-  background: var(--wm-lfo-thumb, var(--wm-control-thumb, #111));
+  background: var(--wm-lfo-thumb, var(--wm-control-thumb, var(--wm-foreground, #111)));
 }
 .wui-lfo__value {
   min-width: 3.2ch;

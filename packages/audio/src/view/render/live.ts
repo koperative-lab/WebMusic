@@ -16,7 +16,16 @@ export function paintLiveProjection(
 ): void {
   const {context, width, height} = frame;
   context.clearRect(0, 0, width, height);
-  if (!buffer || buffer.length === 0 || !(width > 0) || !(height > 0)) return;
+  if (!(width > 0) || !(height > 0)) return;
+  if (!buffer || buffer.length === 0) {
+    // Nothing captured yet: a waveform rests on its centre line, as silence
+    // draws it (DEC-082); a spectrogram stays clear.
+    if (type === 'waveform') {
+      context.fillStyle = options.waveColor ?? 'currentColor';
+      context.fillRect(0, height / 2 - .5, width, 1);
+    }
+    return;
+  }
 
   const columnWidth = Math.max(1, width / buffer.capacity);
   const originX = width - buffer.length * columnWidth;

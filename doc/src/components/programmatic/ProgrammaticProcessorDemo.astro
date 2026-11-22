@@ -1,0 +1,57 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/kernel/processor"
+  name="Authored processor"
+  rootAttrs={{'data-programmatic-processor': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+  <score-synth-panel sections="sound" aria-label="Reference processor parameters" data-panel></score-synth-panel>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
+  import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+  import {defineAllElements} from '@webmusic/score/play/element';
+  import type {ModuleHandle} from '@webmusic/kernel/module';
+  import {loadArabesqueScore} from '../headless/arabesque-score';
+  import {polySynth} from '../../../shared/processors/poly-synth';
+  import polySynthUrl from '../../../shared/processors/poly-synth.worklet.ts?worker&url';
+
+  mountProgrammaticDemo('[data-programmatic-processor]', async (root, scope) => {
+    defineAllElements();
+    const score = await loadArabesqueScore();
+    if (!scope.active) return;
+    const play = root.querySelector('[data-play]') as HTMLButtonElement;
+    const fill = root.querySelector('[data-fill]') as HTMLElement;
+    const time = root.querySelector('[data-time]') as HTMLElement;
+    const panel = root.querySelector('[data-panel]') as HTMLElement & {moduleTarget?: ModuleHandle | null};
+
+    // The reference processor as the player's instrument; the first play loads its worklet file.
+    const sound = Sound.processor(polySynth, {source: {module: polySynthUrl}});
+    const player = new ScorePlayer(score, {synth: sound, synthOwnership: 'owned'});
+    scope.add(() => player.dispose());
+    // The panel edits the Sound's parameter surface: bus gain, then the processor's own parameters.
+    panel.moduleTarget = {id: 'poly-synth', params: sound.params};
+    scope.add(() => { panel.moduleTarget = null; });
+
+    const paint = () => {
+      const duration = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (player.seconds / duration) * 100)}%`;
+      time.textContent = `${player.seconds.toFixed(1)}s`;
+    };
+    scope.add(player.on('timeupdate', paint));
+    scope.add(player.on('end', () => { play.textContent = '▶ Play'; player.seek(0); paint(); }));
+
+    scope.listen(play, 'click', async () => {
+      if (player.isPlaying()) {
+        player.pause();
+        play.textContent = '▶ Play';
+        return;
+      }
+      play.textContent = '❚❚ Pause';
+      await player.play();
+    });
+  });
+</script>

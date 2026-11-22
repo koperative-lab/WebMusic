@@ -64,7 +64,7 @@ ${analysisControlStyle}
   border: 0; background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)); overflow: hidden; }
 :where(.wui-transient-analyzer__column) { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
 :where(.wui-transient-analyzer__bar) { position: absolute; bottom: 0; left: 0; right: 0;
-  background: var(--wm-transient-analyzer-strength, light-dark(#999, #666)); }
+  background: var(--wm-transient-analyzer-strength, var(--wm-foreground-muted, light-dark(#999, #666))); }
 :where(.wui-transient-analyzer__column[data-hit='true'] .wui-transient-analyzer__bar) {
   background: var(--wm-transient-analyzer-hit, var(--wm-foreground, ${neutralColor('foreground')})); }
 :where(.wui-transient-analyzer__threshold) { position: absolute; left: 0; right: 0; pointer-events: none;

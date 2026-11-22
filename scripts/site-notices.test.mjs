@@ -8,11 +8,11 @@ import {pathToFileURL, fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
 import test from 'node:test';
 import {attachSiteNotice, createSiteNoticeCollector, readSitePackageNotice, readSiteSupplement, verifySiteNotices} from './site-notices.mjs';
-import {browserSandboxAlias} from '../apps/doc/webmusic/scripts/browser-sandbox.mjs';
-import {Nodebox} from '../apps/doc/webmusic/src/runtime/unsupported-nodebox.mjs';
+import {browserSandboxAlias} from '../doc/scripts/browser-sandbox.mjs';
+import {Nodebox} from '../doc/src/runtime/unsupported-nodebox.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const appRequire = createRequire(path.join(root, 'apps/doc/webmusic/package.json'));
+const appRequire = createRequire(path.join(root, 'doc/package.json'));
 const astroRequire = createRequire(appRequire.resolve('astro'));
 const {build} = await import(pathToFileURL(astroRequire.resolve('vite')).href);
 
@@ -186,7 +186,7 @@ import('lazy-runtime').then(({value}) => { document.body.dataset.lazyRuntime = v
   // keeps all of its caches and generated files inside the temporary fixture.
   const script = `import {build} from ${JSON.stringify(pathToFileURL(appRequire.resolve('astro')).href)};
 import notices from ${JSON.stringify(new URL('./site-notices.mjs', import.meta.url).href)};
-await build({...${JSON.stringify(config)}, integrations: [notices(${JSON.stringify({root: directory, appDirectory: path.join(root, 'apps/doc/webmusic')})})]});`;
+await build({...${JSON.stringify(config)}, integrations: [notices(${JSON.stringify({root: directory, appDirectory: path.join(root, 'doc')})})]});`;
   await writeFile(path.join(directory, 'build.mjs'), script);
   await promisify(execFile)(process.execPath, ['build.mjs'], {cwd: directory});
   const dist = path.join(directory, 'dist');

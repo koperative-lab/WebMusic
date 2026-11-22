@@ -7,6 +7,11 @@ three-package branch split for source integration; it does not change what was
 published in the first npm release. Read [STATUS](STATUS.md) and the target
 branch's tracked files before making a delivery claim.
 
+To find a decision without reading the register in order, use the generated
+[decision index](DECISION-INDEX.md). It groups every entry by topic, names the
+document that owns the current rule, and lists the later decisions that cite
+each entry, which is where a refinement or replacement is recorded.
+
 ## DEC-001 — A toolkit that grows from demos to music applications
 
 **Decision:** optimize for composable musical capabilities that can support interactive demos, music software, online workstations, and artistic installations.
@@ -226,7 +231,7 @@ Old report URLs redirect to the Headless workflow. Tag-owned live demos continue
 to contain only their player and current component, configured by Parameters.
 
 **Owner:** [Analyze component design](design/ANALYZE-COMPONENTS.md) and the
-[Score report reference](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+[Score report reference](../doc/src/content/docs/score/api/analyze.mdx#reports).
 
 **Verification implications:** retired tags are absent from exports,
 registration, catalogs and navigation; retained live evidence updates from note
@@ -274,7 +279,7 @@ There is no note-only key-diagnostic Element; custom callers can use
 tag. Old URLs redirect to the appropriate retained or Headless/API reference.
 
 **Owner:** [Analyze component design](design/ANALYZE-COMPONENTS.md) and the
-[Analyze Element reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze).
+[Analyze Element reference](../doc/src/content/docs/score/element/index.mdx#analyze).
 
 **Verification implications:** assert exactly five registrations and public
 classes, preserve underlying Headless/API capabilities, migrate shared lifecycle
@@ -331,7 +336,7 @@ explicit render entry retains its independent fallback and has no static UI
 dependency. Source and owning references define the port and styling options.
 
 **Owner:** [View component families](design/VIEW-COMPONENTS.md) and the
-[View reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view).
+[View reference](../doc/src/content/docs/score/element/index.mdx#view).
 
 **Verification implications:** exact registrations/exports; source and note
 identity across type switches; no duplicate borrowed subscriptions; cheap
@@ -380,7 +385,7 @@ behavior is historical evidence, not the integrated public contract.
 **2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the roles remain as module roles — `score-player` is a Source and, when outermost, the Session provider; `score-rack-control` a Rack; `score-rack-part` a Source; `score-note-input` a note Source; `score-recorder` a note sink producing a source; `score-synth-panel` a control view or processor. Rack member-axis seek becomes Session-seconds seek on the Session provider.
 
 **Owner:** [Play component design](design/PLAY-COMPONENTS.md) and the
-[Play Element reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
+[Play Element reference](../doc/src/content/docs/score/element/index.mdx#play).
 
 **Verification implications:** exercise actual engine failures, source/descriptor
 replacement, callback reentrancy, suspended audio clocks and external connection
@@ -725,7 +730,7 @@ cancellation/replacement paths release capture and pending presentation work.
 Main's first-release package scope is unchanged.
 
 **Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), AudioView's public
-reference and the [Stage presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/stage.mdx).
+reference and the [Stage presenter](../doc/src/content/docs/uikit/layout-feedback/stage.mdx).
 
 **Verification implications:** exercise defaults, both directions, final release,
 clamps/loops, coalescing, pointer ownership, follow, annotation, mode/source/zoom
@@ -1064,7 +1069,7 @@ demo composition still applies, but its hidden-runner Audio clause is superseded
 DEC-013/014 retain their Score-specific inventory and are not rewritten.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md) and the
-public [Audio Analyze API](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx)
+public [Audio Analyze API](../doc/src/content/docs/audio/api/analyze.mdx)
 and Element references.
 
 **Verification implications:** exact registration/export inventory, no hidden
@@ -1113,7 +1118,7 @@ when they need performance markers. DEC-033's one-player, one-component demo
 composition still applies, without a hidden runner.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md), the
-[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+[Audio Analyze Element inventory](../doc/src/content/docs/audio/element/index.mdx#analyze)
 and the owning tag references.
 
 **Verification implications:** exact public tag inventory, independent tools
@@ -1177,7 +1182,7 @@ all five tools.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
 [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+[Audio Analyze Element inventory](../doc/src/content/docs/audio/element/index.mdx#analyze)
 and each owning tag reference.
 
 **Verification implications:** assert an exact five-tag Analyze inventory and
@@ -1244,7 +1249,7 @@ whether written or sounding notes are analyzed, especially for transposing
 parts. Retiring a default Element does not remove its code-only analysis.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and each owning Element/API reference.
 
 **Verification implications:** assert the exact five public tags and retired
@@ -1346,7 +1351,7 @@ beneath a lane still applies. Existing callers of retired tags migrate to the
 new tools or compose the retained code-only algorithms themselves.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the owning Element/API references.
 
 **Verification implications:** assert exactly four registered Analyze tags
@@ -1391,7 +1396,7 @@ transitions. Applications needing to choose or compare an alternate reading
 use the available nonvisual analysis data and own that interaction.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the four
-owning [Score Analyze Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+owning [Score Analyze Element pages](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the corresponding Score/UI presenters.
 
 **Verification implications:** inspect normal and narrow live demos for no
@@ -1486,7 +1491,7 @@ tests remain independently verifiable. The research branch is local until
 explicitly published; it is not a second active checkout.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
-[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+[Score Analyze Element inventory](../doc/src/content/docs/score/element/index.mdx#analyze),
 and the owning API/Headless references.
 
 **Verification implications:** assert the exact two-tag registration and no
@@ -1524,7 +1529,7 @@ The late-binding gap formerly tracked as AUDIO-VIEW-01 for Minimap and
 RegionList no longer applies to the supported Element inventory.
 
 **Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[Audio Web Component inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#view),
+[Audio Web Component inventory](../doc/src/content/docs/audio/element/index.mdx#view),
 and the Audio View source and export policy.
 
 **Verification implications:** assert the exact current View tag set and the
@@ -1575,7 +1580,7 @@ change to `main`.
 **Owner:** [Score Play](design/PLAY-COMPONENTS.md),
 [Score Analyze](design/ANALYZE-COMPONENTS.md),
 [Score View](design/VIEW-COMPONENTS.md), and the
-[Score Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx).
+[Score Element inventory](../doc/src/content/docs/score/element/index.mdx).
 
 **Verification implications:** assert exact default registrations for Play,
 Analyze, View, auto/global and the public demo entry; assert old tags do not
@@ -1670,8 +1675,8 @@ component. API/Headless retain detailed data and specialist algorithms; the
 research branch is not merged as part of this work.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), owning
-[Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
-and [Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx).
+[Element pages](../doc/src/content/docs/score/element/index.mdx#analyze)
+and [Analyze API](../doc/src/content/docs/score/api/analyze.mdx).
 
 **Verification implications:** assert the exact tag/export/catalog inventory;
 cover C–F♯ versus C–G♭, transposing parts, explicit-key chord inversions, all
@@ -1740,9 +1745,9 @@ Those are demo display settings, not musical grouping rules. Detailed inspection
 evidence remains available independently of presentation.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
-[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), the
-[four Element references](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
-and the [Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+[Analyze API](../doc/src/content/docs/score/api/analyze.mdx), the
+[four Element references](../doc/src/content/docs/score/element/index.mdx#analyze)
+and the [Harmony presenter reference](../doc/src/content/docs/uikit/views-analysis/harmony.mdx).
 
 **Verification implications:** preserve simultaneous-default regressions and
 test metrical collection of arpeggios, sustained overlaps, passing tones,
@@ -1854,11 +1859,11 @@ throwing for a conventional meter. Browser evidence for long chord windows is
 recorded in STATUS when the correction is verified on the site.
 
 **Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
-[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx),
-the [chord](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
-and [rhythm](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
+[Analyze API](../doc/src/content/docs/score/api/analyze.mdx),
+the [chord](../doc/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
+and [rhythm](../doc/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
 Element references and the
-[Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+[Harmony presenter reference](../doc/src/content/docs/uikit/views-analysis/harmony.mdx).
 
 **Verification implications:** cover mixed 4/4, 5/8 and 7/8 scores with one
 and several lists, equal-sum rejection, a conventional meter replaced by a
@@ -1902,7 +1907,7 @@ into scrolling to preserve pitch-column alignment. Out-of-range sounding notes
 remain available in `.active`; fitting does not infer or expand the range.
 
 **Owner:** [View families](design/VIEW-COMPONENTS.md) and the
-[PitchView reference](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx).
+[PitchView reference](../doc/src/content/docs/score/element/view/score-pitch-view.mdx).
 
 **Verification implications:** test default endpoints, scroll and legacy
 precedence, preserved notes/subscriptions, cleanup, focus and offset resets,
@@ -1975,8 +1980,8 @@ for type, theme and the display attributes.
 
 **Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
 [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
-[meter reference](../apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-meter.mdx)
-and the [metering Headless page](../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx).
+[meter reference](../doc/src/content/docs/audio/element/analyze/audio-meter.mdx)
+and the [metering Headless page](../doc/src/content/docs/audio/headless/view/audio-meter.mdx).
 
 **Verification implications:** assert the seven types and two themes, the
 legacy `mode` mapping, type changes that keep the graph and stage, the stereo
@@ -2027,9 +2032,13 @@ the selected drawing's actual input, rather than unrelated retained data from
 another mode. Source discovery and replacement must refresh feedback even before
 playback, without retaining subscriptions to superseded owners.
 
+**2026-11-18 refinement:** a component waiting for its data draws its empty
+surface under the waiting indicator, not the indicator alone
+([DEC-082](#dec-082--a-component-without-its-data-still-shows-itself)).
+
 **Owner:** [Design principles](DESIGN-PRINCIPLES.md),
-[Status presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx),
-[Workbench](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/workbench.mdx),
+[Status presenter](../doc/src/content/docs/uikit/layout-feedback/status.mdx),
+[Workbench](../doc/src/content/docs/uikit/layout-feedback/workbench.mdx),
 and the affected Element references.
 
 **Verification implications:** loading/waiting/ready/error transitions, source replacement,
@@ -2565,9 +2574,9 @@ cannot follow rubato or edits after its anchor; dynamic grids remain open. The
 `TransportGroup` still coordinates positions, not beats; beat-synchronous
 group commands are a later step.
 
-**Owner:** [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx),
+**Owner:** [Kernel API](../doc/src/content/docs/kernel/api.mdx),
 [Audio clip editing](design/EDIT-COMPONENTS.md#audio-clip-editing) and the
-[clip View reference](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
+[clip View reference](../doc/src/content/docs/audio/element/view/audio-clip-view.mdx).
 
 **Verification implications:** grid math, the operation and anchor mapping,
 in-place revision application, the Grid Edit tools, tap tempo, snap, quantize
@@ -2774,7 +2783,7 @@ Audio state but recreates Score engines and Rack channel state.
 **2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the classification applies to every module, including Score (MOD-13). Sound, source-data and parameter changes also edit a module in place; only a scope change rebinds.
 
 **Owner:** [Modular composition](design/MODULAR-COMPOSITION.md), the
-[Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) and the Audio
+[Kernel API](../doc/src/content/docs/kernel/api.mdx) and the Audio
 player/mixer Element references; [Status](STATUS.md) owns MOD-13.
 
 **Verification implications:** unit tests cover classification, routing leases,
@@ -2861,9 +2870,9 @@ keyboard geometry through its existing presenter. The Arabesque composition
 demo uses one player and independently mounted keyboards at opposite edges.
 
 **Owner:** [View families](design/VIEW-COMPONENTS.md),
-[ScoreView](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
-[PitchView](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx)
-and [UIKit pitch](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/pitch.mdx).
+[ScoreView](../doc/src/content/docs/score/element/view/score-view.mdx),
+[PitchView](../doc/src/content/docs/score/element/view/score-pitch-view.mdx)
+and [UIKit pitch](../doc/src/content/docs/uikit/views-analysis/pitch.mdx).
 
 **Verification implications:** all four directions, default and invalid values,
 property/attribute precedence, unchanged bindings and source identity, exact
@@ -3107,6 +3116,1771 @@ navigation, search dialog and page chrome are site code, covered by
 `npm run docs:build`; every built anchor link resolves; the shell is checked in
 a browser at wide and phone widths with keyboard focus.
 
+## DEC-071 — Web Component and Headless demos show the default interaction only
+
+**Date / status:** 2026-11-11; accepted by the repository owner.
+
+**Problem:** every Web Component page carried a playground: a Parameters strip
+with one control per observed attribute, structured editors for effects, Rack
+parts and synth-panel properties, a live markup readout, Copy and Reset. It
+duplicated the reference tables, cost a large client runtime with its own tests,
+and is the job of a component library with an editor rather than of reference
+documentation.
+
+**Decision:** a Web Component demo shows the component in its default
+composition with the real controls it needs, such as its transport, keys or
+toolbar. `ElementDemo` frames it with the entry and tag; there is no Parameters
+strip, markup readout, Copy or Reset, and no structured editors. The one
+exception is a type switch: an element with several drawings, surfaces or
+recipes marks that attribute `switch: true` in the catalog (`type`, or an
+equivalent such as `layout`), and `ElementDemo` shows one toggle per value, so
+a reader can see every variant without the reference tables. Every Web
+Component page has one shape: main demo, a short prose introduction, Import,
+Ports and composition, topics, API, Styling and Related, checked by
+`scripts/element-docs-policy.mjs`. The attribute,
+property and event tables document configuration, and code examples show it.
+Interactive adjustment and code generation belong to the separately maintained
+component library. The parameter catalog (`src/lib/params`) stays as data for
+the site checks and other tools. Headless demos follow the same rule
+(extended by the owner on 2026-11-12): the shared `HeadlessDemoFrame` shows the
+object working in its default configuration with only the controls that
+operate it, and no Parameters, code readout, Copy or Reset; the Headless page
+explains how it works and documents its API. UI Kit presenter demos keep their
+Parameters. This supersedes the demo-configuration rule of DEC-059 for Web
+Component demos, and the Parameters, copied-markup and Copy/Reset consequences
+recorded for Element demos in earlier decisions (DEC-012, DEC-013, DEC-015,
+DEC-031, DEC-033, DEC-048, DEC-050 and DEC-051).
+
+**Alternatives considered:** keeping the strip collapsed by default, which keeps
+its runtime and tests; keeping Copy without Parameters, which only copies the
+markup already shown in the page's code examples.
+
+**Consequences:** demos that a property editor used to configure set what they
+need from their own script; the synth panel demo nests the panel and a note
+input in a player, so it edits the player's instrument. Page prose no longer
+refers to Parameters, Copy or Reset on Element pages. The two effect pages use
+their own demo, an effect inside a player with an attached panel, instead of
+the shared modular-composition example, so their recipe switch is audible.
+Headless demos build their objects with fixed defaults; operation controls (a
+playlist's next entry, a Rack part's mute, an editor's edit and undo) sit in the
+canvas, and debugging consoles such as raw edit-operation fields are gone. The
+Headless parameter catalog (`src/lib/headless-params`) stays as data.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md) §"Documentation demos",
+[Component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the
+[site plan](docs/DOCS-SITE-PLAN.md).
+
+**Verification:** the documentation tests and build, including the page-shape
+policy and its unit tests; every Element page renders its demo without a
+Parameters strip, and every Headless frame has none (`headless-docs-policy`);
+the changed demos and type switches are checked in a browser.
+
+## DEC-072 — Keep Doc public and all other applications private
+
+**Date / status:** 2026-11-12; accepted by the repository owner.
+
+**Problem:** the public toolkit still carried an application hierarchy and the
+manual acceptance runner after the component Library had moved to the private
+repository. Website and Studio now belong to that private application suite;
+their ownership should be clear in the source layout and verification commands.
+
+**Decision:** `doc/` is the public repository's only application. The Astro
+documentation workspace moves from `apps/doc/webmusic/` to `doc/`, and its
+shared catalogs and UI assets move from `apps/doc/shared/` to `doc/shared/`.
+Website, Library, Studio and Test (the manual acceptance runner) belong to the
+separate closed-source `WebMusic-studio` repository under `apps/`. The public
+repository retains package source, package tests, documentation source and
+documentation tests. The public workspace, build, typecheck, lockfile, scripts
+and CI must not depend on private application source.
+
+Private applications consume built public package entries and may read the
+documentation catalogs, references and approved media through their configured
+public-checkout link. Moving the documentation directory preserves every
+owner-maintained media file and `public.sha256` byte for byte; the Arabesque-only
+and read-only policy in AGENTS remains unchanged at its new `doc/public/` path.
+Public documentation URLs and npm package contracts do not change.
+
+**Alternatives considered:** retaining an otherwise empty public `apps/`
+hierarchy, which obscures the single public application's location; leaving
+Test public, which splits application ownership across repositories.
+
+**Consequences:** Doc has its own local documentation navigation; the private
+Website owns the project hub. The runner's source and application checks move
+to the private repository, while the owner's manual acceptance remains a gate
+for the exact public version and commit. Public CI continues to verify the
+public packages and documentation; private application checks run separately.
+Maintained links and generated inventories follow the new paths. Dated records
+retain their original prose, commands and evidence, with navigation links
+repaired where needed.
+
+**Owner:** [Architecture](ARCHITECTURE.md#packages-and-deployment-boundaries),
+[Doc application](../doc/README.md) and
+[private runner workflow](DEVELOPMENT.md#private-manual-acceptance-runner).
+
+**Verification:** regenerate documentation inventories; run public source and
+package checks and the Doc build; verify the moved asset inventory against its
+unchanged pin. Run the private application checks and runner build, then inspect
+Doc, Website, Library, Studio and Test through their actual development entries.
+Application build success does not establish audible or device acceptance.
+
+## DEC-073 — Authored DSP is a Kernel processor-module contract
+
+**Date / status:** 2026-11-13; direction accepted by the repository owner, who
+asked for the framework to be built on the `dsp-modules` branch. Delivery:
+STATUS DSP-01.
+
+**Problem:** no package registers its own `AudioWorkletProcessor`, so a
+developer cannot add per-sample DSP — a custom voice, a waveshaper, a research
+algorithm — as a module. Sound can only be assembled from native Web Audio
+nodes, and `Effect.createAudioNodes` is synchronous, so an effect cannot wait
+for a worklet to load. The [proposal](plans/2026-11-12-authored-dsp-modules.md)
+records the baseline.
+
+**Decision:** authored DSP is a Kernel contract over `AudioWorklet`, in the
+entries `/processor` and `/processor-worklet`. One serializable
+`ProcessorDefinition` is shared by both threads. Preparation in a context is
+asynchronous and separate from synchronous graph edits. A processor exposes
+only the existing port families, and every parameter is an `AudioParam` behind
+the existing `ParamHandle` path. A changed contract needs a new version.
+Shared memory is optional and reported as a capability. Processor code is
+trusted, like project plugin factories. Open choices follow the proposal's
+recommendations until the owner changes them.
+
+**Alternatives considered:** a separate platform package, which would
+duplicate port and parameter types Kernel already owns; an asynchronous
+`Effect` contract, which would make every insert edit asynchronous; a
+`ScriptProcessorNode` fallback, which imitates a capability on the main thread.
+
+**Consequences:** Kernel gains two public entries and their policy, build and
+reference surfaces. The existing synths and effects do not migrate. Subgraph
+modules, latency compensation, a beat axis and isolated third-party loading
+remain separate proposals.
+
+**Owner:** [Processor modules](design/PROCESSOR-MODULES.md), which also owns
+the development sequence.
+
+**Verification:** each step adds unit tests and, from the first audible step,
+browser evidence; unit tests against structural fakes do not establish sound
+or timing.
+
+## DEC-074 — Objects make components; components make apps
+
+**Date / status:** 2026-11-15; accepted by the repository owner, who fixed the
+three names.
+
+**Problem:** Studio patches graphs in the manner of Max, but WebMusic had no
+names for what a patch is made of, what a finished patch becomes, or what a
+user assembles from finished patches. Max's own words (object, patch) and the
+repository's existing words (module, Element, Web Component, component
+library) overlapped, so the same thing could be called four names and one name
+could mean three things.
+
+**Decision:** WebMusic has three product layers, and maintained writing uses
+these names for them:
+
+1. **Object** — one node in a Studio graph, the counterpart of a Max object: a
+   typed box with inlets and outlets whose behavior is one Kernel module
+   created by a project plugin. Some objects show a package Component inside
+   their box; that does not make them components.
+2. **Component** — a graph of objects, the counterpart of a Max patch. A
+   component is portable code: a developer copies it into a web project,
+   installs the WebMusic packages, and it runs with no other dependency on
+   Studio, private source or a hosted service. The packages' own Components
+   are the official components; components built in Studio or
+   shared by the community meet the same contract.
+3. **App** — music software a user assembles from several components chosen
+   in the Library, official or from the community.
+
+Earlier names are retired in current writing, at the owner's request the
+same day: *Web Component* becomes *Component*, Studio's *patch* becomes
+*component*, and *Headless object* or *Headless component* becomes *Headless
+class* (the code) or *Headless instance* (one running). *Custom element* names
+the browser technology. Words that keep their technical meaning: *module* (the
+Kernel runtime unit behind an object), *project* (the serialized Kernel
+document a component's graph is saved as), *Element* (the class behind a
+Component's tag) and *presenter* (a UI Kit renderer).
+
+**Alternatives considered:** keeping Max's names, which would make "object"
+and "patch" mean Studio-only things a developer never installs; calling a
+graph a "module", which already names the Kernel runtime unit; leaving the
+layers unnamed, which lets Studio, Library and documentation drift apart.
+
+**Consequences:** documentation, Studio and Library describe the same three
+layers. A component's portability is a delivery requirement, not a label:
+until a component built from objects can be exported as runnable code that
+uses only public package entries, only the packages' own Components are
+components in the full sense (STATUS LAYER-01). Current documentation,
+comments, Studio and the private applications use the new names; dated
+records, earlier decisions and public API identifiers and URLs (`/element`,
+`define…Element`, `@webmusic/ui/patch-editor`) are not renamed.
+
+**2026-11-18 refinement:**
+[DEC-081](#dec-081--a-layer-is-a-contract-a-component-in-a-graph-is-an-object)
+defines each layer by the contract it meets. It replaces "some objects show a
+package Component inside their box; that does not make them components" with
+the rule that a component placed in a graph is a box with ports, and states
+what each layer is made of for components authored in code and as graphs. The
+three names are unchanged.
+
+**Owner:** [Product definition](PRODUCT.md#objects-components-and-apps).
+
+**Verification:** documentation and agent instructions use the three names
+consistently; the export contract gets its own design and tests when it is
+built, including a fresh web project that installs only the packages.
+
+## DEC-075 — Messages are a Kernel port family; objects and controls build on them
+
+**Date / status:** 2026-11-15; accepted by the repository owner, who asked for
+the P0 gaps of the Max comparison to be built under the DEC-074 layers.
+Delivery: STATUS MSG-01.
+
+**Problem:** a Max patch is mostly messages — bangs, numbers, symbols and
+lists between logic objects. WebMusic's five port families carry audio, notes,
+modulation, transport and sources, but no general value, so a component
+cannot express "every 250 ms, count to eight, flash on zero". Studio had no
+objects for it and the UI Kit no single-value controls to show it.
+
+**Decision:** `message` becomes the sixth port family, in Kernel because it is
+domain-neutral. A message is a selector and typed atoms (int, float, symbol,
+dict, array) with an optional logical time in AudioContext seconds. Delivery
+is synchronous and depth first, inputs in connection order; nesting past 512
+stops with an error. Timed events come from a `MessageClock` with lookahead and
+carry their time; pointer and keyboard events are untimed and immediate. A
+`message` connection may target a parameter. Kernel `/objects` ships the
+object library as project plugins whose live state is exported in their
+config and which act only after their graph commits, which adds an optional
+`activate` hook to project module instances. UI Kit `/controls` ships ten
+single-value presenters over structural bindings.
+[Messages, objects and controls](design/MESSAGE-OBJECTS.md) owns the contract.
+
+**Alternatives considered:** passing messages as control signals, which are
+audio-rate numbers and cannot carry symbols, lists or discrete events; a
+separate message package, which would duplicate Kernel's port, lease and
+project types; delivering on microtasks, which loses Max's depth-first order
+and makes `trigger` meaningless; timers on Session position, which would stop
+a `metro` whenever the transport is paused and needs tempo the Session does
+not have yet.
+
+**Consequences:** Kernel gains a port family, a project connection kind, an
+`activate` hook and the `/objects` entry; UI Kit gains `/controls`. Existing
+families, plugins and projects are unchanged. Transport-locked timers,
+musical time values, subpatches and presets remain later work.
+
+**Owner:** [Messages, objects and controls](design/MESSAGE-OBJECTS.md).
+
+**Verification:** unit tests for message parsing, ordering, overflow, clocks,
+every object and every control; browser evidence for timing and controls; the
+owner's manual checks.
+
+## DEC-076 — Components nest; layout, presets and mappings are project data
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P1 gaps of the Max comparison (reuse, organization and parameter state).
+Delivery: STATUS ORG-01.
+
+**Problem:** a component could not contain a component, so a graph could not
+be organized or reused in parts. Its layout had one set of positions and no
+comments or groups, values could not be stored and recalled, and there was no
+way to drive a parameter from a MIDI controller or a key without patching.
+
+**Decision:** nesting uses the project's existing contexts. A `component`
+object owns a child context whose modules are its contents and lends that
+context a boundary: one channel per inlet and outlet. The `inlet`, `outlet`,
+`inlet~` and `outlet~` objects inside connect to it; nothing is flattened or
+copied. The shell's config lists its channels; editors keep it in step with
+the edge objects. Project modules may observe their context's capabilities
+through a new object-context `scope`. The project layout gains optional
+`presentation` positions, `comments` and `groups`, and the project an optional
+`mappings` list from MIDI controllers, pitch bend, program change or keys to
+parameter endpoints; the runtime updates both without rebuilding. Kernel adds
+`PresetBank` with capture, recall and interpolation over parameter surfaces,
+`ControlMappings` with learning, and the `preset` and `nodes` objects. Score adds
+`MidiControlSource`. UI Kit `/controls` adds a preset grid, an interpolation pad
+and a mapping overlay. [Organization](design/ORGANIZATION.md) owns the contract.
+
+**Alternatives considered:** flattening nested components into prefixed IDs
+before restoring, which makes the runtime's document differ from the edited
+one and loses the nested record on export; a separate nested runtime per
+component, which would give each its own Session and output gate; storing
+presets outside the project, which loses them with the file; mapping through
+patched objects only, which needs a cord for every controller.
+
+**Consequences:** the project schema gains optional fields that version-1
+readers without them reject, so documents using them need this Kernel. A
+component's inner modules are ordinary records of the same project. Presets
+cover their own component (the modules of the preset's context). Transport-
+locked time, subpatch abstractions loaded from files, and preset morphing over
+time remain later work.
+
+**Owner:** [Organization](design/ORGANIZATION.md).
+
+**Verification:** unit tests for nesting through the runtime, boundaries,
+presets, interpolation, mappings and the schema; tests for the new controls;
+Studio tests for encapsulation, clipboard, arrangement and views; browser
+evidence and the owner's manual checks.
+
+## DEC-077 — Musical time, devices, voices, buffers and channels in components
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P2 gaps of the Max comparison (music and audio capabilities).
+Delivery: STATUS MUS-01.
+
+**Problem:** components had seconds but no bars or beats, so a timer could not
+follow a tempo; MIDI covered notes and controllers only; there was no voice
+allocation, no named sample memory, no frame-based spectral processing, no
+multichannel cord and no microphone, game controller, HID or OSC input.
+
+**Decision:** a project's Session carries an optional `tempo` (BPM and meter)
+and the runtime lends its root context a `MusicalTimeSource` under the
+`MUSICAL_TIME` capability, so objects read bars, beats and ticks (480 per
+quarter) and schedule on the beat grid; tempo changes rebuild nothing. Message
+objects accept note values (`4n`, `8nt`, `4nd`, `1.2.0`, ms, Hz). A lone word in
+message text is its own selector (`stop`, as in Max); a quoted word stays a
+`symbol`. Kernel adds `VoiceAllocator`, a `poly` shell that owns one child
+context per voice with a `voice` object, `multichannelPlugin` and `mc.pack` /
+`mc.unpack` over ordinary multichannel Web Audio connections, an OSC 1.0 codec
+with `oscin` / `oscout` over a WebSocket bridge, `transport`, `makenote`,
+`gamepad` and `hid`, and a worklet-side spectral frame (FFT, Hann window,
+overlap-add). Score adds MPE pitch, pressure and sysex input, MIDI clock in and
+out, a message-to-MIDI sink and MIDI device objects over one shared access
+whose device inputs fan out to every object. Audio adds named `SharedBuffers`
+per AudioContext with `buffer`, `groove`, `record` and `adc` objects, and
+renders an edited clip back to samples. [Music and audio objects](design/MUSIC-AUDIO-OBJECTS.md)
+owns the contract.
+
+**Alternatives considered:** a tempo map in the Session clock itself, which
+would change every scheduler and is not needed for one tempo and meter; a
+flattened `poly` that copies voices into prefixed IDs inside the runtime,
+which makes the exported document differ from the restored one; one buffer
+store per runtime, which would hide a recording from another runtime on the
+same AudioContext; a WebSocket OSC server in the packages, which a browser
+cannot open; each MIDI object owning the device's handler, which lets the
+last one silence the others.
+
+**Consequences:** documents using `session.tempo` need this Kernel. `poly`
+voices are ordinary contexts of the same project; editors that show one voice
+must write the others (Studio copies the first). A buffer outlives a rebuild
+when it is declared the same way, and goes with its last `buffer` object.
+Message text `stop` now arrives as selector `stop` rather than `symbol stop`.
+Tempo maps, time signature changes, an `mc.` form of processors and an OSC
+bridge program remain later work.
+
+**Owner:** [Music and audio objects](design/MUSIC-AUDIO-OBJECTS.md).
+
+**Verification:** unit tests for musical time, voices, OSC, the FFT and
+overlap-add, transport-locked metro, makenote, poly, multichannel, MIDI device
+objects and fan-out, MPE, clock and sysex, shared buffers, recording and
+rendering an edit; Studio tests for the new objects and voice copies; browser
+evidence in Studio and the private runner's checks L1–L6, and the owner's
+manual checks.
+
+## DEC-078 — Observing, scripting, plugins and exporting components
+
+**Date / status:** 2026-11-16; accepted by the repository owner, who asked for
+the P3 gaps of the Max comparison (developer experience).
+Delivery: STATUS DEVX-01; it also delivers the first export path of LAYER-01.
+
+**Problem:** a running component could not be watched without patching
+`print` objects into it; there was no way to run user code, to script the
+editor, or to host the web's plugin format; and a component made in Studio
+could not leave Studio, because its view objects were Studio's own plugins.
+
+**Decision:** `ModuleProjectRuntime` gains `observe(listener)`, which reports
+each message and note just before it crosses a cord, in delivery order and
+depth, without changing delivery, and `probeSignal(endpoint)`, an analyser on
+an audio or control output that follows it across rebuilds. Message clocks
+can `hold`, `resume` (shifting held events by the time held) and `step`, and
+`MessageDebugger` sets trace and break watchpoints with conditions. Editor
+cords carry their project `recordId`. Kernel `/objects` adds `ScriptSandbox`,
+user code in a Worker that reaches its host only through messages and offered
+functions, and the `js` object over it. Kernel `/module` adds `wamPlugin`, a
+structural adapter for Web Audio Modules 2.0 whose host group and URL policy
+the application supplies. A new Bridge entry, `@webmusic/bridge/component`,
+holds what a component needs outside Studio: the standard plugin set, the view
+objects (`webmusic.surface.*`, moved from Studio), the controls of interface
+objects, an asset resolver, `mountComponent`, `defineComponentElement`, and
+generators of an exported module and a standalone page. Studio uses the same
+entry. [Developer tools](design/DEVELOPER-TOOLS.md) owns the contract.
+
+**Alternatives considered:** a global message tracer in the Kernel, which
+would mix every runtime's traffic; slowing delivery for illustration, which
+would change the timing the user is debugging; running scripts on the main
+thread with `new Function`, which lets a loop freeze the page and gives code
+the whole page; bundling a WAM SDK in the packages, which ties a release to it;
+exporting components as a flattened script, which loses the project the user
+can open again; keeping view objects in Studio, which makes exported
+components lose their keyboards and scopes.
+
+**Consequences:** the Bridge gains `@webmusic/ui` as an optional peer, used
+only by `/component`. Documents with Studio's `studio.keys`, `studio.scope`,
+`studio.meter`, `studio.spectrum` or `studio.roll` are migrated by Studio to
+`webmusic.surface.*`. A break holds the message clock of its AudioContext for
+every runtime on it; audio keeps playing. The Worker isolation keeps scripts
+off the page but is not a security boundary: a dynamic `import()` still
+reaches the network. A standalone page loads the published packages from a
+CDN and so works only once the release it names is published; DSP processors
+outside the packages are declared as resources the page must supply.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md).
+
+**Verification:** unit tests for observation order and depth, observers
+across rebuilds, signal probes, watchpoints with hold, step and resume,
+the script sandbox and `js` object in a VM-run Worker prelude, the WAM adapter
+against a structural fake, and the component entry in jsdom; Studio tests for
+the library, templates and debugging helpers; browser evidence in Studio and
+the private runner's checks M1–M3, and the owner's manual checks.
+
+## DEC-079 — A layout records a resized box's size
+
+**Date / status:** 2026-11-17; accepted by the repository owner, who asked
+that Studio's objects can be resized, sit on a grid without overlapping, and
+be arranged by their connections.
+Delivery: STATUS ORG-01.
+
+**Problem:** a layout position held only `x`, `y` and `collapsed`, and the
+schema rejects any other field. A box resized in an editor therefore had
+nowhere to keep its size, and a component exported from that editor would
+show its views and controls at their default sizes.
+
+**Decision:** `ProjectModuleLayout` gains optional `width` and `height`, in
+canvas pixels from 1 to 100 000, in both `layout.modules` and
+`layout.presentation`. Absent means the box's natural size. The editor
+binding reports them as `ProjectEditorModule.size` when both are present and
+keeps them when a module moves. `mountComponent` gives a presentation item
+with a size that size and lets its element fill it. Grid snapping, the
+no-overlap rule and arrangement by connections are editor behavior and stay
+out of the project.
+
+**Alternatives considered:** keeping sizes in Studio's own storage, which
+loses them with the file and in export; a size object nested in the
+position, which would break the flat shape `collapsed` already uses; storing
+grid and arrangement settings in the project, which ties the document to one
+editor's interaction.
+
+**Consequences:** documents that use the fields need this Kernel; version-1
+readers without them reject such documents, as DEC-076 already notes for its
+fields. A view element inside a sized box must follow its box's size.
+
+**Owner:** [Organization](design/ORGANIZATION.md#layout).
+
+**Verification:** Kernel editor tests for the size, its validation and its
+survival across a move; a Bridge test that a sized presentation item keeps
+its size; Studio canvas tests for resizing, grid snapping, the no-overlap
+rule and arrangement; browser evidence and the owner's manual checks.
+
+## DEC-080 — A box sizes what it holds
+
+**Date / status:** 2026-11-18; accepted by the repository owner, who asked
+that every object adapt to the size of its box and reported that dials and
+buttons on the canvas could not change the values cabled to them.
+Delivery: STATUS ORG-01.
+
+**Problem:** DEC-079 recorded a box's size, but only the box followed it. A
+control kept its one-row size in a corner of a larger box, so most of the box
+did nothing when pressed; a keyboard, a scope, a meter, a spectrum, a roll and
+a buffer kept their own heights and left the rest of a taller box empty. The
+dial was read by the angle of the pointer from its centre, which on a control
+24 px across turns a vertical drag — the usual way to turn a small dial —
+into one jump to the middle and nothing after it. Studio and the exported
+component also disagreed about the natural size of a control.
+
+**Decision:**
+
+- UI Kit controls accept `fill`: the control takes its host's whole width and
+  height, and its glyph, track, knob or cells scale with it. A slider accepts
+  `orientation: 'auto'` and stands upright while it is taller than it is wide.
+- `createKnob` accepts `gesture: 'drag'`: the value changes by the distance
+  dragged from the press (up or right raises it; `dragDistance` pixels for the
+  whole range, 160 by default) and a press without a drag changes nothing.
+  `'angle'` stays the default for `createKnob`. `mountDial` uses `'drag'`.
+- The Bridge's `mountObjectControl` always fills its host. `controlSize(name,
+  text)` gives each control's natural size in CSS pixels, in cells of 32 px,
+  and `viewWidth(kind)` each view's natural width; a box without a recorded
+  size takes these, in Studio and in `mountComponent` alike.
+- `fitViewElement(element, kind, box)` makes a view as tall as its box: the
+  drawing takes the height its readouts and tools leave, through the element's
+  public height token or `height` attribute, and follows the box when it is
+  resized. `mountComponent` uses it for every item with a recorded size.
+
+**Alternatives considered:** scaling a box's content with a CSS transform,
+which blurs canvases and scales text and hit targets with the box; container
+query units inside the controls, which need size containment and so give a
+control no natural size at all; keeping the angle-read dial and enlarging it,
+which leaves a small dial unusable; a relative drag on `createKnob` by
+default, which would change the transport's shipped volume knob.
+
+**Consequences:** a control's host must have a size: `fill` gives a control
+no size of its own. An exported component's unsized controls change from a
+160 × 60 cell to their natural size, matching what Studio's interface shows.
+A view in a box too short for its tools is clipped by the box. Elements other
+than the six view kinds need a fitting of their own before they can follow a
+box.
+
+**Owner:** [Organization](design/ORGANIZATION.md#layout); the control
+contract is in the [controls reference](../doc/src/content/docs/uikit/parameters-gestures/controls.mdx).
+
+**Verification:** UI Kit tests for the drag gesture, `fill` and the automatic
+slider; Bridge tests for natural sizes, an unsized cell and view fitting;
+Studio tests for the box frames; browser evidence and the owner's manual
+checks for every object at its natural, an enlarged and a reduced size.
+
+## DEC-081 — A layer is a contract; a component in a graph is an object
+
+**Date / status:** 2026-11-18; accepted by the repository owner, who reported
+that `keys`, `scope` and `roll` are the packages' Components and yet are
+listed in Studio as objects. It refines DEC-074. The same day the owner
+directed that the Library follow rule 5 and that `buffer` be split (rules 5–7
+as recorded here). The layer definitions apply now. The manifest of rule 4
+and the split of rule 7 are implemented in Bridge `/component`, with sixteen
+official components placed by manifest on 2026-11-19, players, desks, a
+recorder and a panel by DEC-084 on 2026-11-20, and the declarations by
+DEC-089; the Library's apps of rule 5 are not. Delivery:
+STATUS LAYER-01.
+
+**Problem:** DEC-074 names three layers, and Product states under it that
+each is made only from the one below. Two of these statements do not hold
+together:
+
+- The packages' Components are the official components, but five of them are
+  placed in a graph as the objects `keys`, `scope`, `meter`, `spectrum` and
+  `roll`. DEC-074 says such a box "does not make them components", so one
+  thing is a component on a web page and an object in Studio.
+- An official Component is written in code from a Headless class and
+  presenters. It is not made of objects, so "made only from the one below"
+  describes components built in Studio and not the official ones.
+
+The implementation follows the same split. A component built in Studio enters
+a graph through the `component` object and its edge objects (DEC-076). An
+official Component enters through a `webmusic.surface.*` plugin and a
+per-kind branch in `@webmusic/bridge/component` that creates, configures,
+binds and fits its element (DEC-078, DEC-080). Each further Component —
+a staff, a waveform, a transport — needs new code in that entry before a
+graph can hold it, and an app builder would need a third way to place both.
+
+**Decision:**
+
+1. **A layer is the contract a thing meets**, not where it came from or how
+   large it is.
+
+   | Layer | Contract | Package counterpart |
+   |---|---|---|
+   | Object | A typed box with ports that runs only inside a graph | API functions, Headless classes and UI Kit presenters |
+   | Component | Self-contained and portable, with its own interface; it runs alone on a web page | Components |
+   | App | Several components, laid out on a page, cabled together and sharing one Session | — |
+
+   The test between the first two is whether the thing is useful alone on a
+   page. A slider, a dial or a button is not, so interface objects stay
+   objects. `score` and `sample` are Headless players with no interface and
+   stay objects.
+
+2. **A component is authored in code or as a graph, under one contract.** The
+   packages' Components are authored in code and are sealed: they cannot be
+   opened in Studio. A component built in Studio is a graph of objects and
+   can be opened. Both follow the same formula — nonvisual behavior plus an
+   interface — and both meet DEC-074's portability requirement.
+
+3. **Any component can be placed in a graph, where it is a box with ports.**
+   This is the one rule that crosses the layers, and it is Max's rule for an
+   abstraction, a bpatcher or a hosted plugin. The `component` object already
+   applies it to graph-authored components; code-authored components follow
+   it too. `keys`, `scope`, `meter`, `spectrum` and `roll` are therefore
+   official components placed in a graph, and are described so.
+
+4. **Every component carries a manifest.** It declares the component's ports
+   (name, family and direction, over the six port families), its parameters
+   and the resources DEC-074 already requires. A graph-authored component's
+   manifest is derived from its edge objects. A code-authored component's
+   manifest is declared beside its Element and names the public property or
+   event that carries each port. A host — Studio, `mountComponent` or an app —
+   places, cables and sizes a component from its manifest alone, with no
+   branch for the component's kind.
+
+5. **An app is a project whose boxes are all components.** It adds a page
+   layout to the presentation layout of DEC-076 and uses the same cords,
+   ports and Session as any graph. It has no runtime of its own, and it runs
+   and exports through `mountComponent` like a component. The Library builds
+   apps this way. A companion that borrows a player's data, state and time
+   (DEC-011) is cabled to it: the player's `module` to the companion's
+   `inputModule` (DEC-063). The markup a Library card copies stays the way to
+   use one official Component on a page; a composition of several is an app,
+   and the Library no longer nests their markup to make one.
+
+6. **Libraries list the two layers apart.** Objects are grouped by family.
+   Components are grouped by who made them: official, the user's own, and the
+   community. The Library and the components group of Studio's Object Library
+   draw from the same listing, so a component exported from Studio can be
+   placed in an app. The five view objects move to the official components;
+   the text typed into their boxes does not change.
+
+7. **`buffer` is split into its data and its view.** The `buffer` object keeps
+   the named buffer of DEC-077 and shows nothing in its box. A buffer's
+   waveform is the official component `<audio-clip-view>` placed in a graph
+   and bound to a buffer by its name, as `groove` and `record` are — Max's
+   `buffer~` beside its `waveform~`. Editing a buffer through that view writes
+   back to the store, as `editableBuffers` does today.
+
+This replaces two statements made under DEC-074. Product's "each layer is
+made only from the one below it" becomes: an app is made only of components; a
+graph-authored component is made of objects and of other components; a
+code-authored component is made of the packages' public entries. DEC-074's "some
+objects show a package Component inside their box; that does not make them
+components" becomes rule 3.
+
+**Alternatives considered:** keeping the Library's nested markup as a second
+way to make an app, which gives apps no cords, no message family, no presets
+or mappings and no export through `mountComponent`; keeping a buffer's
+waveform inside the `buffer` box, which leaves one object showing a component
+and so outside both layers; keeping DEC-074's wording, which leaves one thing
+in two layers and a code change in the Bridge for every Component a graph
+should hold; following Max fully, so that a keyboard and a scope are only
+objects, which leaves the packages' tags without a layer although they are
+what a developer installs; rebuilding the official Components as graphs of
+objects so that every component is made from the layer below, which would
+make each package Component depend on the project runtime and discard its
+hand-written code; drawing the line by size ("as large as a plugin"), which
+gives no test a reviewer can apply; a separate runtime for apps, which would
+add a second routing and clock model beside the Session.
+
+**Consequences:** the manifest is a new public contract. Its open choices
+were settled in delivery the same day:
+
+- **Where it is declared:** in Bridge `/component`, beside the Elements it
+  names, because UI Kit imports no Kernel or domain types and Score and Audio
+  stay independent. A graph-authored component's manifest is derived by
+  `projectManifest`.
+- **How a port is carried:** by the public member the Element already has.
+  An audio input is connected to an `AnalyserNode` handed to `analyser`; a
+  source input hands the upstream module to `inputModule` (DEC-063); a note
+  output forwards the note port of `module`. `inputModule` names a player or
+  source module, not an audio signal, so the Bridge was right to hand an
+  audio cord to `analyser`; this entry's first draft said otherwise. A value
+  that is not a port — the clip view's buffer name — is a parameter.
+- **How a sealed component is sized:** the manifest carries its natural
+  `width` and a `fit` (a height token measured against a public part, or the
+  `height` attribute), which replace DEC-080's per-kind tables. A component
+  without a fit keeps its own height.
+- **Which come first:** the five, then `<audio-level-analyzer>` as `level`,
+  added with its manifest alone, and `<audio-clip-view>` as `clip`.
+
+The `webmusic.surface.*` plugin IDs and their configs stay readable, so saved
+projects and exported components keep working; the per-kind functions of
+DEC-078 and DEC-080 are replaced by manifest-based ones in the unpublished
+entry. A project that placed a `buffer` in its presentation is migrated by
+`migrateBufferViews`, which places a `clip` bound to that name beside it and
+in its place in the presentation. Studio's Object Library and boxes follow
+the manifests in the private repository. Rule 5 is not yet met: the players,
+racks and companions the Library composes own their Headless instances and
+Session inside their Elements, and how such a component's module joins a
+graph's Session needs its own design before the Library can build apps as
+projects. DEC-084 settles that design; the Library's apps remain.
+
+**Owners:** [Product](PRODUCT.md#objects-components-and-apps) for the layers
+and [Developer tools](design/DEVELOPER-TOOLS.md#component-manifest) for the
+manifest.
+
+**Verification:** tests that a manifest is derived from edge
+objects and matches the `component` object's ports; that the five view
+objects are placed, bound and fitted through their manifests with no branch
+on their kind; that one official Component outside the five is placed in a
+graph by adding only its manifest; that projects saved with
+`webmusic.surface.*` records load unchanged; and that a project of
+components alone runs through `mountComponent`; that a `buffer` box shows
+nothing, a clip view bound to its name shows and edits it, and a project with
+a presented `buffer` migrates to that pair; and that a Library app of a
+player and its companions, cabled through `module` and `inputModule`, behaves
+as their nested markup did. Browser evidence and the owner's manual checks
+cover the two listings, a sealed component in a resized box, and an app built
+and exported in the Library.
+
+## DEC-082 — A component without its data still shows itself
+
+**Date / status:** 2026-11-18; accepted at the maintainer's request.
+
+**Problem:** placed in a graph before a cord reaches it, `roll`, `meter` and
+`clip` showed only the outlined waiting square on a blank box, while `keys`,
+`scope`, `spectrum` and `level` drew their whole interface. A component whose
+data has not arrived looked like one that had failed to load. DEC-052 already
+says pending feedback preserves mounted content; these three replaced it.
+
+**Decision:** missing data is a state of the data, not of the interface. A
+component waiting for its input draws its empty surface — what it shows with
+nothing in it — and the DEC-052 waiting indicator over that surface, never the
+indicator alone. The surface stays operable where it can be: its toolbar,
+zoom and scrolling work, and nothing borrowed or edited is pretended.
+
+- `<score-grid-view>` draws its keys, ruler and grid lines with no notes. This
+  covers no source, `.inputModule = null`, a player without a score and an
+  editor that is not ready; the empty grid borrows no editor.
+- `<audio-clip-view>` draws an empty clip, its ruler and lane, with no audio
+  or editor yet, or an editor that is not ready.
+- `<audio-meter>` draws its type at rest, as it would for silence, without a
+  source.
+- `<score-sheet-view>` and `<score-view>` draw a blank score — one empty 4/4
+  bar on one staff — as a staff, a roll or a waterfall. `<score-view>` draws
+  a score whose data has no notes the same way, under its `empty` state; a
+  piano roll or waterfall draws notes only, so its blank surface is its frame.
+- `<score-pitch-view>` draws its keyboard, staff or fretboard with nothing
+  sounding.
+- The Score analyses (`chord`, `interval`, `rhythm`, `scale`) draw an empty,
+  disabled lane — axis and beat lines, no bands.
+- `<audio-live-view>` draws a waveform's centre line; a spectrogram stays
+  clear.
+
+The indicator sits in a `waiting` layer over the surface that takes no
+pointer input, in the stage status of a canvas surface, or, for UI Kit's
+Workbench, over a stage that already holds the caller's surface. Loading, failure
+and a blocked editor keep their DEC-052 presentation. Data accessors report
+the truth: `.score`, `.clip` and `.snapshot` stay `undefined` while waiting.
+
+**Alternatives considered:** hiding the waiting indicator on an empty surface,
+which would lose the distinction DEC-052 draws between missing input and an
+empty result; and placeholder data, which would show notes or audio nobody
+supplied.
+
+**Consequences:** a score view's host is now a positioning context, through
+the zero-specificity rule each view already installs. The blank score is
+internal to Score core, shared by View and Analyze. A renderer measuring an
+empty sequence shows the octave from middle C instead of an inverted range.
+Tests that asserted a removed surface while waiting now assert the empty
+surface and its indicator. An analysis bound through `inputModule` now reads
+that module's score, which DEC-068 promised and placing analyses in a graph
+exposed. Players, recorders, racks and mixers are reviewed against this rule
+when their manifests are designed (STATUS LAYER-01); DEC-084 places the
+players and desks, which wait in their existing waiting state without an
+asset.
+
+**Owners:** [Design principles](DESIGN-PRINCIPLES.md) for the rule, and the
+[`<score-grid-view>`](../doc/src/content/docs/score/element/view/score-grid-view.mdx),
+[`<audio-clip-view>`](../doc/src/content/docs/audio/element/view/audio-clip-view.mdx),
+[`<audio-meter>`](../doc/src/content/docs/audio/element/analyze/audio-meter.mdx)
+and other affected Element references.
+
+**Verification:** tests that a grid with `.inputModule = null` draws an empty
+grid under a `waiting` layer and replaces it when a score arrives and returns
+to it when the score goes; that a disposed editor leaves the empty grid, not a
+blank box; that a clip view without audio draws an empty clip under the layer
+and that a ready editor replaces it; and that a meter without a source paints
+a silent `vu` frame while `.snapshot` stays `undefined`; that a score view
+whose source goes keeps its blank staff under the indicator; that an analysis
+bound to a module analyses its score; and that every official component placed
+with no cords mounts its Element. Browser evidence: the sixteen placed with no
+cords each draw their surface, and the score components cabled to Arabesque
+No. 1 draw and analyse it.
+
+## DEC-083 — Icon buttons name themselves at once; Help explains objects, not components
+
+**Date / status:** 2026-11-18; accepted by the repository owner, who asked
+that every icon button on the site show its name in a black box the moment
+the pointer rests on it, and that the Library and Studio menus end in a Help
+toggle that, while pressed, shows what the hovered thing does, as an
+instrument's info view does. The owner then narrowed both the same day:
+only buttons without text are named, and Help explains small controls and
+the basic layers, not everything.
+
+**Problem:** icon buttons named themselves only through the platform's
+`title` tooltip: a system-styled box that appears after about a second, in
+the platform's font and colours, and not at all for keyboard focus. A
+toolbar of icons read as a row of guesses. Studio crammed a sentence of
+purpose into each menu tab's title, where it could only be read slowly.
+
+**Decision:**
+
+- The UI Kit's `controls` entry exports `mountTooltips(document, options)`.
+  It is one delegated tooltip per document: the name of the element under the
+  pointer, in an ink box (`--wm-foreground` fill, `--wm-accent-foreground`
+  mono text, square, no shadow) just below and right of the pointer, shown at
+  once and following it, in the top layer above modal cards. Keyboard focus
+  shows the same box under the focused control. It reaches open shadow roots,
+  so it serves every component on the page without each drawing its own.
+- Only an element that shows no words (no letter or digit) is named: its
+  `title`, or the `aria-label` of a control (button, link, tab, slider and the
+  like) — every icon button. A card, a tab, a chip, a readout or a component
+  shows its own text and gets no box. While a box is shown, the element's
+  `title` waits beside it, so the platform's tooltip never follows; an icon
+  control whose title was its only name keeps that name meanwhile.
+- Help mode is one per document (`setHelp`, `help: true`). In it, an element's
+  `aria-description` joins its name in the box, including on elements that
+  show text. The description is the same text assistive technology reads.
+- Help explains only small things and the basic layers (DEC-074).
+  Icon tools, chips, filters and parameters say what they do in one plain
+  sentence. An object says what an object is and then what this one does. A
+  component — a Library card, a component box or cell in Studio — says only
+  what a component is: no line can tell what a whole component does. Pages,
+  page names and other text navigation carry no description.
+- Components keep naming icon buttons in `aria-label` and `title`, so a
+  component on a page without tooltips still names itself through the
+  platform. A page opts in once: the documentation site and every closed-source
+  application mount the tooltips; the Library and Studio menus end in a Help
+  toggle (`?` key), remembered per viewer.
+
+**Alternatives considered:** a tooltip inside each component, which an
+overflowing frame clips and which repeats across every presenter; removing
+`title` from the components, which leaves a component pasted into another
+project with no visible names; and a docked info panel, which takes a corner
+of Studio's canvas permanently for text that matters only while help is on.
+
+**Consequences:** a page that mounts tooltips changes an element's `title`
+attribute while that element's box is shown. A text element that keeps a
+`title` still gets the platform's own delayed tooltip, so the applications
+drop titles that repeat or expand shown text. Descriptions are authored only
+where help should explain something; an element without one shows only its
+name in help mode. Touch input shows no box.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md#icons); the API is in the
+[controls reference](../doc/src/content/docs/uikit/parameters-gestures/controls.mdx).
+
+**Verification:** UI Kit tests for naming only what shows no text, the lifted
+title, shadow roots, press, touch, help mode and release; application tests
+for the object and component help; browser evidence and the owner's manual
+checks on the documentation site, the Library and Studio.
+
+## DEC-084 — A player or desk in a graph borrows the graph's Session
+
+**Date / status:** 2026-11-20; accepted by the repository owner, who asked
+that players and racks be designed as components too. It meets the part of
+DEC-081 rule 5 that DEC-081 left open: how a component that owns a player
+and Session inside its Element joins a graph's Session.
+
+**Problem:** `<score-player>`, `<audio-player>`, `<score-rack-control>` and
+`<audio-mixer>` are the packages' Components, but none had a manifest, so no
+graph could hold them. Each owns its Session when it is outermost on a page.
+Placed in a graph that way, a player would start a second Session beside the
+graph's, with its own clock and transport, and the graph's transport, its
+other players and its companions would not follow it. A desk takes its
+channels from the players nested inside it in markup, and a graph has no
+markup nesting: its members arrive by cords.
+
+**Decision:** a placed player or desk is a nested member of the graph, by
+the DEC-063 rules a nested Element already follows on a page.
+
+1. **The box lends a module context.** A component with an audio output
+   bound through `context` gets, on its box, the context the graph gives that
+   box's module: the graph's audio environment, Session and registry, with
+   the box's own output bus as its default destination. The Element finds it
+   through the DEC-063 context request, as a player nested in another finds
+   its. A player in it is a nested player with its own source: its engine
+   joins the graph's Session, and its transport, shown with
+   `controls="show"`, commands that Session, as the graph's transport does. A
+   desk in it is a nested Rack: its master plays into the box's output.
+2. **A desk's inputs are channels.** Each audio input bound through `admit`
+   is one channel strip, numbered from 1. The box offers the cord's audio as
+   an output port, and the host admits it through the Element's `module`,
+   whose `admit(module, port)` gives an output its own channel. A Rack's
+   module already has it; `<audio-mixer>`'s module gains it. The first
+   delivery gives `rack` and `mixer` four inputs.
+3. **A source output carries the Element's module.** A cord from a player's
+   `source` port hands the player's own `module` to the companion's
+   `inputModule`, so a roll, a sheet or an analysis follows that player as it
+   would nested inside it.
+4. **The music is a project asset.** A manifest's `asset` names the role the
+   box's module loads — a Score or an AudioClip — and the Element property it
+   is given to. The asset is a declared resource (DEC-074), and the
+   placement uses Arabesque No. 1. Without it, the player waits (DEC-082).
+5. **Bind before connecting; remove before releasing.** A host binds the
+   Element on its box before the box joins the page, so the player never
+   starts a Session of its own, and takes it off the page before releasing
+   the binding, so losing the lent context does not start one either.
+6. **The host preloads the Session it owns.** DEC-069 has a Session's owner
+   preload it as members join. In a graph that owner is the host, so
+   `mountComponent` and Studio call `keepComponentSessionPreloaded`: a placed
+   player's sound, parameters and inserts are real before the first play.
+7. **A recorder takes notes; a panel takes a target.** A note input bound
+   through `inputModule` gives the Element a module whose `notes` output
+   repeats the notes cabled to the box, which is the member
+   `<score-recorder>` already records from. A source input bound through
+   `moduleTarget` hands the upstream module to a panel, which then edits that
+   module's parameters and inserts; with no cord it is explicitly unbound and
+   borrows nothing by containment.
+8. **A companion of an audio player is cabled from it.** `<audio-playlist>`
+   and `<audio-recorder>` play through an `<audio-player>`: nested in one on
+   a page, linked through `.player` in a graph. A source input bound through
+   `player` hands the companion the Element of the box its cord comes from —
+   `track`, which gains a `source` output — so a queue is that track's
+   transport and one participant of the graph's Session, and a take is
+   auditioned through it. With no cord the companion is linked to no player:
+   it shows itself and waits, and never plays by itself on a context of its
+   own outside the graph.
+9. **A queue plays into its own box.** A playlist's entries are every asset
+   role with its manifest's prefix (`entry1`, `entry2`, …), loaded as clips
+   and named by their files. `<audio-playlist>` in a lent scope that is not
+   a player's and names a default destination builds its queue on that
+   scope's AudioContext and plays into that destination, so the queue's audio
+   leaves by the playlist's `output`. Nested in a player or alone on a page
+   it keeps its own context, as before.
+10. **A named buffer has three uses.** A parameter that names a shared buffer
+    says how its Element uses it: `clip` edits it (`<audio-clip-view>`),
+    `wave` shows it read-only as the Element's `clip` (`<audio-view>`), and
+    `take` writes each recorded take to it (`<audio-recorder>`), so a `clip`,
+    a `wave` or a `groove` of that name has the recording. A manifest with
+    `scope` is lent the graph's module context although it has no audio
+    output, so the microphone is captured in the graph's AudioContext.
+11. **An Audio view follows a track by containment.** A source input bound
+    through `owner` lends the view, on its box, a module context whose
+    `AUDIO_PLAYER_OWNER` is the Element of the box its cord comes from — the
+    capability an `<audio-player>` lends its nested companions (DEC-068). The
+    view then follows that track as if nested in it: its playhead, and its
+    clip when it has none of its own. A manifest's `spectrogram` has the host
+    compute the Element's `.spectrogram` from the clip it shows, at most 2048
+    columns, because `<audio-view>` draws a spectrogram only from data given
+    to it.
+12. **An insert takes the audio through the Element.** Audio ports bound
+    through `insert` give the box an input and an output and the Element the
+    graph's `context`; the host connects the box's input to the Element's
+    `input` and its `output` to the box's output. `<score-synth-panel>` in
+    `mode="insert"` with its `eq` section is placed this way.
+
+The first four components placed this way are `player` (`<score-player>`),
+`track` (`<audio-player>`), `rack` (`<score-rack-control>`) and `mixer`
+(`<audio-mixer>`). `recorder` (`<score-recorder>`) and `panel`
+(`<score-synth-panel>`, attached to the player its cord comes from) followed
+the same day, and `wave` (`<audio-view>`), `take` (`<audio-recorder>`) and
+`playlist` (`<audio-playlist>`) the day after: every Component of the
+packages with an interface of its own is now placed. `wave` then gained a
+source input from a `track` and a `spectrogram` type, and `eq`
+(`<score-synth-panel mode="insert" sections="eq">`) placed the panel's insert
+mode.
+
+**Alternatives considered:** a player in a graph that keeps its own Session,
+which makes two clocks and two transports; a separate Session object that
+players are cabled to, which adds a port family for what the context already
+lends; a desk whose members are boxes nested inside its box, which would make
+a second way to group modules beside components (DEC-076); a desk with one
+input that sums every cord, which loses the per-cord strip that makes it a
+desk; and a desk input count set by an argument, deferred because a
+manifest's ports are fixed today.
+
+**Consequences:** the manifest gains three bindings (`context`, `admit`, a
+`source` output through `module`) and an optional `asset`. A component plugin
+loads its asset before it makes its ports, and stays synchronous when it has
+none. `mountComponent` binds each component before it is shown and removes
+its interface before it releases the bindings, and each Element in its stage
+is a block, as in Studio's boxes. The graph's transport and a player's own
+are two views of one Session. The Library's apps as projects (DEC-081 rule 5)
+are not delivered by this decision. A host that owns a graph's Session now
+prepares its members when they join, not at the first play. In
+`mountComponent` the box, not the Element, carries a component's natural
+width and the Element fills it, because `<audio-view>` owns its inline width.
+`<audio-view>` draws an empty waveform under the waiting indicator until its
+audio arrives (DEC-082). `wave` draws the waveform only: the Element's
+spectrogram is computed by the host (rule 11) and its meter type is not
+offered, since a buffer has no analyser. The insert panel is placed with its
+`eq` section only; its `effects` section needs an effect list handed to it,
+which no box argument describes yet (STATUS LAYER-01).
+`<score-effect>`, `<audio-effect>` and `<score-rack-part>` show nothing and
+were left out; DEC-089 placed them as they are.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#component-manifest);
+[Modular composition](design/MODULAR-COMPOSITION.md#session-time-and-commands)
+for the nested-member rules it reuses.
+
+**Verification:** Bridge tests that a placed player's Session is the
+graph's and its score is the asset; that a source cord from a player hands
+the companion that player's module; that a rack and a mixer admit their four
+inputs as numbered channels; and that destroying the component releases the
+channels and leaves the player with no Session of its own; that the notes
+cabled to a recorder reach the module its Element listens to; and that a
+panel is attached to the player its cord comes from, whose parameters exist
+before any play, and to nothing without a cord. Browser evidence:
+a player, a roll, a recording, a rack and a mixer placed with Arabesque No. 1,
+started from the player's own transport and paused from the graph's, at one
+position; a panel showing its player's sound and envelope before play; and a
+recorder capturing a take played on `keys`. Bridge tests also cover a `wave`
+following its buffer, a take written to its buffer, and a `take` and a
+`playlist` linked to the track cabled to them, with the queue as that track's
+transport playing into the playlist's box; Audio tests cover the empty
+waveform. Browser evidence: a playlist of two entries started from its
+track's transport on the graph's Session and paused from the graph's, and a
+take shown by a `wave` of its buffer. Recording from a real microphone is the
+owner's check. Bridge tests cover a `wave` following its track, a bounded
+spectrogram, and an `eq` joined between its box's ends in the graph's
+context; browser evidence covers both views' playheads following a playing
+track and the recording reaching a meter through the `eq`. The owner's manual checks cover placing them in Studio and hearing
+a player through a rack.
+
+## DEC-085 — A component in a graph is set by its Element's own attributes and tokens
+
+**Date / status:** 2026-11-21; accepted by the repository owner, who asked
+that a component placed in a graph be set in as much detail as a component
+in an app: a meter's type, a view's editing switch, a keyboard's key sizes.
+It extends the manifest of DEC-081.
+
+**Problem:** a component in a graph could be given only what its manifest
+turned into box arguments — a keyboard's range, a scope's timebase — and the
+attributes the manifest fixed. Everything else its Element documents (a
+meter's `type`, a clip view's `tools`, a view's `theme`) and every styling
+token it reads could not be set per box, so a component behaved one way on a
+page, where the author writes those attributes and tokens, and a poorer way
+in a graph. A second vocabulary of per-component options in the manifest
+would repeat each Element's reference and fall behind it.
+
+**Decision:** a component's settings in a graph are its Element's public
+settings, kept in its module's config and applied by the Bridge wherever the
+component is placed.
+
+1. **Two records in the config.** `attributes` maps an attribute of the
+   Element to its value, and `style` maps a custom property to its value. A
+   component without settings has neither key, so existing projects and
+   exported components are unchanged.
+2. **The Element decides what a setting may write.** An attribute is written
+   only when the Element observes it, so an event handler or an unknown name
+   is never written. It is never written when the graph owns it (`src`,
+   `input`, `port`, `target`, `session`, `id` and the like: sources,
+   connections and identity come from cords, assets and the host), when a
+   box argument writes it, or when the manifest lists it in `locked`. A
+   custom property is written only under the public `--wm-` prefix, with a
+   value that loads nothing (`url()`, images and declaration separators are
+   refused). What does not pass is left out without an error.
+3. **The manifest's attributes become defaults.** A setting replaces an
+   attribute the manifest gives the Element in a graph, and taking the
+   setting out gives it back. `locked` names the attributes the host needs
+   as they are (`keys`: `layout`, `routing`). `roll` and `sheet` locked
+   `editable` and their editing tools until DEC-086 lent them an editor.
+4. **A resized box still sizes the Element.** While a fit holds the height
+   attribute or token, a setting for it waits; the natural size gives it
+   back.
+5. **A setting never lends what the host does not.** A clip view's
+   `editable="false"` turns off the editing a host allowed; no setting turns
+   on editing the host did not allow.
+
+**Alternatives considered:** options declared one by one in each manifest,
+which duplicates the Element references and needs a manifest change for every
+new attribute; more box arguments, which are positional and cannot carry a
+dozen optional settings; a pass-through of any attribute and any CSS, which
+lets a shared project file write event handlers and load remote resources; a
+project-level stylesheet, which would style every box of a kind at once and
+could not be exported with one component; and settings kept by Studio alone,
+which an exported component would not have.
+
+**Consequences:** `@webmusic/bridge/component` gains `componentSettings`,
+`settableAttributes`, `withComponentSetting`, `isStyleSetting`,
+`GRAPH_ATTRIBUTES` and the `ComponentSettings` types, and `ComponentManifest`
+gains `locked`. `configureComponentElement` applies settings before the box
+arguments, and removes those that are gone. A host that edits settings offers
+the attributes in `settableAttributes` and describes them from the Element's
+own reference; Studio's Inspector does, with the parameter catalog the
+documentation uses. Interface objects (`slider`, `dial`) have no settings of
+this kind yet: their look is still their box's size and the page's tokens.
+Score views in a graph were read-only until DEC-086 lent them an editor.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#component-settings).
+
+**Verification:** Bridge tests that only observed, unowned, unlocked
+attributes and safe `--wm-` properties are read from a config; that a setting
+is written over the manifest's attribute and gives it back when removed; that
+a box argument's attribute cannot be set; that a height setting waits while a
+resized box sizes the Element; and that `mountComponent` gives an exported
+component the settings in its project. Browser evidence in Studio: a meter
+switched to a spectrum, a keyboard's key width set by its token, and a clip
+view's editing turned off, each kept when the component is reopened. The
+owner's manual checks cover the same in Studio and in an exported component.
+
+## DEC-086 — A view in a graph edits the score its source plays; an edit pauses the Session
+
+**Date / status:** 2026-11-21; accepted by the repository owner, who asked for
+the `editable` switch of score views in a graph after DEC-085 left it locked.
+It extends DEC-053's revision protocol to a player that follows a Session,
+and DEC-085's settings.
+
+**Problem:** a `roll` or `sheet` in a graph follows the box its `source` cord
+comes from through `inputModule`, but edits only through a borrowed `.editor`
+that owns the score, and nothing in a graph made or lent one. Every score
+source in a graph also follows the graph's Session (DEC-084), and a player
+that follows a Session could not apply a document at all: the DEC-053
+protocol pauses the player's own transport for each revision, which a
+Session follower does not own, so attaching a document threw, and the
+Session's scheduler kept the timeline it was made with.
+
+**Decision:**
+
+1. **The source's score becomes a document.** The first editing view cabled
+   to a box that plays a score turns that score into one document, a
+   `ScoreEditor` owned by the host's `ComponentSurfaces`. The box plays the
+   document from then on: the `score` object through `setDocumentSource`, a
+   `player` component through its Element's `.editor` in place of `.score`.
+   The document is kept for as long as the surfaces exist, so it outlives a
+   rebuild of the graph and the cord that asked for it. It is not written
+   back to the project's asset.
+2. **A `source` cord lends it.** A component whose manifest says
+   `edits: 'score'` borrows the document of the box its cord comes from while
+   its `editable` attribute is on, and lets go when it is turned off; other
+   views on the same source keep following it and show the same document.
+   `editable` is an ordinary setting (DEC-085), off unless its author turns
+   it on, so `roll` and `sheet` no longer lock it or their editing tools.
+3. **A revision pauses the Session.** For a player that follows a Session,
+   DEC-053's "pause playback" is the Session's pause: the player asks the
+   member that joined the Session, which pauses it when it is playing. The
+   player writes no transport. The Session keeps its position, its scheduler
+   adopts the new timeline there, cancelling what the old one scheduled, and
+   the member is read again for its length. Playing again is an explicit
+   command, as before. A revision arriving while the Session is paused is
+   adopted without a command.
+4. **A fixed-height view keeps its toolbar.** Under a `height` attribute the
+   grid and the sheet are as tall as their host and scroll in their viewport,
+   so the editing toolbar a box now shows does not scroll away.
+
+**Alternatives considered:** adopting the timeline while the Session keeps
+playing, which is what a workstation does but contradicts DEC-053's rule
+that a revision which changes what plays pauses playback, and leaves "play
+while preparing" undefined for a Session; an editor made by each view, which
+would give two views of one source two documents; an editor kept by Studio
+alone, which an exported component would not have; a host option like
+`editableBuffers`, unnecessary because the setting is off until an author
+turns it on; and writing each edit into the project as a new asset, which
+needs a score serialization the project format does not have.
+
+**Consequences:** `ScorePlayer` gains `setSessionRequests` and the
+`ScoreSessionRequests` type; `ScorePlayerModule` supplies them for the Session
+it joins and takes them back on disposal. A followed player with no member
+requests adopts a revision without pausing. The Session's position is not
+mapped through an edit: one that moves time leaves the Session where it was.
+`ComponentSurfaces` gains `document(id, peek?)`, and `SurfaceSlot` gains
+`score`, `document` and `lender`; `ComponentManifest` gains `edits`.
+Turning `editable` on while the graph plays pauses it once, because attaching
+a document is a revision. Edits are undone with the view's own history, not
+the host's, and are lost when the component is closed: saving them needs the
+score in the project (STATUS LAYER-01). `<score-grid-view>` and
+`<score-sheet-view>` with a `height` attribute now scroll in their viewport
+instead of in their host.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#editing-a-score-from-a-view)
+for the graph; [editing contracts](design/EDIT-COMPONENTS.md) and the
+[ScorePlayer reference](../doc/src/content/docs/score/headless/play/score-player.mdx#apply-document-revisions)
+for the revision protocol.
+
+**Verification:** a Score test that a Session follower applies a document
+without writing its transport: attaching and editing pause the Session, its
+position stays, the next play schedules the document's notes from there, the
+Session reads the new length, and a revision while paused commits nothing.
+Bridge tests that the first request makes one document per source and keeps
+it; that an editing roll borrows the document its `score` object then plays
+while a second roll borrows none; that a `player` Element is given the
+document in place of its score; and that turning `editable` on and off lends
+and returns it. Browser evidence in Studio: a roll set to editable shows its
+toolbar, a note moved with the arrow keys reaches the player as document
+revision 1, and the transport pauses at its position. The owner's manual
+check O3 covers hearing the edit.
+
+## DEC-087 — An edited score is saved in the config of the box that plays it
+
+**Date / status:** 2026-11-21; accepted by the repository owner, who asked for
+edited scores to be saved with the component after DEC-086 left them in
+memory. It changes the lifetime DEC-086 rule 1 gave a document.
+
+**Problem:** under DEC-086 a score edited in a graph lived in the host's
+`ComponentSurfaces` and was gone when the component was closed. A component
+is one project JSON document: Studio stores it as text, copies it, exports
+it as a module or a page, and reads it back, and nothing else travels with
+it. A Score does not fit in that document as it is. Arabesque No. 1 is about
+400 kB of Score JSON in some 40 000 values, against the project schema's
+50 000 values and 65 536 characters a string; an asset is a URI of at most
+8 192 characters that the host resolves, so a `data:` URI does not fit
+either; and a loader gives every note a new ID on each load, so a list of
+edits or a difference against the asset cannot be applied to it again.
+Documents also had no end: a box deleted and a new one given its ID, or
+another project shown in the same surfaces, met the old box's document.
+
+**Decision:**
+
+1. **The score is saved in its box.** A box that plays a score exports its
+   config with the edited score under `document`:
+   `{format: 'webmusic.score+json', encoding: 'gzip+base64', data: string[]}`,
+   the Score's own JSON (`Score.toJSON`, read by `scoreFromJSON`), gzipped,
+   as base64 text in strings of at most 32 768 characters. It is written
+   through `exportConfig`, the path an object's state already takes, so it is
+   in every export of the project and nowhere else. Arabesque No. 1 takes
+   about 37 000 characters.
+2. **A box starts from the score saved in it.** The `score` object's plugin
+   and a `player` component's plugin read `document` when they make the box
+   and start it with that document, before any view edits: the box plays the
+   saved score, alone on a page or in a graph. The asset still loads and is
+   never written, so it remains the original.
+3. **Only an edited score is saved.** A document whose content is what it
+   began as exports what it began from: nothing for the asset, the same text
+   for a restored score. Undoing every edit in the view removes `document`
+   again.
+4. **A document lives as long as its box.** Each module of a box counts
+   itself in and out of the surfaces. A rebuild makes the new module before
+   it disposes the old one, so the document stays through it, undo history
+   included; when the last module of a box is disposed the document goes, and
+   a new box with that ID starts from its own score or its own config. A
+   document already edited is newer than any config and stays when a config
+   is read; one never edited gives way to a saved score.
+5. **Reverting gives the asset back.** `ComponentSurfaces.revert(id)` replaces
+   the box's document with a new one made from the score the box loaded: the
+   box plays the asset at once, the views that edit borrow it, and the box
+   saves no score.
+6. **A saved score is untrusted input.** The text is bounded before it is
+   decoded (1 000 000 characters), the inflated size while it inflates
+   (24 MB), and the result is validated by `scoreFromJSON` and the editor. A
+   box whose saved score cannot be read stays unresolved with its config, so
+   the project loads, the problem is shown, and nothing is overwritten.
+7. **Encoding is off the edit.** An edit is encoded after the call that made
+   it, one at a time, the newest last. `ComponentSurfaces.subscribe` tells a
+   host when what a box saves changed, `settled()` resolves when every edit
+   so far is encoded, and `ComponentHandle.save()` waits for it. A score too
+   large to save, or a platform without compression streams, leaves the box
+   `unsaved`: it keeps what it last saved and says so.
+
+**Alternatives considered:** the Score's JSON as structure in the config,
+which exceeds the schema's limits for a piano piece; raising those limits,
+which changes a Kernel contract for every project to carry one kind of data;
+a new asset holding the edited score, which needs storage beside the project
+in every host and a second file in every export, and makes a copied project
+point at another project's file; the edits as a list of commands replayed on
+the asset, or a difference against it, which fail because note IDs are new
+on every load and history is bounded; MIDI as the saved form, which is small
+but loses spelling, voices and notation a `sheet` edits; and a host that
+writes the score into the project itself, which every host would repeat and
+an exported component would not have.
+
+**Consequences:** `@webmusic/bridge/component` gains `encodeScore`,
+`decodeScore`, `canSaveScores`, `SAVED_SCORE_FORMAT` and
+`SAVED_SCORE_ENCODING`; `ComponentSurfaces` gains `withDocument`, `revive`,
+`revert`, `forget`, `enter`, `documentState`, `subscribe` and `settled`, and
+the `ComponentDocumentState` type; `ComponentHandle` gains `save()`. The
+`config.document` key of `webmusic.score-player` and of the `player`
+component's plugin is reserved for it. A host that shows another project in
+the same surfaces first disposes the boxes it shows (restoring an empty
+project does) or calls `forget()`. A project with an edited score needs
+`CompressionStream` and `DecompressionStream` where it is loaded. Reverting
+is not part of the host's undo: the edits are the document's, and they go
+with it. The saved form depends on the Score JSON schema, whose reader
+migrates earlier versions. An edit made within the encoding of the one
+before it is saved a moment later; a page closed in that moment keeps the
+earlier one.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#saving-an-edited-score)
+and the [Bridge API](../doc/src/content/docs/bridge/api.mdx).
+
+**Verification:** Bridge tests that a score encodes to text a project holds
+and decodes to the same notes and IDs; that input which is not a saved score
+is refused; that an edit appears in the box's config and leaves it when
+undone; that a `score` object and a `player` component play the saved score
+from a project mounted again, with and without a view that edits; that an
+unreadable saved score leaves its box unresolved with its config; that
+`revert` gives the asset back in place and a deleted box takes its document
+with it; and that an untouched document gives way to a saved score while an
+edited one stays. Browser evidence in Studio: an edited note is in the file
+after the edit, plays after a reload, does not appear in another file whose
+boxes have the same IDs, returns with its box when a deletion is undone, and
+is gone after a revert. The owner's manual check O4 covers hearing it.
+
+## DEC-088 — Every display part answers to shared roles; a component and an app each have a theme
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked that
+every display part of an object and a component have a style interface, so a
+component can be styled in depth in its interface and an app styled as a
+whole. It extends DEC-085's settings from official components to interface
+objects, to a component and to an app.
+
+**Problem:** the visual design already resolves every value through
+`--wm-<part>-<role>` to a shared `--wm-<role>`, and DEC-085 lets an official
+component in a graph be given its own tokens. Three things were missing.
+Some twenty colour tokens of the packages ended in a literal without passing
+a shared role — error text, scrims, range thumbs and tracks, grid lines, a
+clip's playhead, sounding notes in the grid and the sheet — so a page that
+set the shared roles restyled most of a component and left those behind. An
+interface object (`slider`, `dial`, `toggle` and the rest) showed its tokens
+and could not be given any. And there was no place to style a component as a
+whole, or an app as a whole: every box had to be set one by one.
+
+**Decision:**
+
+1. **Every colour reaches a shared role.** A part's own token falls back to a
+   shared role before its literal: errors to `--wm-danger`, scrims to the new
+   `--wm-scrim`, a clip's playhead to `--wm-playhead`, sounding notes to
+   `--wm-accent` as `<score-view>` already had it, range thumbs to
+   `--wm-foreground`, tracks and subtle surfaces to `--wm-surface-muted`,
+   grid lines to `--wm-border`, secondary marks to `--wm-foreground-muted`.
+   The literal stays last, so nothing looks different until a role is set.
+   A piano's black keys, a loop region and a spectral map keep their own
+   colours: they are meaning, not theme.
+2. **The shared roles are named in one list.** `THEME_TOKENS` in
+   `@webmusic/bridge/component` lists them with the kind of value each takes
+   and its fallback: foreground, muted foreground, surface, muted surface,
+   border, control border, accent, content over accent, danger, recording,
+   playhead, scrim, focus ring, control radius, control size, component
+   radius and border, and the two font families. Editors offer this list; a
+   theme may hold any `--wm-` token.
+3. **A component has a theme.** `layout.style` in the project holds custom
+   properties of the presentation as a whole. Kernel keeps them as names and
+   text; a host applies those a setting may write (DEC-085: a `--wm-` name
+   and a value that loads nothing). `mountComponent` writes them on the root
+   it makes, and a component defined as a custom element writes them at
+   `:host` from inside its shadow root.
+4. **An interface object is styled like a component.** `style` in the config
+   of an interface object is written on its box by `mountComponent` and by
+   Studio, with the same check.
+5. **The nearest setting wins, as CSS has it.** A box's own style is written
+   on the box, the component's theme on the component's root, and an app's
+   on whatever holds its components, so a box's own colour stands in a themed
+   component. A theme at `:host` is the lowest declaration there is: a rule
+   the page writes for the element wins over it, while a value the page sets
+   only on an ancestor does not. An app that means to restyle a themed
+   component sets its tokens on that component's element.
+6. **An app's theme is set once.** The Library gives a composed app a theme
+   of the same shared roles, written on the app's root and in its code as one
+   `:root` rule, above each element's own tokens.
+
+**Alternatives considered:** a second set of names (`--wm-theme-*`) that a
+component's theme would read first, which lets an ancestor override a themed
+component but doubles the vocabulary every page has to learn; a theme kept
+in a module's config, which has no module to belong to; a new `--wm-` role
+for every orphan token, which grows the vocabulary without need where a
+shared role already says the same thing; following the foreground for a
+piano's black keys, which turns them light on any dark page; and a theme
+object in JavaScript, which nothing in CSS could override.
+
+**Consequences:** Kernel's `ProjectLayout` gains `style` (at most 256 custom
+properties, each a nonempty string of at most 256 characters); a runtime
+older than this refuses a project that has one. `@webmusic/bridge/component`
+gains `THEME_TOKENS`, `componentTheme`, `withComponentTheme`,
+`styleSettings`, `styleDeclarations` and `applyComponentStyle`, and the
+`ThemeToken` and `ThemeTokenKind` types. `--wm-scrim` is a new shared role.
+A page that already sets `--wm-danger`, `--wm-accent`, `--wm-border`,
+`--wm-foreground`, `--wm-foreground-muted`, `--wm-surface-muted` or
+`--wm-playhead` now restyles the parts listed in rule 1 as well. Studio's
+boxes set `--wm-component-border: 0` round what they show, and a theme that
+sets the frame is written nearer, so it shows on the canvas too. A nested
+component's interface objects carry their own style as top-level ones do.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md#palette) for the roles,
+[Developer tools](design/DEVELOPER-TOOLS.md#component-theme) for the theme,
+and the [Bridge API](../doc/src/content/docs/bridge/api.mdx).
+
+**Verification:** a Kernel test that `layout.style` round-trips and refuses
+what is not a custom property; Bridge tests that every listed role takes its
+fallback as a setting, that a theme is read, written and removed, that a
+mounted component carries its theme on its root and an interface object its
+style on its box, both without what loads, and that a defined element
+carries it at `:host`; UI, Score and Audio suites unchanged by the new
+fallbacks. Browser evidence in Studio: a theme of four roles restyles a
+roll, a keyboard, a scope, a dial and a toggle at once and is in the file; a
+dial's own colour stands over it; a value that loads is refused. In the
+Library: an app's theme restyles a player and its roll together and appears
+in the code as one `:root` rule. The owner's manual check O5 covers looking
+at it.
+
+## DEC-089 — A component made of objects meets the same contract as an official one
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked
+that every official Component be placed, the declarations `<score-effect>`,
+`<audio-effect>` and `<score-rack-part>` included, that `eq` open as much as
+it can, and that a component made of objects in Studio be brought into
+another graph and an app on the same terms as an official one, with objects
+as the logic between them. It extends DEC-076, DEC-081 and DEC-084.
+
+**Problem:** an audit after DEC-084 found four gaps between the two ways of
+authoring a component that DEC-081 rule 2 says meet one contract.
+
+1. A component's edge objects carried messages and audio only, so a
+   component made of objects had no note or source ports: it could not play
+   an outside synth, record outside notes, or hand its player's score to an
+   outside view.
+2. A nested component shown in its box showed only its interface objects;
+   the official components inside it were missing, and an exported page
+   showed every level's components at once, at the wrong place.
+3. Placing a user's component file copied it, and the copy's ports did not
+   follow the file's edge objects; editing the file never reached the copy.
+4. Library listed the packages' Elements and Studio its own listing, so a
+   component made in Studio was not offered where the official ones are.
+
+Three Elements had no manifest because they draw nothing of their own.
+
+**Decision:**
+
+1. **Notes and sources cross a component's edge.** Kernel `/objects` adds
+   `inlet.note n`, `outlet.note n`, `inlet.source n` and `outlet.source n`.
+   A shell's channel kinds are `message`, `audio`, `note` or `source`, and
+   its ports `in<n>` and `out<n>` take that family. A note channel repeats
+   notes; a source channel is a `SourceRelay` (Kernel `/module`), a module
+   that stands for whichever module is cabled into it and passes on its
+   ports, parameters, inserts and changes. `sourceOrigin(module)` reads
+   through relays to the module a source comes from.
+2. **The runtime carries sources.** A project module instance may name the
+   module a source cord from one of its ports carries (`sourceOutput`) and
+   may accept a source cord itself (`connectSource`). The runtime uses them
+   before the host's connector, which then receives the carried module. An
+   official box that forwards its Element's module carries it as a relay, so
+   a view inside a component follows a player outside it, and the reverse.
+3. **One rule for what a level shows.** Bridge `componentContents(project,
+   shell?)` lists what one level of a component shows — interface objects,
+   official components and nested components set to show theirs
+   (`config.embed`) — where its presentation puts them. `mountComponent`
+   shows the top level and draws a nested component as a framed cell of its
+   own level; Studio's boxes use the same function.
+4. **A placed file is followed by reference.** Studio records the file a
+   nested component was placed from and when it was read (`config.link`).
+   Opening a component brings every linked component up to date with its
+   file — objects, cords, presentation, assets — and the file's edge objects
+   become the shell's ports; cords to a port that still exists stay, and a
+   file that is gone leaves the last copy. Opening a linked component opens
+   its file. The project still holds the contents, so an exported component
+   needs no file.
+5. **One listing.** The studio site's listing reads the official components
+   from their manifests and the user's component files from the store Studio
+   keeps. Studio's Component Library and Library draw from it: Library lists
+   the user's own under Mine, each opening in Studio, and names on each
+   official card the box a graph places it as. Community components are
+   listed when there is a place that holds them.
+6. **Declarations are wrapped as they are.** `effect` (`<score-effect>`) and
+   `audio-effect` (`<audio-effect>`) take the player or track their cord comes
+   from as `moduleTarget` and add one insert to its chain; a `panel` cabled to
+   the same player shows its controls. `part` (`<score-rack-part>`) is placed
+   inside a `<score-rack-control>` of its own, as the declaration needs, which
+   gives it a channel strip and plays its score in the graph's Session through
+   the box's output. A manifest may name such a `container`.
+7. **`eq` opens.** Its `effects` argument lists Score effect types, separated
+   by commas, which play before its EQ; its `sections` are a setting
+   (DEC-085). A manifest's word parameter may be such a `list`, and a
+   manifest may `configure` Element properties a config describes.
+
+**Alternatives considered:** one edge object with a family argument
+(`inlet 0 note`), which changes the meaning of existing `inlet` boxes;
+handling source cords only in the Bridge's connector, which cannot see
+through a component's edge; flattening nested components when they are
+shown, which DEC-076 rejected; keeping placed files as copies, which leaves
+a component made once and used in many graphs out of date; a second listing
+in Library, which is the gap itself; leaving the declarations as objects,
+which leaves three Elements of the documentation without a component.
+
+**Consequences:** Kernel's project instance type gains `sourceOutput` and
+`connectSource`, and Kernel `/module` gains `SourceRelay` and
+`sourceOrigin`. A nested component not set to show its contents shows nothing
+in an exported page; one set to show them is a framed cell there as in
+Studio. Studio's `config.link` is its own record; other hosts read and keep
+it but do not follow it. The demo music rule applies to the documentation's
+static showcases; what users load into Studio and apps is theirs (the
+owner's clarification of 2026-11-22).
+
+**Owner:** [Organization](design/ORGANIZATION.md#nested-components) for the
+edges, [Developer tools](design/DEVELOPER-TOOLS.md#component-manifest) for
+the manifest and listing.
+
+**Verification:** Kernel tests that notes cross `inlet.note` and
+`outlet.note` and a source crosses `inlet.source` and `outlet.source` to a
+companion outside, following a replacement; Bridge tests that official
+components inside a component of objects follow a player, a track and keys
+outside and hand the score out again, that a nested component set to show
+its contents is a cell holding them, that the declarations are placed and an
+`eq` takes its effects; Studio tests that encapsulation gives note and source
+cords edge objects, that a file fills a nested component with its ports and
+presentation and is followed when newer, and that a nested box shows its
+official and nested components; Library tests of the listing. Browser
+evidence: an effect, a panel, a part, an `eq` with a delay and a nested
+component holding a roll that follows the player outside, with Arabesque
+No. 1. The owner's manual checks cover linking a file in Studio and Library's
+Mine section.
+
+## DEC-090 — Whose style is shown is the author's choice, box by box and component by component
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked that
+the user choose the priority, for example selecting every component and
+having them follow the app's style. It refines DEC-088 rule 5.
+
+**Problem:** under DEC-088 the nearest setting always won: a box's own style
+over its component's theme, a component's theme over the app's. That is
+right while a part is being designed and wrong when the whole is: an app
+assembled from components that each bring a theme cannot be made one thing,
+and a component cannot fall back to its theme without deleting every style a
+box was given.
+
+**Decision:**
+
+1. **Each part chooses its style source.** A box, and a component, shows its
+   `own` style or `inherit`s that of what holds it. `own` is the default and
+   is the absence of a key, so every existing project and page is unchanged.
+2. **A box.** `styling: 'inherit'` in a box's config sets its own `style`
+   aside: an official component's Element and an interface object's box are
+   written nothing of their own, and take the component's theme. A
+   component's attributes stay; they are what it does.
+3. **A component.** `styling="inherit"` on a defined component element, or
+   `styling: 'inherit'` in `mountComponent`'s options, sets aside both the
+   component's theme and every box's own style, so only what the page or app
+   sets reaches it. `ComponentHandle.setStyling` and the attribute change it
+   in place: nothing is rebuilt.
+4. **Nothing is lost by choosing.** The style set aside stays in the project
+   and in the editor's fields, shown and not in effect; choosing `own` again
+   brings it back. Saving a component that inherits saves its own theme and
+   styles as they were.
+5. **A selection chooses at once.** Studio gives the choice to one box or to
+   every styled box of a selection in one undo step; the Library gives it to
+   one element or to every element of an app.
+
+**Alternatives considered:** a number per level, which says more than there
+is to say when there are two sources at each step; `!important` on the app's
+rule, which a page cannot then undo; deleting a box's style to follow the
+theme, which loses the work; a property of the project that makes it always
+inherit, which is the app's choice and not the component's; and a `theme`
+attribute, which `<audio-meter>` already uses for something else.
+
+**Consequences:** `@webmusic/bridge/component` gains `styleSource`,
+`withStyleSource`, `ownStyle` and the `StyleSource` type; `componentSettings`
+returns no style for a box that inherits; `MountComponentOptions` gains
+`styling`, `ComponentHandle` gains `setStyling`, and a defined element
+observes `styling`. The config key `styling` is reserved in the records of
+official components and interface objects. The Library writes no custom
+properties on an element that follows the app; a graph-authored component in
+an app will carry `styling="inherit"` when apps are made of them (STATUS
+LAYER-01). An appearance attribute an Element has, such as a note colour, is
+an attribute and stays while the box inherits.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#component-theme) and
+the [Bridge API](../doc/src/content/docs/bridge/api.mdx).
+
+**Verification:** Bridge tests that the choice is read and written and keeps
+the style it sets aside; that one box follows the theme while the others
+keep their own; that a mounted component inherits and takes its own style
+back in place with the same elements, and saves its own theme either way;
+and that a defined element follows its `styling` attribute. Browser evidence
+in Studio: a dial switched to follow the theme takes its colour, keeps its
+own in the record and gets it back; a whole selection follows at once and
+one undo returns it. In the Library: an element set to the app's style loses
+its own property on the canvas and in the code and gets it back, and every
+element is set at once from the app.
+
+## DEC-091 — An app is assembled in the same editor a component is, from the Library
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked for
+the App page to work as the component editor does, its purpose being to bring
+components together into a whole music app, with components added from a
+menu that opens the Library. It carries out DEC-081's definition of an app.
+
+**Problem:** DEC-074 and DEC-081 define an app as a project whose boxes are
+all components, cabled together on one Session, and the packages can mount
+and export one (DEC-084). The App page did not build one. It was the
+Library: a catalogue of components, each with a page that composed one
+element with the players it needs as nested markup. Nothing there could
+place two components side by side, cable a view to a player, lay a page out,
+keep the result or run it as one thing.
+
+**Decision:**
+
+1. **One editor, two documents.** An app is edited by the component editor's
+   own code, told by its page that the document is an app. The canvas, the
+   cords, the Inspector, undo, files, templates, export and the run as the
+   exported element are the same. What differs is stated in one place:
+   nothing but components is placed, and the files are the app's own.
+2. **Only components.** A box an app holds is an official component, with
+   its arguments, or one of the user's own components placed by reference.
+   Typing an object's name places nothing and opens the Library; an object
+   copied in the component editor is not pasted. The speakers remain, as in
+   every project.
+3. **The Library is where components come from.** The editor's Library
+   button lists the official components and the user's own, and opens the
+   Library — the catalogue, with each component's live demo, parameters,
+   style and code — in place over the workbench. A component's page there
+   has `Add to app`: it places that component with the type, attributes and
+   tokens it was shown with, as the box's own settings (DEC-085). Opened on
+   its own, the Library sends the choice to the editor with the visitor.
+4. **A placed component is cabled when there is no choice to make.** A
+   companion follows the app's one player through its `source` cord; a
+   component that only listens hears the app's one sound source, as a send.
+   With more than one candidate nothing is cabled, and the author does it.
+5. **The layout is the app.** An app has no interface apart from its
+   components: where a box is placed on the canvas is where the running app
+   shows it. Its two pages are Design and Run; it has no Interface or Debug
+   page and no Console.
+6. **An app's files are its own.** They live in the same browser storage
+   under their own names, with their own templates and window layout. The
+   user's components are read where the component editor wrote them, and a
+   component of the user's placed in an app is opened for editing there.
+
+**Alternatives considered:** a second editor written for apps, which would
+drift from the first in every detail of selection, cords and undo; a layout
+tool with no cords, which cannot express a view following a player and so
+is not the app DEC-081 defines; the catalogue rebuilt inside the editor,
+which duplicates a page that already draws, searches and demonstrates every
+component; adding a component with its defaults only, which discards what
+was set while it was looked at; and letting an app hold objects, which makes
+it a component by another name.
+
+**Consequences:** the App tab's address is the editor, and the Library is a
+page of that section, shown in place by the editor and still reachable on
+its own. `keepComponentSessionPreloaded` asks again, up to twenty times a
+tenth of a second apart, while a member's document is still being applied
+(DEC-086), instead of reporting that moment as a failure: an editable view
+added beside a player made it visible. A player typed by name has its music,
+as one taken from the library has. A component whose Element no box places
+(a rack part, an effect) cannot be added and says so. A parameter a box
+takes as an argument (a keyboard's range) is not carried over from the
+Library's page; it is set in the Inspector. Community components are still
+not listed: there is no place that holds them. The application is in the
+private repository (DEC-072); this entry records the product contract.
+
+**Owner:** [Developer tools](design/DEVELOPER-TOOLS.md#components-outside-studio)
+for what an app is; the private repository's README for the editor.
+
+**Verification:** a Bridge test that a preload is asked again while a
+document is not ready and that any other failure is reported. In the private
+repository, tests of the rules (what text is a component, what project is an
+app, the starter and templates, separate storage, a Library choice turned
+into a box with only the settings a box may hold), of the Library panel
+(shown on demand, a choice taken only from its own frame and origin) and of
+placing a configured component in one undo step. Browser evidence: the
+editor opens on a player, its roll and a meter, cabled and with music; a
+spectrum meter and a sheet set in the Library are added with their settings
+and cabled; a choice made in the Library opened on its own arrives in the
+editor; an object's name typed on the canvas places nothing; Run shows the
+app as the exported element; no error is logged.
+
+## DEC-092 — An app is designed as a web page: boxes, text, images and components
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who rejected
+DEC-091's editor on the day it was made: an app is not built by the logic of
+Max, as a component is, but by that of a website builder — boxes laid out as
+a web page is, holding text and images as well as components — so that a
+whole music web app can be made. It supersedes DEC-091 rules 1, 2 and 5 and
+refines DEC-081's definition of an app.
+
+**Problem:** DEC-091 gave an app the component editor: boxes on a canvas and
+cords between them. That is how a graph is built, and the person assembling
+an app is laying out a page. A page needs containers that arrange what they
+hold, headings, paragraphs and pictures; a canvas of absolutely placed boxes
+has none of them, and DEC-081's rule that an app is made only of components
+left no room for a title.
+
+**Decision:**
+
+1. **An app is a page.** It is a tree of boxes. A box lays out what it holds
+   in a row or a column, with a gap, padding and alignment, as a flex
+   container does; what it holds is other boxes, text (a heading or a
+   paragraph), images and components. Nothing is positioned by coordinates.
+2. **Only components make music.** The components of an app are a module
+   project, as before: one graph on one Session, mounted by the packages.
+   Text, images and boxes play nothing and are not modules. DEC-081's "an
+   app is made only of components" now reads: only components run in it.
+3. **Connections are chosen, not cabled.** What a component follows or hears
+   is a choice in its inspector — `follows`, `hears`, `notes from`, one for
+   each inlet — which writes the project's connection. A component added
+   from the Library is connected when there is no choice to make (DEC-091
+   rule 4, kept).
+4. **The page is kept in the project.** `layout.page` holds the tree. Kernel
+   keeps it as plain data under the project's limits and reads none of it;
+   the host reads it as untrusted input. So an app is still one project
+   document: one file, one history, one export.
+5. **A node carries only what is safe to show.** Its style is drawn from a
+   short list of CSS properties for layout, size, face and type, and `--wm-`
+   tokens (so a box can theme what it holds, DEC-088); a value may not end
+   its declaration or load anything. An image's address is a web address, a
+   path of the site or a small image in the document. A component node
+   names a module and nothing else.
+6. **The exported app is a web page.** Its boxes, text and images are
+   written as plain HTML with their styles inline, with an empty place for
+   each component, and one script runs the project and puts each component
+   in its place. For that, `mountComponent` takes `place`: given, it draws
+   no frame, transport or stage of its own, puts each shown box's Element in
+   the element the host returns for it, and writes the theme on the host.
+7. **The editor has the page builder's three panes.** Layers (the tree), the
+   page itself, and an inspector for the selection: a box's layout, a text's
+   words and type, an image's address, a component's connections and its
+   own settings. Design selects and arranges; Preview is the page, live.
+   Components are added from the Library, as under DEC-091 rule 3.
+
+**Alternatives considered:** free placement by coordinates, which is how a
+canvas works and does not reflow to a phone; a grid of fixed cells, which is
+simpler to draw and cannot nest; the page in a file of its own beside the
+project, which doubles every path that saves, copies, undoes or exports an
+app; text and images as modules of the project, which gives the graph boxes
+that play nothing; cords drawn over the page, which brings the graph back;
+and arbitrary CSS or HTML in a node, which makes a shared app a way to run
+someone else's markup.
+
+**Consequences:** Kernel's `ProjectLayout` gains `page`, an object kept
+whole; a runtime older than this refuses a project that has one.
+`MountComponentOptions` gains `place`. A project's module positions
+(`layout.modules`) mean nothing to an app, which places by the page; a
+project with no page, or one that does not read, is given a first page of
+its name and its components. An image kept in the document is limited by the
+project's 65 536-character strings, so photographs are linked, not embedded.
+The exported page needs a published release that has `place`. The component
+editor's app profile from DEC-091 is no longer reached by any page. The
+application is in the private repository (DEC-072); this entry records the
+product contract and the two public additions.
+
+**Owner:** [Product](PRODUCT.md#objects-components-and-apps) for what an app
+is, [Developer tools](design/DEVELOPER-TOOLS.md#components-outside-studio)
+for `place`, and the private repository's README for the editor.
+
+**Verification:** a Kernel test that `layout.page` round-trips, must be an
+object and stays under the project's limits; a Bridge test that `place`
+puts each box where the host says, draws no frame, leaves out a box given
+no place, themes the host and takes its cells back on destroy. In the
+private repository, tests of the page model (what a node may carry, reading
+untrusted data, inserting, styling, moving and removing, agreeing with the
+project) and of the export. Browser evidence: a box set to a row with a gap
+and a background, text and an image inside it, a value that loads refused;
+a roll set to follow nothing and then the player; a component moved into a
+box and its Element kept; a component deleted and brought back by undo; a
+spectrum meter added from the Library into the selected box and connected;
+Preview live; the exported page holding the boxes, a place for each
+component and the project without its page.
+
+## DEC-093 — An app holds the user's own components as it holds official ones
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked
+that apps be aligned with the layers after DEC-089 and DEC-092. It completes
+DEC-081 rule 6 for apps under DEC-092.
+
+**Problem:** DEC-092's App editor placed, listed and connected only official
+components: its list of an app's components, the Inspector's connection
+choices and the Library's "Add to app" all went through component manifests.
+A component made of objects in Studio — which DEC-089 gave every port family,
+a box of its own and a place in the listing — could not be put in an app,
+though DEC-081 rule 6 says a component exported from Studio can be placed in
+one, and DEC-092 names the components of an app as those chosen in the
+Library, official or not.
+
+**Decision:**
+
+1. **A component is read by its ports, whoever made it.** Bridge
+   `componentPorts(record)` gives an official component's ports from its
+   manifest and a graph-authored component's — a `component` object — from
+   the channel kinds its config lists, as `in<n>` and `out<n>`. A host that
+   lists or connects an app's components uses it, so it treats both alike.
+2. **The Library offers the user's own components to an app.** Its Mine
+   section adds one to the app as its official cards do: shown in the App
+   editor, the choice is handed to it; on its own, the Library opens the
+   editor with it. The choice names the Studio file.
+3. **In an app it is a linked nested component.** The App editor places it
+   as Studio does under DEC-089: a `component` object filled from the file,
+   showing what its presentation shows, following the file, and connected
+   when there is no choice to make (DEC-091 rule 4). Opening the app brings
+   it up to date with its file. Its inlets are chosen in the Inspector like
+   any component's, and the exported page places it through `place` with
+   the components it holds.
+
+**Alternatives considered:** flattening a user's component into the app's
+own graph, which loses the component boundary, its file and its ports;
+listing it in the app without connections, which leaves its source or notes
+unreachable; a second kind of page node for it, which the page builder does
+not need, since a page node names a module and a nested component is one.
+
+**Consequences:** Bridge `/component` gains `componentPorts`. The studio
+site's shared listing gains `readUserComponent`, the Library's add message may
+name a file instead of a tag, and the App editor reads Studio's component
+files to place and refresh them. Community components follow when a place
+holds them.
+
+**Owner:** [Product](PRODUCT.md#objects-components-and-apps) for what an app
+holds, [Developer tools](design/DEVELOPER-TOOLS.md#component-manifest) for
+`componentPorts`, and the private repository's README for the editor.
+
+**Verification:** a Bridge test that `componentPorts` reads an official and a
+graph-authored component and nothing else; Library tests that a user's file
+is read with what it holds and that a user choice has no official placement;
+the private suites. Browser evidence: a user's component added to an app from
+the Library's add path, drawn on the page with its roll following the app's
+player, its inlet offered in the Inspector, and, after its file changed,
+brought up to date on reopening with its cord kept.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.
+
+File each new identifier under one topic in `DECISION_TOPICS` in
+[scripts/docs-catalog.mjs](../scripts/docs-catalog.mjs), then run
+`npm run docs:sync`; `npm run check:dev-docs` fails while a decision is unfiled.
+Keep verification totals and browser observations in a dated
+[audit](audits/README.md) and link it from the entry, so the register states
+the choice and its reason.

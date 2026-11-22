@@ -297,6 +297,31 @@ describe('<audio-clip-view>', () => {
     expect(editor.getSnapshot().status).toBe('ready');
   });
 
+  it('draws an empty clip while its audio has not arrived, and the audio when it does (DEC-082)', () => {
+    const view = element(); document.body.append(view);
+    expect(view.querySelector('[data-audio-clip]')).not.toBeNull();
+    expect(view.clip).toBeUndefined();
+    const waiting = view.querySelector<HTMLElement>('[part="waiting"]')!;
+    expect(waiting.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    expect(waiting.style.pointerEvents).toBe('none');
+    view.clip = clip();
+    expect(view.querySelector('[part="waiting"]')).toBeNull();
+    expect(view.querySelector('[data-audio-clip]')).not.toBeNull();
+    view.clip = undefined;
+    expect(view.querySelector('[part="waiting"]')).not.toBeNull();
+    view.remove();
+  });
+
+  it('replaces the empty clip drawn while waiting for an editor once the editor is ready', () => {
+    const editor = createAudioClipEditor(clip());
+    cleanups.push(() => editor.dispose());
+    const view = element(); view.editor = editor; view.editable = true;
+    document.body.append(view);
+    expect(view.querySelector('[part="waiting"]')).toBeNull();
+    expect(view.getAttribute('data-editable-state')).toBe('ready');
+    view.remove();
+  });
+
   it('draws an assigned clip read-only and rejects a conflicting editor', () => {
     const view = element(); view.clip = clip(); document.body.append(view);
     expect(view.querySelector('[data-audio-clip]')).not.toBeNull();

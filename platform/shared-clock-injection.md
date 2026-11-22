@@ -6,7 +6,7 @@
 borrow its reference-time anchor; independent Sessions may share an audio context
 without sharing transport authority. [DEC-064](../dev/DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
 records the accepted protocol. [STATUS](../dev/STATUS.md) owns current verification;
-the [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) owns exact
+the [Kernel API](../doc/src/content/docs/kernel/api.mdx) owns exact
 public members.
 
 ## Layers and ownership
@@ -146,5 +146,5 @@ measurement remains necessary for acoustic latency and hardware claims.
 Project restore builds a fresh owned Session and graph from serializable state;
 it does not restore active voices or transfer a live writable clock. Default
 restore remains paused. See [the modular contract](../dev/design/MODULAR-COMPOSITION.md)
-for graph ownership and [the runnable guide](../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+for graph ownership and [the runnable guide](../doc/src/content/docs/bridge/modular-composition.mdx)
 for application-owned storage and editing.

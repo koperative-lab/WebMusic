@@ -1,0 +1,23 @@
+---
+// The composition the page documents: the player owns the instrument, the note
+// input plays it, and the panel edits its sound and envelope. Nested, the
+// panel and the keys find the player's instrument through the module context.
+import ElementDemo from './ElementDemo.astro';
+
+const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+---
+
+<ElementDemo tag="score-synth-panel">
+  <score-player src={SRC}>
+    <score-note-input layout="piano" start="48" end="71"></score-note-input>
+    <score-synth-panel sections="sound,envelope"></score-synth-panel>
+  </score-player>
+</ElementDemo>
+
+<script>
+  import {defineNoteInputElement, defineScorePlayerElement, defineSynthPanelElement} from '@webmusic/score/play/element';
+
+  defineScorePlayerElement();
+  defineNoteInputElement();
+  defineSynthPanelElement();
+</script>

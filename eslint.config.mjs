@@ -13,7 +13,7 @@ export default tseslint.config(
       // Hidden local worktree copies of this repository are not its source.
       '.*/worktrees/**',
       '**/*.d.ts',
-      'apps/**/public/**',
+      'doc/public/**',
       // Temporary standalone export; it has its own ESLint config and will be
       // moved out of this repository.
       'WebMusic-Marketing-Site/**',

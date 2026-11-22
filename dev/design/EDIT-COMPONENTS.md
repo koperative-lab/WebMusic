@@ -12,7 +12,7 @@ Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and
 [DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
 places editing inside View rather than a separate capability, and
 [DEC-057](../DECISIONS.md#dec-057--editable-documents-are-an-api-not-a-web-component),
-which replaces the document Web Components with loading APIs, and
+which replaces the document Components with loading APIs, and
 [DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view).
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
@@ -29,14 +29,14 @@ Source reuse starts with [ScoreEditSession](../../packages/score/src/core/model/
 [Score](PLAY-COMPONENTS.md) / [Audio](AUDIO-PLAY-COMPONENTS.md) players.
 Public references and demos ship with the corresponding implementation, using
 the [documentation templates](../docs/README.md).
-The Score surface is documented in the [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+The Score surface is documented in the [View API](../../doc/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](../../doc/src/content/docs/score/headless/view/score-editor.mdx)
 references. Score bindings are described by the
-[native player](../../apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx)
-and the [grid View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx).
-Audio public contracts are documented in the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
-[AudioClipEditor](../../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
-and the [Play export API](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx).
+[native player](../../doc/src/content/docs/score/headless/play/score-player.mdx)
+and the [grid View](../../doc/src/content/docs/score/element/view/score-grid-view.mdx).
+Audio public contracts are documented in the [View API](../../doc/src/content/docs/audio/api/view.mdx),
+[AudioClipEditor](../../doc/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
+and the [Play export API](../../doc/src/content/docs/audio/api/play.mdx).
 ## User task and boundary
 
 The first Score workflow imports MIDI, edits authored notes in a piano roll,
@@ -330,6 +330,15 @@ keeps eventual content at origin while it remains the latest position intent;
 a later valid seek supersedes it. Applying content never creates/resumes an
 AudioContext just to edit. Playback readiness and resource preload remain explicit.
 
+A player that follows a Session does not own the transport the protocol
+pauses (DEC-086). Step 1 is then the Session's pause: the player asks the
+member that joined the Session (`setSessionRequests`), which pauses it when it
+is playing, and writes no transport itself. Step 3 adopts the candidate in the
+Session's scheduler at the Session's own position, which is not mapped through
+the edit, and has the member read again for its length. `play()` on the
+player still belongs to the Session. Without a member's requests the revision
+is adopted without a pause.
+
 The existing native single-ScorePlayer gains paused timeline adoption, preserving
 player, publisher, scheduler/clock reader, synth and graph identity. Scope preload
 work by content generation. Replacing the scheduler would strand existing clock
@@ -353,9 +362,9 @@ for a sequence, never its first asset. Clip-only companions report unavailable;
 graph meters can continue, and sequence-aware View reads the sequence directly.
 Static PCM analysis uses an explicit render adapter.
 
-## Web Components and source selection
+## Components and source selection
 
-There is no document Web Component (DEC-057). An application creates and owns
+There is no document Component (DEC-057). An application creates and owns
 the editor through the Headless API, then lends it to Elements through the
 `.editor` property. The owning public references list each shipped member.
 

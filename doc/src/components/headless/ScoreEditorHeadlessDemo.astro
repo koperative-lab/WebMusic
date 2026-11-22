@@ -1,0 +1,77 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+
+<HeadlessDemoFrame
+  entry="@webmusic/score/view/headless"
+  name="ScoreEditor"
+  rootAttrs={{'data-score-editor-demo': true}}
+>
+  <section class="wm-editor-demo" aria-label="Editable Score document">
+    <p data-edit-summary>Preparing document.</p>
+    <ul data-edit-notes aria-label="Current notes"></ul>
+    <p data-edit-last></p>
+    <div class="wui-row"><button class="wui-btn" type="button" data-edit-action="edit" disabled>Move first note</button><button class="wui-btn" data-variant="ghost" type="button" data-edit-action="undo" disabled>Undo</button><button class="wui-btn" data-variant="ghost" type="button" data-edit-action="redo" disabled>Redo</button></div>
+  </section>
+</HeadlessDemoFrame>
+
+<script>
+  import {createScoreEditor} from '@webmusic/score/view/headless';
+  import {mountDemos} from '../demo-lifecycle';
+  import {arabesqueExcerpt, loadArabesqueScore} from './arabesque-score';
+
+  mountDemos('[data-score-editor-demo]', async (root, scope) => {
+    const summary = root.querySelector<HTMLElement>('[data-edit-summary]')!;
+    const notes = root.querySelector<HTMLElement>('[data-edit-notes]')!;
+    const last = root.querySelector<HTMLElement>('[data-edit-last]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-edit-action]')];
+    const fail = (text: string): void => { feedback.hidden = false; feedback.textContent = text; };
+    // The opening four quarters of Arabesque No. 1.
+    const opening = arabesqueExcerpt(await loadArabesqueScore('midi'), 4);
+    if (!scope.active) return;
+    const editor = createScoreEditor(opening, {history: {limit: 100}, onListenerError: (error) => fail(String(error))});
+    scope.add(() => editor.dispose());
+    const paint = (): void => {
+      if (!scope.active) return;
+      const state = editor.getState();
+      summary.textContent = `revision ${state.document.documentRevision} · ${state.dirty ? 'unsaved' : 'saved'} · ${state.history.undoCount} undo / ${state.history.redoCount} redo`;
+      notes.replaceChildren(...state.document.content.notes.map((note) => {
+        const item = document.createElement('li');
+        item.textContent = `${note.id}: ${note.pitch?.toString() ?? 'rest'} · q${note.onsetQuarters.toString()}`;
+        return item;
+      }));
+      last.textContent = state.document.change ? `${state.document.change.origin}: ${state.document.change.label}` : 'No edits yet.';
+      for (const button of buttons) {
+        const action = button.dataset.editAction;
+        button.disabled = action === 'undo' ? !state.history.canUndo : action === 'redo' ? !state.history.canRedo : false;
+      }
+    };
+    scope.add(editor.subscribeState(paint));
+    for (const button of buttons) {
+      scope.listen(button, 'click', () => {
+        feedback.hidden = true;
+        const action = button.dataset.editAction;
+        const snapshot = editor.getSnapshot();
+        const first = editor.score.notes[0];
+        // One undoable edit: move the first note a quarter later.
+        const result = action === 'undo' ? editor.undo() : action === 'redo' ? editor.redo()
+          : editor.execute({version: 1, documentId: snapshot.documentId, expectedRevision: snapshot.documentRevision, label: 'Move first note',
+            operations: first ? [{type: 'move-notes', noteIds: [first.id], deltaQuarters: [1, 4]}] : []});
+        if ('error' in result && result.error) fail(`${result.status}: ${result.error.message}`);
+        paint();
+      });
+    }
+    paint();
+  });
+</script>
+
+<style>
+  .wm-editor-demo { display: grid; gap: .5rem; font-size: .85rem; min-width: 0; }
+  .wm-editor-demo p, .wm-editor-demo ul { margin: 0; }
+  .wm-editor-demo li { overflow-wrap: anywhere; }
+  .wm-editor-demo__fields { display: grid; gap: .5rem; }
+  .wm-editor-demo__fields label { display: grid; gap: .25rem; font-size: .8rem; }
+  .wm-editor-demo__fields textarea { width: 100%; box-sizing: border-box; font: inherit; }
+  .wm-editor-demo__actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+</style>

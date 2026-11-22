@@ -1,0 +1,20 @@
+---
+import ElementDemo from '../ElementDemo.astro';
+import ElementComposition from '../ElementComposition.astro';
+const playerId = 'pg-pitch-view-player';
+const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+---
+
+<ElementDemo tag="score-pitch-view">
+  <ElementComposition>
+    <score-player id={playerId} src={SRC}></score-player>
+    <score-pitch-view input={`#${playerId}`}></score-pitch-view>
+  </ElementComposition>
+</ElementDemo>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {definePitchViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  definePitchViewElement();
+</script>

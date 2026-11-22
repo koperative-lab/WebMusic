@@ -1,0 +1,42 @@
+---
+// createScoreAudioSession: the opening of Arabesque No. 1's MIDI rendered as a
+// clip and conducted with its muted Score player by one Session. The stage
+// holds the Session's own commands, its rate and its loop.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/bridge"
+  name="createScoreAudioSession"
+  rootAttrs={{'data-bridge-composition': true}}
+>
+  <div class="composition-demo__body">
+    <div class="wui-row">
+      <button class="wui-btn" type="button" data-load>Load</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-replace disabled>Replace source</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-attach disabled>Attach Score views</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-dispose disabled>Dispose</button>
+      <select class="wui-select" data-rate disabled aria-label="Session rate"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+      <label class="wui-row"><input type="checkbox" data-loop disabled /> Loop</label>
+    </div>
+    <div data-transport></div>
+    <output class="wui-readout" data-position>No active session</output>
+    <output class="wui-readout" role="status" data-status></output>
+    <div data-wave-surface role="img" aria-label="Rendered backing track and its playback position"></div>
+    <div data-playback-owner hidden></div>
+    <div class="composition-demo__views" data-score-views></div>
+  </div>
+</HeadlessDemoFrame>
+<script>
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {mountBridgeComposition} from './bridge-composition-client';
+  mountProgrammaticDemo('[data-bridge-composition]', mountBridgeComposition);
+</script>
+<style>
+  .composition-demo__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; width: 100%; min-width: 0; }
+  .composition-demo__body [data-wave-surface] :global(canvas) { display: block; max-width: 100%; }
+  .composition-demo__body > .wui-row { flex-wrap: wrap; }
+  .composition-demo__body output { display: block; }
+  .composition-demo__body output:empty { display: none; }
+  .composition-demo__views { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .composition-demo__views :global(score-view), .composition-demo__views :global(score-chord-analysis) { margin-top: 0.5rem; }
+</style>

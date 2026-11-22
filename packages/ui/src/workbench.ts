@@ -1445,8 +1445,16 @@ export function mountWorkbench(
     feedbackState = phase === 'loading' || phase === 'waiting'
       ? {kind: phase, message: said || undefined} : {kind: 'ready'};
     feedback.update();
+    // A waiting stage that already holds the caller's surface keeps it, with
+    // the indicator laid over it (DEC-082); loading, or a stage with nothing
+    // in it yet, shows the indicator in its place (DEC-052).
+    const over = phase === 'waiting' && stage.childElementCount > 0;
     setHidden(feedbackHost, !pending);
     setStyleValue(feedbackHost, 'display', pending ? 'flex' : 'none');
+    setStyleValue(main, 'position', over ? 'relative' : undefined);
+    for (const [name, value] of [['position', 'absolute'], ['inset', '0'], ['pointer-events', 'none']] as const) {
+      setStyleValue(feedbackHost, name, over ? value : undefined);
+    }
     if (inline) {
       setStyleValue(feedback.element, 'display', pending ? 'flex' : 'none');
       setStyleValue(feedback.indicator, 'border', phase === 'waiting' ? '1px solid currentColor' : '0');
@@ -1455,7 +1463,7 @@ export function mountWorkbench(
           .map((position) => `linear-gradient(currentColor, currentColor) ${position} / 40% 40% no-repeat`).join(', ')
         : 'transparent');
     }
-    setHidden(stage, pending);
+    setHidden(stage, pending && !over);
     setText(message, pending ? '' : said);
     setText(detail, told);
     setHidden(detail, told === '');

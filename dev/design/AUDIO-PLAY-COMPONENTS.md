@@ -7,8 +7,8 @@ acceptance belong to [STATUS](../STATUS.md).
 Layer and public entries: Audio Play Headless, Elements and neutral UI bindings.
 Related decisions: DEC-004, DEC-007, DEC-009, DEC-011, DEC-025, DEC-029, DEC-030 and DEC-031.
 Source: [Audio Play](../../packages/audio/src/play/).
-Public owners: [Play Elements](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#play)
-and [Headless inventory](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx).
+Public owners: [Play Elements](../../doc/src/content/docs/audio/element/index.mdx#play)
+and [Headless inventory](../../doc/src/content/docs/audio/headless/index.mdx).
 
 DEC-063 introduced [modular composition](MODULAR-COMPOSITION.md) and DEC-068
 makes it the only model. The source-free aggregate role uses Headless
@@ -104,7 +104,7 @@ and clear their flags when the current operation settles or is released.
 AudioMixer owns mix state. `snapshot()` returns immutable master/member values,
 solo identity and effective gains; `change` invalidates that readback. Elements
 retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple
-presenters and custom UI observe the same Headless object. A source's direct
+presenters and custom UI observe the same Headless instance. A source's direct
 out-of-band gain changes are not a second mixer-state authority.
 
 ## Document playback (DEC-053)
@@ -113,8 +113,8 @@ out-of-band gain changes are not a second mixer-state authority.
 [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
 define the document-owned audio sequence and borrowed playback implemented in P3.
 Current verification belongs to [STATUS EDIT-01](../STATUS.md). Public members and
-limits are owned by [AudioPlayer](../../apps/doc/webmusic/src/content/docs/audio/headless/play/audio-player.mdx)
-and [its Element](../../apps/doc/webmusic/src/content/docs/audio/element/play/audio-player.mdx);
+limits are owned by [AudioPlayer](../../doc/src/content/docs/audio/headless/play/audio-player.mdx)
+and [its Element](../../doc/src/content/docs/audio/element/play/audio-player.mdx);
 clip/queue/mix use remains supported.
 
 `AudioClipEditor` owns immutable asset/segment content, transactions and optional

@@ -94,8 +94,8 @@ flows, keyboard and focus behavior in the target environment.
 ## Documentation
 
 Maintain documentation in English, preserving API identifiers. Public site
-pages live in [apps/doc/webmusic/src/content/docs/](apps/doc/webmusic/src/content/docs/);
-[apps/README.md](apps/README.md) explains routes and local development. Update the
+pages live in [doc/src/content/docs/](doc/src/content/docs/);
+[doc/README.md](doc/README.md) explains routes and local development. Update the
 owning component, Headless, presenter or API page instead of copying a complete
 contract into another guide. Use repository-relative links in repository guides
 and site routes in published pages. Every public reading path must resolve
@@ -151,7 +151,7 @@ with `npm ci`, then runs `npm run check`, `npm run check:external-install` and
 main's collector for the actual bundled modules.
 
 Only a `main` push or a manual run selected from `main` in
-`koperative-lab/WebMusic` uploads `apps/doc/webmusic/dist/` as the Pages artifact
+`koperative-lab/WebMusic` uploads `doc/dist/` as the Pages artifact
 and deploys it. Deployment waits for every quality matrix entry and the
 documentation job to succeed. Pull requests, other branches and forks run the
 checks without publishing a site. In-progress runs on `main` are not cancelled

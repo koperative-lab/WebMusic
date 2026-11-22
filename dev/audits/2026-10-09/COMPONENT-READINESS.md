@@ -95,9 +95,9 @@ The composed-owner regressions live in
 [Audio player lifecycle](../../../packages/audio/test/play/clip-player-element.test.ts)
 and [Score player lifecycle](../../../packages/score/test/play/score-player-lifecycle.test.ts).
 Actual demo scripts are exercised by
-[Audio view/workbench fixtures](../../../apps/doc/webmusic/test/audio-view-demo-fixture.test.ts),
-[Audio mixer preparation](../../../apps/doc/webmusic/test/audio-mixer-demo.test.ts)
-and [the waterfall composition](../../../apps/doc/webmusic/test/waterfall-keyboard-demo.test.ts).
+[Audio view/workbench fixtures](../../../doc/test/audio-view-demo-fixture.test.ts),
+[Audio mixer preparation](../../../doc/test/audio-mixer-demo.test.ts)
+and [the waterfall composition](../../../doc/test/waterfall-keyboard-demo.test.ts).
 
 With stable rebuilt package output, all 4,546 workspace tests passed (158 Kernel,
 714 UI, 2,273 Score, 965 Audio, 182 Bridge and 254 documentation tests).

@@ -1,7 +1,8 @@
 import {afterEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {
   AudioOutputPort, ModuleAudioEnvironment, ModuleProjectRuntime, ParamHandle, ParamSurface,
-  ProjectPluginRegistry, createConnectionLease, parseModuleProject, serializeModuleProject,
+  ProjectModuleUnavailableError, ProjectPluginRegistry, createConnectionLease, isProjectModuleUnavailable,
+  parseModuleProject, serializeModuleProject,
   type ConnectionLease, type ModuleProject, type ModuleRegistry, type ProjectFactoryRequest, type ProjectJsonObject, type ProjectModuleInstance,
 } from '../src/module';
 
@@ -86,6 +87,31 @@ describe('versioned module project data', () => {
     expect(parseModuleProject(serializeModuleProject(project))).toEqual(project);
     expect(Object.isFrozen(project.modules[0].config)).toBe(true);
     expect(project.modules[0].plugin.version).toBe('2.4');
+  });
+
+  it('keeps the presentation\'s custom properties and refuses what is not one (DEC-088)', () => {
+    const themed = document({layout: {modules: [], style: {'--wm-foreground': '#204060', '--wm-control-radius': '4px'}}});
+    expect(themed.layout.style).toEqual({'--wm-foreground': '#204060', '--wm-control-radius': '4px'});
+    expect(parseModuleProject(serializeModuleProject(themed))).toEqual(themed);
+    // No style is no key, so a project without one is the project it was.
+    expect('style' in document({layout: {modules: [], style: {}}}).layout).toBe(false);
+    expect(() => document({layout: {modules: [], style: {color: 'red'}}})).toThrow(/custom properties/);
+    expect(() => document({layout: {modules: [], style: {'--WM-x': 'red'}}})).toThrow(/custom properties/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': 3} as never}})).toThrow(/nonempty string/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': ' '}}})).toThrow(/nonempty string/);
+    expect(() => document({layout: {modules: [], style: {'--wm-foreground': 'x'.repeat(257)}}})).toThrow(/256 characters/);
+    expect(() => document({layout: {modules: [], style: ['--wm-foreground'] as never}})).toThrow();
+  });
+
+  it('keeps a host\'s page with the layout as plain data (DEC-092)', () => {
+    const page = {id: 'page', type: 'box', children: [{id: 'title', type: 'text', text: 'Arabesque'}, {id: 'c1', type: 'component', module: 'voice'}]};
+    const paged = document({layout: {modules: [], page: page as never}});
+    expect(paged.layout.page).toEqual(page);
+    expect(parseModuleProject(serializeModuleProject(paged))).toEqual(paged);
+    expect('page' in document({layout: {modules: []}}).layout).toBe(false);
+    // A page is an object; what is in it is the host's to read, and the project's limits still bound it.
+    expect(() => document({layout: {modules: [], page: ['box'] as never}})).toThrow();
+    expect(() => document({layout: {modules: [], page: {text: 'x'.repeat(70000)}}})).toThrow(/limits/);
   });
 
   it('rejects accessors without invoking them and rejects native/prototype data', () => {
@@ -191,6 +217,41 @@ describe('owned project restoration', () => {
     await runtime.retryMissing();
     expect(runtime.snapshot().unresolved).toEqual([]);
     expect(runtime.snapshot().modules.every(module => module.status === 'ready')).toBe(true);
+  });
+
+  it('keeps a module unresolved when its factory reports it unavailable, then recovers on retry', async () => {
+    const {runtime, plugins} = fixture();
+    let available = false;
+    const fallback = vi.fn((request: ProjectFactoryRequest) => {
+      if (!available) throw new ProjectModuleUnavailableError('Needs a capability this context lacks.');
+      return plugins.get('gain', '1')!.create(request);
+    });
+    plugins.register({id: 'gain', version: '3', create: fallback});
+    const initial = document();
+    const project = document({modules: [initial.modules[0], {...initial.modules[1], plugin: {id: 'gain', version: '3'}, params: {gain: 0.7}}]});
+    expect((await runtime.restore(project)).status).toBe('committed');
+    expect(runtime.snapshot().modules.map(module => [module.status, module.diagnostic])).toEqual([
+      ['ready', undefined], ['unresolved', 'Needs a capability this context lacks.'],
+    ]);
+    // The record, its saved parameters and its routes survive export untouched.
+    expect(runtime.exportProject().modules[1]).toEqual(project.modules[1]);
+    expect(runtime.exportProject().connections).toEqual(project.connections);
+    available = true;
+    await runtime.retryMissing();
+    expect(runtime.snapshot().unresolved).toEqual([]);
+    expect(runtime.exportProject().modules[1].params).toEqual({gain: 0.7});
+  });
+
+  it('still fails a restore for any other factory error, and recognizes the error across copies', async () => {
+    const {runtime, plugins} = fixture();
+    plugins.register({id: 'gain', version: '4', create: () => { throw new Error('broken factory'); }});
+    const initial = document();
+    await expect(runtime.restore(document({modules: [initial.modules[0], {...initial.modules[1], plugin: {id: 'gain', version: '4'}}]})))
+      .rejects.toThrow('broken factory');
+    const copy = Object.assign(new Error('from another package copy'), {name: 'ProjectModuleUnavailableError'});
+    expect(isProjectModuleUnavailable(copy)).toBe(true);
+    expect(isProjectModuleUnavailable(new Error('other'))).toBe(false);
+    expect(new ProjectModuleUnavailableError('x', {cause: 1}).cause).toBe(1);
   });
 
   it('retains unsupported domain signals without silently connecting them', async () => {

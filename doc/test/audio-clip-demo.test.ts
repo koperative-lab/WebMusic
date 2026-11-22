@@ -1,0 +1,139 @@
+// @vitest-environment jsdom
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {dirname, resolve} from 'node:path';
+import ts from 'typescript';
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {mountDemos, type DemoScope} from '../src/components/demo-lifecycle';
+
+const registrations: Array<() => void> = [];
+const flush = async () => {for (let index = 0; index < 24; index++) await Promise.resolve();};
+const urlMethods = ['createObjectURL', 'revokeObjectURL'].map(name => [name, Object.getOwnPropertyDescriptor(URL, name)] as const);
+afterEach(() => {
+  // Each test owns its demo registrations; a leftover one would mount the next test's DOM too.
+  for (const stop of registrations.splice(0)) stop();
+  document.body.replaceChildren();
+  for (const [name, descriptor] of urlMethods) {
+    if (descriptor) Object.defineProperty(URL, name, descriptor); else delete (URL as unknown as Record<string, unknown>)[name];
+  }
+  vi.restoreAllMocks();
+});
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {resolve = yes; reject = no;});
+  return {promise, resolve, reject};
+}
+function runDemo(file: string, modules: Record<string, unknown>) {
+  const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), `../src/components/${file}.astro`), 'utf8')
+    .match(/<script>([\s\S]*?)<\/script>/)![1];
+  const code = ts.transpileModule(source, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS}}).outputText;
+  modules['../demo-lifecycle'] = {mountDemos: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void) =>
+    registrations.push(mountDemos(selector, setup))};
+  new Function('require', 'exports', code)((name: string) => {
+    if (!(name in modules)) throw new Error(`Unexpected import ${name}`);
+    return modules[name];
+  }, {});
+}
+function editor() {
+  let undos = 0;
+  let snapshot = {content: {length: 16, sampleRate: 8000, channelLayout: ['mono'], segments: []}, assets: {}, contentId: 'initial',
+    documentId: 'document', documentRevision: 0, status: 'ready'};
+  const session = {getSnapshot: () => ({documentId: 'document', selection: {startFrame: 2, endFrame: 8}, disposed: false}),
+    subscribe: vi.fn(() => vi.fn()), dispose: vi.fn()};
+  return {
+    getSnapshot: () => snapshot,
+    getState: () => ({document: snapshot, dirty: true, processing: false, history: {undoCount: undos, redoCount: 0, historyOnlyBytes: 0}}),
+    subscribeState: vi.fn((listener: () => void) => {listener(); return vi.fn();}),
+    processRange: vi.fn(async (_request: unknown) => ({status: 'committed'})), cancelProcessing: vi.fn(),
+    markSaved: vi.fn(), clearHistory: vi.fn(),
+    execute: vi.fn((_request: {operations: Array<{type: string}>}) => { undos += 1; return {status: 'committed'}; }),
+    undo: vi.fn(() => { undos -= 1; return {status: 'committed'}; }), redo: vi.fn(() => ({status: 'committed'})), createInteractionSession: () => session, dispose: vi.fn(),
+    createCheckpoint: vi.fn(() => ({release: vi.fn()})), restoreCheckpoint: vi.fn(),
+    replace: () => {snapshot = {...snapshot, contentId: 'changed', documentRevision: 1};},
+  };
+}
+type Editor = ReturnType<typeof editor>;
+async function mountWorkflow(initial: 'ready' | 'pending' = 'ready') {
+  document.body.innerHTML = `<div data-wm-pg><section data-clip-demo data-clip-src="example.wav">
+    <audio-player data-clip-player></audio-player><audio-clip-view data-clip-view></audio-clip-view>
+    <p data-clip-status hidden></p>
+  </section></div>`;
+  const player = Object.assign(document.querySelector('[data-clip-player]')!, {editor: undefined as unknown});
+  const view = Object.assign(document.querySelector('[data-clip-view]')!, {editor: undefined as unknown});
+  const first = editor();
+  const configured = deferred<Editor>();
+  const headless = {loadAudioClipEditor: vi.fn<(...args: unknown[]) => Promise<Editor>>(() => configured.promise)};
+  runDemo('elements/AudioClipViewDemo', {
+    '@webmusic/audio/play/element': {defineAudioPlayerElement() {}},
+    '@webmusic/audio/view/element': {defineAudioClipViewElement() {}},
+    '@webmusic/audio/view/headless': headless,
+    '@webmusic/audio/view': {AUDIO_RANGE_PROCESSOR_KINDS: ['normalize', 'reverse', 'invert', 'remove-dc'],
+      createAudioRangeProcessor: vi.fn((kind: string) => ({id: kind}))},
+    '@webmusic/audio': {readAudioSequenceRange: vi.fn()},
+    '@webmusic/audio/analyze': {detectTempo: vi.fn(async () => ({bpm: 96.4321, grid: {beats: [0.5, 1.12]}}))},
+  });
+  if (initial === 'ready') { configured.resolve(first); await flush(); }
+  return {first, configured, headless, view, player, status: document.querySelector<HTMLElement>('[data-clip-status]')!};
+}
+
+describe('Audio clip editing demo', () => {
+  it('loads Arabesque with every built-in processor and lends one editor to both elements', async () => {
+    const {first, headless, view, player} = await mountWorkflow();
+    expect(headless.loadAudioClipEditor).toHaveBeenCalledWith('example.wav', expect.objectContaining({
+      processors: [{id: 'normalize'}, {id: 'reverse'}, {id: 'invert'}, {id: 'remove-dc'}], signal: expect.any(AbortSignal),
+    }));
+    // The estimated grid is the saved starting state, not an undoable edit.
+    expect(first.execute).toHaveBeenCalledWith(expect.objectContaining({label: 'Detect tempo',
+      operations: [{type: 'set-beat-grid', grid: {bpm: 96.43, anchorFrame: 4000, beatsPerBar: 4}}]}));
+    expect(first.clearHistory).toHaveBeenCalled();
+    expect(first.markSaved).toHaveBeenCalled();
+    expect(player.editor).toBe(first);
+    expect(view.editor).toBe(first);
+  });
+
+  it('reports a failed load in its one error line and lends no editor', async () => {
+    const {configured, player, view, status} = await mountWorkflow('pending');
+    configured.reject(new Error('decode failed')); await flush();
+    expect(player.editor).toBeUndefined();
+    expect(view.editor).toBeUndefined();
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toBe('decode failed');
+  });
+
+  it('detaches both elements and disposes the owned editor at teardown', async () => {
+    const {first, view, player} = await mountWorkflow();
+    for (const stop of registrations.splice(0)) stop();
+    expect(player.editor).toBeUndefined(); expect(view.editor).toBeUndefined();
+    expect(first.cancelProcessing).toHaveBeenCalled();
+    expect(first.dispose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Audio editor Headless demo', () => {
+  it('edits, undoes and redoes the opening second, then releases its editor and session', async () => {
+    document.body.innerHTML = `<section data-audio-editor-demo><p data-summary></p><ul data-segments></ul><p data-last></p>
+      <p data-hl-feedback hidden></p><button data-action="edit"></button><button data-action="undo"></button><button data-action="redo"></button></section>`;
+    const first = editor();
+    const create = vi.fn().mockReturnValue(first);
+    const clip = {sampleRate: 44100};
+    const excerpt = vi.fn(async () => clip);
+    runDemo('headless/AudioClipEditorHeadlessDemo', {
+      '@webmusic/audio': {audioSegmentLength: () => 0},
+      '@webmusic/audio/view/headless': {createAudioClipEditor: create},
+      './arabesque-audio': {loadArabesqueAudioExcerpt: excerpt},
+    });
+    await flush();
+    // The demo edits the opening second of the Arabesque No. 1 recording.
+    expect(excerpt).toHaveBeenCalledWith(1);
+    expect(create).toHaveBeenCalledWith(clip, {history: {limit: 100}});
+    document.querySelector<HTMLButtonElement>('[data-action="edit"]')!.click();
+    expect(first.execute).toHaveBeenCalledOnce();
+    expect(first.execute.mock.calls[0][0].operations[0].type).toBe('insert-silence');
+    document.querySelector<HTMLButtonElement>('[data-action="undo"]')!.click();
+    expect(first.undo).toHaveBeenCalledOnce();
+    for (const stop of registrations.splice(0)) stop();
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(first.createInteractionSession().dispose).toHaveBeenCalledOnce();
+  });
+});

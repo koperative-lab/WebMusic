@@ -1,0 +1,28 @@
+---
+// The demo card every Headless page uses: the entry and object title, then the
+// object working in its default configuration on a live canvas, with only the
+// controls needed to operate it, and one line for a failure. The page explains
+// how it works and documents its API; adjusting options and copying code is not
+// part of the documentation site (DEC-071).
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  entry: string;
+  name: string;
+  rootAttrs?: Record<string, string | boolean | number | undefined>;
+}
+const {entry, name, rootAttrs = {}} = Astro.props;
+---
+
+<div class="wui-panel wui-panel--flow not-content wm-pg wm-hl" data-headless-demo {...rootAttrs}>
+  <div class="wui-panel__title"><span>{entry}</span><strong>{name}</strong></div>
+  <LiveDemoCanvas>
+    <div class="wm-pg__stage" data-hl-stage><slot /></div>
+  </LiveDemoCanvas>
+  <p class="wm-pg__note wm-hl__feedback" data-hl-feedback role="status" hidden></p>
+</div>
+
+<style is:global>
+  .wm-hl [hidden] { display: none !important; }
+  .wm-hl__feedback { margin: .5rem 0 0; overflow-wrap: anywhere; }
+</style>

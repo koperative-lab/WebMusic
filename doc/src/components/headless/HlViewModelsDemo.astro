@@ -1,0 +1,46 @@
+---
+// WaveformViewModel projecting the opening of Arabesque No. 1 through its
+// timeline at 40 px/s into one column per visible pixel. The canvas draws
+// exactly the columns it returns.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/view/headless"
+  name="createWaveformViewModel"
+  rootAttrs={{'data-hl-view-models': true}}
+>
+  <canvas class="hl-columns" data-canvas width="800" height="96" aria-label="Visible waveform columns"></canvas>
+  <div class="wui-row"><span class="wui-readout" data-summary>—</span></div>
+</HeadlessDemoFrame>
+
+<style>
+  .hl-columns { display: block; width: 100%; height: 96px; border: 1px solid var(--wui-line-mid); background: var(--wui-surface); }
+</style>
+
+<script>
+  import {computeClipPeaks, createWaveformViewModel} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+
+  mountProgrammaticDemo('[data-hl-view-models]', async (root, scope) => {
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-canvas]')!;
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    const peaks = computeClipPeaks(clip);
+    if (!peaks) { summary.textContent = 'no decoded samples'; return; }
+    const waveform = createWaveformViewModel(peaks, {durationSeconds: clip.duration});
+    waveform.timeline.setViewport(canvas.width);
+    waveform.timeline.setZoom(40);
+    const columns = waveform.columns();
+    const {startSeconds, endSeconds} = waveform.timeline.visibleRange();
+    summary.textContent = `${columns.length} columns · ${startSeconds.toFixed(2)}–${endSeconds.toFixed(2)} s · ${columns[0]?.peaks.length ?? 0} peak(s) per column`;
+    const context = canvas.getContext('2d')!;
+    const {height} = canvas;
+    context.fillStyle = getComputedStyle(canvas).color || '#444';
+    for (const column of columns) {
+      const peak = column.peaks[0];
+      if (peak) context.fillRect(column.x, (1 - peak.max) * height / 2, 1, Math.max(1, (peak.max - peak.min) * height / 2));
+    }
+  });
+</script>

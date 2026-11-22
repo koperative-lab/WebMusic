@@ -1,7 +1,7 @@
-# Web Component page template
+# Component page template
 
 This is the authoring contract for pages under
-`apps/doc/webmusic/src/content/docs/{score,audio}/element/<capability>/`,
+`doc/src/content/docs/{score,audio}/element/<capability>/`,
 including behavior-only declarations such as `score-rack-part`.
 It does not replace product component design: establish a new component's
 purpose, layer boundaries, and composition through
@@ -29,27 +29,27 @@ Sharing a page does not hide a companion's API. Each tag's inputs, methods,
 events, lifecycle, and styling have one identifiable reference location. Catalogs
 and other pages link there instead of maintaining another reference table.
 
-An element whose `type` switches drawings remains one page with a mode control
+An element whose `type` switches drawings remains one page with a type switch
 in its main demo. Do not split pages or stack near-identical demos by mode.
 
 ## Page and supporting files
 
-Here, `src/` paths are relative to `apps/doc/webmusic/`.
+Here, `src/` paths are relative to `doc/`.
 
 | File | Responsibility |
 |---|---|
 | `src/content/docs/<family>/element/<capability>/<tag>.mdx` | Page prose; a shared workflow uses its primary tag's filename |
-| `src/components/elements/<PascalTag>Playground.astro` | Real elements/workflow, demo wiring, and local styles; use a descriptive workflow name for a composition |
-| `src/lib/params/<family>-<capability>.ts` | Attribute controls; reconcile names and order with source `static observedAttributes`, resolving spreads |
-| `src/components/ElementPlayground.astro` | Shared title, controls, markup readout, and Copy/Reset panel |
+| `src/components/elements/<PascalTag>Demo.astro` | Real elements/workflow in their default composition, demo wiring, and local styles; use a descriptive workflow name for a composition |
+| `src/lib/params/<family>-<capability>.ts` | Attribute catalog: entry, names, kinds, options and fallbacks; reconcile names and order with source `static observedAttributes`, resolving spreads. `switch: true` marks the one enum that selects the element's drawing, surface or recipe. `paramGroup` files each attribute as param, style or data by name; an entry the rule would misfile sets `group` |
+| `src/components/ElementDemo.astro` | Shared panel: the entry and tag title, the type switch when the catalog marks one, then the live canvas |
 | `src/components/LiveDemoCanvas.astro` | Shared stage background, padding, and Live status frame |
-| `src/components/ElementComposition.astro` | Full-width sibling composition with a `0.5rem` gap; fragment Copy includes real elements without the layout wrapper |
+| `src/components/ElementComposition.astro` | Full-width sibling composition with a `0.5rem` gap |
 
-Catalog `fallback` describes actual behavior when the attribute is absent;
-`defaultOptionLabel` uses it for a short unset-option label. A `note` is one
-short control-row sentence. The API table owns full defaults, parsing, and
-behavior. Catalog `properties` and `events` are not repeated under the attribute
-strip; their presence does not mean the API table has been automatically checked.
+Catalog `fallback` describes actual behavior when the attribute is absent, and a
+`note` is one short sentence. The catalog is data, not page UI: the site's
+checks and other tools read it, while the API table owns full defaults, parsing,
+and behavior. Its `properties` and `events` lists do not mean the API table has
+been automatically checked.
 
 ## Page skeleton
 
@@ -64,9 +64,9 @@ sidebar:
   order: N
 ---
 
-import MyElementPlayground from '../../../../../components/elements/MyElementPlayground.astro';
+import MyElementDemo from '../../../../../components/elements/MyElementDemo.astro';
 
-<MyElementPlayground />
+<MyElementDemo />
 
 Opening prose.
 
@@ -100,10 +100,18 @@ Complete member tables.
 CSS properties, public parts and host styling.
 
 </details>
+
+## Related
+
+- [`<score-grid-view>`](/score/element/view/score-grid-view/) — what a sibling adds.
+- [Headless ScoreView](/score/headless/view/score-view/) — the model behind this element.
 ````
 
 Order: main demo → introduction → Import → Ports and composition → optional
-topics → API → Styling.
+topics → API → Styling → Related. Every Component page has all of them
+except the optional topics, in this order, and nothing else at the top level:
+`npm run check:docs` fails a page that departs from it
+(`scripts/element-docs-policy.mjs`).
 The main demo is the first visible page-body content, immediately after the
 page title. Only frontmatter, imports and non-rendered comments precede it in
 the MDX source. Do not put introductory paragraphs, notices, code examples or
@@ -119,66 +127,64 @@ complete API table.
 - `title` is the primary tag in angle brackets, such as `'<audio-view>'`.
   `description` is one plain sentence. A capability group expands straight to
   its element pages, so leaf `sidebar.order` is dense from 1.
-- After the main demo, use 1–3 short paragraphs to explain what the element does,
-  required input or binding, and when to choose it against related elements,
-  with links.
+- After the main demo, use 1–3 short prose paragraphs to explain what the
+  element does, required input or binding, and when to choose it against
+  related elements, with links. When the demo has a type switch, name the
+  values and say that the switch shows each one. Code, tables, lists and notes
+  belong in Import or a topic section.
 - Identify attached components in a shared workflow; keep their complete member
   descriptions in their reference sections.
 - Do not enumerate attributes, registration steps, or styling in the intro.
   Name a member only when necessary to explain the contract.
 
-### Main demo: real components and controllable contracts
+### Main demo: real components in their default composition
 
-Use `ElementPlayground`, whose stage reaches `LiveDemoCanvas`. The shared
-facilities own background, spacing, and Live status; the demo supplies the real
-components, wiring, and necessary local layout. Use `ElementComposition` for
-stacked sibling components: stretch to the available width with a `0.5rem` gap
-and set `markup="[data-demo-composition]"`. Preserve package control geometry;
-do not override a companion player's height just for its demo. Hidden/nonvisual
-companions remain part of copied markup without reserving a visible grid row.
+Use `ElementDemo`, whose stage reaches `LiveDemoCanvas`. The shared facilities
+own background, spacing, and Live status; the demo supplies the real
+components and wiring. Use `ElementComposition` for stacked sibling components:
+stretch to the available width with a `0.5rem` gap. Components nested in a
+player get the same `0.5rem` below its transport from the shared stage rule.
+`ElementDemo` takes no class: Astro scopes a demo's `<style>` to its own
+template, so a rule aimed at the panel would silently not apply. Every
+component draws its own one outer frame from `--wm-component-border`, falling
+back to `--wm-border`; the demo adds no frame, gap or colour of its own.
+Preserve package control geometry; do not override a companion player's height
+just for its demo.
 
 ```text
 @webmusic/<family>/<capability>/element                  <the-tag>
+TYPE  [Piano roll][Staff][Waterfall]          (only with a switch)
 ┌───────────────────────────────────────────────────────────────┐
-│ The running element or workflow                               │
+│ The running element or workflow, in its default composition   │
 └───────────────────────────────────────────────────────────────┘
-▾ PARAMETERS
-  Attribute                Control                One short note
-  Attribute                Control                One short note
-┌───────────────────────────────────────────────────────────────┐
-│ Actual element markup reflecting the controls                 │
-└───────────────────────────────────────────────────────────────┘
-Copy / Reset
 ```
 
-- The title is the primary tag. Attribute values already appear in controls
-  and markup; composition belongs in the introduction, not a title override.
-- Every observed attribute should have a control, one row per attribute:
-  name → control → note, with aligned columns. Catalog coverage follows source;
-  demo wiring should make changes as observable as possible.
-- If properties such as `.rack` or collections drive the element, supply useful
-  controls through the panel's `controls` slot. An attribute-free element can
-  still have meaningful property inputs.
-- For a workflow, `target` selects the controlled element. Set `markup` to the
-  composition root when copying the full nested structure is necessary.
-  Companion controls must mount, update, and remove the real companion.
-- Supply required data for every supported `type` mode. Keep mode-specific
-  attributes in the same strip, with scope in the note rather than separate
-  per-mode control groups.
-- Mark a control `inert` when this demo cannot show its effect, with a reason.
-  Demo-specific limitations belong in `.astro`; fixed attribute limitations
-  belong in the catalog. Being useful only in one mode is not permanent inertia.
+- The title is the primary tag; composition belongs in the introduction, not a
+  title override.
+- The demo shows the default interaction (DEC-071): the authored markup and the
+  real controls the component needs, such as its transport. There is no
+  Parameters strip, markup readout, Copy or Reset; the attribute, property and
+  event tables document configuration, and code examples show it.
+- An element with several drawings, surfaces or recipes shows all of them
+  through one type switch. Mark that attribute `switch: true` in the catalog
+  (`type`, or the element's equivalent such as `layout`); `ElementDemo` renders
+  one toggle per option and writes the attribute on every instance of the tag
+  in the stage. The switch is the only adjustment control in an Element demo.
+  It starts on the attribute the markup authors, else the catalog fallback,
+  whose first word must name the default option. A topic demo of the same tag
+  passes `typeSwitch={false}`; only the main demo switches.
+- Supply the data the default composition needs, and anything a property must
+  carry for the component to be useful (a `.members` list, a lent editor). Set
+  properties from the demo's script, as an application would.
 - Gesture or microphone prerequisites need an understandable resting state and
   an operable trigger. A disabled Play button cannot obtain a user gesture;
   an unexplained blank surface is not adequate feedback.
-- The markup readout mirrors actual settings, wrapping long tags one attribute
-  per line, followed by Copy/Reset. Reset restores parameters and workflow
-  attachments. Markup cannot show registration, so it never replaces Import.
 
 There is one main demo per page. Add a topic example only when its behavior
-cannot be expressed by the main controls, such as a different property-data
-composition or binding relationship. Another attribute value is not a reason
-for another main panel.
+shows something the main composition cannot, such as a different property-data
+composition or binding relationship, and place it in that topic section, before
+API. Another attribute value is not a reason for another main panel; show it in
+a code example.
 
 ### Import
 
@@ -269,9 +275,16 @@ When canvas paint is input-driven, say so. The corresponding attributes' types
 and defaults still belong in API; Styling links to them or gives a short
 example. Do not document variables without an effective reader.
 
-## Web Components inventory and acceptance
+### Related
 
-One Web Components inventory per family, at `/<family>/element/`, covers each
+The last section: a bullet list, one link per item followed by an em dash and
+what that page adds (see the skeleton). List sibling elements a reader might
+choose instead, the companions this element composes with, and the Headless or API
+page behind it. Label an element by its tag in code and backticks.
+
+## Components inventory and acceptance
+
+One Components inventory per family, at `/<family>/element/`, covers each
 implemented capability in its own section: Play, Analyze and View.
 The [Site Plan](DOCS-SITE-PLAN.md) owns its responsibilities: selection,
 composition, registration, and shared theming, with no live demo.
@@ -295,11 +308,12 @@ Before shipping:
 - Reconcile attribute names/order with source; every public member and attached
   tag has a discoverable explanation.
 - Add or update this page's tag row, purpose, and `define*` entry in the family
-  Web Components inventory when a tag, job, or registration function changes.
-- Exercise controls, modes, and composition changes or state their limitations;
-  Copy/Reset reflects the real structure.
-- Place the main demo first and keep introduction, Import, topics, API, and
-  Styling distinct. Do not omit reference content because a demo exists.
+  Components inventory when a tag, job, or registration function changes.
+- Exercise the default interaction and composition in a browser, or state its
+  limitations.
+- Place the main demo first and keep introduction, Import, topics, API,
+  Styling and Related distinct and in that order. Do not omit reference
+  content because a demo exists.
 - Verify browser upgrade, interaction, unexpected console errors, and cleanup
   across disconnect/reconnect.
 - Check links and actual heading IDs; follow the automated and manual

@@ -6,7 +6,7 @@ import {neutralPalette} from './palette';
  * Component-specific tokens remain the first override point, while the
  * `--wm-component-*` layer lets an application retheme every presenter with a
  * single set of properties. Literal fallbacks intentionally describe a light,
- * neutral component card so Web Components are complete without page CSS.
+ * neutral component card so Components are complete without page CSS.
  */
 export interface ComponentSurfaceFallbacks {
   /** Compatibility chain used after the canonical component surface token. */

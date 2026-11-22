@@ -195,7 +195,9 @@ describe('composable View player followers', () => {
     await flush();
     expect(view.score).toBeUndefined();
     expect(view.currentTime).toBe(0);
-    expect(view.querySelector('svg')).toBeNull();
+    // The borrowed notes are gone; the blank staff stays under the waiting layer (DEC-082).
+    expect(view.querySelectorAll('[data-note-id], [data-index]')).toHaveLength(0);
+    expect(view.querySelector('[part="waiting"] .wui-status')?.getAttribute('data-kind')).toBe('waiting');
   });
 
   it('clears and rebinds a score view when a uniquely selected owner is replaced', async () => {

@@ -430,3 +430,109 @@ export class TempoClock {
     return this.clock.timeAt(tempoGridBeatPosition(this.grid, beat));
   }
 }
+
+// ============================================================================
+// Musical time (DEC-077): tempo, meter, bars:beats:ticks and Max-style time
+// values such as `4n`, `8nt` and `1.2.0`. Pure arithmetic on a seconds axis;
+// `bpm` always counts quarter notes, and a beat is the meter's beat unit.
+// ============================================================================
+
+/** Ticks in one quarter note, as in Max. */
+export const TICKS_PER_QUARTER = 480;
+
+export interface MusicalTempo {
+  /** Quarter notes per minute; finite and > 0. */
+  readonly bpm: number;
+  /** Beats in a bar (time-signature numerator). */
+  readonly beatsPerBar: number;
+  /** The note value of one beat (time-signature denominator): 2, 4, 8 or 16. */
+  readonly beatUnit: number;
+}
+
+/** A position as bars, beats and ticks, all counted from 1 except ticks (from 0). */
+export interface BarsBeatsTicks { readonly bar: number; readonly beat: number; readonly tick: number }
+
+export const DEFAULT_MUSICAL_TEMPO: MusicalTempo = Object.freeze({bpm: 120, beatsPerBar: 4, beatUnit: 4});
+
+/** Validate and freeze a tempo. */
+export function createMusicalTempo(init: Partial<MusicalTempo> = {}): MusicalTempo {
+  const bpm = init.bpm ?? 120, beatsPerBar = init.beatsPerBar ?? 4, beatUnit = init.beatUnit ?? 4;
+  if (!Number.isFinite(bpm) || bpm <= 0 || bpm > MAX_TEMPO_GRID_BPM) throw new RangeError(`Tempo must be finite, > 0 and <= ${MAX_TEMPO_GRID_BPM} bpm.`);
+  if (!Number.isInteger(beatsPerBar) || beatsPerBar < 1 || beatsPerBar > MAX_TEMPO_GRID_BEATS_PER_BAR) throw new RangeError('Beats per bar must be an integer from 1 to 64.');
+  if (![1, 2, 4, 8, 16, 32].includes(beatUnit)) throw new RangeError('The beat unit must be 1, 2, 4, 8, 16 or 32.');
+  return Object.freeze({bpm, beatsPerBar, beatUnit});
+}
+
+/** Seconds per tick at a tempo. */
+export const tickSeconds = (tempo: MusicalTempo): number => 60 / tempo.bpm / TICKS_PER_QUARTER;
+/** Ticks in one beat of the meter. */
+export const ticksPerBeat = (tempo: MusicalTempo): number => TICKS_PER_QUARTER * 4 / tempo.beatUnit;
+/** Ticks in one bar. */
+export const ticksPerBar = (tempo: MusicalTempo): number => ticksPerBeat(tempo) * tempo.beatsPerBar;
+
+const NOTE_VALUE = /^(\d+)(n|nd|nt)$/;
+
+/**
+ * The length in ticks of a time value: a note value (`1n`, `4n`, `8nd`
+ * dotted, `16nt` triplet), `bars.beats.ticks` as a length (`1.0.0` is one
+ * bar), or `480 ticks`. Undefined for a value that is not musical (`250ms`,
+ * `2hz`, a plain number of milliseconds).
+ */
+export function timeValueTicks(text: string, tempo: MusicalTempo = DEFAULT_MUSICAL_TEMPO): number | undefined {
+  const value = text.trim().toLowerCase();
+  const note = NOTE_VALUE.exec(value);
+  if (note) {
+    const division = Number(note[1]);
+    if (division < 1 || division > 128 || (division & (division - 1)) !== 0) throw new RangeError(`${text} is not a note value: use 1n, 2n, 4n … 128n.`);
+    const base = TICKS_PER_QUARTER * 4 / division;
+    return note[2] === 'nd' ? base * 1.5 : note[2] === 'nt' ? base * 2 / 3 : base;
+  }
+  const bbt = /^(\d+)\.(\d+)\.(\d+(?:\.\d+)?)$/.exec(value);
+  if (bbt) return Number(bbt[1]) * ticksPerBar(tempo) + Number(bbt[2]) * ticksPerBeat(tempo) + Number(bbt[3]);
+  const ticks = /^(\d+(?:\.\d+)?)\s*ticks?$/.exec(value);
+  if (ticks) return Number(ticks[1]);
+  return undefined;
+}
+
+/**
+ * The length in seconds of a time value at `tempo`: any musical value of
+ * {@link timeValueTicks}, or `250ms`, `0.5s`, `2hz` (one period) or a plain
+ * number of milliseconds.
+ */
+export function timeValueSeconds(text: string, tempo: MusicalTempo = DEFAULT_MUSICAL_TEMPO): number {
+  const ticks = timeValueTicks(text, tempo);
+  if (ticks !== undefined) return ticks * tickSeconds(tempo);
+  const value = text.trim().toLowerCase();
+  const match = /^(-?\d+(?:\.\d+)?)\s*(ms|s|hz)?$/.exec(value);
+  if (!match) throw new SyntaxError(`${text} is not a time value: use 4n, 8nt, 1.0.0, 480 ticks, 250ms, 0.5s or 2hz.`);
+  const amount = Number(match[1]);
+  if (match[2] === 's') return amount;
+  if (match[2] === 'hz') { if (amount <= 0) throw new RangeError('A frequency must be > 0 Hz.'); return 1 / amount; }
+  return amount / 1000;
+}
+
+/** Bars, beats and ticks at `seconds` from `anchor` (where bar 1 beat 1 begins). */
+export function barsBeatsTicksAt(seconds: number, tempo: MusicalTempo, anchor = 0): BarsBeatsTicks {
+  const total = Math.max(0, (seconds - anchor) / tickSeconds(tempo) + 1e-6);
+  const bar = Math.floor(total / ticksPerBar(tempo));
+  const inBar = total - bar * ticksPerBar(tempo);
+  const beat = Math.floor(inBar / ticksPerBeat(tempo));
+  return Object.freeze({bar: bar + 1, beat: beat + 1, tick: Math.floor(inBar - beat * ticksPerBeat(tempo))});
+}
+
+/** Seconds at a bars:beats:ticks position. */
+export function secondsAtBarsBeatsTicks(position: BarsBeatsTicks, tempo: MusicalTempo, anchor = 0): number {
+  const ticks = (position.bar - 1) * ticksPerBar(tempo) + (position.beat - 1) * ticksPerBeat(tempo) + position.tick;
+  return anchor + ticks * tickSeconds(tempo);
+}
+
+/** `bar.beat.tick`, as Max shows a transport position. */
+export function formatBarsBeatsTicks(position: BarsBeatsTicks): string {
+  return `${position.bar}.${position.beat}.${position.tick}`;
+}
+
+/** The next multiple of `interval` seconds at or after `position`, measured from `anchor`. */
+export function nextGridTime(position: number, interval: number, anchor = 0): number {
+  if (!(interval > 0)) throw new RangeError('A grid interval must be > 0.');
+  return anchor + Math.ceil((position - anchor) / interval - 1e-9) * interval;
+}

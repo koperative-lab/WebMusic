@@ -31,7 +31,7 @@ const rootManifest = JSON.parse(await readFile(path.join(root, 'package.json'), 
 // presenter between classes remains a reviewed information-architecture change.
 const uiPresenterClassPolicy = Object.freeze({
   'transport-time': ['transport', 'timeline', 'minimap', 'playlist', 'track-list'],
-  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq', 'patch-editor'],
+  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq', 'patch-editor', 'controls'],
   'mixing-capture': ['mixer', 'meter', 'recorder'],
   notes: ['note'],
   'views-analysis': ['analysis', 'pitch', 'harmony', 'level-analyzer', 'oscilloscope', 'spectrum-analyzer', 'transient-analyzer'],
@@ -54,14 +54,13 @@ for (const directory of packageDirs) {
 
 compareExactSet('Root workspace', 'workspace directory', rootManifest.workspaces ?? [], [
   ...packageDirectories,
-  'apps/doc/webmusic',
-  'apps/test',
+  'doc',
 ]);
 compareExactSet('Package policy', 'published package', [...packages.keys()], Object.keys(expectedPublicEntries));
 if ([...packages.keys()].join() !== releasePackageNames.join()) {
   errors.push('Package order must match packageDirectories and package manifests.');
 }
-for (const directory of ['', ...packageDirectories, 'apps/doc/webmusic', 'apps/test']) {
+for (const directory of ['', ...packageDirectories, 'doc']) {
   const file = path.join(root, directory, 'package.json');
   const manifest = JSON.parse(await readFile(file, 'utf8'));
   errors.push(...manifestBoundaryProblems(manifest, packages.keys()).map((problem) => `${relativeToRoot(file)} ${problem}`));
@@ -82,7 +81,7 @@ for (const [name, pkg] of packages) {
   checkCapabilityBoundaries(name, pkg);
   checkSideEffectPolicy(name, pkg);
   checkImports(name, pkg);
-  checkUiWebComponentFreedom(name, pkg);
+  checkUiCustomElementFreedom(name, pkg);
   checkUiDomainVocabulary(name, pkg);
   checkKernelPrimitiveOwnership(name, pkg);
   checkRetiredCompositionSurfaces(name, pkg);
@@ -740,7 +739,7 @@ function checkImports(name, pkg) {
   }
 }
 
-// The ui kit publishes presenters, not Web Components: registration and
+// The ui kit publishes presenters, not custom elements: registration and
 // HTMLElement subclassing live in the domain families' element layers. The
 // dependency policy keeps ui import-clean and the entry checks prove imports
 // are DOM-safe, but a registration inside a mount function evaluates nothing
@@ -848,7 +847,7 @@ function checkRetiredCompositionSurfaces(name, pkg) {
   }
 }
 
-function checkUiWebComponentFreedom(name, pkg) {
+function checkUiCustomElementFreedom(name, pkg) {
   if (name !== '@webmusic/ui') return;
   for (const file of pkg.files) {
     const inspected = modules.get(file);
@@ -859,7 +858,7 @@ function checkUiWebComponentFreedom(name, pkg) {
     }
     for (const heritage of inspected.classExtends) {
       if (/^(globalThis\.)?(HTML[A-Za-z0-9]*Element|Element|ShadowRoot)$/.test(heritage)) {
-        errors.push(`${relativeToRoot(file)} declares a class extending ${heritage}; @webmusic/ui must not define Web Components.`);
+        errors.push(`${relativeToRoot(file)} declares a class extending ${heritage}; @webmusic/ui must not define custom elements.`);
       }
     }
   }
@@ -1020,7 +1019,7 @@ function checkInternalCycles(name, pkg) {
 }
 
 async function checkApplicationImports() {
-  const applicationRoots = [path.join(root, 'app'), path.join(root, 'apps')].filter((dir) => existsSync(dir));
+  const applicationRoots = [path.join(root, 'doc')].filter((dir) => existsSync(dir));
   const files = (await Promise.all(applicationRoots.map(applicationTextFiles))).flat();
   const pattern = /(?:from\s+|import\s*(?:\(\s*)?)["'](@(?:webscore|webaudio|webmusic)\/[a-z-]+(?:\/[a-z0-9._/-]+)?)["']/g;
   // MC-27: documentation, demos and snippets write `input`, never the retired selectors.
@@ -1295,7 +1294,7 @@ async function checkElementComposition() {
     }
   }
 
-  const catalogPath = path.join(root, 'apps/doc/shared/ui-catalog.ts');
+  const catalogPath = path.join(root, 'doc/shared/ui-catalog.ts');
   const catalog = await readFile(catalogPath, 'utf8');
   const catalogTags = [...catalog.matchAll(/\btag:\s*'([^']+)'/g)].map((match) => match[1]);
   compareExactSet('UI composition catalog', 'element tags', catalogTags, [...seenTags]);
@@ -1334,7 +1333,7 @@ async function checkElementComposition() {
     publishedUiSubpaths,
   );
 
-  const presenterCatalogPath = path.join(root, 'apps/doc/shared/ui-presenter-catalog.ts');
+  const presenterCatalogPath = path.join(root, 'doc/shared/ui-presenter-catalog.ts');
   const presenterCatalog = await readFile(presenterCatalogPath, 'utf8');
   const catalogPresenterPairs = [...presenterCatalog.matchAll(
     /\bpresenter:\s*'([^']+)'[\s\S]*?\bclassSlug:\s*'([^']+)'/g,
@@ -1352,9 +1351,9 @@ async function checkElementComposition() {
     expectedPresenterPairs,
   );
 
-  const uikitDocsRoot = path.join(root, 'apps/doc/webmusic/src/content/docs/uikit');
+  const uikitDocsRoot = path.join(root, 'doc/src/content/docs/uikit');
   const docsNavigation = await readFile(
-    path.join(root, 'apps/doc/webmusic/src/site/navigation.ts'),
+    path.join(root, 'doc/src/site/navigation.ts'),
     'utf8',
   );
   const uiKitNavigationStart = docsNavigation.indexOf("group('UI Kit'");
@@ -1383,7 +1382,7 @@ async function checkElementComposition() {
 
   const liveDemoDirectory = path.join(
     root,
-    'apps/doc/webmusic/src/lib/ui-presenter-demos',
+    'doc/src/lib/ui-presenter-demos',
   );
   const liveDemoSources = await Promise.all(
     ['transport-time.ts', 'parameters-gestures.ts', 'mixing-notes.ts', 'views-analysis.ts'].map(
@@ -1410,7 +1409,7 @@ async function checkElementComposition() {
       expectedUikitPages.push(relativePage);
       const pagePath = path.join(uikitDocsRoot, relativePage);
       if (!existsSync(pagePath)) {
-        errors.push(`@webmusic/ui/${presenter} is missing its classified UI Kit page: apps/doc/webmusic/src/content/docs/uikit/${relativePage}.`);
+        errors.push(`@webmusic/ui/${presenter} is missing its classified UI Kit page: doc/src/content/docs/uikit/${relativePage}.`);
         continue;
       }
       const page = await readFile(pagePath, 'utf8');

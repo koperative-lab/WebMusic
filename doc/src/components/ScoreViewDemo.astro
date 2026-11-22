@@ -1,0 +1,20 @@
+---
+import ElementDemo from './ElementDemo.astro';
+import ElementComposition from './ElementComposition.astro';
+const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
+const PLAYER_ID = 'sv-demo-player';
+---
+
+<ElementDemo tag="score-view">
+  <ElementComposition>
+    <score-player id={PLAYER_ID} src={SRC}></score-player>
+    <score-view input={`#${PLAYER_ID}`} type="staff"></score-view>
+  </ElementComposition>
+</ElementDemo>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  defineScoreViewElement();
+</script>

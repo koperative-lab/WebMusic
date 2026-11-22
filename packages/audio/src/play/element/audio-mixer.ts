@@ -21,7 +21,7 @@ import {AudioMixer, type AudioMixerOptions} from '../headless/mixer';
 import type {PlayerLike} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
 import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
-import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, moduleScopeChange, routeModuleOutput, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, moduleScopeChange, routeModuleOutput, type AudioOutputPort, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
 import {provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {SessionTransport, type ModuleSession, type SessionParticipantLease} from '@webmusic/kernel/session';
 import {
@@ -389,7 +389,7 @@ export class AudioMixerElement extends WebMusicElement {
     if (this.moduleHandle?.id === id && this.moduleSyncedMixer === mixer) return;
     this.moduleRegistration?.release();
     this.moduleSyncedMixer = mixer;
-    this.moduleHandle = {
+    const handle: ModuleHandle & {admit(module: ModuleHandle, port: AudioOutputPort): ConnectionLease} = {
       // The DOM id is the module and parent channel ID when present (DEC-068).
       id,
       get inserts() { return mixer.module.inserts; },
@@ -398,7 +398,14 @@ export class AudioMixerElement extends WebMusicElement {
       ports: () => mixer.module.ports?.() ?? [],
       prepare: () => this.prepareModuleMixer(),
       subscribe: (listener) => mixer.module.subscribe?.(listener) ?? (() => {}),
+      // A channel for an output that is not a nested element, as a Rack's
+      // `admit` gives one: a cord into the desk's box in a graph (DEC-084).
+      admit: (module, port) => {
+        this.prepareModuleMixer();
+        return mixer.admitAudio(module.id, port);
+      },
     };
+    this.moduleHandle = handle;
     this.moduleRegistration = this.parentModuleContext?.registry.register(this.moduleHandle);
     this.moduleContext = this.moduleContext.derive({
       id: this.moduleContext.id,

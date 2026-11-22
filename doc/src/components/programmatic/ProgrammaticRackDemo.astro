@@ -1,0 +1,99 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Rack"
+  rootAttrs={{'data-programmatic-rack': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span><span class="wui-seg" aria-label="Mute parts"><button class="wui-btn" data-mute="upper" data-variant="ghost" type="button" aria-pressed="false">Mute upper</button><button class="wui-btn" data-mute="lower" data-variant="ghost" type="button" aria-pressed="false">Mute lower</button></span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
+  import { createRack, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+
+  mountProgrammaticDemo('[data-programmatic-rack]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
+    const [upper, lower] = score.parts;
+
+    const btn = root.querySelector('[data-play]') as HTMLButtonElement;
+    const fill = root.querySelector('[data-fill]') as HTMLElement;
+    const time = root.querySelector('[data-time]') as HTMLElement;
+    const muteButtons = Array.from(root.querySelectorAll('[data-mute]')) as HTMLButtonElement[];
+
+    const rack = createRack();
+    scope.add(() => rack.dispose());
+
+    // Keep the two imported MIDI parts on separate Rack channels.
+    rack.add({
+      id: 'upper',
+      score: score.withoutPart(lower.id),
+      soundOwnership: 'owned',
+      sound: Sound.oscillator({ type: 'triangle', gain: 0.18, releaseSeconds: 0.05 }),
+    });
+    rack.add({
+      id: 'lower',
+      score: score.withoutPart(upper.id),
+      soundOwnership: 'owned',
+      sound: Sound.oscillator({ type: 'sawtooth', gain: 0.1, releaseSeconds: 0.08 }),
+    });
+
+    let playing = false;
+    const muted: Record<string, boolean> = {};
+
+    // Each member has its own player clock. This display follows the upper part,
+    // reading a fresh member snapshot after the rack builds its players lazily.
+    const paint = () => {
+      const player = rack.get('upper')?.player;
+      if (!(player instanceof ScorePlayer)) return;
+      const cur = player.seconds;
+      const dur = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    rack.on('end', () => {
+      playing = false;
+      btn.textContent = '▶ Play';
+      rack.seek(0);
+      fill.style.width = '0%';
+      time.textContent = '0.0s';
+    });
+
+    let cursorBound = false;
+    scope.listen(btn, 'click', () => {
+      if (playing) {
+        rack.pause();
+        btn.textContent = '▶ Play';
+        playing = false;
+        return;
+      }
+      scope.run(rack.play().then(() => {
+        if (!scope.active || !playing) return;
+        // Members (and their ScorePlayers) now exist; bind the cursor once.
+        const player = rack.get('upper')?.player;
+        if (!cursorBound && player instanceof ScorePlayer) {
+          scope.add(player.on('cursor', paint));
+          cursorBound = true;
+        }
+      }), () => { playing = false; btn.textContent = '▶ Play'; });
+      btn.textContent = '⏸ Pause';
+      playing = true;
+    });
+
+    muteButtons.forEach((b) => {
+      const id = b.dataset.mute as string;
+      scope.listen(b, 'click', () => {
+        const next = !muted[id];
+        muted[id] = next;
+        rack.mute(id, next);
+        b.dataset.on = next ? 'true' : 'false';
+        b.dataset.variant = next ? '' : 'ghost';
+        b.setAttribute('aria-pressed', String(next));
+      });
+    });
+  });
+</script>

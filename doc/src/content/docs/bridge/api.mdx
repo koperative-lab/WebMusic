@@ -1,0 +1,393 @@
+---
+title: '@webmusic/bridge'
+description: 'Bridge exports for timeline conversion, offline rendering, transport adapters, transcription assembly and modular project factories.'
+sidebar:
+  label: '@webmusic/bridge'
+  order: 2
+---
+
+`@webmusic/bridge` has two entries: the root, which needs no UI, and
+`@webmusic/bridge/component`, which runs a component as a page element and
+needs `@webmusic/ui`. It is the only package allowed to import both families,
+and both are peer dependencies alongside `@webmusic/kernel`. Bridge can coordinate supplied
+players or construct explicitly owned instances through its factories.
+
+The root does not decode audio, parse notation, or draw anything. Those live in
+[`@webmusic/audio`](/audio/api/) and [`@webmusic/score`](/score/api/); what is
+here is only the work that needs *both*.
+
+## Install
+
+`npm install @webmusic/bridge` — use an available published version or the local workspace. Its one optional peer is `@webmusic/ui`, needed only by `/component`; otherwise it inherits whatever the two families need.
+
+## Entry map
+
+| Subpath | Form | What is there |
+| --- | --- | --- |
+| `@webmusic/bridge` | root · the whole API | Everything below. |
+| — | [Headless](/bridge/headless/) | `createScoreAudioSession` and `registerAudioParticipant` are root exports, documented under the headless contract because the composition is constructed and disposed rather than called. |
+| `@webmusic/bridge/component` | element and code generators | [Components as page elements](#components-as-page-elements): a saved project running as a custom element, and its exported code. |
+
+There is no `/headless`, `/element` or `/auto` subpath: the Bridge ships no
+Components of its own; `/component` defines the element a project asks for.
+
+## Session composition
+
+The stateful half of the package. `createScoreAudioSession` puts a Score engine
+and an Audio clip player under one Session — the single command authority of
+modular composition (DEC-068) — each mapped onto its own axis
+(`score-nominal-seconds`, `clip-seconds`). `registerAudioParticipant` is the
+adapter it uses to register any Headless Audio engine on the shared
+`clip-seconds` axis. Both are documented on
+[their page](/bridge/headless/score-audio-session/). There is no
+master/follower pair: both engines are Session participants.
+
+## Modules and data functions
+
+`createScoreAudioSession` and the project plugins create modules. The timeline
+conversions, `renderScoreToClip` and `scoreFromTranscription` are data
+functions: their results feed modules (a rendered clip becomes an
+`<audio-player>` source; a transcribed `Score` becomes a `<score-player>` source).
+
+## Timeline conversions
+
+The two families deliberately keep different musical time models — Score's
+exact `TimeMap` (rational quarters → seconds) and Audio's `BeatGrid`
+(beats[] in seconds). Both project onto the same seconds ruler, so they
+convert:
+
+```ts
+import {beatGridFromTimeMap, timeMapFromBeatGrid} from '@webmusic/bridge';
+
+// Exact at the sampled positions; intervening tempo changes can be lost.
+const grid = beatGridFromTimeMap(score.timeMap, {durationQuarters: 64});
+
+// Approximate: each inter-beat interval becomes one tempo segment.
+const map = timeMapFromBeatGrid(gridFromTempoDetection);
+```
+
+Use `beatGridFromTimeMap` to hand a score's tempo curve to audio-side tools
+(beat-synced effects, waveform beat markers); use `timeMapFromBeatGrid` to
+carry a detected tempo grid (e.g. from `@webmusic/audio/analyze`'s tempo detection)
+into score-side quantization. `DEFAULT_MAX_MAPPED_BEATS` is the ceiling that
+keeps a pathological tempo map from generating an unbounded grid.
+
+`timeMapFromBeatGrid` maps each grid beat to one quarter note, sets quarter
+zero to second zero, and supplies a default 4/4 meter. Retain the original
+`grid.beats[0]` offset separately when aligning a recording. It does not recover
+the original meter or the subdivision factor used to create a grid. These
+functions therefore do not form a lossless round trip.
+
+### Mapping contract
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `beatGridFromTimeMap(map, options): BeatGrid` | — | Samples a Score `TimeMap` at uniform quarter subdivisions, returning Audio beat positions in seconds. The final sample rounds up to the next subdivision if needed. |
+| `options.durationQuarters` | Required | Finite number greater than zero; requested span on the quarter axis. |
+| `options.beatsPerQuarter` | `1` | Positive safe integer; samples per quarter. The resulting grid's beat index is a subdivision index. |
+| `options.maxBeats` | `DEFAULT_MAX_MAPPED_BEATS` (`1_000_000`) | Safe integer at least 2. The allocation includes the zero-position sample; excessive spans throw `RangeError`. |
+| `timeMapFromBeatGrid(grid): TimeMap` | — | Each positive inter-beat interval becomes a tempo segment; zero/nonpositive intervals throw `RangeError`. With fewer than two beats, uses `grid.bpm`. |
+
+`BeatGridFromTimeMapOptions` is the options shape above. Both operations return
+data, own no running transport or audio resources, and need no disposal.
+
+## Offline rendering
+
+`renderScoreToClip(score, options?)` plays a score into an `OfflineAudioContext`
+and returns the result as an `AudioClip` — a matched backing track, without a
+speaker or a user gesture. This is what lets the composition demo make the clip
+the sounding source while a muted Score engine drives the visuals.
+
+The renderer includes an effect/release tail by default; render with
+`tailSeconds: 0` when the clip must end with the score. A `tempo` override that
+differs from the Score's base tempo changes the clip's time axis: set
+`clipPositionScale` on `createScoreAudioSession` accordingly, or render at the
+base tempo and change speed with the Session's `setRate()`.
+
+For repeated notation, call `expandRepeats(score)` first, then render and pair
+the expanded Score instance. Passing `scoreOptions.expandRepeats` with a
+Bridge-rendered clip would expand only the live player, so the factories reject
+it before allocating playback resources.
+
+Its signature is `renderScoreToClip(score: Score, options?: RenderOptions):
+Promise<AudioClip>`. Options and synth ownership follow
+[Score's offline render helpers](/score/headless/play/score-player/).
+An `OfflineAudioContext` implementation and an offline-compatible synth are
+required; self-routing Tone/Spessa synths do not route into that capture graph.
+Rendering rejects on preparation/render failures. The returned clip is data,
+with the renderer's sample rate and channel count, and has no playback lifetime
+until supplied to a player. Timbre, effects, tempo, and rendering tails are
+choices made during rendering, not information recoverable from the clip's
+original notation.
+
+## Audio → Score assembly
+
+`@webmusic/audio/analyze/transcribe` emits family-neutral note events; the bridge
+turns them into a real `Score`:
+
+```ts
+import {transcribe} from '@webmusic/audio/analyze/transcribe';
+import {scoreFromTranscription} from '@webmusic/bridge';
+
+const {notes, bpm} = await transcribe(clip, {quantize: true});
+const score = scoreFromTranscription(notes, {bpm, quantizeGrid: 4});
+```
+
+Notation snaps to the grid (default sixteenths; `quantizeGrid: 0` still rounds
+to a 1/480-quarter tick). Accepted notes retain their supplied onset and
+duration in `performed.onsetSec` / `durationSec`; velocity is converted to
+integer MIDI units. Pitches are rounded and out-of-range results are dropped.
+This preserves supplied timing alongside notation but cannot recover material
+the transcriber did not represent. Note that
+`transcribe` itself needs its optional peers installed
+(`@spotify/basic-pitch`, `@tensorflow/tfjs`); `scoreFromTranscription` is
+pure and always available. `DEFAULT_MAX_TRANSCRIPTION_MEASURES` and
+`DEFAULT_MAX_TRANSCRIPTION_NOTES` bound what one call will assemble.
+
+### Assembly contract
+
+`scoreFromTranscription(notes: readonly TranscribedNote[], options?:
+ScoreFromTranscriptionOptions): Score` is synchronous. It creates one part,
+one voice, a constant tempo, and enough measures to cover the accepted notes
+(at least one measure for empty input). It does not detect instruments,
+voices, meter, or a variable tempo map.
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `bpm` | `120` | Finite, positive output tempo. Pass the desired interpretation explicitly. |
+| `timeSignature` | `{numerator: 4, denominator: 4}` | Positive safe-integer numerator and denominator; defines measure duration. |
+| `quantizeGrid` | `4` | Nonnegative safe integer subdivisions per quarter. Zero uses 480 ticks per quarter; rounded durations have at least one grid unit. |
+| `title` | `'Transcription'` | Score title. |
+| `partName` | `'Transcribed'` | The single part's name. |
+| `maxNotes` | `DEFAULT_MAX_TRANSCRIPTION_NOTES` (`100_000`) | Positive safe integer limiting input count, before pitch filtering. |
+| `maxMeasures` | `DEFAULT_MAX_TRANSCRIPTION_MEASURES` (`4_096`) | Positive safe integer limiting materialized measures. |
+
+For each input note, `midi` must be finite; its rounded pitch outside 0–127
+is skipped. For an accepted pitch, seconds must be finite, nonnegative, and
+ordered, and velocity must be finite. Velocity is multiplied by 127, rounded,
+and clamped to 1–127. Invalid options, accepted-note values, unsafe timing
+arithmetic, or resource-limit violations throw `RangeError`. Assembly owns
+no context, subscription, or running clock and has no disposal step.
+
+## Project module factories
+
+`createWebMusicProjectPlugins(): readonly ProjectPluginFactory[]` returns trusted
+factory definitions for [Kernel projects](/kernel/api/#versioned-projects).
+Register them in `ProjectPluginRegistry` explicitly. Calling this function
+creates no graph, loads no asset and registers nothing globally. Each factory
+creates a fresh instance owned by `ModuleProjectRuntime`; all use the project's
+borrowed audio environment and staged output destination.
+
+Every built-in factory uses exact plugin version **`1.0.0`**. This is the
+project-plugin schema version, separate from the package release version.
+
+| Plugin ID | Configuration and assets | Ports / parameters |
+| --- | --- | --- |
+| `webmusic.score-player` | Asset role `source` must resolve to a Score. `waveform` defaults `sine`; accepts sine/square/triangle/sawtooth. `offsetSeconds` defaults 0 and `positionScale` 1. Owns an oscillator Sound and one ScorePlayerModule. | Audio `output`; oscillator/shared ADSR parameters, including gain, detune, cutoff, resonance and busGain. |
+| `webmusic.audio-player` | Asset role `source` must resolve to an AudioClip. `offsetSeconds` defaults 0 and `positionScale` 1. Owns one AudioClipPlayer. | Audio `output`; synchronous `volume` (0…1) and `pan` (−1…1). Native automation uses an audio bus/effect parameter. |
+| `webmusic.score-rack` | `masterVolume` defaults 1. Optional `channels` maps stable child module IDs to `{volume?, muted?, solo?}`; channel volume is 0…1. Settings apply after child admission and live states are exported while unresolved records are retained. | Audio `input` and `output`; a child context owned by this module admits outputs as real Rack channels. |
+| `webmusic.audio-bus` | `gain` defaults 1. A child context owned by this module routes its normal outputs into this bus. | Audio `input`, `output`; native gain parameter. |
+| `webmusic.effect` | Required `type`: gain, filter, delay, compressor or reverb. `options` defaults `{}` and uses the effect's named numeric options. Filter options additionally accept a Biquad `type` (default lowpass). | Audio `input`, `output`; the realized effect's shared parameters. |
+| `webmusic.lfo` | Session-relative `frequency` defaults 1 cycle/Session-second, `phase` 0 cycles, `waveform` sine and `loop` repeat (or once). | Control `output`; shared frequency/phase handles. Paused Session produces zero; phase reconstructs from Session position. |
+
+Gain options are `gain`; filter options are `frequency`, `Q`, `gain`, `type`;
+delay options are `delaySeconds`, `feedback`, `wet`, `dry`; compressor options
+are `threshold`, `knee`, `ratio`, `attack`, `release`; reverb options are
+`seconds`, `decay`, `wet`, `dry`. Units and backend ranges follow
+[Score Effect](/score/headless/play/effect/). Runtime module `params` restore
+onto realized handles after construction, independently of recipe defaults.
+
+The application supplies `resolveAsset(reference, signal)`. Bridge checks the
+resolved domain object; it does not fetch URLs, decode arbitrary files, persist
+sample data or install missing code. A saved plugin reference without a matching
+registry entry remains unresolved until an explicit registration and retry.
+See [the complete project example](/bridge/modular-composition/#save-and-edit-a-project).
+
+## Components as page elements
+
+`@webmusic/bridge/component` runs a component made of objects (DEC-074) outside
+Studio, from public entries only (DEC-078). It needs `@webmusic/ui`.
+
+### Components in a graph
+
+Any official Component in `OFFICIAL_COMPONENTS` can be placed in a graph as a
+box with ports (DEC-081). Its `ComponentManifest` declares the box's name, the
+Element's tag, the project plugin, its ports, its parameters (box arguments by
+position, written to Element attributes) and how it takes a box's size. Each
+port is carried by a public member the Element already has: an audio input is
+connected to an `AnalyserNode` handed to `analyser`, a source input hands the
+upstream module to `inputModule`, and a note output forwards the note port of
+`module`. Hosts place, bind and size every component from its manifest, with
+no code for its kind.
+
+A player or desk plays inside the graph (DEC-084). Its box lends the Element a
+module context with the graph's Session and audio environment, whose default
+destination is the box's `output`, so the player's own transport and the
+graph's command one Session. A desk admits each audio input as a numbered
+channel through its `module`, and a player's `source` output carries its own
+`module` to a companion. The music is the project asset the manifest's
+`asset` names, loaded by the box and given to the Element's `score` or
+`clip`. A recorder is handed, through `inputModule`, a module whose `notes`
+output repeats the notes cabled to its box. A panel is handed the upstream
+module through `moduleTarget` and edits that module's parameters and inserts;
+without a cord it is unbound.
+
+`take` and `playlist` are companions of an audio player. A source cord from a
+`track` hands them that track's Element through `player`: the playlist's queue
+becomes the track's transport and one participant of the graph's Session, and
+a take is auditioned through the track. Without a cord they are linked to no
+player and wait. The playlist's entries are its box's asset roles `entry1`,
+`entry2`, …, loaded as clips and named by their files, and its queue plays
+into its own `output`. A buffer name is used as the component's manifest says:
+`clip` edits the buffer, `wave` shows it read-only, and `take` writes each
+finished take to it. A `wave` cabled from a `track` follows it as a view
+nested in that player would: its playhead, and its audio when it names no
+buffer. As a spectrogram it shows data the host computes from that audio, at
+most 2048 columns. `eq` takes the audio cabled into it through the panel's EQ
+and out of its `output`, in the graph's AudioContext.
+
+| Box | Element | Ports | Arguments |
+| --- | --- | --- | --- |
+| `keys` | `<score-note-input>` | `notes` note out | `low` `high` (48 72) |
+| `roll` | `<score-grid-view>` | `source` source in | — |
+| `scope` | `<audio-oscilloscope>` | `input` audio in | milliseconds (10) |
+| `meter` | `<audio-meter>` | `input` audio in | — |
+| `spectrum` | `<audio-spectrum-analyzer>` | `input` audio in | — |
+| `level` | `<audio-level-analyzer>` | `input` audio in | threshold dBFS (-12) |
+| `clip` | `<audio-clip-view>` | — | the name of a shared buffer; without one it shows nothing until named |
+| `sheet` | `<score-sheet-view>` in flow layout | `source` source in | — |
+| `view` | `<score-view>` | `source` source in | type: `staff`, `piano-roll` or `waterfall` (staff) |
+| `pitch` | `<score-pitch-view>` | `source` source in | type: `keyboard`, `staff` or `fretboard` (keyboard) |
+| `chords` | `<score-chord-analysis>` | `source` source in | — |
+| `intervals` | `<score-interval-analysis>` | `source` source in | — |
+| `rhythm` | `<score-rhythm-analysis>` | `source` source in | — |
+| `degrees` | `<score-scale-analysis>` | `source` source in | scale (major), tonic |
+| `transients` | `<audio-transient-analyzer>` | `input` audio in | — |
+| `live` | `<audio-live-view>` | `input` audio in | type: `waveform` or `spectrogram` (waveform) |
+| `player` | `<score-player>` with its transport | `output` audio out, `source` source out | — (asset `source`: a Score) |
+| `track` | `<audio-player>` with its transport | `output` audio out | — (asset `source`: an AudioClip) |
+| `rack` | `<score-rack-control>` | `in1`–`in4` audio in, one channel each; `output` audio out | — |
+| `mixer` | `<audio-mixer>` | `in1`–`in4` audio in, one channel each; `output` audio out | — |
+| `recorder` | `<score-recorder>` | `notes` note in; `output` audio out | — |
+| `panel` | `<score-synth-panel>` with sound, envelope and effects | `target` source in, from a `player` | — |
+| `wave` | `<audio-view>`, read-only | `source` source in, from a `track` | the name of a shared buffer; type: `waveform` or `spectrogram` (waveform) |
+| `take` | `<audio-recorder>` | `player` source in, from a `track` | the name of the shared buffer each take is written to |
+| `playlist` | `<audio-playlist>` | `player` source in, from a `track`; `output` audio out | — (asset roles `entry1`, `entry2`, …: AudioClips) |
+| `eq` | `<score-synth-panel>` in insert mode, effects then EQ | `input` audio in, `output` audio out | effects: Score effect types, separated by commas (none) |
+| `effect` | `<score-effect>`, one insert on a score player | `target` source in, from a `player` | type: `gain`, `panner`, `filter`, `delay`, `reverb`, `compressor`, `limiter`, `tremolo`, `chorus`, `distortion` or `bitcrusher` (gain) |
+| `audio-effect` | `<audio-effect>`, one insert on a track | `target` source in, from a `track` | type: `gain`, `filter`, `delay` or `compressor` (gain) |
+| `part` | `<score-rack-part>` in a desk of its own | `output` audio out, `source` source out | sound: `sine`, `square`, `sawtooth` or `triangle` (triangle); asset `source`, a Score |
+
+A word argument with listed choices rejects any other word and keeps its
+default. Each component draws its own surface before a cord brings its data.
+
+A `buffer` object holds named samples and shows nothing; `clip name` shows and
+edits them. `migrateBufferViews(project)` moves a buffer that an older project
+placed in its presentation into a `clip` beside it; `mountComponent` applies it.
+The five components of DEC-078 keep their `webmusic.surface.*` plugin IDs, so
+earlier projects load unchanged. `projectManifest(project, contextId?)` derives
+a graph-authored component's ports from its edge objects — `inlet`, `inlet~`,
+`inlet.note` and `inlet.source`, `outlet`, `outlet~`, `outlet.note` and
+`outlet.source` — as `in<n>` and `out<n>`, as the `component` object names
+them, and lists its assets. A component made of objects therefore has every
+port family an official one has (DEC-089). `componentContents(project, shell?)`
+lists what one level of a component shows: interface objects, official
+components and nested components set to show theirs (`config.embed`), where
+its presentation puts them; `mountComponent` draws a nested component that
+shows its contents as a framed cell of that level.
+
+`mountComponent(host, project, options?)` runs the project in a
+`ModuleProjectRuntime` over `createComponentPlugins` and shows its
+presentation under a UI Kit transport: the modules placed in
+`layout.presentation`, or every component and interface object at its
+editing position when nothing is placed. It returns `{runtime, ready, save(),
+setStyling(), play(), pause(), destroy()}`; a `place(record)` option puts each shown box in an element of a page the host lays out itself, with no frame, transport or stage (DEC-092); `save()` resolves to the project as it stands,
+with live parameter values and every score as its views edited it (DEC-087),
+and mounting that project gives the same component again; `destroy` releases
+the runtime, the audio environment it made, the elements and their bindings. Each placed Element is bound before it
+is shown and taken off the page before its binding is released, so a player
+never starts a Session of its own. `mountComponent` owns the runtime's Session
+and preloads it as members join, so a placed player's parameters and inserts
+exist before the first play. Options: `extra` (more factories, such
+as a prepared `processorPlugin`), `midi`, `wam`, `objects` (the object
+environment), `plugins` (replace the set), `resolveAsset` and `base` (assets,
+by default `resolveComponentAsset` relative to the page), `audio` (lend an
+environment), `editableBuffers` (let a `clip` edit its buffer), `label` and
+`onError`. The first pointer or
+key in the component resumes its AudioContext.
+
+`defineComponentElement(tag, project, options?)` defines a custom element that
+mounts the project in its shadow root while connected (its `component`
+property is the handle) and returns the class; a defined tag is left as it is.
+
+```ts
+import {defineComponentElement} from '@webmusic/bridge/component';
+
+const project = {
+  schema: 'webmusic.module-project', version: 1, id: 'arabesque-filter', contexts: [{id: 'root'}],
+  assets: [{id: 'midi', uri: 'midi/Arabesque%20No.1.mid', mediaType: 'audio/midi'}],
+  modules: [
+    {id: 'piano', contextId: 'root', plugin: {id: 'webmusic.score-player', version: '1.0.0'}, config: {waveform: 'sawtooth'}, assets: {source: 'midi'}},
+    {id: 'filter', contextId: 'root', plugin: {id: 'webmusic.effect', version: '1.0.0'}, config: {type: 'filter', options: {type: 'lowpass', frequency: 900}}},
+    {id: 'cutoff', contextId: 'root', label: 'dial 200. 4000.', plugin: {id: 'webmusic.object.dial', version: '1.0.0'}, config: {args: '200. 4000.'}},
+  ],
+  connections: [
+    {id: 'a', kind: 'audio', from: {moduleId: 'piano', port: 'output'}, to: {moduleId: 'filter', port: 'input'}, mode: 'replace'},
+    {id: 'b', kind: 'message', from: {moduleId: 'cutoff', port: 'out0'}, to: {moduleId: 'filter', port: 'param:frequency'}},
+  ],
+};
+defineComponentElement('arabesque-filter', project);
+// <arabesque-filter></arabesque-filter> now plays Arabesque No. 1 through a filter its dial controls.
+```
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `mountComponent` · `defineComponentElement` | function · element factory | Run a project in a host or as a custom element. |
+| `keepComponentSessionPreloaded` | function | `keepComponentSessionPreloaded(runtime, onError?)` preloads a runtime's Session as members join and follows a rebuilt Session; a host with its own runtime calls it, as `mountComponent` does. A member whose score is a document still being applied cannot prepare yet: the preload is asked again shortly, up to twenty times, before that is reported. It returns the function that stops it. |
+| `createComponentPlugins` | function | Every plugin a component may use: Bridge players and effects (the score player with a `source` outlet), `webmusic.mc.effect`, Kernel objects, sampler and MIDI objects, the official components, `webmusic.wam` when `wam` is given, and `extra`. |
+| `resolveComponentAsset` | function | Load an asset by URI: MIDI and MusicXML as a Score, audio files as an AudioClip. |
+| `componentPorts` | function | The ports of a placed component, official (from its manifest) or made of objects (from the channel kinds its config lists, as `in<n>` and `out<n>`); undefined for a module that is not a component (DEC-093). |
+| `OFFICIAL_COMPONENTS` · `ComponentManifest` · `ComponentAsset` · `componentManifestOf` · `findComponentManifest` · `isListener` | constant · type · functions | The manifests of the official components a graph can hold, by plugin ID or box name; `isListener(plugin)` is true for a component whose inputs only listen, so its audio cords are sends. |
+| `KEYS_PLUGIN` · `ROLL_PLUGIN` · `SCOPE_PLUGIN` · `METER_PLUGIN` · `SPECTRUM_PLUGIN` · `LEVEL_PLUGIN` · `CLIP_PLUGIN` · `COMPONENT_PLUGIN_VERSION` | constants | Their project plugin IDs and version. |
+| `configOfArguments` · `componentUsage` · `parameterValue` | functions | A module config from a box's argument words, with the first problem; a box's usage line; one parameter's value or fallback. |
+| `ComponentSurfaces` · `SurfaceSlot` · `SurfaceChannel` · `SurfaceEntry` | classes · type | One project plugin per manifest, and the slot of each box: the analyser, upstream module, note sink, note source, lent module context, desk channels or loaded asset its Element borrows, and the Element's own module a source cord carries. Pass `connect` to the runtime for source cords. |
+| `createComponentElement` · `configureComponentElement` · `bindComponentElement` · `rebindsOnConfig` · `defineComponentElements` | functions | Make a component's Element from its config, apply a changed config, and bind it to its slot (and a named buffer); `rebindsOnConfig` is true when a changed config needs a new binding. A player or desk must be inside its box when bound, and is best bound before the box is shown; take it off the page before calling the release function. |
+| `componentSettings` · `settableAttributes` · `withComponentSetting` · `isStyleSetting` · `GRAPH_ATTRIBUTES` · `ComponentSettings` · `ComponentSettingKind` | functions · constant · types | A component's own settings in a graph (DEC-085): `attributes` and `style` in its module's config. `componentSettings(manifest, config)` returns those that may be applied: an attribute the Element observes that is not graph-owned (`GRAPH_ATTRIBUTES`), written by a box argument or `locked` by the manifest, and a `--wm-` custom property whose value loads nothing (`isStyleSetting`). `settableAttributes(manifest)` lists the attributes, and is empty until the Element is defined. `withComponentSetting(config, kind, name, value)` returns a config with one setting written, or removed for `undefined`. `configureComponentElement` applies them; anything else in the two records is ignored without an error. |
+| `ComponentSurfaces.document` · `SurfaceSlot.score` · `SurfaceSlot.document` · `SurfaceSlot.lender` | members | Editing a score from a view (DEC-086). `document(id)` is the `ScoreEditor` that owns the score box `id` plays, made the first time it is asked for and kept; `document(id, true)` only looks. A box that plays a score provides `score` and plays `document` once there is one; a `source` cord offers the reached box a `lender`, which a component whose manifest says `edits: 'score'` calls while its `editable` attribute is on. Edits are not written to the project's asset. |
+| `ComponentSurfaces.withDocument` · `revive` · `revert` · `forget` · `enter` · `documentState` · `subscribe` · `settled` · `ComponentDocumentState` | members · type | Saving an edited score (DEC-087). `withDocument(id, config)` is the config a box exports: its edited score under `document`, or none while the document is still the asset. `revive(id, config, signal?)` starts a box from the score its config holds; a document already edited stays, and an unreadable score rejects with `ProjectModuleUnavailableError`. `revert(id)` replaces the document with a new one made from the box's asset. `enter(id)` counts a module of a box in and returns the function that counts it out; the document goes with the last one. `forget(id?)` lets go of one document or of all, for a host about to show another project. `documentState(id)` is `'original'`, `'edited'`, `'unsaved'` (edited, but too large to save or without compression streams), or undefined for a box that plays no score. `subscribe(listener)` reports a change in what a box saves; `settled()` resolves when every edit so far is encoded. |
+| `THEME_TOKENS` · `componentTheme` · `withComponentTheme` · `styleSettings` · `styleDeclarations` · `applyComponentStyle` · `ThemeToken` · `ThemeTokenKind` | constant · functions · types | A component's theme and an interface object's style (DEC-088). `THEME_TOKENS` lists the shared roles every display part falls back to, each with its `kind` (`color`, `length`, `border` or `font`), `role` and `fallback`. `componentTheme(project)` is the project's `layout.style` as it may be applied: `--wm-` names with values that load nothing. `withComponentTheme(project, name, value)` returns the project with one token written, or removed for `undefined`, and throws for a value a setting would refuse. `styleSettings(style)` filters any such record, `styleDeclarations(style)` writes it as CSS declarations, and `applyComponentStyle(element, style)` writes it on an element and takes back what an earlier call wrote. `mountComponent` writes the theme on the root it makes, or at `:host` inside a shadow root, and each interface object's `style` on its box. |
+| `styleSource` · `withStyleSource` · `ownStyle` · `StyleSource` | functions · type | Whose style is shown (DEC-090): `'own'`, the default, or `'inherit'` for that of what holds it. `styleSource(config)` reads a box's choice from its config's `styling`; `withStyleSource(config, source)` writes it, leaving no key for `'own'`; `ownStyle(config)` is the box's `style` as it may be written, or nothing while it inherits. `componentSettings` returns no style for a box that inherits and keeps its attributes. For a whole component, pass `styling` to `mountComponent`, call `ComponentHandle.setStyling(source)`, or write `styling="inherit"` on a defined element: neither the theme nor any box's own style is then written, in place, and `save()` still resolves to the project with them. |
+| `encodeScore` · `decodeScore` · `canSaveScores` · `SAVED_SCORE_FORMAT` · `SAVED_SCORE_ENCODING` | functions · constants | The saved form of a score: `{format: 'webmusic.score+json', encoding: 'gzip+base64', data: string[]}`, the Score's JSON gzipped as base64 text in strings of at most 32 768 characters. `encodeScore(score)` resolves to it, or to undefined when it cannot be saved. `decodeScore(value)` resolves to the Score and rejects for a value that is not one, holds more than 1 000 000 characters, inflates beyond 24 MB or is not a valid Score. Both need `CompressionStream` and `DecompressionStream`; `canSaveScores()` says whether they are there. |
+| `fitComponentElement` · `bindBufferView` | functions | `fitComponentElement(element, manifest, box?)` makes the Element as tall as its box and follows the box's size (DEC-080); a component without a fit keeps its own height. `bindBufferView` shows a shared buffer in an `<audio-clip-view>`. |
+| `projectManifest` · `migrateBufferViews` | functions | A graph-authored component's ports and assets; an older project's presented buffer moved into a `clip`. |
+| `mountObjectControl` · `CONTROL_OBJECTS` · `controlSize` | functions · constant | The UI Kit control of an interface object, following its rebuilt instances; it fills its host, so the host needs a size. `controlSize(name, text)` is the control's natural size in CSS pixels. |
+| `componentModuleSource` · `componentPageSource` · `componentResources` · `standardPluginIds` | functions | Exported code: a module that defines the element, a standalone page, and the assets and plugins either needs beyond the packages. |
+
+An exported module imports `@webmusic/bridge/component`, so a project that
+installs `@webmusic/kernel`, `@webmusic/ui`, `@webmusic/score`, `@webmusic/audio`
+and `@webmusic/bridge` imports it and writes the element. An exported page
+imports the published entry from jsDelivr's ESM build (`version` defaults to
+0.3.0, or pass `moduleUrl`), so it works once that version is published. Both
+list, as comments, the asset URIs and the plugins outside the standard set
+(such as a DSP processor) that must be supplied through `extra`.
+
+## API Reference
+
+Every export of the root, exactly once.
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `createScoreAudioSession` | factory | [createScoreAudioSession](/bridge/headless/score-audio-session/) — one Session over a Score engine and an Audio clip. |
+| `registerAudioParticipant` | adapter | Register a Headless Audio engine with a Session on `clip-seconds`. |
+| `beatGridFromTimeMap` | function | Sample a score's exact tempo map onto an audio `BeatGrid`. |
+| `timeMapFromBeatGrid` | function | Carry a detected beat grid into a score `TimeMap`. |
+| `renderScoreToClip` | function | Render a score offline into an `AudioClip`. |
+| `scoreFromTranscription` | function | Assemble transcribed note events into a `Score`. |
+| `createWebMusicProjectPlugins` | factory | Exact-version Score, Audio, Rack, bus, effect and Session-LFO factories for Kernel project restore. |
+| `DEFAULT_MAX_MAPPED_BEATS` | constant | The beat ceiling `beatGridFromTimeMap` will not exceed. |
+| `DEFAULT_MAX_TRANSCRIPTION_MEASURES` | constant | Measure ceiling for one assembly. |
+| `DEFAULT_MAX_TRANSCRIPTION_NOTES` | constant | Note ceiling for one assembly. |
+| `CreateScoreAudioSessionOptions` · `ScoreAudioSession` | types | Options and result of `createScoreAudioSession`. |
+| `AudioParticipantOptions` · `AudioParticipantPlayer` | types | Options and engine surface of `registerAudioParticipant`. |
+| `BeatGridFromTimeMapOptions` | type | Options for `beatGridFromTimeMap`. |
+| `ScoreFromTranscriptionOptions` | type | Options for `scoreFromTranscription`. |

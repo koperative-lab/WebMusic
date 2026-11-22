@@ -8,17 +8,17 @@ Their bodies and paths are retained as technical and migration evidence.
 Old imports, API shapes, install commands, counts and links may no longer
 match the package. They are not current runbooks or acceptance evidence.
 Use the current [package README](../README.md),
-[getting started guide](../../../apps/doc/webmusic/src/content/docs/score/index.mdx) and
-[API entry reference](../../../apps/doc/webmusic/src/content/docs/score/api/index.mdx) for supported usage.
+[getting started guide](../../../doc/src/content/docs/score/index.mdx) and
+[API entry reference](../../../doc/src/content/docs/score/api/index.mdx) for supported usage.
 
 | Historical note | Current authoritative reference |
 | --- | --- |
-| [analyze](README-analyze.md) | [Current analyze API reference](../../../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx) |
-| [core](README-core.md) | [Current core API reference](../../../apps/doc/webmusic/src/content/docs/score/api/index.mdx) |
-| [io](README-io.md) | [Current io API reference](../../../apps/doc/webmusic/src/content/docs/score/api/io.mdx) |
-| [play](README-play.md) | [Current play API reference](../../../apps/doc/webmusic/src/content/docs/score/api/play.mdx) |
-| [react](README-react.md) | [Current react API reference](../../../apps/doc/webmusic/src/content/docs/score/api/react.mdx) |
-| [view](README-view.md) | [Current view API reference](../../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) |
+| [analyze](README-analyze.md) | [Current analyze API reference](../../../doc/src/content/docs/score/api/analyze.mdx) |
+| [core](README-core.md) | [Current core API reference](../../../doc/src/content/docs/score/api/index.mdx) |
+| [io](README-io.md) | [Current io API reference](../../../doc/src/content/docs/score/api/io.mdx) |
+| [play](README-play.md) | [Current play API reference](../../../doc/src/content/docs/score/api/play.mdx) |
+| [react](README-react.md) | [Current react API reference](../../../doc/src/content/docs/score/api/react.mdx) |
+| [view](README-view.md) | [Current view API reference](../../../doc/src/content/docs/score/api/view.mdx) |
 
 The current site sources linked above own usage and API documentation. Do not
 update an old example here as a second copy of that reference. If a historical

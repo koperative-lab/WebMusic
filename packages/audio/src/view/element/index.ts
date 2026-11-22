@@ -1,4 +1,4 @@
-// Styled Web Component entry — imported via `@webmusic/audio/view/element`.
+// Styled Component entry — imported via `@webmusic/audio/view/element`.
 // Kept separate from the package's main entry so the renderer/binding API tree-shakes free of
 // any custom-element / DOM registration code for code-only consumers.
 //

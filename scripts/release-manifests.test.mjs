@@ -26,8 +26,8 @@ function checkout(t, origin) {
       publishConfig: {access: 'public'},
     }));
   }
-  mkdirSync(path.join(root, 'apps/doc/webmusic'), {recursive: true});
-  writeFileSync(path.join(root, 'apps/doc/webmusic/package.json'), JSON.stringify({name: 'webmusic-doc', private: true}));
+  mkdirSync(path.join(root, 'doc'), {recursive: true});
+  writeFileSync(path.join(root, 'doc/package.json'), JSON.stringify({name: 'webmusic-doc', private: true}));
   if (origin !== undefined) {
     execFileSync('git', ['init', '--quiet', root]);
     if (origin !== null) execFileSync('git', ['-C', root, 'remote', 'add', 'origin', origin]);

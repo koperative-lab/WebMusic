@@ -128,10 +128,40 @@
         "default": "./dist/session.cjs"
       }
     },
+    "./processor": {
+      "import": {
+        "types": "./dist/processor.d.ts",
+        "default": "./dist/processor.js"
+      },
+      "require": {
+        "types": "./dist/processor.d.cts",
+        "default": "./dist/processor.cjs"
+      }
+    },
+    "./processor-worklet": {
+      "import": {
+        "types": "./dist/processor-worklet.d.ts",
+        "default": "./dist/processor-worklet.js"
+      },
+      "require": {
+        "types": "./dist/processor-worklet.d.cts",
+        "default": "./dist/processor-worklet.cjs"
+      }
+    },
+    "./objects": {
+      "import": {
+        "types": "./dist/objects.d.ts",
+        "default": "./dist/objects.js"
+      },
+      "require": {
+        "types": "./dist/objects.d.cts",
+        "default": "./dist/objects.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/events.ts src/elements.ts src/worker.ts src/audio-context.ts src/player.ts src/effect.ts src/module.ts src/meter.ts src/transport.ts src/tick.ts src/session.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
+    "build": "tsup src/index.ts src/events.ts src/elements.ts src/worker.ts src/audio-context.ts src/player.ts src/effect.ts src/module.ts src/meter.ts src/transport.ts src/tick.ts src/session.ts src/processor.ts src/processor-worklet.ts src/objects.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepack": "node ../../scripts/package-artifacts.mjs"

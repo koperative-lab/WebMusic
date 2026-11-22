@@ -292,9 +292,9 @@ test('successful deadline SIGKILL preserves the command result and releases star
 
 test('all npm entry points route through the same startup coordinator without predev stop', async () => {
   const root = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  const site = JSON.parse(await readFile(new URL('../apps/doc/webmusic/package.json', import.meta.url), 'utf8'));
+  const site = JSON.parse(await readFile(new URL('../doc/package.json', import.meta.url), 'utf8'));
   assert.equal(root.scripts.predev, undefined);
   assert.equal(root.scripts.dev, 'node scripts/docs-dev.mjs --build');
   assert.equal(root.scripts['dev:restart'], 'node scripts/docs-dev.mjs --build restart');
-  assert.equal(site.scripts.dev, 'node ../../../scripts/docs-dev.mjs');
+  assert.equal(site.scripts.dev, 'node ../scripts/docs-dev.mjs');
 });

@@ -2,6 +2,7 @@ import type {InsertChain} from '../effect';
 import type {AudioInputPort, AudioOutputPort} from './audio-port';
 import type {ControlPort} from './control-port';
 import type {NoteInputPort, NoteOutputPort} from './note-port';
+import type {MessageInputPort, MessageOutputPort} from './message';
 import type {PortDirection, PortFamily} from './port';
 import type {SourcePort} from './source-port';
 import type {TransportPort} from './transport-port';
@@ -16,6 +17,7 @@ export interface ModulePortMap {
   control: ControlPort;
   transport: TransportPort;
   source: SourcePort;
+  message: MessageOutputPort | MessageInputPort;
 }
 
 /** Any port a module can expose. */

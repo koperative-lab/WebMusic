@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
 import {SessionTransport} from '@webmusic/kernel/session';
-import {Duration, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
+import {Duration, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type Score, type ScoreDocumentSnapshot, type ScoreDocumentSource} from '../../src/core';
 import {ScorePlayer} from '../../src/play/headless/score-player';
 import {ScorePlayerModule} from '../../src/play/headless/score-module';
 import type {HeadlessSynth} from '../../src/play/headless/audio-contracts';
@@ -168,5 +168,66 @@ describe('Score consumes one Session scheduling authority', () => {
     await f.session.play();
     expect(f.context.resume).toHaveBeenCalledOnce();
     expect(f.ons[0].time).toBeCloseTo(0.1);
+  });
+
+  it('applies a document revision to a Session follower: the Session pauses, keeps its position, and plays the new notes from there (DEC-086)', async () => {
+    /** A document source for tests: one content, replaced whole. */
+    class Document implements ScoreDocumentSource {
+      private value: ScoreDocumentSnapshot;
+      private readonly listeners = new Set<(snapshot: ScoreDocumentSnapshot) => void>();
+      constructor(content: Score) { this.value = Object.freeze({documentId: 'document', documentRevision: 0, contentId: 'content-0', content, status: 'ready'}); }
+      getSnapshot(): ScoreDocumentSnapshot { return this.value; }
+      subscribe(listener: (snapshot: ScoreDocumentSnapshot) => void): () => void { this.listeners.add(listener); listener(this.value); return () => { this.listeners.delete(listener); }; }
+      replace(content: Score): void {
+        const revision = this.value.documentRevision + 1;
+        this.value = Object.freeze({documentId: 'document', documentRevision: revision, contentId: `content-${revision}`, content, status: 'ready'});
+        for (const listener of [...this.listeners]) listener(this.value);
+      }
+    }
+    const flush = async () => { for (let index = 0; index < 20; index++) await Promise.resolve(); };
+    const f = fixture({notes: [{start: 0, duration: 4, midi: 60}]});
+    await f.session.play();
+    f.at(0.6);
+    expect(f.ons.map(note => note.midi)).toEqual([60]);
+    expect(f.player.followsSession).toBe(true);
+    const origin = f.session.clock.state.originTime;
+
+    // Attaching the document is a revision: the member asks the Session to pause, and the player writes no transport.
+    const document = new Document(score([{start: 0, duration: 4, midi: 64}]));
+    expect(() => f.module.setDocumentSource(document)).not.toThrow();
+    expect((await f.player.waitForDocumentRevision(document.getSnapshot())).status).toBe('applied');
+    await flush();
+    expect(f.session.snapshot.paused).toBe(true);
+    expect(f.cancel).toHaveBeenCalled();
+    const position = f.session.position;
+    expect(position).toBeCloseTo(0.5);
+    expect(f.player.playback.snapshot().score).toBe(document.getSnapshot().content);
+    expect(() => f.player.pause()).toThrow(/owned by its Session/);
+
+    // Played again, the Session goes on from where it was, with the document's notes.
+    await f.session.play();
+    expect(f.ons.map(note => note.midi)).toEqual([60, 64]);
+    expect(f.session.position).toBeCloseTo(position);
+    expect(f.session.clock.state.originTime).not.toBe(origin);
+
+    // An edit while it plays does the same, and the Session reads the member's new length.
+    f.at(1.2);
+    document.replace(score([{start: 0, duration: 8, midi: 67}]));
+    expect((await f.player.waitForDocumentRevision(document.getSnapshot())).status).toBe('applied');
+    await flush();
+    expect(f.session.snapshot.paused).toBe(true);
+    expect(f.session.snapshot.durationSeconds).toBe(8);
+    await f.session.play();
+    expect(f.ons.map(note => note.midi)).toEqual([60, 64, 67]);
+
+    // Paused, a revision is adopted without another command.
+    await f.session.pause();
+    const commits = f.session.snapshot.revision;
+    document.replace(score([{start: 0, duration: 8, midi: 72}]));
+    expect((await f.player.waitForDocumentRevision(document.getSnapshot())).status).toBe('applied');
+    await flush();
+    expect(f.session.snapshot.revision).toBe(commits);
+    await f.session.play();
+    expect(f.ons.at(-1)!.midi).toBe(72);
   });
 });

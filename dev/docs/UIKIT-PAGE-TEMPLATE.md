@@ -1,7 +1,7 @@
 # UI Kit page template
 
 This is the authoring contract for
-`apps/doc/webmusic/src/content/docs/uikit/<class>/<presenter>.mdx`: each published
+`doc/src/content/docs/uikit/<class>/<presenter>.mdx`: each published
 `@webmusic/ui/<presenter>` entry has a reference page. Source, catalogs, and
 policies determine the classified release surface; see
 [COMPONENTS.md](../COMPONENTS.md), not counts or migration notes in this template.
@@ -32,12 +32,12 @@ document their real exports rather than inventing a uniform State/Binding.
 
 ## Page and supporting files
 
-Here, `src/` paths are relative to `apps/doc/webmusic/`.
+Here, `src/` paths are relative to `doc/`.
 
 | File | Responsibility |
 |---|---|
 | `src/content/docs/uikit/<class>/<presenter>.mdx` | Prose, Import, API, Styling, and composition navigation |
-| `apps/doc/shared/ui-presenter-catalog.ts` | Presenter/class/label/summary, canonical import, consumerTags, and demo state/options specifications |
+| `doc/shared/ui-presenter-catalog.ts` | Presenter/class/label/summary, canonical import, consumerTags, and demo state/options specifications |
 | Relevant module under `src/lib/ui-presenter-demos/` | Caller state, binding, actual mount, feedback, and cleanup; use the existing module routing |
 | `src/components/UiPresenterLiveDemo.astro` | Shared panel, controls, readout, and Copy/Reset |
 | `src/components/UiPresenterRelated.astro` | Used by / More in class navigation |

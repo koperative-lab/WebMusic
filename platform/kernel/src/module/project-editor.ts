@@ -11,9 +11,13 @@ export interface ProjectEditorPort {
 }
 export interface ProjectEditorModule {
   readonly id: string;
+  /** The context the module belongs to; nested components have their own (DEC-076). */
+  readonly contextId?: string;
   readonly label: string;
   readonly ports: readonly ProjectEditorPort[];
   readonly position?: {readonly x: number; readonly y: number};
+  /** The box's saved size in canvas pixels, when it was resized. */
+  readonly size?: {readonly width: number; readonly height: number};
   readonly status: 'ready' | 'unresolved';
   readonly diagnostic?: string;
 }
@@ -25,6 +29,8 @@ export interface ProjectEditorConnection {
   readonly status: 'connected' | 'unresolved';
   readonly diagnostic?: string;
   readonly editable?: boolean;
+  /** The project connection this cord shows, for runtime observation (DEC-078); absent for modulations and default routes. */
+  readonly recordId?: string;
 }
 export interface ProjectEditorState {
   readonly modules: readonly ProjectEditorModule[];
@@ -97,11 +103,12 @@ export function createProjectEditorBinding(runtime: ModuleProjectRuntime, option
         if (available.has(parameterId) || entry.status === 'unresolved') ports.push({id, parameterId, label, direction: 'input', kind: 'control'});
       }
       const position = project?.layout.modules.find(layout => layout.moduleId === entry.record.id);
-      return {id: entry.record.id, label: entry.record.label ?? entry.record.id, ports, position, status: entry.status, diagnostic: entry.diagnostic};
+      const size = position?.width !== undefined && position.height !== undefined ? {width: position.width, height: position.height} : undefined;
+      return {id: entry.record.id, contextId: entry.record.contextId, label: entry.record.label ?? entry.record.id, ports, position, ...(size ? {size} : {}), status: entry.status, diagnostic: entry.diagnostic};
     });
     const diagnostic = (kind: 'connection' | 'modulation', id: string) => state.unresolved.find(item => item.kind === kind && item.id === id)?.reason;
     const connections: ProjectEditorConnection[] = (project?.connections ?? []).map(record => ({
-      id: connectionId(record.id), from: record.from, to: record.to, mode: record.mode ?? (record.kind === 'audio' ? 'replace' : 'connect'),
+      id: connectionId(record.id), recordId: record.id, from: record.from, to: record.to, mode: record.mode ?? (record.kind === 'audio' ? 'replace' : 'connect'),
       status: diagnostic('connection', record.id) ? 'unresolved' : 'connected', diagnostic: diagnostic('connection', record.id),
     }));
     for (const record of project?.modulations ?? []) connections.push({

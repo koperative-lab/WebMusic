@@ -1,0 +1,29 @@
+---
+// One real <score-note-input> demonstrates every surface. The public `layout`
+// parameter switches that same element between piano, grid, and chords; the
+// preloaded map keeps the grid playable when readers switch to it.
+import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
+import ElementDemo from './ElementDemo.astro';
+---
+
+<ElementDemo tag="score-note-input">
+    <score-note-input
+      data-ni-input
+      data-ni-wire
+      layout="piano"
+      start="48"
+      end="71"
+      map={DEFAULT_TR808_GRID_MAP}
+    ></score-note-input>
+</ElementDemo>
+
+<script>
+  import {defineNoteInputElement, type NoteInputElement} from '@webmusic/score/play/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {monitorNoteInput} from './note-input-monitor';
+
+  defineNoteInputElement();
+  mountDemos('score-note-input[data-ni-wire]', (node, scope) => {
+    monitorNoteInput(node as NoteInputElement, scope);
+  });
+</script>

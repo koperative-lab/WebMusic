@@ -5,7 +5,7 @@
 //
 //   1. params catalog  ==  each element's `static observedAttributes`
 //   2. catalog integrity — every tag has a page, an entry and a live href
-//   3. selected element page structure, shared Score Headless leaf/demo shape and exports
+//   3. one Component page shape and type switch, shared Score Headless leaf/demo shape and exports
 //   4. live demo integration — every rendered demo uses LiveDemoCanvas
 //   5. plan rules — both family form inventories exist and carry no demos, dense
 //      element order, UI Kit labels mirror the catalog, root API entry coverage
@@ -21,12 +21,13 @@ import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
+import {elementDocProblems, headlessShapeProblems} from './element-docs-policy.mjs';
 import {requiredFeatureLayers} from './package-policy.mjs';
-import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
-import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
+import {declaredAgentContextPaths} from '../doc/scripts/agent-context.mjs';
+import {audioBridgeContext} from '../doc/scripts/agent-context-audio-bridge.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = 'apps/doc/webmusic/src/content/docs';
+const DOCS = 'doc/src/content/docs';
 const failures = [];
 const notes = [];
 
@@ -146,7 +147,7 @@ async function checkParams(sources) {
     .filter(([, layers]) => layers.element).map(([capability]) => `${family}-${capability}`));
   const catalog = {};
   for (const group of groups) {
-    const module = await load(`apps/doc/webmusic/src/lib/params/${group}.ts`);
+    const module = await load(`doc/src/lib/params/${group}.ts`);
     Object.assign(catalog, Object.values(module)[0]);
   }
 
@@ -182,8 +183,8 @@ async function checkParams(sources) {
 // ---------------------------------------------------------------------------
 
 async function checkCatalogs(pages, paramsCatalog) {
-  const {UI_COMPOSITION_CATALOG} = await load('apps/doc/shared/ui-catalog.ts');
-  const {UI_PRESENTER_CATALOG, UI_PRESENTER_CLASSES} = await load('apps/doc/shared/ui-presenter-catalog.ts');
+  const {UI_COMPOSITION_CATALOG} = await load('doc/shared/ui-catalog.ts');
+  const {UI_PRESENTER_CATALOG, UI_PRESENTER_CLASSES} = await load('doc/shared/ui-presenter-catalog.ts');
 
   const tags = new Set(UI_COMPOSITION_CATALOG.map((entry) => entry.tag));
   for (const entry of UI_COMPOSITION_CATALOG) {
@@ -241,24 +242,25 @@ function checkElementPages(files, paramsCatalog) {
     }
     const title = frontmatter(source).title;
     if (title !== `'<${tag}>'`) fail('page', `${page}: title is ${title}, expected '<${tag}>'`);
+  }
+}
 
-    const playgrounds = source.match(/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b[^>]*\/>/gm) ?? [];
-    if (playgrounds.length === 0) fail('page', `${page}: no live demo`);
-
-    // Element pages lead with the real demo. Strip only non-rendered preamble;
-    // fenced examples, prose, headings and notices must not precede the stage.
-    const body = source
-      .replace(/^---\r?\n[\s\S]*?\r?\n---/, '')
-      .replace(/<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/g, '')
-      .replace(/^\s*import\s+(?:[\w\s{},*]+\s+from\s+)?['"][^'"\r\n]+['"];?[ \t]*(?:\r?\n|$)/gm, '')
-      .trimStart();
-    if (!/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b/.test(body)) {
-      fail('page', `${page}: the main demo must be the first visible body content, before introduction and headings`);
-    }
-
-    for (const section of ['API', 'Styling']) {
-      if (!source.includes(`<summary>${section}</summary>`)) {
-        fail('page', `${page}: missing the ${section} <details> block`);
+/**
+ * The catalog's `switch` marks the one attribute an Element demo offers as its
+ * type switch. It must be an enum with at least two values whose fallback names
+ * the value an absent attribute resolves to, so the switch starts pressed on
+ * the drawing the element actually shows.
+ */
+async function checkTypeSwitches(catalog) {
+  const {defaultType} = await load('doc/src/components/element-demo-types.ts');
+  for (const [tag, spec] of Object.entries(catalog)) {
+    const switches = spec.params.filter((param) => param.switch);
+    if (switches.length > 1) fail('params', `<${tag}> marks ${switches.length} switch attributes; at most one`);
+    for (const param of switches) {
+      if (param.kind !== 'enum' || (param.options?.length ?? 0) < 2) {
+        fail('params', `<${tag}> ${param.name}: a switch must be an enum with at least two options`);
+      } else if (!defaultType(param.options, param.fallback)) {
+        fail('params', `<${tag}> ${param.name}: the fallback must start with the default option`);
       }
     }
   }
@@ -341,7 +343,7 @@ function checkCapabilityGroups(files) {
   // Both form inventories are required, and for the same reason: each is the
   // only page that lists its whole form for the family.
   for (const family of ['score', 'audio']) {
-    for (const [form, what] of [['element', 'Web Components'], ['headless', 'Headless']]) {
+    for (const [form, what] of [['element', 'Components'], ['headless', 'Headless']]) {
       const inventory = `${DOCS}/${family}/${form}/index.mdx`;
       if (!existsSync(abs(inventory))) {
         fail('plan', `${family}/${form}/index.mdx: the family ${what} inventory is missing`);
@@ -357,7 +359,7 @@ function checkCapabilityGroups(files) {
 
 /** The UI Kit class labels have one source; the navigation lists its groups from it. */
 async function checkUiKitLabels() {
-  const navigation = read('apps/doc/webmusic/src/site/navigation.ts');
+  const navigation = read('doc/src/site/navigation.ts');
   const start = navigation.indexOf("group('UI Kit'");
   const group = navigation.slice(start, navigation.indexOf("group('Kernel'", start));
   if (start < 0 || !/UI_PRESENTER_CLASSES\.map\(\(entry\) => group\(entry\.label, \[directory\(`uikit\/\$\{entry\.slug\}`\)\]/.test(group)) {
@@ -583,7 +585,7 @@ function collectPages(files) {
 }
 
 function astroRedirects() {
-  const config = read('apps/doc/webmusic/astro.config.mjs');
+  const config = read('doc/astro.config.mjs');
   const block = /redirects:\s*\{([\s\S]*?)\n {2}\},/.exec(config);
   const map = new Map();
   for (const line of block?.[1].split('\n') ?? []) {
@@ -615,7 +617,7 @@ function publicAssets() {
       else assets.add(`/${prefix}${encodeURIComponent(name)}`);
     }
   };
-  scan('apps/doc/webmusic/public', '');
+  scan('doc/public', '');
   return assets;
 }
 
@@ -657,7 +659,7 @@ function checkLinks(files, pages, redirects, assets) {
 // 9. The docs site's own component kit must not squat on @webmusic/ui's class
 //    names.
 //
-//    apps/doc/shared/ui.css loads globally on every page, and the elements the
+//    doc/shared/ui.css loads globally on every page, and the elements the
 //    docs demo mount kit presenters into the LIGHT DOM — so a docs rule sharing
 //    a name with a kit class silently restyles the shipped component it is
 //    supposed to be demonstrating, with the winner decided by document order.
@@ -683,7 +685,7 @@ function checkDocsCssNamespace() {
     for (const match of source.matchAll(/["'`](wui-[a-z0-9-]+(?:__[a-z0-9-]+)?)/g)) kit.add(match[1]);
     for (const match of source.matchAll(/\.(wui-[a-z0-9-]+(?:__[a-z0-9-]+)?)/g)) kit.add(match[1]);
   }
-  const stylesheet = 'apps/doc/shared/ui.css';
+  const stylesheet = 'doc/shared/ui.css';
   const declared = new Set(
     [...read(stylesheet).matchAll(/\.(wui-[a-z0-9_-]+)/g)].map((match) => match[1]),
   );
@@ -753,10 +755,21 @@ const paramsCatalog = await checkParams(sources);
 const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
-for (const message of headlessDocProblems({
-  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file === `${DOCS}/audio/headless/view/audio-clip-editor.mdx`).map((file) => ({file, source: read(file)})),
+for (const message of elementDocProblems({
+  pages: files.filter((file) => /\/(?:score|audio)\/element\//.test(file)).map((file) => ({file, source: read(file)})),
   readFile: read,
-  frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
+  frameFile: 'doc/src/components/ElementDemo.astro',
+})) fail('page', message);
+await checkTypeSwitches(paramsCatalog);
+for (const message of headlessShapeProblems({
+  pages: files.filter((file) => /\/(?:score|audio|bridge)\/headless\//.test(file)).map((file) => ({file, source: read(file)})),
+  readFile: read,
+  frameFile: 'doc/src/components/HeadlessDemoFrame.astro',
+})) fail('headless-page', message);
+for (const message of headlessDocProblems({
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file.startsWith(`${DOCS}/audio/headless/`)).map((file) => ({file, source: read(file)})),
+  readFile: read,
+  frameFile: 'doc/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
 checkLiveDemoCanvases(files);
 checkTitles(files);

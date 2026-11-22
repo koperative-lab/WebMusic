@@ -10,7 +10,7 @@ An independently usable component has a complete usage path. A declaration or co
 
 ## 2. Give data, behavior, and presentation clear authority
 
-Models represent musical material. Headless objects own behavior and session state. Presenters read caller-supplied bindings and issue commands. Elements compose those parts into browser tags. A visible value should be traceable to one state owner; repainting does not create another copy of playback truth.
+Models represent musical material. Headless classes own behavior and session state. Presenters read caller-supplied bindings and issue commands. Elements compose those parts into browser tags. A visible value should be traceable to one state owner; repainting does not create another copy of playback truth.
 
 Use functions for explicit input/output operations and stateful objects for starting, stopping, subscriptions, and disposal. UI does not own audio devices or introduce another scheduler because it displays a Play button. Animation frames may drive drawing and readouts, but are not independent musical clocks.
 
@@ -91,6 +91,9 @@ for active loading and a slower square-outline pulse while awaiting input. Keep 
 text available to assistive technology without displaying source-binding instructions as
 placeholder copy. Respect reduced motion, reveal content when ready, and retain visible
 errors and meaningful empty results. The animation owns no playback clock (DEC-052).
+Missing data is not a missing interface: a component waiting for its input draws its
+empty surface — keys and grid lines, a ruler and lane, a meter at rest — with the
+waiting indicator over it, never the indicator alone (DEC-082).
 
 Usable defaults do not impose one brand. A workstation may need dense controls; an installation may need one visual surface mapped to sound. They reuse interaction and timing contracts while expressing different aesthetics.
 
@@ -104,7 +107,7 @@ examples demonstrate the same task with different ownership of presentation.
 Cross-domain reference compositions exercise replacement, late attachment,
 seek/rate/loop and cleanup through public contracts.
 
-LiveDemoCanvas, its grid and Live label, parameter panels, and Copy/Reset are documentation chrome. They are not mandatory package UI or application design. [Site architecture](docs/DOCS-SITE-PLAN.md) and the page templates own demo presentation; [Component design](design/COMPONENT-DESIGN.md) owns the capability being demonstrated.
+LiveDemoCanvas, its grid and Live label, and the UI Kit presenter demos' parameter panels and Copy/Reset are documentation chrome. They are not mandatory package UI or application design. [Site architecture](docs/DOCS-SITE-PLAN.md) and the page templates own demo presentation; [Component design](design/COMPONENT-DESIGN.md) owns the capability being demonstrated.
 
 ## 9. Make resources and failure boundaries explicit
 
@@ -114,4 +117,4 @@ Resource adapters declare capabilities, formats, precision, dependencies, enviro
 
 ## 10. Extend through contracts and evidence
 
-Before introducing a capability, check whether an existing model, API, Headless object, presenter, or driver can express it. Record shared decisions in [DECISIONS](DECISIONS.md) and use the component template for acceptance scenarios. Automated checks cover mechanical contracts; browsers, sound, and devices verify user outcomes. Neither substitutes for the other.
+Before introducing a capability, check whether an existing model, API, Headless class, presenter, or driver can express it. Record shared decisions in [DECISIONS](DECISIONS.md) and use the component template for acceptance scenarios. Automated checks cover mechanical contracts; browsers, sound, and devices verify user outcomes. Neither substitutes for the other.

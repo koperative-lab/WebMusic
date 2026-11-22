@@ -1,5 +1,5 @@
 // ============================================================================
-// @webmusic/score/play/element — Web Components: every custom element @webmusic/score/play
+// @webmusic/score/play/element — Components: every custom element @webmusic/score/play
 // ships, as ONE flat set. Imported via `@webmusic/score/play/element`, kept separate
 // from the package's main entry so the data API tree-shakes free of any DOM /
 // custom-element code for code-only consumers.

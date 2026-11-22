@@ -45,7 +45,7 @@ do not mix different barrels into a purported root export list.
 
 ## Page and example carriers
 
-Here, `src/` paths are relative to `apps/doc/webmusic/`.
+Here, `src/` paths are relative to `doc/`.
 
 | File | Responsibility |
 |---|---|
@@ -128,7 +128,7 @@ global / render / driver / worker forms.
 
 The `/headless` form belongs to the family's Headless inventory
 (`/score/headless/`, `/audio/headless/`), and the `/element`, `/auto` and
-`/global` forms to the family's Web Components inventory (`/score/element/`,
+`/global` forms to the family's Components inventory (`/score/element/`,
 `/audio/element/`). Each inventory has one section per capability, so link the
 capability anchor — `/score/headless/#play`, `/audio/element/#view`. A single
 object or tag still links to its own leaf page and a function to its export group

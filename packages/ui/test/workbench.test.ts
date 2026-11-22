@@ -132,7 +132,7 @@ describe('the workbench stylesheet', () => {
   it('namespaces every class away from the docs kit, comments included', () => {
     // The gate this mirrors — `check-docs.mjs` `checkDocsCssNamespace` — harvests
     // every `wui-` token out of `packages/ui/src/**.ts`, from string literals
-    // AND from comments, and fails on any name `apps/doc/shared/ui.css` also
+    // AND from comments, and fails on any name `doc/shared/ui.css` also
     // declares. Essentially every natural name for this shell — tab, tabs,
     // panel, surface, empty, grid, row, toolbar, seg — is already taken there.
     //
@@ -144,7 +144,7 @@ describe('the workbench stylesheet', () => {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const declared = new Set(
       [
-        ...readFileSync(path.join(here, '..', '..', '..', 'apps', 'doc', 'shared', 'ui.css'), 'utf8')
+        ...readFileSync(path.join(here, '..', '..', '..', 'doc', 'shared', 'ui.css'), 'utf8')
           .matchAll(/\.(wui-[a-z0-9_-]+)/g),
       ].map((match) => match[1]!),
     );

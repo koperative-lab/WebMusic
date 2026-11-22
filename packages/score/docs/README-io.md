@@ -6,7 +6,7 @@
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current io API reference](../../../apps/doc/webmusic/src/content/docs/score/api/io.mdx).
+> Current references: [Current io API reference](../../../doc/src/content/docs/score/api/io.mdx).
 > See the [archive index](README.md) for scope, the
 > [contribution guide](../../../CONTRIBUTING.md) for setup and validation, and
 > [Score architecture](../ARCHITECTURE.md) for current package boundaries.

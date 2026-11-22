@@ -6,7 +6,7 @@
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current react API reference](../../../apps/doc/webmusic/src/content/docs/score/api/react.mdx).
+> Current references: [Current react API reference](../../../doc/src/content/docs/score/api/react.mdx).
 > See the [archive index](README.md) for scope, the
 > [contribution guide](../../../CONTRIBUTING.md) for setup and validation, and
 > [Score architecture](../ARCHITECTURE.md) for current package boundaries.
@@ -98,7 +98,7 @@ when a factory's target or configuration changes, pass a different stable
 ## Documentation
 
 Full API docs live in the monorepo's documentation site
-([`apps/doc/webmusic-score`](../../../apps/doc/webmusic-score), `npm run docs:dev:score`) — see the **React
+([`apps/doc/webmusic-score`](../../../doc-score), `npm run docs:dev:score`) — see the **React
 integration** page.
 
 ## License

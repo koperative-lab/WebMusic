@@ -1,0 +1,23 @@
+---
+// Canonical demo pattern: drop the tag and register it in a client script.
+// The element owns its sizing; the shared stage owns composition spacing.
+// The transport paints on mount, so the panel is alive before any gesture;
+// sound itself still waits for the play button, as every browser insists.
+import ElementDemo from './ElementDemo.astro';
+import ElementComposition from './ElementComposition.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+
+// The decoded clip uses the buffer engine, where pitch preservation is a no-op.
+---
+
+<ElementDemo tag="audio-player">
+  <ElementComposition>
+    <audio-player src={SRC} controls></audio-player>
+  </ElementComposition>
+</ElementDemo>
+
+<script>
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+</script>

@@ -1,0 +1,50 @@
+---
+// AudioMeterController reading an AudioClipPlayer's analyser once per frame,
+// and a VU AudioMeterDisplay reducing it. The stage shows the numbers the
+// reduction returns; drawing them is the application's job.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/view/headless"
+  name="AudioMeterController"
+  rootAttrs={{'data-hl-meter-controller': true}}
+>
+  <HeadlessTransport />
+  <div class="wui-row"><span class="wui-readout" data-level>rms 0.000 · peak 0.000 · hold 0.000</span></div>
+  <div class="wui-row"><span class="wui-readout" data-display>—</span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {AudioClipPlayer} from '@webmusic/audio/play/headless';
+  import {createAudioMeterController, createAudioMeterDisplay} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-meter-controller]', async (root, scope) => {
+    const levelOut = root.querySelector<HTMLElement>('[data-level]')!;
+    const displayOut = root.querySelector<HTMLElement>('[data-display]')!;
+    let player: AudioClipPlayer | undefined = undefined;
+    const transport = bindTransport(root, scope, () => player);
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    player = new AudioClipPlayer(clip);
+    // Borrow the player's analyser; the meter never connects or disconnects it.
+    const meter = createAudioMeterController({analyser: player.analyser});
+    const display = createAudioMeterDisplay({type: 'vu', referenceDbfs: -18});
+    scope.add(() => { meter.dispose(); player?.dispose(); });
+    transport.paint();
+    let frame = 0;
+    const tick = (now: number): void => {
+      if (!scope.active) return;
+      const level = meter.readLevel();
+      levelOut.textContent = `rms ${level.rms.toFixed(3)} · peak ${level.peak.toFixed(3)} · hold ${level.peakHold.toFixed(3)}`;
+      const snapshot = display.capture(meter, now);
+      if (snapshot.type === 'vu') displayOut.textContent = `vu ${snapshot.vu.toFixed(1)} · deflection ${snapshot.deflection.toFixed(3)}`;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    scope.add(() => cancelAnimationFrame(frame));
+  });
+</script>

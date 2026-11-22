@@ -1,0 +1,35 @@
+---
+// An Effect chain described as data — a low-pass filter into a delay — and
+// realized by an AudioClipPlayer playing the opening of Arabesque No. 1.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="Effect"
+  rootAttrs={{'data-hl-effects': true}}
+>
+  <HeadlessTransport />
+</HeadlessDemoFrame>
+
+<script>
+  import {AudioClipPlayer, chainEffects, delay, filter} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-effects]', async (root, scope) => {
+    let player: AudioClipPlayer | undefined = undefined;
+    const transport = bindTransport(root, scope, () => player);
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    player = new AudioClipPlayer(clip);
+    scope.add(() => player?.dispose());
+    // A chain described as data; the player realizes it in order.
+    player.setEffect(chainEffects(
+      filter({type: 'lowpass', frequency: 800}),
+      delay({delaySeconds: 0.25, feedback: 0.35, wet: 0.4}),
+    ));
+    transport.paint();
+  });
+</script>

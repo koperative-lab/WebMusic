@@ -1,15 +1,15 @@
 # Component design contract and template
 
-> Use this document to design and review capabilities, not to format API pages. It applies to Elements, Headless objects, UI presenters, APIs, drivers, and workers. [COMPONENTS](../COMPONENTS.md) derives the current instance index.
+> Use this document to design and review capabilities, not to format API pages. It applies to Elements, Headless classes, UI presenters, APIs, drivers, and workers. [COMPONENTS](../COMPONENTS.md) derives the current instance index.
 
 ## Choose the design unit
 
 | Unit | Owns | Delegates |
 |---|---|---|
 | Model and API | Inputs/outputs, formats, units, limits, data transformations | Page layout and long-lived playback state |
-| Headless object | State, commands, events, scheduling/analysis sessions, lifecycle | Brand-specific UI and tag registration |
+| Headless class | State, commands, events, scheduling/analysis sessions, lifecycle | Brand-specific UI and tag registration |
 | UI presenter | DOM/drawing, accessible interaction, public styling seams, disposable presentation resources | Music models and audio-device ownership |
-| Web Component | Attribute/property/event mapping, resource connections, composition of Headless and UI | Duplicate algorithms or a second musical clock |
+| Component | Attribute/property/event mapping, resource connections, composition of Headless and UI | Duplicate algorithms or a second musical clock |
 | Bridge, driver, adapter | Explicit conversion and coordination across domains or external capabilities | Hidden conversion assumptions and global side effects |
 
 A capability need not manufacture every layer. A nonvisual declaration needs no presenter. A pure function needs no simulated lifecycle. A compound component must explain its public value rather than exist only for directory symmetry.

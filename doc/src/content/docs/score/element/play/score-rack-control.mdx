@@ -1,0 +1,237 @@
+---
+title: '<score-rack-control>'
+description: 'Mixer element for a shared Rack — a master fader plus per-member volume faders, re-rendering whenever members are added or removed.'
+sidebar:
+  order: 2
+---
+
+import RackControlDemo from '../../../../../components/RackControlDemo.astro';
+
+<RackControlDemo />
+
+`<score-rack-control>` is the mixing desk for a [`Rack`](/score/headless/play/rack/): a fader per member,
+a master over them, and mute and solo on each. Write the parts inside it and wrap the whole thing in a
+player; the demo mixes three parts of Arabesque No. 1 this way.
+
+A [`<score-rack-part>`](#score-rack-part) is a **declaration**, not a player: it renders nothing and owns no
+engine. A rack member is headless — a score and a sound, and the rack builds the `ScorePlayer` that
+plays it — and this is how one is written down without pretending otherwise.
+
+The desk announces its Rack to the containing player. Its direct `<score-rack-part>`
+children supply member declarations; script can also add members to an assigned
+Rack. The Rack owns the member players and their musical state.
+
+## Import
+
+```html
+<script type="module">
+  import {
+    defineScorePlayerElement,
+    defineRackControlElement,
+    defineRackPartElement,
+  } from '@webmusic/score/play/element';
+  defineScorePlayerElement();
+  defineRackControlElement();
+  defineRackPartElement();
+</script>
+
+<score-player>
+  <score-rack-control>
+    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle"></score-rack-part>
+  </score-rack-control>
+</score-player>
+```
+
+## Ports and composition
+
+`<score-rack-control>` is a **Rack**. Without an assigned `.rack` it builds a
+`ScoreRackModule` in the enclosing scope, exposes it as `.module` and provides
+that Rack's context to its children. Each direct `<score-rack-part>` becomes one
+`ScorePlayerModule` (its id is the part `id`), admitted into one channel; the
+part's `.module` borrows it and lists the same ports as a
+[player's module](/score/element/play/score-player/#ports-and-composition). The
+desk's own ports:
+
+| Port | Family | Direction | Notes |
+| --- | --- | --- | --- |
+| `params` | `control` | input | The `master-volume` parameter |
+| `master` | `audio` | output | Master insert output, once prepared; routed to the enclosing destination |
+| `channel:<id>` | `audio` | output | Post-insert tap of one admitted channel |
+
+Inside a `<score-player>` the desk passes that player's Session through, so
+parts join it rather than choosing a child as master. An outermost desk, or one
+below a provider without a Session, owns a Session of its own:
+`sessionTransport` returns it, and its commands start, pause and seek every
+part together. Nesting another bus admits that one bus output and does not
+duplicate descendant registrations.
+
+Containment places a direct `<score-effect>` or `audio-effect` on the master
+chain. Inside a `<score-rack-part>`, an effect belongs to that part's
+post-fader channel inserts unless it sets `slot="master"`, and a view or
+analysis tool borrows that part's playback. Elsewhere, `input="#lead"` names a
+part for a companion, and an audio analyser can read the bus with
+`input="#desk" port="master"`. Assigning a Headless `Rack` to `.rack` backs the
+same mixer surface with that borrowed Rack instead and provides no module
+context: declarations become its members and an enclosing player drives it. See
+[the mixed example](/bridge/modular-composition/).
+
+```html
+<score-player>
+  <score-rack-control id="desk">
+    <score-rack-part id="lead" src="/midi/Arabesque%20No.1.mid" sound="triangle">
+      <score-effect type="delay" time="0.25" wet="0.2"></score-effect>
+      <score-view type="piano-roll"></score-view>
+    </score-rack-part>
+    <score-rack-part id="pad" src="/midi/Arabesque%20No.1.mid" sound="sine"></score-rack-part>
+  </score-rack-control>
+</score-player>
+```
+
+## What the desk shows
+
+Its attributes are about what the desk **shows**. `master`, `mute` and `solo` each add or take away a
+control, which is the only thing a mixing surface has to configure that is not already a property of
+the rack behind it. Hiding mute or solo does not grey a button out: the command is not offered to the
+mixer at all.
+
+The rack is the single source of truth. Levels, mute and solo are read back off it rather than
+mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
+change as well as a membership change, anything else driving the rack repaints this desk too.
+
+A desk without resolved members shows the shared outlined-square waiting animation.
+While a child `score-rack-part` loads its score, the desk shows the four-square loading
+animation; existing channel controls remain available. A failed child load displays its
+error, and replacement or cancellation cannot leave stale loading feedback. The declaration
+itself stays nonvisual. Both animations use the shared grayscale status tokens and stop
+for reduced motion, with descriptions retained for assistive technology.
+
+## Master effects
+
+Effects on the desk use the same recipes as
+[`<score-player>`](/score/element/play/score-player/#add-an-effect-chain). Assign an
+`Effect.chain(...)` to the desk's `.effect` property: its order is signal order, from the rack's
+summed output through each effect, and it processes the master bus once rather than creating a
+separate copy for every part.
+
+## `<score-rack-part>`
+
+One member of the desk, declared in markup. This section owns its nonvisual
+contract. Outside a direct `<score-rack-control>` parent, `src` is not fetched and no
+Rack member or playback engine is created.
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `id` | attribute | `part-N` | Member id and fader label; `N` is the declaration's position among the desk's direct children. Changing it reconciles the member without reloading its score. |
+| `src` | attribute | — | URL of the score this part contributes, loaded through the sibling `@webmusic/score/io` capability while inside a desk. |
+| `format` | attribute | adaptive | Forces the parser when the extension is missing or lies. Only read while `src` is loading. |
+| `sound` | attribute | the rack's default | Oscillator name: `sine`, `square`, `sawtooth` or `triangle`. |
+| `.score` | property | — | A `Score` assigned directly. Wins over `src`. |
+| `.sound` | property | — | A `HeadlessSynth` assigned directly. Wins over `sound`, and the only way to give a part a synth the attribute cannot name. |
+| `webscore:error` | event | — | `{ operation: 'rack-part', error }`, bubbling and composed. |
+
+The `id` names the fader the desk draws, so give each part one; a part with no `id` falls back to its
+position among its siblings. There is no `rate`, `loop`, `pan` or chrome: a part is not a player, so
+there is nothing on it for those to act on. The player wrapping the desk owns playback for every part
+at once, and the desk owns the levels.
+
+Changing `id` renames the live member without downloading its score again, rebuilding its player or
+resetting its mix state. Duplicate requested ids leave existing members intact and emit an error.
+Changing `sound` re-voices the part in place. Changing `src` or `format`
+reloads its score, which does replace the member — `Rack.add` on an existing id disposes the live
+player, and a new score is a different member.
+
+A source replacement or disconnection aborts its pending request. Late results cannot replace
+the current declaration. A failed current load emits `webscore:error`; the already resolved
+declaration remains until replacement succeeds or its source is cleared. Removing a declaration
+removes its member from the desk. Supplied sounds remain caller-owned.
+
+## Filling the rack
+
+`<score-rack-part>` covers the markup case. From script, build the members headless and hand a rack over
+instead. Either assign one — adopted, and never disposed
+here — or let the element create its own and reach it through `.rack`:
+
+```ts
+import { Rack, Sound } from '@webmusic/score/play/headless';
+import type { RackControlElement } from '@webmusic/score/play/element';
+
+const rack = new Rack();
+rack.add({ id: 'lead', score: lead, sound: Sound.oscillator() });
+rack.add({ id: 'bass', score: bass, sound: Sound.oscillator({ type: 'sawtooth' }) });
+
+document.querySelector<RackControlElement>('score-rack-control')!.rack = rack;
+```
+
+Add or remove a member later and the desk redraws its strips; move a level from anywhere and the
+faders follow.
+
+<details class="component-section">
+<summary>API</summary>
+
+
+The desk reads master and member state from its Rack. Membership changes update
+the strips; mix changes update their values. Direct `<score-rack-part>` children
+declare members, and `.rack` can supply an existing Rack. Transport remains on
+`<score-player>` or the application-owned Headless controller.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `master` | attribute | Show the master strip. Absent means shown; `master="false"` leaves the channel strips alone. |
+| `mute` | attribute | Show per-channel mute, enabled by default; `mute="false"` removes the command from the mixer. |
+| `solo` | attribute | Show per-channel solo, enabled by default. Soloing one channel clears the rest; `solo="false"` removes the command. |
+| `preload` | attribute | An outermost desk, which owns its Session, prepares every part as it joins: the AudioContext (created suspended; the first play resumes it), each part's engine, its channel and the inserts on it, so faders and effect panels are live before the first play. On by default; `preload="none"` defers all of it to the first play. A desk inside a player follows that player's `preload`. |
+| child `<score-rack-part>` | markup | Each declares one rack member. Labelled by its `id`, or by position when it has none. |
+| `.rack` | property | The `Rack` to mix. Assigning one adopts it — it is never disposed here. Left unset, the element creates its own and disposes it on disconnect. |
+| `.sessionTransport` | property | Read-only `ModuleSession` the parts play in: the desk's own when it is outermost, otherwise the enclosing provider's; `undefined` while disconnected or when a Headless `.rack` is assigned. |
+| `.effect` | property | Post-processing recipe for the rack's summed output. Assign an `Effect` or `Effect.chain(...)`; replacing it updates the owned or assigned Rack in place without rebuilding members. |
+| `webscore:error` | event | `{ operation: 'rack-control', error }`, bubbling and composed. Reports member reconciliation, Rack mix commands, master-effect replacement, owned Rack cleanup or presenter failures. |
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fits its container and respects native `hidden`. The master stays beside
+an internally scrollable channel bank whose scrollbar is hidden; strips are separated by
+hairlines, names are uppercase mono captions that wrap within their strips, and a
+nonempty bank can receive keyboard focus for horizontal scrolling. Resizing does
+not rebuild controls or alter the Rack.
+
+The `--rc-*` aliases override this desk only. Without them, controls keep their
+`--wm-mixer-*` and shared UIKit theme inputs, including `--wm-foreground`,
+`--wm-foreground-muted`, `--wm-surface-muted` and `--wm-focus-ring`. The fader fill falls back
+to `--rc-fill` → `--wm-mixer-fill` → `--wm-foreground-muted`, and labels to `--rc-text` →
+`--wm-mixer-text` → `--wm-foreground-muted`. Use the exposed parts to
+change the strip or label layout without replacing the fader behavior.
+
+The outer surface also reads `--wm-component-background`, `--wm-component-border`,
+`--wm-component-radius` and `--wm-component-padding`. Override just this desk
+with `--wm-rack-control-surface-background`, `--wm-rack-control-surface-border`,
+`--wm-rack-control-surface-radius` or `--wm-rack-control-surface-padding`. Padding falls back
+through `--wm-mixer-surface-padding`, `--wm-component-padding` and `--wm-mixer-padding` to `0`,
+so the desk's rows run edge to edge and each strip carries its own inset.
+Background accepts `transparent`; the surface border accepts a complete border
+or `none`. Channel declarations (`score-rack-part`) have no visual surface.
+
+
+```css
+score-rack-control {
+  --rc-border: light-dark(#d8d8d8, #333);
+  --rc-fader-width: 2rem;
+  --rc-fader-height: 96px;
+  --rc-track: light-dark(#f3f3f3, #1c1c1c);
+  --rc-track-border: light-dark(#d8d8d8, #333); /* soft control outline */
+  --rc-fill: light-dark(#777, #aaa);
+  --rc-thumb: light-dark(#111, #eee);           /* position indicator */
+  --rc-radius: 0;
+}
+```
+
+</details>
+
+## Related
+
+- [`Rack`](/score/headless/play/rack/) — the Headless rack this desk mixes.
+- [`<score-player>`](/score/element/play/score-player/) — the transport that drives every part.
+- [`<score-effect>`](/score/element/play/score-effect/) — inserts on the master or a part channel.
+- [Modular composition](/bridge/modular-composition/) — score and Audio sources on one desk.

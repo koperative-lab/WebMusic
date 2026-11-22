@@ -1,0 +1,271 @@
+import { defineConfig } from 'astro/config';
+import mdx from '@astrojs/mdx';
+import sitemap from '@astrojs/sitemap';
+import {satteri} from '@astrojs/markdown-satteri';
+import {asides} from './scripts/asides.mjs';
+import {codeFrame, monochromeTheme} from './scripts/code-blocks.mjs';
+import {localSearch} from './scripts/local-search.mjs';
+import {browserSandboxAlias} from './scripts/browser-sandbox.mjs';
+import siteNoticeIntegration from '../scripts/site-notices.mjs';
+import {agentContext} from './scripts/agent-context.mjs';
+import {audioBridgeContext} from './scripts/agent-context-audio-bridge.mjs';
+import {docsBaseLinksIntegration} from './scripts/docs-base-links.mjs';
+
+const docsBase = process.env.DOCS_BASE
+  ? `${process.env.DOCS_BASE.replace(/\/+$/, '')}/`
+  : '/';
+const withDocsBase = (pathname) => docsBase === '/'
+  ? pathname
+  : `${docsBase.slice(0, -1)}${pathname}`;
+
+// Optional / copyleft audio engines that the @webmusic/audio play & analyze
+// capabilities reach only through guarded `await import(...)`. They are NOT
+// installed, and the docs never trigger those code paths. The production build
+// marks them external so Rollup leaves the dynamic imports alone; the dev server
+// can't use `build.rollupOptions.external`, so `stubOptionalPeers` (below)
+// resolves the same specifiers to an empty module.
+const OPTIONAL_AUDIO_PEERS = [
+  'music-metadata',
+  'mpg123-decoder',
+  'ogg-opus-decoder',
+  'mediabunny',
+  'signalsmith-stretch',
+  '@soundtouchjs/audio-worklet',
+  '@wasm-audio-decoders/flac',
+  '@wasm-audio-decoders/ogg-vorbis',
+  'webfft',
+  'realtime-bpm-analyzer',
+  'pitchfinder',
+  'aubiojs',
+  'essentia.js',
+  '@spotify/basic-pitch',
+  '@tensorflow/tfjs',
+  '@magenta/music',
+];
+
+// Dev-only: stand in for the uninstalled optional peers with an empty module so
+// the dev server doesn't error on their guarded dynamic imports. Scoped to
+// `serve`; the build keeps externalizing them (see `build.rollupOptions` below).
+// In dev, root `plugins` also apply to the analysis Web Worker, so this covers
+// the worker's dynamic imports too.
+const stubOptionalPeers = {
+  name: 'webmusic:stub-optional-peers',
+  apply: 'serve',
+  enforce: 'pre',
+  resolveId(id) {
+    return OPTIONAL_AUDIO_PEERS.includes(id) ? `\0webmusic-empty:${id}` : null;
+  },
+  load(id) {
+    return id.startsWith('\0webmusic-empty:') ? 'export default {};' : null;
+  },
+};
+
+export default defineConfig({
+  // Main's documentation foundation also hosts the Audio and Bridge additions.
+  // Inside Score and Audio, each URL segment is a word from the package
+  // export map: element/ documents the /element form, headless/ documents
+  // /headless, and api/ documents the package root plus its capability
+  // subpaths. The pre-restructure URLs below retain redirects for existing
+  // local links when the same site is published through GitHub Pages.
+  site: process.env.DOCS_SITE || 'https://koperative-lab.github.io',
+  base: docsBase,
+  server: { port: 4321 },
+  // Pages and their navigation are the site's own (src/site/): Astro compiles
+  // the MDX pages and live demos to static HTML; no documentation theme.
+  markdown: {
+    // Directives carry only the :::note and :::caution asides.
+    processor: satteri({features: {directive: true}, mdastPlugins: [asides]}),
+    shikiConfig: {theme: monochromeTheme, transformers: [codeFrame]},
+  },
+  redirects: {
+    // Audio and Bridge preserve their earlier public routes.
+    '/score/bridges/score-audio': withDocsBase('/bridge'),
+    '/audio/getting-started': withDocsBase('/audio'),
+    '/audio/element/play': withDocsBase('/audio/element/#play'),
+    '/audio/element/analyze': withDocsBase('/audio/element/#analyze'),
+    // Retired Audio Analyze result tags resolve to their API workflow or live tool.
+    '/audio/element/analyze/audio-analysis': withDocsBase('/audio/api/analyze/#analysis-in-a-worker'),
+    '/audio/element/analyze/audio-analysis-view': withDocsBase('/audio/api/analyze/#choose-an-analysis-surface'),
+    '/audio/element/analyze/audio-clip-summary': withDocsBase('/audio/api/analyze/#clip-summary'),
+    '/audio/element/analyze/audio-analysis-timeline': withDocsBase('/audio/api/analyze/#onsets'),
+    '/audio/element/analyze/audio-histogram': withDocsBase('/audio/api/analyze/#key'),
+    '/audio/element/analyze/audio-onset-analysis': withDocsBase('/audio/api/analyze/#onsets'),
+    '/audio/element/analyze/audio-beat-analysis': withDocsBase('/audio/api/analyze/#tempo'),
+    '/audio/element/analyze/audio-pitch-analysis': withDocsBase('/audio/api/analyze/#pitch'),
+    '/audio/element/analyze/audio-tuner': withDocsBase('/audio/api/analyze/#pitch'),
+    '/audio/element/view': withDocsBase('/audio/element/#view'),
+    '/audio/element/view/audio-meter': withDocsBase('/audio/element/analyze/audio-meter/'),
+    // Retired View companions fold into the waveform and region workflow.
+    '/audio/element/view/audio-clip-thumbnail': withDocsBase('/audio/element/view/audio-view/'),
+    '/audio/element/view/audio-minimap': withDocsBase('/audio/element/view/audio-view/'),
+    '/audio/element/view/audio-region-list': withDocsBase('/audio/element/view/audio-view/'),
+    '/audio/headless/play': withDocsBase('/audio/headless/#play'),
+    '/audio/headless/analyze': withDocsBase('/audio/headless/#analyze'),
+    '/audio/headless/view': withDocsBase('/audio/headless/#view'),
+    '/audio/api/core': withDocsBase('/audio/api'),
+    '/audio/integration/react': withDocsBase('/audio/api/react'),
+    '/audio/web-component/play': withDocsBase('/audio/element'),
+    '/audio/web-component/analyze': withDocsBase('/audio/element'),
+    '/audio/web-component/view': withDocsBase('/audio/element'),
+    '/audio/headless-component/play': withDocsBase('/audio/headless'),
+    '/audio/headless-component/analyze': withDocsBase('/audio/headless'),
+    '/audio/headless-component/view': withDocsBase('/audio/headless'),
+    '/audio/element/view/waveform': withDocsBase('/audio/element/view/audio-view'),
+    '/audio/element/view/spectrogram': withDocsBase('/audio/element/view/audio-view'),
+    '/audio/element/view/meter': withDocsBase('/audio/element/view/audio-view'),
+    // /introduction is rendered by a page alias. Redirecting it to / would
+    // loop with the cached permanent / -> /introduction redirect from older
+    // checkouts using the same localhost origin.
+    // The UI Kit moved onto one prefix: the overview to /uikit/, the catalog
+    // off the index it was occupying, and the per-entry reference to the root
+    // API page. /score/ui-kit is retargeted in the same batch so it does not
+    // become a redirect to a redirect.
+    '/score/ui-kit': withDocsBase('/uikit'),
+    '/ui': withDocsBase('/uikit'),
+    '/ui/presenters': withDocsBase('/uikit/api'),
+    // Presenter categories follow UI responsibilities; package import paths stay unchanged.
+    '/uikit/parameters-gestures/panel': withDocsBase('/uikit/layout-feedback/panel/'),
+    '/uikit/views-analysis/stage': withDocsBase('/uikit/layout-feedback/stage/'),
+    '/uikit/views-analysis/status': withDocsBase('/uikit/layout-feedback/status/'),
+    '/uikit/views-analysis/workbench': withDocsBase('/uikit/layout-feedback/workbench/'),
+    '/uikit/views-analysis/track-list': withDocsBase('/uikit/transport-time/track-list/'),
+    // Each family's scope, install and walkthrough are one page at the family
+    // root, so the separate Getting Started route folds into it. A static
+    // redirect drops the fragment, which is why inbound anchored links were
+    // repointed at the same time rather than left to bounce.
+    '/score/getting-started': withDocsBase('/score'),
+    // A capability group now expands straight to its element or object pages.
+    // The per-capability Overview is gone; the family's element/ and headless/
+    // inventories own the tag list, the export table and the shared theming,
+    // with a section per capability.
+    '/score/element/play': withDocsBase('/score/element/#play'),
+    '/score/element/analyze': withDocsBase('/score/element/#analyze'),
+    '/score/element/view': withDocsBase('/score/element/#view'),
+    '/score/headless/play': withDocsBase('/score/headless/#play'),
+    '/score/headless/analyze': withDocsBase('/score/headless/#analyze'),
+    '/score/headless/view': withDocsBase('/score/headless/#view'),
+    '/score/api/core': withDocsBase('/score/api'),
+    '/score/integration/react': withDocsBase('/score/api/react'),
+    '/score/web-component/play': withDocsBase('/score/element/#play'),
+    '/score/web-component/analyze': withDocsBase('/score/element/#analyze'),
+    // Whole-score reports now share their stateless API workflow.
+    '/score/element/analyze/score-analysis': withDocsBase('/score/api/analyze/#report-summary-report'),
+    '/score/element/analyze/analysis-histogram': withDocsBase('/score/api/analyze/#report-histograms'),
+    '/score/element/analyze/rhythm-patterns': withDocsBase('/score/api/analyze/#report-rhythm-patterns'),
+    '/score/element/analyze/key-analysis': withDocsBase('/score/api/analyze/#detect-key'),
+    '/score/element/analyze/interval-analysis': withDocsBase('/score/element/analyze/score-interval-analysis/'),
+    '/score/element/analyze/rhythm-analysis': withDocsBase('/score/element/analyze/score-rhythm-analysis/'),
+    '/score/element/analyze/motif-analysis': withDocsBase('/score/api/analyze/#find-motifs'),
+    '/score/element/analyze/rhythm-pattern-analysis': withDocsBase('/score/api/analyze/#find-recurring-rhythmic-phrases'),
+    // Score inspection tools retain code-only Roman and voice-leading analysis.
+    '/score/element/analyze/roman-analysis': withDocsBase('/score/api/analyze/#roman-numerals'),
+    '/score/element/analyze/voice-leading-analysis': withDocsBase('/score/api/analyze/#voice-leading'),
+    '/score/element/analyze/key-candidates': withDocsBase('/score/headless/analyze/live-trackers/#key-diagnostics'),
+    '/score/element/analyze/key-wheel': withDocsBase('/score/headless/analyze/live-trackers/#key-diagnostics'),
+    '/score/element/analyze/pitch-evidence': withDocsBase('/score/headless/analyze/live-trackers/#pitch-evidence'),
+    '/score/element/analyze/chord-history': withDocsBase('/score/headless/analyze/live-trackers/#chord-history'),
+    '/score/element/analyze/analysis-view': withDocsBase('/score/element/#analyze'),
+    '/score/element/analyze/analysis-timeline': withDocsBase('/score/element/analyze/score-chord-analysis/'),
+    '/score/web-component/view': withDocsBase('/score/element/#view'),
+    '/score/element/play/simple-score-player': withDocsBase('/score/element/play/score-player/'),
+    // Score's canonical Element tags now carry the family prefix. These
+    // retired page slugs remain direct bookmarks to their renamed references.
+    '/score/element/play/rack-control': withDocsBase('/score/element/play/score-rack-control/'),
+    '/score/element/play/note-input': withDocsBase('/score/element/play/score-note-input/'),
+    '/score/element/play/synth-panel': withDocsBase('/score/element/play/score-synth-panel/'),
+    '/score/element/analyze/live-chord-analysis': withDocsBase('/score/element/analyze/score-chord-analysis/'),
+    '/score/element/analyze/score-live-chord-analysis': withDocsBase('/score/element/analyze/score-chord-analysis/'),
+    '/score/element/analyze/chord-analysis': withDocsBase('/score/element/analyze/score-chord-analysis/'),
+    '/score/element/view/pitch-view': withDocsBase('/score/element/view/score-pitch-view/'),
+    '/score/element/view/sheet-view': withDocsBase('/score/element/view/score-sheet-view/'),
+    // Recording is configured from note input, so both elements now share one
+    // workflow page and live demo. Preserve the former standalone bookmark.
+    '/score/programmatic/play': withDocsBase('/score/headless'),
+    '/score/programmatic/analyze': withDocsBase('/score/headless'),
+    '/score/programmatic/view': withDocsBase('/score/headless'),
+    '/score/headless-component/play': withDocsBase('/score/headless'),
+    '/score/headless-component/analyze': withDocsBase('/score/headless'),
+    '/score/headless-component/view': withDocsBase('/score/headless'),
+    // Helper/integration references share their primary Headless workflow or API owner.
+    '/score/headless/play/tone-player': withDocsBase('/score/headless/play/score-player/#toneplayer'),
+    '/score/headless/play/synth-backends': withDocsBase('/score/headless/play/sound/#synth-backends'),
+    '/score/headless/play/transport-drivers': withDocsBase('/score/headless/play/interactive-player/#clock-input'),
+    '/score/headless/play/web-midi': withDocsBase('/score/headless/play/interactive-player/#web-midi-input'),
+    '/score/headless/analyze/analysis-worker': withDocsBase('/score/headless/analyze/analysis-session/#analysis-worker'),
+    '/score/headless/analyze/transport-clock': withDocsBase('/score/headless/analyze/analysis-follower/#presentation-clock'),
+    '/score/headless/view/active-note-tracker': withDocsBase('/score/headless/view/pitch-view/#active-note-tracker'),
+    '/score/headless/analyze/score-report': withDocsBase('/score/api/analyze/#reports'),
+    // Staff input was removed; ScoreEditor still owns the document and its commands.
+    '/score/headless/view/staff-editing': withDocsBase('/score/headless/view/score-editor/'),
+    // The aggregated headless pages became one page per object. The capability
+    // URL itself is now a redirect to the family inventory (above), so these
+    // deep anchors are repointed at the object page that absorbed them.
+    '/score/headless/view/createscoreview': withDocsBase('/score/headless/view/score-view'),
+    '/score/headless/play/scoreplayer--the-push-engine': withDocsBase('/score/headless/play/score-player'),
+    '/score/headless/play/playercontroller--an-event-wrapper': withDocsBase('/score/headless/play/player-controller'),
+    '/score/headless/play/sound--timbres': withDocsBase('/score/headless/play/sound'),
+    // `<score-view>` used to spend separate sidebar entries on its `type` values.
+    // Those representations now share their owning element page.
+    '/score/element/view/keyboard-view': withDocsBase('/score/element/view/score-pitch-view#keyboard'),
+    '/score/element/view/staff-view': withDocsBase('/score/element/view/score-pitch-view#staff'),
+    '/score/element/view/fretboard-view': withDocsBase('/score/element/view/score-pitch-view#fretboard'),
+    '/score/element/view/score-map': withDocsBase('/score/element/view/score-view#map'),
+    '/score/element/view/score-thumbnail': withDocsBase('/score/element/view/score-view#thumbnail'),
+    '/score/element/view/piano-roll': withDocsBase('/score/element/view/score-view'),
+    '/score/element/view/staff': withDocsBase('/score/element/view/score-view'),
+    '/score/element/view/waterfall': withDocsBase('/score/element/view/score-view'),
+  },
+  vite: {
+    plugins: [stubOptionalPeers],
+    resolve: {alias: [browserSandboxAlias]},
+    optimizeDeps: {
+      // Pre-bundle the CommonJS deps the linked workspace dists pull in, so
+      // Vite's dev server doesn't 504 on late-discovered optimized dependencies
+      // used by Score.
+      include: [
+        '@tonejs/midi',
+        'fast-xml-parser',
+        'fflate',
+        '@tonaljs/abc-notation',
+        'spessasynth_core',
+        'fft.js',
+        'meyda',
+        'music-tempo',
+      ],
+      exclude: OPTIONAL_AUDIO_PEERS,
+    },
+    // Score and Audio workers use code splitting.
+    worker: { format: 'es' },
+    build: {
+      rollupOptions: { external: OPTIONAL_AUDIO_PEERS },
+    },
+  },
+  integrations: [
+    {
+      name: 'webmusic-dev-cache-recovery',
+      hooks: {
+        'astro:server:setup': ({ server }) => {
+          // Static-mode Astro pages strip query strings. Read this explicit
+          // recovery request before rendering; never run it in built sites.
+          server.middlewares.use((req, res, next) => {
+            const [pathname, query = ''] = (req.url ?? '').split('?', 2);
+            // Astro's development middleware has already removed config.base.
+            // The same route therefore handles / and /WebMusic/ deployments.
+            if ((pathname === '/introduction' || pathname === '/introduction/')
+              && new URLSearchParams(query).get('reset-cache') === '1') {
+              res.setHeader('Cache-Control', 'no-store');
+              res.setHeader('Clear-Site-Data', '"cache"');
+            }
+            next();
+          });
+        },
+      },
+    },
+    docsBaseLinksIntegration(),
+    mdx(),
+    sitemap(),
+    localSearch(),
+    agentContext({extension: audioBridgeContext}),
+    siteNoticeIntegration(),
+  ],
+});

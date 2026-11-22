@@ -1,0 +1,25 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="createAnalysisSession"
+  rootAttrs={{'data-analysis-session-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Score analysis">
+    <p class="wm-hl-music__summary" data-session-summary></p>
+    <div class="wm-hl-music__chips" data-session-notes aria-label="Score notes"></div>
+    <div class="wm-hl-music__chips" data-session-chords aria-label="Chord segments and Roman numerals"></div>
+    <p data-session-detail></p>
+    <div class="wui-row"><button class="wui-btn" type="button" data-session-edit>Edit first note</button></div>
+  </section>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountAnalysisSessionDemo} from './analysis-view-playgrounds-client';
+  import {loadArabesqueScore} from './arabesque-score';
+  mountDemos('[data-analysis-session-demo]', async (root, scope) => {
+    const source = await loadArabesqueScore();
+    if (scope.active) mountAnalysisSessionDemo(root, scope, source);
+  });
+</script>

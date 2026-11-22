@@ -2,7 +2,7 @@
 
 **Symbolic music for the web.** One package: an immutable `Score` model,
 MIDI / MusicXML / MXL / ABC import and export, two playback engines, staff /
-piano-roll / waterfall views, document editing, musical analysis, Web Components, and React
+piano-roll / waterfall views, document editing, musical analysis, Components, and React
 bindings.
 
 ```bash
@@ -14,7 +14,7 @@ npm install @webmusic/score
 > reasoning behind them.
 
 The command above is enough for the model, IO, API and Headless entries. Add
-the optional presenter peer when using Web Components:
+the optional presenter peer when using Components:
 
 ```bash
 npm install @webmusic/score @webmusic/ui
@@ -49,10 +49,10 @@ analyze the same immutable object — or ship it to a Worker.
 
 Current usage and reference pages are maintained in the documentation site:
 
-- [Getting started](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/index.mdx)
-- [Web Components](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/element/index.mdx)
-- [Headless](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/index.mdx)
-- [API entries](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/index.mdx)
+- [Getting started](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/index.mdx)
+- [Components](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/element/index.mdx)
+- [Headless](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/index.mdx)
+- [API entries](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/index.mdx)
 
 [Historical package notes](https://github.com/koperative-lab/WebMusic/blob/main/packages/score/docs/README.md) retain earlier technical material;
 they are not the current runnable reference. For development, start at the
@@ -88,11 +88,11 @@ these API entries are DOM-free.
 | `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types, plus atomic note operations, document contracts and position maps for editing. |
 | `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback, and the persistent `ScoreEditor` (bounded history, checkpoints, draft/selection sessions); no DOM. |
 | `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas), the piano-roll grid and engraved sheet pages. |
-| `@webmusic/score/view/element` | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` Components. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
-| `@webmusic/score/play/element` | All playback Web Components (`<score-player>`, …). |
+| `@webmusic/score/play/element` | All playback Components (`<score-player>`, …). |
 | `@webmusic/score/play/auto` | Import for side effect: registers every play element. |
 | `@webmusic/score/play/global` | Browser IIFE bundle (`window.WebMusicScorePlay`). |
 | `@webmusic/score/play/demos` | Demo elements and sample scores. |
@@ -286,8 +286,8 @@ edit velocity in a lane, snap and zoom. Its `tools` attribute chooses which of
 those features exist. `<score-view>` is read-only and draws the editor's content.
 Playback applies revisions while paused and requires
 an explicit later Play action. See the
-[View API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+[View API](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/score-editor.mdx)
 for complete commands, failures and ownership.
 
 ## Views (`@webmusic/score/view`)
@@ -313,12 +313,12 @@ const viz = renderPianoRollVisualizer(score, svg, {pixelsPerSecond: 30, noteHeig
 viz.redraw(sequence.notes[0]); // highlight one currently-sounding note
 ```
 
-For application-owned navigation, [createScoreMapView](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-map-view.mdx)
+For application-owned navigation, [createScoreMapView](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/score-map-view.mdx)
 borrows a playback source and delegates quarter-note seeks with explicit command
-outcomes. [createPitchView](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/pitch-view.mdx)
+outcomes. [createPitchView](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/view/pitch-view.mdx)
 maintains held pitches for any representation; `currentStaffMarks` and
 `currentFretMarks` from `@webmusic/score/view` provide pure readout data.
-[createAnalysisFollower](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/analyze/analysis-follower.mdx)
+[createAnalysisFollower](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/analyze/analysis-follower.mdx)
 combines that source's score, position and activity with an analysis session.
 These objects release only their own subscriptions and never own playback.
 
@@ -327,7 +327,7 @@ These objects release only their own subscriptions and never own playback.
 (the editable piano-roll grid) and `mountScoreSheet` (engraved pages with
 notation editing).
 
-The Web Component entry provides three composable tags:
+The Component entry provides three composable tags:
 
 ```ts
 import {defineAllViewElements} from '@webmusic/score/view/element';
@@ -582,7 +582,7 @@ bindValue(player, {getValue: () => sensor()}); // any number → seek/rate
 Offline rendering is code-only too: `renderScoreToBuffer` /
 `renderScoreToWav` / `bufferToWav` from `@webmusic/score/play/headless`.
 
-### Playback Web Components
+### Playback Components
 
 Registration is explicit, so the headless entries stay DOM-free:
 
@@ -672,7 +672,7 @@ const issues = voiceLeading(score);              // large leaps, parallel fifths
 `createAnalysisSession`, `createLiveChordTracker`, `createLiveKeyTracker`.
 The pure `createScoreReport` helper returns formatted summary rows. Whole-score
 summary, distribution and rhythm reports use these code-only inputs rather than
-Element wrappers; see the [report workflow](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+Element wrappers; see the [report workflow](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/api/analyze.mdx#reports).
 
 Heavy analysis moves off the main thread with the Worker trio:
 
@@ -693,7 +693,7 @@ and terminated on `dispose()`. Structured remote failures reject with
 live at `@webmusic/score/analyze/worker-protocol`; the runtime at
 `@webmusic/score/analyze/worker`.
 
-Analysis Web Components expose four elementary inspection tools:
+Analysis Components expose four elementary inspection tools:
 
 ```ts
 import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
@@ -717,13 +717,13 @@ playback graph.
 The four tags inspect chord structure (score or live mode), spelled intervals,
 notes against an explicit tonic/scale, and written placement within grouped
 meter. They do not guess a key or judge harmonic function. The
-[Analyze overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+[Analyze overview](../../doc/src/content/docs/score/element/index.mdx#analyze)
 selects and documents them. Each live demo contains its player and the current
 tag, with external Parameters.
 
 Specialist Roman/voice-leading views and retained chord updates remain
 application-owned compositions using the API and
-[Headless trackers and projections](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/analyze/live-trackers.mdx).
+[Headless trackers and projections](https://github.com/koperative-lab/WebMusic/blob/main/doc/src/content/docs/score/headless/analyze/live-trackers.mdx).
 Motif search remains an API/Headless result. Choose a fixed musical surface for
 live display; disconnecting it releases its resources and leaves playback with
 its owner.
@@ -835,7 +835,7 @@ The core install stays lean; each optional peer unlocks one capability:
 | `spessasynth_lib` | `^4.0.0` | `Sound.soundfont2()` — `.sf2` / `.sf3` SoundFont playback (see the `workletUrl` recipe above). |
 | `tone` | `>=14.0.0` | `Sound.from(toneInstrument)` — play a Tone.js instrument as a synth. |
 | `react` | `>=18` | `@webmusic/score/react` hooks and components. |
-| `@webmusic/ui` | `^0.3.0` | `/element`, `/auto`, visible analysis elements and default Web Component presenters. |
+| `@webmusic/ui` | `^0.3.0` | `/element`, `/auto`, visible analysis elements and default Component presenters. |
 
 Everything else — parsing, the built-in oscillator / FM / wavetable / sampler
 sounds, Headless views and analysis — works without optional peers.
@@ -847,7 +847,7 @@ sounds, Headless views and analysis — works without optional peers.
 - [`@webmusic/kernel`](https://www.npmjs.com/package/@webmusic/kernel) — the
   shared primitives this package builds on (a required peer).
 - `@webmusic/ui` — domain-neutral styles and presenters used by all visible
-  Score Web Components (an optional peer for browser UI entries).
+  Score Components (an optional peer for browser UI entries).
 - `@webmusic/audio` — audio-signal capabilities in the shared five-package release.
 - `@webmusic/bridge` — score ↔ audio interop in the shared five-package release.
 

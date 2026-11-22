@@ -392,6 +392,26 @@ describe('score grid settings', () => {
 });
 
 describe('score grid sources', () => {
+  it('draws an empty grid while its score has not arrived, and the score when it does (DEC-082)', async () => {
+    const view = document.createElement('grid-test-view') as ScoreGridViewElement;
+    // As a component in a graph is before a cord reaches its source input.
+    view.inputModule = null;
+    document.body.append(view); await settle();
+    expect(view.querySelector('[part="grid"]')).not.toBeNull();
+    expect(view.querySelectorAll('rect[data-note-id]')).toHaveLength(0);
+    expect(view.score).toBeUndefined();
+    const waiting = view.querySelector<HTMLElement>('[part="waiting"]')!;
+    expect(waiting.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    expect(waiting.style.pointerEvents).toBe('none');
+    view.score = fixture(); await settle();
+    expect(view.querySelector('[part="waiting"]')).toBeNull();
+    expect(view.querySelectorAll('rect[data-note-id]')).toHaveLength(2);
+    view.score = undefined; await settle();
+    expect(view.querySelector('[part="waiting"]')).not.toBeNull();
+    expect(view.querySelectorAll('rect[data-note-id]')).toHaveLength(0);
+    view.remove();
+  });
+
   it('remounts from a fixed score to an assigned editor and back', async () => {
     const view = document.createElement('grid-test-view') as ScoreGridViewElement;
     const fixed = fixture(); view.score = fixed; view.editable = true; document.body.append(view); await settle();
@@ -405,7 +425,10 @@ describe('score grid sources', () => {
     expect([...view.querySelectorAll('rect[data-note-id]')].map((note) => note.getAttribute('data-note-id'))).toEqual(['editor-note']);
     expect(view.querySelector<HTMLElement>('[part="toolbar"]')!.hidden).toBe(false);
     view.editor = undefined; await settle();
-    expect(view.querySelector('[part="grid"]')).toBeNull();
+    // Without data the grid stays, empty, under the waiting indicator (DEC-082).
+    expect(view.querySelector<HTMLElement>('[part="grid"]')!.dataset.editState).toBe('static');
+    expect(view.querySelectorAll('rect[data-note-id]')).toHaveLength(0);
+    expect(view.querySelector('[part="waiting"] .wui-status')?.getAttribute('data-kind')).toBe('waiting');
     expect(view.textContent).toContain('Waiting for a score');
     view.score = fixed; await settle();
     expect(view.querySelector<HTMLElement>('[part="grid"]')!.dataset.editState).toBe('static');

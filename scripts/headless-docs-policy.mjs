@@ -4,7 +4,7 @@ import {dirname, join} from 'node:path';
 // literal relative default Astro imports and rendered component names. Ignore
 // fenced examples and comments so a copied skeleton cannot satisfy the policy.
 const blank = (text) => text.replace(/[^\n]/g, ' ');
-function prose(source) {
+export function prose(source) {
   let fence;
   return source.split('\n').map((line) => {
     const match = /^\s*(`{3,}|~{3,})/.exec(line);
@@ -17,12 +17,12 @@ function prose(source) {
   }).join('\n').replace(/<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/g, blank);
 }
 
-function imports(source) {
+export function imports(source) {
   return [...source.matchAll(/\bimport\s+([A-Z][A-Za-z0-9]*)\s+from\s+['"](\.[^'"]*\.astro)['"]/g)]
     .map((match) => ({name: match[1], specifier: match[2]}));
 }
 
-function markup(source) {
+export function markup(source) {
   return source.replace(/^---\r?\n[\s\S]*?\r?\n---/, blank)
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, blank);
 }
@@ -109,13 +109,16 @@ export function headlessDocProblems({pages, readFile, frameFile}) {
   const frame = load(frameFile);
   if (frame !== undefined) {
     const body = markup(frame);
+    if ([...body.matchAll(/<LiveDemoCanvas\b/g)].length !== 1) failures.push(`${frameFile}: expected exactly one LiveDemoCanvas`);
+    // DEC-071: a Headless demo shows the object working with its defaults; it
+    // carries no option panel, code readout, Copy or Reset.
     for (const [label, pattern] of [
-      ['Parameters disclosure', /<summary>\s*Parameters\s*<\/summary>/g],
-      ['LiveDemoCanvas', /<LiveDemoCanvas\b/g],
-      ['Copy control', /\bdata-hl-copy(?=\s|=|>)/g],
-      ['Reset control', /\bdata-hl-reset(?=\s|=|>)/g],
+      ['Parameters disclosure', /<summary>\s*Parameters\s*<\/summary>/],
+      ['code readout', /\bdata-hl-readout(?=\s|=|>)/],
+      ['Copy control', /\bdata-hl-copy(?=\s|=|>)/],
+      ['Reset control', /\bdata-hl-reset(?=\s|=|>)/],
     ]) {
-      if ([...body.matchAll(pattern)].length !== 1) failures.push(`${frameFile}: expected exactly one ${label}`);
+      if (pattern.test(body)) failures.push(`${frameFile}: the shared frame must not render a ${label}`);
     }
     if (/<(summary|legend|h[1-6])\b[^>]*>\s*(?:State|Events)(?:\s|<)/i.test(body)
       || /\b(?:aria-label|data-panel)\s*=\s*['"](?:State|Events)['"]/i.test(body)

@@ -29,7 +29,7 @@ export interface ProjectModuleRecord {
   readonly assets?: Readonly<Record<string, string>>;
   readonly params?: Readonly<Record<string, number>>;
 }
-export type ProjectSignalKind = 'audio' | 'control' | 'note' | 'transport' | 'source';
+export type ProjectSignalKind = 'audio' | 'control' | 'note' | 'transport' | 'source' | 'message';
 export interface ProjectEndpoint { readonly moduleId: string; readonly port: string }
 export interface ProjectParamEndpoint { readonly moduleId: string; readonly param: string }
 export interface ProjectConnectionRecord {
@@ -72,13 +72,66 @@ export interface ProjectModuleLayout {
   readonly x: number;
   readonly y: number;
   readonly collapsed?: boolean;
+  /** The box's width and height in canvas pixels, when it was resized; absent means its natural size. */
+  readonly width?: number;
+  readonly height?: number;
 }
-export interface ProjectLayout { readonly modules: readonly ProjectModuleLayout[] }
+/** A text note on the canvas of one context (DEC-076). */
+export interface ProjectComment {
+  readonly id: string;
+  readonly contextId: string;
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+}
+/** Modules selected and moved together. */
+export interface ProjectGroup { readonly id: string; readonly moduleIds: readonly string[] }
+export interface ProjectLayout {
+  readonly modules: readonly ProjectModuleLayout[];
+  /**
+   * The presentation view (DEC-076): the modules it shows and where. A module
+   * without an entry is absent from presentation.
+   */
+  readonly presentation?: readonly ProjectModuleLayout[];
+  readonly comments?: readonly ProjectComment[];
+  readonly groups?: readonly ProjectGroup[];
+  /**
+   * Custom properties of the presentation as a whole (DEC-088): their names
+   * and the CSS values they are given. Kernel only keeps them; a host that
+   * shows the presentation decides which it applies.
+   */
+  readonly style?: Readonly<Record<string, string>>;
+  /**
+   * The page a host lays the presentation out in (DEC-092): a tree of its
+   * own design that says where each shown module sits among whatever else
+   * the page holds. Kernel keeps it as plain data, under the project's
+   * limits; what it means, and what of it is safe to show, is the host's.
+   */
+  readonly page?: ProjectJsonObject;
+}
+/** What drives a mapped parameter: a MIDI controller, pitch bend, program change or a computer key. */
+export type ProjectMappingSource =
+  | {readonly kind: 'cc'; readonly controller: number; readonly channel?: number}
+  | {readonly kind: 'pitchbend'; readonly channel?: number}
+  | {readonly kind: 'program'; readonly channel?: number}
+  | {readonly kind: 'pressure'; readonly channel?: number}
+  | {readonly kind: 'key'; readonly key: string};
+/** One mapping from a control source to a parameter (DEC-076). */
+export interface ProjectMappingRecord {
+  readonly id: string;
+  readonly source: ProjectMappingSource;
+  readonly target: ProjectParamEndpoint;
+  /** Target range the source's 0–1 maps onto; defaults to the parameter's display range. */
+  readonly min?: number;
+  readonly max?: number;
+}
 export interface ProjectSessionState {
   /** Unwrapped Session seconds, preserving once-only automation and LFO phase across loop passes. */
   readonly positionSeconds: number;
   readonly rate: number;
   readonly loop?: Readonly<{startSeconds: number; endSeconds: number}> | null;
+  /** Tempo and meter of the Session's musical time (DEC-077); 120 bpm in 4/4 when absent. */
+  readonly tempo?: Readonly<{bpm: number; beatsPerBar: number; beatUnit: number}>;
 }
 /** Serializable project state. DSP objects, DOM, storage and undo history are deliberately absent. */
 export interface ModuleProject {
@@ -94,6 +147,8 @@ export interface ModuleProject {
   readonly automation: readonly ProjectAutomationRecord[];
   readonly session: ProjectSessionState;
   readonly layout: ProjectLayout;
+  /** Control mappings (DEC-076); absent means none. */
+  readonly mappings?: readonly ProjectMappingRecord[];
 }
 
 export interface ProjectPortDescriptor {
@@ -117,12 +172,54 @@ export interface ProjectModuleInstance {
   getControl?(port: string): ControlSignal | undefined;
   /** Enrich a fresh child scope; keep its ID, registry and shared AudioEnvironment. */
   childContext?(context: ModuleContext): ModuleContext;
+  /**
+   * The module a `source` cord from `port` carries (DEC-089). Without it, or
+   * when it returns undefined, the cord carries this instance's module.
+   */
+  sourceOutput?(port: string): ModuleHandle | undefined;
+  /**
+   * Accept a `source` cord on `port`: follow `module` until the lease is
+   * released (DEC-089). Return undefined to leave the cord to the runtime's
+   * connector.
+   */
+  connectSource?(port: string, module: ModuleHandle): ConnectionLease | undefined;
   /** Capture live serializable configuration such as oscillator waveform. */
   exportConfig?(): ProjectJsonObject;
+  /**
+   * Called once after the graph holding this instance commits, before
+   * observers hear of it; a candidate graph that never commits is disposed
+   * without activation. Message objects start timers and fire `loadbang` here.
+   */
+  activate?(): void;
   dispose(): void;
 }
+/**
+ * Thrown by a plugin factory when its module cannot exist in this environment
+ * (a capability, preparation or resource it needs is unavailable). Restoration
+ * keeps the record unresolved with this message, exactly like a missing
+ * plugin, instead of failing; any other error still fails the restore.
+ */
+export class ProjectModuleUnavailableError extends Error {
+  /** The underlying failure, when there is one. */
+  readonly cause?: unknown;
+  constructor(message: string, options?: {cause?: unknown}) {
+    super(message);
+    this.name = 'ProjectModuleUnavailableError';
+    if (options && 'cause' in options) this.cause = options.cause;
+  }
+}
+
+/** True for {@link ProjectModuleUnavailableError}, also across duplicate package copies. */
+export function isProjectModuleUnavailable(error: unknown): error is ProjectModuleUnavailableError {
+  return error instanceof ProjectModuleUnavailableError || (error instanceof Error && error.name === 'ProjectModuleUnavailableError');
+}
+
 export interface ProjectPluginFactory extends ProjectPluginReference {
-  /** Must return a fresh, exclusively owned instance, even when replacing the same stable ID. */
+  /**
+   * Must return a fresh, exclusively owned instance, even when replacing the
+   * same stable ID. Throw {@link ProjectModuleUnavailableError} to leave the
+   * module unresolved.
+   */
   create(request: ProjectFactoryRequest): ProjectModuleInstance | Promise<ProjectModuleInstance>;
 }
 export interface ProjectConnectionRequest {

@@ -53,20 +53,20 @@ are also outside the site's snippet scan.
 ## `check:docs`: static page and catalog checks
 
 Implementation: [scripts/check-docs.mjs](../../scripts/check-docs.mjs). Page scanning
-covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
+covers `.md` and `.mdx` under `doc/src/content/docs/`.
 
 | Check | What it verifies | What it does not establish |
 |---|---|---|
 | `params` | Element source files and parameter catalogs correspond across the six Score/Audio capabilities; names and order match parsable `static observedAttributes`, with supported spread tables resolved | Defaults, behavior, property/method/event tables, or arbitrary JavaScript declaration forms |
 | `catalog` | Element hrefs resolve to pages or collected anchors; tags have params; presenters have classified pages; `consumerTags` are catalog tags | Whether each consumer actually composes that presenter, or whether descriptions are accurate |
-| `page` | Element leaf filenames name real tags, titles equal `'<tag>'`, a recognizable top-level Demo/Playground starts the body after frontmatter/imports/comments, a self-closing demo exists, and API/Styling summaries exist | Exactly one demo, complete member tables, remaining section order, or arbitrary MDX expressions/import forms |
-| `title` | Every page has a title; the Score/Audio API, UI presenter, UI Kit root, and Bridge root titles equal their entry specifier | Title form for any other page kind, including family pages, each family's Web Components and Headless inventories, Headless objects, and the Kernel API page; element leaf titles belong to the `page` check |
-| `plan`: groups | No `index.mdx` remains in an element capability directory; every element leaf has an integer `sidebar.order` and the group's orders are dense from 1; both of a family's `element/index.mdx` and `headless/index.mdx` exist and carry no recognizable demo; UI Kit category labels match the catalog | A stray capability `index.mdx` under `headless/`, or Headless object order. Also what an inventory actually lists, whether it has a section per capability, a demo mounted in an unrecognized form, or whether a removed route gained a redirect |
+| `page` | Element leaf filenames name real tags and titles equal `'<tag>'`. `scripts/element-docs-policy.mjs` holds every Component leaf to one shape: a main Demo/Playground first, rendering `ElementDemo`; a one-to-three-paragraph prose introduction; `## Import`, then `## Ports and composition`; topic sections and topic demos before one API and one Styling `<details>`; no other `<details>`; and a last `## Related` bullet list. Catalog `switch` attributes are enums of at least two values whose fallback names the default | Complete member tables, introduction quality, whether a topic demo is justified, or arbitrary MDX expressions/import forms |
+| `title` | Every page has a title; the Score/Audio API, UI presenter, UI Kit root, and Bridge root titles equal their entry specifier | Title form for any other page kind, including family pages, each family's Components and Headless inventories, Headless classes, and the Kernel API page; element leaf titles belong to the `page` check |
+| `plan`: groups | No `index.mdx` remains in an element capability directory; every element leaf has an integer `sidebar.order` and the group's orders are dense from 1; both of a family's `element/index.mdx` and `headless/index.mdx` exist and carry no recognizable demo; UI Kit category labels match the catalog | A stray capability `index.mdx` under `headless/`, or Headless instance order. Also what an inventory actually lists, whether it has a section per capability, a demo mounted in an unrecognized form, or whether a removed route gained a redirect |
 | `plan`: entries | The five package root API pages name every published sub-entry and no nonexistent sub-entry; Kernel also has a path-bearing section per sub-entry | Complete API Reference members, or a requirement that matched paths occur in a table |
 | `plan`: Headless | Recognizable value exports from the six Score/Audio `/headless` barrels occur as backticked names in the family `headless/index.mdx` read together with that capability's object pages; relative `export *` is followed, and a failure names the capability and its barrel | Types, unique ownership, whether the inventory rather than one leaf names an export, whether a name appears in its own capability's section, whether a name is linked to an explanation, or Bridge's root exports |
-| Score Headless leaf shape | All Score Headless leaves checked by `scripts/headless-docs-policy.mjs` have the shared demo frame, ordered sections and compact controls; the frame has one copy/reset pair and no separate State/Events panels | Audio leaves retain their existing export/link checks until their demos migrate; source shape does not prove running interactions |
+| Headless leaf shape | Every Score and Audio Headless leaf renders the shared `HeadlessDemoFrame` (one live canvas; no Parameters, code readout, Copy/Reset or separate State/Events panels) and has dense sidebar orders (`scripts/headless-docs-policy.mjs`). Every Score, Audio and Bridge Headless page has the Component page shape without Styling: main demo first, a one-to-three-paragraph prose introduction, `## Import`, `## Ports and composition`, topics, one API `<details>`, and a last `## Related` bullet list (`headlessShapeProblems`) | Source shape does not prove running interactions; Bridge has no dense-order check |
 | `live-demo` | Rendered Astro imports named with a Demo/Playground/Showcase/Sandbox suffix have a recursive import path to `LiveDemoCanvas.astro` | Browser rendering or successful mounting; this is static import reachability |
-| `docs-css` | `wui-*` classes in shared `apps/doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
+| `docs-css` | `wui-*` classes in shared `doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
 | `css-variable` | Backticked non-`--wm-*` variables in site pages have a recognizable read, write, or declaration somewhere in Score/Audio/UI source | Whether the variable affects this particular component or demo |
 | `link` | Markdown `](/...)` links resolve to a page or a public file directly; `](#...)` resolves against the current page, with fragments checked against collected anchors. A link that resolves only through a parsed redirect FAILS, naming the destination, because the redirect is for a bookmark and drops the fragment | Relative links, HTML hrefs, dynamic links, external URLs, redirects declared outside the parsed `redirects:` block, or whether a redirect target is itself sensible |
 
@@ -91,7 +91,7 @@ page responsibility; the checker does not define it.
 Follow the Site Plan's naming: `'<score-player>'` for a tag,
 `'@webmusic/score/play'` for an API entry, `'@webmusic/ui/transport'` for a
 presenter, the family or platform name for a family page (`'Score'`), and that
-name qualified by its form for the two inventories (`'Score Web Components'`,
+name qualified by its form for the two inventories (`'Score Components'`,
 `'Score Headless'`). Titles need not be unique across the site;
 navigation provides context.
 
@@ -135,8 +135,8 @@ Documentation-related assertions include:
 “Aligned UI Kit page” in an error message does not identify a permitted exempt
 set: a missing skeleton fails an earlier assertion. These checks still do not
 verify member completeness, state controls, accessibility, styles, or cleanup.
-Do not infer equivalent section-order coverage for Element, Headless, or API
-pages.
+Element and Headless pages have section-order gates (the `page` and Headless
+leaf shape rows); do not infer equivalent coverage for API pages.
 
 ## `check:dev-docs`: inventories, reading routes and repository links
 
@@ -265,9 +265,10 @@ above.
   replace the table.
 - Follow the appropriate template for section structure and the distinction
   between a main demo and a justified topic example.
-- Web Component leaf/workflow pages place the main demo immediately after the
+- Component leaf/workflow pages place the main demo immediately after the
   page title, before the introduction, notices, code examples or headings.
-  Move the existing main demo; keep topic examples beside their explanations.
+  Move the existing main demo; keep topic examples beside their explanations,
+  in topic sections before API.
 - Explain inputs, state, operations, events, errors, ownership, disposal,
   accessibility, and styling according to the actual public contract. Do not
   copy defaults from a neighboring component.
@@ -281,7 +282,7 @@ above.
 ### Demo resource lifetime
 
 In this checkout, standalone programmatic/Headless demos and the API sandbox
-bootstrap use `mountDemos` in the [demo components](../../apps/doc/webmusic/src/components/).
+bootstrap use `mountDemos` in the [demo components](../../doc/src/components/).
 Register
 cleanup as resources are acquired, bind controls through the scope, and check
 `scope.active` after asynchronous preparation before starting sound or changing
@@ -289,10 +290,10 @@ UI. The scope releases on removal, Astro navigation and page hide; a late
 resource registered after cancellation is released immediately. A demo owns
 what it creates, unless its API explicitly transfers that ownership.
 
-The [Headless controller](../../apps/doc/webmusic/src/lib/headless-playground-client.ts)
+The [Headless controller](../../doc/src/lib/headless-playground-client.ts)
 invalidates pending factories on replacement/removal and releases subscriptions
 and the owned instance even when another cleanup fails. Its state display uses
-the object's events. The [API editor client](../../apps/doc/webmusic/src/components/api-sandbox-client.ts)
+the object's events. The [API editor client](../../doc/src/components/api-sandbox-client.ts)
 retains and unmounts its React root; preview stays opt-in and dependency keys
 must name npm packages, not import subpaths. Lifecycle regressions run in the
 documentation workspace tests; they do not establish real device behavior.
@@ -313,7 +314,7 @@ what happens on failure.
 ### Demo assets
 
 Every musical demo and copyable example uses Claude Debussy's Arabesque No. 1
-from the owner-maintained `apps/doc/webmusic/public/` folder, as fixed by
+from the owner-maintained `doc/public/` folder, as fixed by
 [AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only) and DEC-066. Do not
 change that folder or substitute generated notes, fixtures or other media; use a
 passage of the piece when a demo needs less. The format choices below are
@@ -333,22 +334,22 @@ control requires extra data such as audiowaveform JSON for `peaks-src`, supply
 that data or explain why the control cannot work in this example.
 In browser URLs percent-encode the space as `%20`, and use
 `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve. The
-[asset inventory](../../apps/doc/webmusic/ASSETS.md) records what is known about
+[asset inventory](../../doc/ASSETS.md) records what is known about
 each file. `npm run check:demo-music` rejects any other media reference and any
 change to the folder that the owner's pin does not record.
 
 ### Demo file ownership
 
 ```text
-apps/doc/shared/                  catalogs and shared documentation styles
-apps/doc/webmusic/src/
+doc/shared/                  catalogs and shared documentation styles
+doc/src/
   content/docs/                   page prose
   lib/params/                     element attribute catalogs
   lib/headless-params/            implemented Headless panel catalogs
   lib/ui-presenter-demos/         presenter demo bindings
   components/                    shared canvas, panels, and catalog renderers
   components/elements/           element or workflow demos
-  components/headless/           Headless object demos
+  components/headless/           Headless instance demos
   components/bridges/            cross-package composition demos
 ```
 

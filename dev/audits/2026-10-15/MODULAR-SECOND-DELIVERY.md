@@ -41,7 +41,7 @@ implied. The environment is Node 24.19.0, npm 11.9.0 and headless Chromium
   neither a native AudioParam intrinsic value nor an animation-frame estimate
   is presented as a sampled signal value.
 
-The [public composition guide](../../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+The [public composition guide](../../../doc/src/content/docs/bridge/modular-composition.mdx)
 contains a real instrument, note keyboard, two attached panels, four ADSR
 controls, a cutoff LFO, a shared brightness macro and sweep/hold controls.
 The neutral parameter machinery also drives native Audio and Score effects.

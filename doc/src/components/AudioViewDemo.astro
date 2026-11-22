@@ -1,0 +1,113 @@
+---
+// One visible view; data is shared with the optional examples below it.
+// Spectral analysis starts only when the selected representation needs it.
+import ElementDemo from './ElementDemo.astro';
+import ElementComposition from './ElementComposition.astro';
+
+// "Wired, but nothing visible changes HERE" — honest rather than flattering.
+// Only demo-scoped reasons belong here: an attribute that merely applies to one
+// `type` is not inert, because `type` is one control away — that scoping lives in
+// the catalog note instead.
+const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
+---
+
+<ElementDemo tag="audio-view">
+  <div data-audio-view-demo>
+  <ElementComposition>
+  <audio-player id="wa-v-player" controls></audio-player>
+  <audio-view
+    id="wa-v-view"
+    input="#wa-v-player"
+    type="waveform"
+    pixels-per-second="90"
+    height="96"
+    amplitude="1.6"
+    interactive
+    drag-mode="scrub"
+    data-view-demo
+  ></audio-view>
+  </ElementComposition>
+  <p role="status" class="wm-demo-status" data-view-status></p>
+  </div>
+</ElementDemo>
+
+<script>
+  import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {acquireAudioViewFixture} from './audio-view-fixture';
+
+  defineAudioPlayerElement();
+  defineAudioViewElement();
+
+  mountDemos('[data-audio-view-demo]', (root, scope) => {
+    const view = root.querySelector<AudioViewElement>('audio-view')!;
+    const player = root.querySelector<AudioPlayerElement>('audio-player')!;
+    const status = root.querySelector<HTMLElement>('[data-view-status]')!;
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    scope.add(() => fixture.release());
+    scope.add(() => { player.stop(); player.clip = undefined; player.loading = false; view.peaks = undefined; view.spectrogram = undefined; view.loading = false; });
+    let generation = 0;
+    let ready = false;
+    let prepared = false;
+    const setLoading = (value: boolean): void => {
+      view.loading = value;
+    };
+    const needsSpectrum = (): boolean => view.type === 'spectrogram' ||
+      (view.type === 'waveform' && ['multiband', 'colormap'].includes(view.getAttribute('color-mode') ?? ''));
+    const update = async (): Promise<void> => {
+      const current = ++generation;
+      if (!ready) return;
+      delete status.dataset.error;
+      status.textContent = '';
+      if (!needsSpectrum() || prepared) { setLoading(false); return; }
+      setLoading(true);
+      try {
+        const spectrum = await fixture.spectrum('left', true);
+        if (!scope.active || current !== generation || !needsSpectrum()) return;
+        view.spectrogram = spectrum;
+        prepared = true;
+        status.textContent = '';
+      } catch (error) {
+        if (scope.active && current === generation) { status.textContent = 'Spectrum could not be prepared. Change the view type to retry.'; status.dataset.error = ''; }
+        throw error;
+      } finally {
+        if (scope.active && current === generation) setLoading(false);
+      }
+    };
+    const observer = new MutationObserver(() => scope.run(update()));
+    observer.observe(view, {attributes: true, attributeFilter: ['type', 'color-mode']});
+    scope.add(() => observer.disconnect());
+    const tap = (): void => {
+      if (view.type === 'meter' && player.analyser) view.type = 'meter';
+    };
+    scope.listen(player, 'webaudio:loaded', tap);
+    let tapFrame = 0;
+    scope.listen(player, 'click', () => {
+      cancelAnimationFrame(tapFrame);
+      tapFrame = requestAnimationFrame(() => { if (scope.active) tap(); });
+    });
+    scope.add(() => cancelAnimationFrame(tapFrame));
+    scope.run((async () => {
+      status.textContent = '';
+      setLoading(true);
+      player.loading = true;
+      const clip = await fixture.clip();
+      if (!scope.active) return;
+      const peaks = await fixture.peaks();
+      if (!scope.active) return;
+      // Explicit peaks arrive first so the player binding need not derive them.
+      view.peaks = peaks;
+      player.clip = clip;
+      player.loading = false;
+      ready = true;
+      status.textContent = '';
+      scope.run(update());
+    })(), () => {
+      setLoading(false);
+      player.loading = false;
+      status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+      status.dataset.error = '';
+    });
+  });
+</script>

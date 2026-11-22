@@ -42,10 +42,27 @@ the application.
 Native participants consume mapped read-only Session anchors with invalidation
 epochs and future loop segments. Backend lookahead, media fallback, effect tails
 and device latency retain explicit limits. The
-[public factory reference](../../apps/doc/webmusic/src/content/docs/bridge/api.mdx)
+[public factory reference](../../doc/src/content/docs/bridge/api.mdx)
 owns exact IDs, configuration and ports; the
-[runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+[runnable guide](../../doc/src/content/docs/bridge/modular-composition.mdx)
 shows save/load, missing-plugin recovery and keyboard-accessible patch editing.
+
+## Components as page elements
+
+`@webmusic/bridge/component` (DEC-078) runs a component made of objects outside
+Studio: `createComponentPlugins` registers everything such a project may use,
+including the official Components a graph can hold, placed by their
+manifests (DEC-081); `mountComponent` shows its
+presentation under a transport; `defineComponentElement` makes it a custom
+element; `componentModuleSource` and `componentPageSource` write exported code
+and list what it needs beyond the packages. A placed component is set by its
+Element's own attributes and `--wm-` tokens, kept in its module's config and
+checked against what the Element observes (DEC-085). A score a view edits in
+a graph is saved in the config of the box that plays it, as the Score's JSON
+gzipped into base64 text, and `ComponentHandle.save()` resolves to the
+project that holds it (DEC-087). This entry needs `@webmusic/ui`;
+the root entry does not. The [component reference](../../doc/src/content/docs/bridge/api.mdx#components-as-page-elements)
+owns the contract.
 
 ## Conversion
 
@@ -65,7 +82,7 @@ uses `maxNotes` and `maxMeasures` to bound work.
 `dispose()` on the composition releases the engines it created and an owned
 context. A context passed in `options.context` stays caller-owned.
 
-Kernel, Score and Audio are required peers. Install compatible versions in the
+Kernel, Score and Audio are required peers; UI is an optional peer used only by `/component`. Install compatible versions in the
 application; Bridge externalizes them. Sharing package implementations does not
 itself share live clocks, contexts or players. Bridge boundaries live in
 [bridges/README.md](../README.md). Accepted session

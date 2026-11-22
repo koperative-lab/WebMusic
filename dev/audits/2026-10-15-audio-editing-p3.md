@@ -35,7 +35,7 @@ browser. These results describe this working tree, not a published release.
   extrema reuse asset data without rendering the entire sequence per commit.
 - API, Headless and Element references, three demos, parameter catalogs, package
   exports/policies and generated Agent Context references describe the real API.
-  The generated WAV fixture has provenance in the [asset inventory](../../apps/doc/webmusic/ASSETS.md).
+  The generated WAV fixture has provenance in the [asset inventory](../../doc/ASSETS.md).
 
 ## Automated verification
 

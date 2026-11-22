@@ -1,5 +1,5 @@
 import type {ViewPlayerSnapshot} from './internal/player-binding';
-import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase} from './internal/score-view-base';
+import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase, emptyScore} from './internal/score-view-base';
 import {
   SCORE_SHEET_FEATURES, SCORE_SHEET_LAYOUTS, mountScoreSheet, parseScoreSheetFeatures,
   type ScoreSheetFeature, type ScoreSheetHandle, type ScoreSheetLayout, type ScoreSheetOptions,
@@ -113,6 +113,8 @@ export class SheetViewElement extends ScoreViewElementBase {
     if (!this.hasEditingSurface() || !available) this.renderCurrent(false);
   }
 
+  protected drawsEmptySurface(): boolean { return true; }
+
   protected disposePresentation(): number {
     const revision = ++this.presentationRevision;
     const surface = this.surface, status = this.status;
@@ -135,15 +137,19 @@ export class SheetViewElement extends ScoreViewElementBase {
     if (revision !== this.presentationRevision || generation !== this.editorGeneration) return;
     const prepared = this.prepareRender();
     if (!prepared?.owner) return;
-    if (this.hasEditorIntent() && !this.editing) {
+    let waiting = prepared.waiting;
+    if (!waiting && this.hasEditorIntent() && !this.editing) {
       const blocked = this.blockedEditorState();
-      this.showStatus(blocked ? 'error' : 'waiting', blocked ? `Editor unavailable: ${blocked}` : 'Waiting for the editor');
-      return;
+      if (blocked) { this.showStatus('error', `Editor unavailable: ${blocked}`); return; }
+      waiting = 'Waiting for the editor';
     }
+    // Waiting, the sheet is a blank staff and borrows no editor (DEC-082).
+    const editing = waiting ? undefined : this.editing;
     try {
-      this.surface = mountScoreSheet(this, this.editing ? {editing: this.editing} : {score: prepared.score}, this.sheetOptions());
-      this.surfaceEditing = this.editing;
+      this.surface = mountScoreSheet(this, editing ? {editing} : {score: waiting ? emptyScore() : prepared.score}, this.sheetOptions());
+      this.surfaceEditing = editing;
       this.surface.updatePlayback(this.sheetPlayback());
+      if (waiting) this.showWaitingOver(waiting);
     } catch (error) {
       if (this.hasEditorIntent()) this.setAttribute('data-editable-state', 'unavailable');
       this.showStatus('error', this.errorMessage(error));
@@ -177,7 +183,7 @@ export class SheetViewElement extends ScoreViewElementBase {
     return {
       layout: this.layout, zoom: this.zoom, features: this.tools, followPlayback: this.followCursor,
       noteColor: note ? `rgb(${note})` : 'var(--wm-score-sheet-note, var(--wm-foreground, light-dark(#111, #eee)))',
-      activeNoteColor: active ? `rgb(${active})` : 'var(--wm-score-sheet-active-note, var(--wm-score-view-active-note, rgb(240, 84, 119)))',
+      activeNoteColor: active ? `rgb(${active})` : 'var(--wm-score-sheet-active-note, var(--wm-score-view-active-note, var(--wm-accent, rgb(240, 84, 119))))',
       onPreview: (result) => this.dispatchEvent(new CustomEvent('editpreview', {detail: result, bubbles: true, composed: true})),
       onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),
       onError: (error) => this.dispatchEvent(new CustomEvent('editerror', {detail: {error}, bubbles: true, composed: true})),

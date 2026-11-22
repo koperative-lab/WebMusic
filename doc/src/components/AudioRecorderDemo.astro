@@ -1,0 +1,21 @@
+---
+// The recorder in its default composition: a player session and the recorder
+// bound to it. It captures the microphone, so it does nothing until the reader
+// presses Record and the browser grants permission; it never auto-starts.
+import ElementDemo from './ElementDemo.astro';
+import ElementComposition from './ElementComposition.astro';
+---
+
+<ElementDemo tag="audio-recorder">
+  <ElementComposition>
+    <audio-player id="recorder-session"></audio-player>
+    <audio-recorder input="#recorder-session" id="wa-recorder-demo"></audio-recorder>
+  </ElementComposition>
+</ElementDemo>
+
+<script>
+  import { defineAudioRecorderElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+
+  defineAudioPlayerElement();
+  defineAudioRecorderElement();
+</script>

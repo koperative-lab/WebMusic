@@ -1,0 +1,60 @@
+---
+title: Introduction
+description: Documentation for the five WebMusic packages — Score for notation, Audio for digital audio, the Bridge that syncs them, and the shared UI and kernel foundations.
+sidebar:
+  label: Introduction
+  order: 0
+---
+
+WebMusic is a toolkit for music software, interactive demos, and web-based
+musical installations. Use ready-made **Components**, drive **Headless
+objects** with your own interface, or compose **APIs and UI presenters**
+directly. These choices share data and runtime contracts so a prototype can
+grow without replacing every layer.
+
+Online music workstations and expressive installations are long-term
+application goals. Project models, undo, persistence, and collaboration remain
+application responsibilities to design on top of the toolkit.
+
+Five TypeScript packages organize these capabilities. Two domain families —
+[Score](/score/) for symbolic music and [Audio](/audio/) for digital audio —
+never depend on each other; what they share lives below them, and what needs
+both lives above:
+
+| Package | Role |
+| --- | --- |
+| [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC: playback, views, analysis. |
+| [`@webmusic/audio`](/audio/) | Digital audio — decoding, playback, waveforms, MIR analysis. |
+| [`@webmusic/bridge`](/bridge/) | The only package that knows both domains — synchronized playback, score→clip rendering, transcription. |
+| [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks both families compose. |
+| [`@webmusic/kernel`](/kernel/) | The zero-domain runtime kernel — contracts and pure logic everything builds on. |
+
+Inside each family the docs follow the package's own vocabulary: **Web
+Components** document the `/element` form, **Headless** documents
+`/headless`, **API** documents the package root and its capability subpaths,
+and **UI Kit** documents `@webmusic/ui`. Pick the family that matches your
+source material: notation — MIDI, MusicXML, MXL, ABC — is Score; recorded
+sound is Audio.
+
+Participants performing together should follow one session time authority,
+with explicit mappings between musical positions and audio time. The current
+[Bridge](/bridge/) coordinates separate clocks; shared-instance injection is
+further work. Rendering chooses a sound realization, while transcription
+estimates notes: conversion does not imply a lossless round trip.
+
+Start with **[Quick Start](/quick-start/)**: a Score player with synchronized notation and keyboard, plus a compact Audio
+example. [Score](/score/) owns setup and registration; [Audio](/audio/) includes
+its setup and walkthrough. [Agent Toolkit](/agent-toolkit/) supplies coding-agent
+references, skills and project instructions.
+
+Search covers every package at once, so a term from one family will find the
+other.
+
+## Objects, components and apps
+
+WebMusic builds music software in three layers. An **object** is one node
+with inlets and outlets — a source, an effect, a keyboard, a scope. A
+**component** is a graph of objects that you copy into a web project; once the
+WebMusic packages are installed, it runs. The packages' own Components,
+such as `<score-player>` and `<audio-oscilloscope>`, are the official
+components. An **app** is music software assembled from several components.

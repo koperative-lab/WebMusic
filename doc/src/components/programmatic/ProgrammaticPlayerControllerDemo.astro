@@ -1,0 +1,64 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="PlayerController"
+  rootAttrs={{'data-programmatic-playercontroller': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><button class="wui-btn" data-variant="ghost" data-pause type="button">⏸ Pause</button><button class="wui-btn" data-variant="ghost" data-seek type="button">Scrub +2s</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticFeedback} from './programmatic-demo-lifecycle';
+  import { PlayerController, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+
+  mountProgrammaticDemo('[data-programmatic-playercontroller]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
+    const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const pauseBtn = root.querySelector<HTMLButtonElement>('[data-pause]')!;
+    const seekBtn = root.querySelector<HTMLButtonElement>('[data-seek]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+
+    const scrubInput = root.querySelector<HTMLInputElement>('[data-scrub-seconds]');
+    const scrubSeconds = () => Math.max(-10, Math.min(10, Number(scrubInput?.value ?? 2)));
+
+    const player = new ScorePlayer(score, {
+      synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
+      synthOwnership: 'owned',
+    });
+    scope.add(() => player.dispose());
+    const controller = new PlayerController(player, score);
+    scope.add(() => controller.destroy());
+
+    const paint = () => {
+      const cur = controller.currentTime;
+      const dur = controller.duration || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    controller.on('timeupdate', paint);
+    scope.add(controller.on('error', (error) => {
+      if (scope.active) programmaticFeedback(root, error instanceof Error ? error.message : String(error));
+    }));
+    controller.on('end', () => {
+      playBtn.textContent = '▶ Play';
+      controller.seek(0);
+      paint();
+    });
+
+    scope.listen(playBtn, 'click', () => {
+      controller.play();
+      playBtn.textContent = '▶ Play';
+    });
+    scope.listen(pauseBtn, 'click', () => controller.pause());
+    scope.listen(seekBtn, 'click', () => {
+      controller.scrub(scrubSeconds());
+      paint();
+    });
+  });
+</script>

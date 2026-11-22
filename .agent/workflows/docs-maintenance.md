@@ -30,7 +30,7 @@ Apply this section to public contract/reference/demo work, not a path-only move.
 2. Resolve discrepancies through an authorized fix, an accepted decision change
    or an explicit gap in [STATUS](../../dev/STATUS.md); do not invent behavior.
 3. Update the owning reference once, then link it from inventories and Related
-   sections. Reconcile catalogs, Parameters, registration and policy inputs.
+   sections. Reconcile parameter catalogs, registration and policy inputs.
 4. Use real fixtures and public entries in examples. Verify that every exposed
    setting has an effect or explains its actual limitation; retain cleanup.
 5. Follow the site plan for family inventories and workflow pages. Do not revive

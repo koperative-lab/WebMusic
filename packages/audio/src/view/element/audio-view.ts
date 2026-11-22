@@ -40,6 +40,7 @@ import {observeCompanionTarget} from '../../play/element/internal/companion-targ
 
 import {
   Region,
+  createAudioClip,
   createRegion,
   peaksFromWaveformData,
   type AudioClip,
@@ -201,6 +202,12 @@ const EMPTY_STATE_MESSAGES: Readonly<Record<AudioViewType, string>> = {
   spectrogram: 'No spectrogram to draw — assign .spectrogram',
   meter: 'No analyser to meter — bind a player with an analyser',
 };
+
+// What a waveform view draws before its audio arrives (DEC-082): no samples at all.
+let noPeaks: AudioPeaks | undefined;
+function emptyPeaks(): AudioPeaks | undefined {
+  return noPeaks ??= computeClipPeaks(createAudioClip({sampleRate: 48_000, channelData: [new Float32Array(0)]}));
+}
 
 /** Accessible names for a view that is displayed rather than operated. */
 const DISPLAY_LABELS: Readonly<Record<AudioViewType, string>> = {
@@ -870,7 +877,7 @@ export class AudioViewElement extends WebMusicElement {
         ? {peakColor: 'var(--wm-meter-peak, var(--wm-danger, #c0392b))'}
         : this.type === 'waveform'
           ? {
-              waveColor: 'var(--wm-waveform, #999)',
+              waveColor: 'var(--wm-waveform, var(--wm-foreground-muted, #999))',
               progressColor: 'var(--wm-waveform-progress, var(--wm-foreground, #444))',
               playheadColor: 'var(--wm-playhead, #c0392b)',
             }
@@ -974,7 +981,10 @@ export class AudioViewElement extends WebMusicElement {
       }
       default: {
         const peaks = this.resolvePeaks();
-        if (!peaks) return this.renderEmpty(host);
+        if (!peaks) {
+          const blank = this.waitsForAudio() ? emptyPeaks() : undefined;
+          return blank ? this.renderEmptyWaveform(host, blank, options) : this.renderEmpty(host);
+        }
         // The waveform tints by frequency (color-mode multiband/colormap) from
         // `.frequencyData`, computed from the same channel as `.peaks`.
         this.rendered = renderWaveformVisualizer(host, peaks, {
@@ -991,6 +1001,32 @@ export class AudioViewElement extends WebMusicElement {
     this.syncTimeline();
     this.configureAccessibility();
     this.bindVisualizer();
+  }
+
+  /** True when no audio has been given and none is loading or has failed: the data is missing, nothing else. */
+  private waitsForAudio(): boolean {
+    const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
+    return !this.loading && !this.sourceAbort && !this.peaksAbort && !owner?.loading
+      && !this.peaksError && !this.sourceError && !owner?.loadError && !this.playerSelectionError;
+  }
+
+  /**
+   * The audio has not arrived, but the view has (DEC-082): draw an empty
+   * waveform lane with the waiting indicator over it (DEC-052). The layer
+   * takes no pointer input and goes with the presentation; `.clip` and
+   * `.peaks` stay `undefined`.
+   */
+  private renderEmptyWaveform(host: HTMLElement, blank: AudioPeaks, options: ReturnType<AudioViewElement['renderOptions']>): void {
+    this.rendered = renderWaveformVisualizer(host, blank, options);
+    host.style.position = 'relative';
+    const layer = host.ownerDocument.createElement('div');
+    layer.setAttribute('part', 'waiting');
+    layer.style.cssText = 'position: absolute; inset: 0; display: grid; pointer-events: none;';
+    host.append(layer);
+    const status = mountStatus(layer, {snapshot: (): StatusState => ({kind: 'waiting', message: EMPTY_STATE_MESSAGES.waveform})},
+      {classNames: {root: 'wui-status--embedded'}});
+    this.status = {...status, destroy: () => { status.destroy(); layer.remove(); }};
+    this.configureAccessibility();
   }
 
   /**

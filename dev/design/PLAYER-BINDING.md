@@ -33,7 +33,7 @@ supplied musical input remain useful without a player. A capability does not
 become a playback participant merely because another component on the page plays
 music. Multiple independent sessions must remain isolated.
 
-The same musical capabilities must be accessible through Web Components,
+The same musical capabilities must be accessible through Components,
 Headless composition and API + UI composition. The Element adds declarative
 target resolution and presentation; it must not be the only place that can
 obtain playback state or implement analysis behavior. Equivalent capability
@@ -353,17 +353,17 @@ compatibility review; they do not independently define the target contract:
 
 | Area                                              | Source and public reference                                                                                                                                                                                                                                    |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Score player and its current data/events/commands | [Play Element sources](../../packages/score/src/play/element/), [Play references](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play); use this branch's exported player tag and owning leaf page |
-| Analyze attachment and score loading              | [Player binding](../../packages/score/src/analyze/element/internal/player-binding.ts), [score source](../../packages/score/src/analyze/element/internal/score-source.ts), [Analyze reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze) |
-| Interactive analysis position                     | [Analyze lane source](../../packages/score/src/analyze/element/internal/analysis-component.ts), [score-chord-analysis reference](../../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)                                                                         |
-| Score and keyboard views                          | [View Elements](../../packages/score/src/view/element/), [View reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view)                                                                                                                     |
-| Nonvisual behavior and custom composition         | [Play API](../../apps/doc/webmusic/src/content/docs/score/api/play.mdx), [Analyze API](../../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)                                         |
+| Score player and its current data/events/commands | [Play Element sources](../../packages/score/src/play/element/), [Play references](../../doc/src/content/docs/score/element/index.mdx#play); use this branch's exported player tag and owning leaf page |
+| Analyze attachment and score loading              | [Player binding](../../packages/score/src/analyze/element/internal/player-binding.ts), [score source](../../packages/score/src/analyze/element/internal/score-source.ts), [Analyze reference](../../doc/src/content/docs/score/element/index.mdx#analyze) |
+| Interactive analysis position                     | [Analyze lane source](../../packages/score/src/analyze/element/internal/analysis-component.ts), [score-chord-analysis reference](../../doc/src/content/docs/score/element/analyze/score-chord-analysis.mdx)                                                                         |
+| Score and keyboard views                          | [View Elements](../../packages/score/src/view/element/), [View reference](../../doc/src/content/docs/score/element/index.mdx#view)                                                                                                                     |
+| Nonvisual behavior and custom composition         | [Play API](../../doc/src/content/docs/score/api/play.mdx), [Analyze API](../../doc/src/content/docs/score/api/analyze.mdx), [View API](../../doc/src/content/docs/score/api/view.mdx)                                         |
 | Shared timing and cross-domain boundaries         | [Architecture](../ARCHITECTURE.md), [shared-clock design](../../platform/shared-clock-injection.md), [Bridge contracts](../../bridges/README.md)                                                                                                                     |
 
 For Audio counterparts, start with the
 [View Elements](../../packages/audio/src/view/element/),
-[View reference](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#view)
-and [Analyze reference](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze).
+[View reference](../../doc/src/content/docs/audio/element/index.mdx#view)
+and [Analyze reference](../../doc/src/content/docs/audio/element/index.mdx#analyze).
 Those references own their current, component-specific connection contracts.
 
 When implementation changes a public contract, update its owning reference and

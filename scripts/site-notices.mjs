@@ -144,7 +144,7 @@ const noticeText = (records) => 'WebMusic documentation site: third-party notice
   + records.map((record) => record.text).join('\n\n' + '='.repeat(72) + '\n\n') + '\n';
 
 /** One collector is shared by Vite's client and worker builds, but excludes SSR bundles. */
-export function createSiteNoticeCollector({root = repository, appDirectory = path.join(root, 'apps/doc/webmusic'), includeGenerated = true} = {}) {
+export function createSiteNoticeCollector({root = repository, appDirectory = path.join(root, 'doc'), includeGenerated = true} = {}) {
   const modules = new Set();
   const outputNames = new Set();
   const require = createRequire(path.join(appDirectory, 'package.json'));
@@ -310,6 +310,6 @@ export default function siteNoticeIntegration(options) {
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [flag, directory, ...rest] = process.argv.slice(2);
   if (flag !== '--check' || rest.length) throw new Error('Usage: node scripts/site-notices.mjs --check [site-dist]');
-  const result = await verifySiteNotices(path.resolve(directory ?? path.join(repository, 'apps/doc/webmusic/dist')));
+  const result = await verifySiteNotices(path.resolve(directory ?? path.join(repository, 'doc/dist')));
   console.log(`Site licenses verified: ${result.packages} records, ${result.artifacts} files.`);
 }

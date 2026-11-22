@@ -2,7 +2,7 @@
 // @webmusic/score/play/demos — ready-made demo elements.
 //
 // Each element is a self-contained, zero-wiring showcase of one `@webmusic/score/play`
-// web component: it builds its own sample music and wires the underlying element
+// component: it builds its own sample music and wires the underlying element
 // (or engine) for you. Drop the tag on a page — no JavaScript needed:
 //
 //   import {defineNoteInputDemoElement} from '@webmusic/score/play/demos';

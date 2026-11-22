@@ -14,7 +14,7 @@ This document preserves its original package-era evidence. See the
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current core API reference](../../../apps/doc/webmusic/src/content/docs/audio/api/index.mdx).
+> Current references: [Current core API reference](../../../doc/src/content/docs/audio/api/index.mdx).
 > See the [archive index](README.md) for scope, the
 > [contributor index](../../../dev/README.md) for current rules, and
 > [STATUS.md](../../../dev/STATUS.md) for active work.

@@ -19,9 +19,9 @@ Source and public types: [notation projection](../../packages/score/src/view/cor
 [SVG renderer](../../packages/score/src/view/render/renderers/staff.ts),
 [renderer options](../../packages/score/src/view/core/types.ts).
 
-Owning reference page and demo: [ScoreView](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
-[View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx),
-[MusicXML demo](../../apps/doc/webmusic/src/components/ScoreViewDemo.astro).
+Owning reference page and demo: [ScoreView](../../doc/src/content/docs/score/element/view/score-view.mdx),
+[View API](../../doc/src/content/docs/score/api/view.mdx),
+[MusicXML demo](../../doc/src/components/ScoreViewDemo.astro).
 
 ## User task and boundary
 
@@ -228,7 +228,7 @@ That resource was removed on 2026-10-16 and restored by the repository owner on
 The comparison below remains historical evidence. Regression coverage also uses
 the independently authored
 [notation study fixture](../../packages/score/test/notation-study-fixture.ts);
-the public demos use [Arabesque No. 1](../../apps/doc/webmusic/ASSETS.md).
+the public demos use [Arabesque No. 1](../../doc/ASSETS.md).
 
 | Present in the PDF | Source and implementation finding | Acceptance boundary |
 |---|---|---|

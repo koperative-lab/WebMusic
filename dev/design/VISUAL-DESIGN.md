@@ -35,6 +35,19 @@ Defaults are neutral greys. Each value is a fallback behind a public token, and
 | Surface | `--wm-<component>-background` → `--wm-surface` | `#fff` / `#111` |
 | Raised: hover fill | `--wm-surface-muted` | `#f3f3f3` / `#1c1c1c` |
 | On ink: content over a pressed fill | `--wm-accent-foreground` | `#fff` / `#111` |
+| Emphasis: values, fills that are on, sounding notes | `--wm-<component>-…` → `--wm-accent` | the component's own |
+| Danger: errors, clipping | `--wm-<component>-error` → `--wm-danger` | `#b42318` / `#f97066` |
+| Recording | `--wm-recording` | `#c62828` / `#ef5350` |
+| Playhead | `--wm-<component>-playhead` → `--wm-playhead` | the component's own red |
+| Scrim behind an adjustment card | `--wm-<component>-scrim` → `--wm-scrim` | 45% black |
+
+These roles, with the geometry and type tokens below, are the theme
+vocabulary (DEC-088): `THEME_TOKENS` in `@webmusic/bridge/component` lists
+them for editors. A part's own token always falls back to one of them before
+its literal, so setting the roles on a component, or on an app's root,
+restyles every display part at once. A colour that is meaning in itself — a
+piano's black keys, a loop region, a spectral map — keeps its own token and
+no shared role.
 
 Colour is reserved for meaning: a sounding note, recording, clipping, an error,
 or musical data with its own palette (pitch classes, spectral maps). Do not add
@@ -48,8 +61,10 @@ is ink, not colour.
   toolbar rows and card headers share it.
 - Lines are 1px hairlines in the line colour. Separate groups with a hairline,
   not with spacing, shadows or nested boxes.
-- One outer frame per component (`--wm-component-border`, `--wm-component-radius`).
-  Inner parts do not draw a second card.
+- One outer frame per component (`--wm-component-border`, `--wm-component-radius`),
+  falling back to `1px solid var(--wm-border)`. Outer frames never fall back to
+  `--wm-control-border`, which is for controls inside the frame, so every
+  component edge has the same colour. Inner parts do not draw a second card.
 - No shadows, gradients or blur, except the single shadow under a floating card.
 
 ## Type
@@ -84,6 +99,18 @@ is ink, not colour.
 - One meaning per icon. The name goes in `aria-label` and `title`; the icon is
   `aria-hidden`. Toolbars show icons only; a value readout (such as `1/16`) may
   sit beside its icon in mono type.
+- On a page that mounts the UI Kit's tooltips (DEC-083), the name shows the
+  moment the pointer rests on an icon: an ink box with on-ink mono text, square
+  and without shadow, just below and right of the pointer, following it; under
+  the control for keyboard focus. Never on touch. Only what shows no text gets
+  a box: cards, tabs, chips, readouts and components already say what they are,
+  so give them no `title` that repeats or expands their text.
+- Help is a pressed-state `?` icon at the right end of an application's menu.
+  While it is on, the box adds the hovered element's `aria-description`, in the
+  UI font. Describe only small things and the basic layers: a tool, chip,
+  filter or parameter in one plain sentence of purpose; an object as an object,
+  then what this one does; a component only as a component, never with a
+  summary of what it does. Pages and text navigation carry no description.
 
 ## Toolbars
 
@@ -123,16 +150,28 @@ window:
 
 ## Documentation demos
 
-The live canvas shows the component and the real controls it needs to be used
-(for example its transport). Configuration — feature switches, modes, sizes and
-settings — goes in Parameters as controls bound to attributes. No demo-only
-checkboxes, hint text or event logs inside the canvas; a failed load may show
-one error line.
+The live canvas shows the component in its default composition with the real
+controls it needs to be used (for example its transport). Component demos
+have no Parameters strip, markup readout or Copy/Reset (DEC-071): the page's
+reference tables document configuration, and interactive adjustment is not part
+of the documentation site. The one exception is the type switch between the
+panel title and the canvas: a mono uppercase attribute name, then one square
+toggle per value, edge to edge, the current one inverted, for an element with
+several drawings, surfaces or recipes. Components in a demo stand 0.5rem apart,
+whether siblings or nested in a player, and each shows its own single frame in
+the line colour. No demo-only checkboxes, hint text or event logs
+inside the canvas; a failed load may show one error line. Headless demos follow
+the same rule: the object works in its default configuration, with only the
+controls that operate it (play, a note, an edit and its undo) in the canvas,
+and no Parameters, code readout or Copy/Reset. UI Kit presenter demos keep their
+external Parameters for configuration.
 
 ## Styling mechanics
 
 - Resolve every value through `--wm-<component>-<role>` → shared `--wm-<role>`
-  → the fallback above. Hard-code a literal only as the final fallback.
+  → the fallback above. Hard-code a literal only as the final fallback, and
+  never as the only one: a token that ends in a literal without a shared role
+  is a part a theme cannot reach.
 - A presenter's own stylesheet, or a scoped one injected by a renderer, keeps
   rules at zero specificity with `:where()` so application CSS wins. Inline
   styles are for geometry that changes with data.
@@ -154,11 +193,12 @@ inversion.
 
 - [ ] Only neutral tokens are used; colour appears only for meaning.
 - [ ] Corners are square, controls share one height and lines are hairlines.
-- [ ] Toolbars are one icon row with names in `aria-label` and `title`.
+- [ ] Toolbars are one icon row with names in `aria-label` and `title`; on the
+      site each name shows at once in the ink tooltip.
 - [ ] Pressed and selected states invert ink; focus outlines are visible.
 - [ ] Adjustments open as an in-component card over a scrim, with modal focus.
 - [ ] No scrollbars are visible; labels of scrolling content are sticky.
 - [ ] No explanatory text inside the component or the demo canvas.
-- [ ] Demo configuration is in Parameters.
+- [ ] Element demos show the default composition without Parameters, plus a type switch when the element has several drawings, surfaces or recipes; Headless demos show the object with its defaults and no Parameters; presenter demo configuration is in Parameters.
 - [ ] Checked in a browser beside an existing component, at a narrow width and
       with keyboard focus; dark-scheme fallbacks are present.

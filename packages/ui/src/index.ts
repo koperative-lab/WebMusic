@@ -14,6 +14,7 @@ export * from "./minimap";
 export * from "./note";
 export * from "./oscilloscope";
 export * from "./panel";
+export * from "./controls";
 export * from "./parameter";
 export * from "./patch-editor";
 export * from "./pitch";

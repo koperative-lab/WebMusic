@@ -1,0 +1,40 @@
+---
+// A catalog object built by its page's demo factory in its default configuration,
+// in the same frame as manual demos. The catalog still describes its options,
+// commands, state and events for the site checks; the demo shows none of them
+// as controls (DEC-071): the page's own stage carries what operates it.
+import { HEADLESS_OBJECTS } from '../lib/headless-params';
+import HeadlessDemoFrame from './HeadlessDemoFrame.astro';
+
+interface Props {
+  /** Catalog key, e.g. `score-player`. */
+  object: string;
+  /** Global key the page's demo module publishes its factory under. */
+  factory: string;
+}
+
+const { object, factory } = Astro.props;
+
+const spec = HEADLESS_OBJECTS[object];
+if (!spec) throw new Error(`<HeadlessPlayground object="${object}"> has no entry in src/lib/headless-params`);
+
+const errors = spec.errors ?? [];
+---
+
+<HeadlessDemoFrame
+  entry={spec.entry}
+  name={spec.name}
+  rootAttrs={{
+    'data-wm-hl': true,
+    'data-hl-object': object,
+    'data-hl-factory': factory,
+    'data-hl-construction': spec.construction,
+    'data-hl-errors': JSON.stringify(errors),
+  }}
+>
+  <slot />
+</HeadlessDemoFrame>
+
+<script>
+  import '../lib/headless-playground-client';
+</script>

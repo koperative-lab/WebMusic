@@ -1,7 +1,7 @@
 {
   "name": "@webmusic/score",
   "version": "0.3.0",
-  "description": "Symbolic music for the web: immutable score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views, Web Components and React bindings.",
+  "description": "Symbolic music for the web: immutable score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views, Components and React bindings.",
   "type": "module",
   "sideEffects": [
     "./src/io/worker.ts",

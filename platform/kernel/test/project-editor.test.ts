@@ -208,6 +208,17 @@ describe('project editor structural adapter', () => {
     expect(() => editor.moveModule('gone', {x: 0, y: 0})).toThrow('Unknown module');
   });
 
+  it('exposes a resized box and keeps its size when it moves', async () => {
+    const {runtime, editor} = fixture();
+    await runtime.restore(project({layout: {modules: [{moduleId: 'source', x: 16, y: 32, width: 240, height: 96}, {moduleId: 'sink', x: 0, y: 0}]}}));
+    const modules = editor.snapshot().modules;
+    expect(modules.find(module => module.id === 'source')!.size).toEqual({width: 240, height: 96});
+    expect(modules.find(module => module.id === 'sink')!.size).toBeUndefined();
+    editor.moveModule('source', {x: 48, y: 64});
+    expect(runtime.exportProject().layout.modules.find(item => item.moduleId === 'source')).toEqual({moduleId: 'source', x: 48, y: 64, width: 240, height: 96});
+    expect(() => project({layout: {modules: [{moduleId: 'source', x: 0, y: 0, width: 0}]}})).toThrow('width must be a finite number');
+  });
+
   it('rejects incompatible modes and directions without altering saved wiring', async () => {
     const {runtime, editor} = fixture(); await runtime.restore(project());
     await expect(editor.connect({...audioPatch, mode: 'connect'})).rejects.toThrow('Audio patches');

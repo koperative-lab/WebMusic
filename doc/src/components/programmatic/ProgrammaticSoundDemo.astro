@@ -1,0 +1,67 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Sound"
+  rootAttrs={{'data-programmatic-sound': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-timbre="triangle" type="button">Triangle</button><button class="wui-btn" data-timbre="fm" type="button">FM</button><button class="wui-btn" data-timbre="wavetable" type="button">Wavetable</button><button class="wui-btn" data-timbre="noise" type="button">Noise</button><span class="wui-readout" data-readout>pick a timbre</span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
+  import { Sound } from '@webmusic/score/play/headless';
+
+  mountProgrammaticDemo('[data-programmatic-sound]', (root, scope) => {
+
+    const readout = root.querySelector<HTMLElement>('[data-readout]');
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-timbre]');
+    // One note of the opening pitch range at a fixed velocity and length.
+    const midi = () => 60;
+    const velocity = () => 100;
+    const duration = () => 0.6;
+
+    let ctx: AudioContext | null = null;
+    scope.add(() => ctx?.close());
+    const sounds = new Map<string, Sound>();
+    scope.add(() => sounds.clear());
+
+    const makeSound = (kind: string): Sound => {
+      switch (kind) {
+        case 'fm':
+          return Sound.fm({ ratio: 2, index: 200, attackSeconds: 0.005, releaseSeconds: 0.12 });
+        case 'wavetable':
+          return Sound.wavetable({ real: [0, 1, 0.5, 0.25, 0.12], attackSeconds: 0.008, releaseSeconds: 0.1 });
+        case 'noise':
+          return Sound.noise({ pitched: true, Q: 8, attackSeconds: 0.001, releaseSeconds: 0.12 });
+        case 'triangle':
+        default:
+          return Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 });
+      }
+    };
+
+    buttons.forEach((btn) => {
+      scope.listen(btn, 'click', async () => {
+        const kind = btn.dataset.timbre ?? 'triangle';
+        if (!ctx) ctx = new AudioContext();
+        await ctx.resume();
+        if (!scope.active) return;
+
+        let sound = sounds.get(kind);
+        if (!sound) {
+          sound = makeSound(kind);
+          sounds.set(kind, sound);
+          const ownedSound = sound;
+          scope.add(() => ownedSound.dispose());
+          sound.connect(ctx.destination);
+        }
+        await sound.preload();
+        if (!scope.active) return;
+        sound.noteOn(midi(), velocity(), ctx.currentTime, duration());
+
+        if (readout) readout.textContent = `${btn.textContent} · noteOn(${midi()}, ${velocity()})`;
+      });
+    });
+  });
+</script>

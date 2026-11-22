@@ -138,6 +138,6 @@ see the [failure log](2026-10-16-editing-release-review/waveform-probe-results.t
   is successful but covers `ef8664d`, not this uncommitted editing tree. A clean,
   reviewed release commit and its matching CI remain necessary.
 - Documentation deployment separately remains blocked by the eight unverified
-  media resources in the [asset inventory](../../apps/doc/webmusic/ASSETS.md).
+  media resources in the [asset inventory](../../doc/ASSETS.md).
   These resources are excluded from npm tarballs. No package publication, tag,
   credential change or deployment was performed.

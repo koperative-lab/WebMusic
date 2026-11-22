@@ -4,7 +4,7 @@ This document defines Score's internal responsibilities, time axes, ownership an
 extension boundaries. The [README](README.md) is the package usage guide.
 The [contribution guide](../../CONTRIBUTING.md) owns setup and validation;
 [platform contracts](../../platform/README.md) and the [UI Kit](../ui/README.md)
-own their respective shared boundaries. The [public component reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx)
+own their respective shared boundaries. The [public component reference](../../doc/src/content/docs/score/element/index.mdx)
 links to each Element's behavior and composition contract.
 
 ---
@@ -106,9 +106,9 @@ element → api → headless → core
 | `core/` | Stateless algorithms, contracts, data transforms owned by that capability. | **Nothing.** Deliberately internal — implementation helpers must not become permanent semver surface. |
 | `headless/` | Code-only domain components: engines, sessions, controllers, state machines. They **never** create, accept or manipulate DOM/canvas/SVG, and carry no visual styles. | `/…/headless` |
 | `api/` | The supported code-facing facade — functions, option bags, result types selected from `core` and, where useful, `headless`. | **The capability root.** `/play` *is* the API; there is no `/play/api` subpath. |
-| `element/` | Styled Web Components compose Headless with a UI presenter; reviewed declaration/behavior elements may render nothing. | `/…/element` (import-only, registers nothing) |
+| `element/` | Styled Components compose Headless with a UI presenter; reviewed declaration/behavior elements may render nothing. | `/…/element` (import-only, registers nothing) |
 
-Consumers can use Web Components, Headless, or API + UI. These reuse the same
+Consumers can use Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
 Editing adds no entries: operations and contracts ship from `/view`, the
 editor and `loadScoreEditor` from `/view/headless`. Note editing is the
@@ -344,9 +344,9 @@ importing the module on the main thread or during SSR is harmless.
 The target pattern, and what "no Element Adapter layer" means:
 
 ```
-domain Headless object  +  @webmusic/ui presenter
+domain Headless instance  +  @webmusic/ui presenter
               composed by the concrete Element class
-                    = the Web Component
+                    = the Component
 ```
 
 The Element class is the browser composition root: it translates attributes,
@@ -363,7 +363,7 @@ supports a native Score, a borrowed Rack or a borrowed Headless
 `PlayerController`; built-in facades share seek/readback without adding a clock.
 Borrowed controllers retain their rate and are not disposed on unmount.
 Input layout and Synth sections configure a role without multiplying tags.
-The [Play element reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play)
+The [Play element reference](../../doc/src/content/docs/score/element/index.mdx#play)
 and composition policy define the supported roles.
 
 `WebMusicElement` provides a generation-guarded connected lifetime: a fresh
@@ -487,7 +487,7 @@ Native playback applies document revisions through Core ports while retaining
 its scheduler and clock. The application owns the editor; existing
 View adds written-quarter piano-roll gestures and exact-value alternatives.
 These implement P2 in the [current editing roadmap](../../dev/design/EDIT-COMPONENTS.md#implementation-and-reference-delivery).
-The [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) owns
+The [View API](../../doc/src/content/docs/score/api/view.mdx) owns
 the implemented public contract; [STATUS](../../dev/STATUS.md), EDIT-01, owns
 current verification.
 
@@ -498,7 +498,7 @@ transport alternative, technical `/render` and `/drivers` entries, and explicit
 by claims of universal bundle size.
 
 Same-instance session-clock injection and cross-boundary loop scheduling require
-the protocol described above. The [public component reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx)
+the protocol described above. The [public component reference](../../doc/src/content/docs/score/element/index.mdx)
 and package export map identify delivered surfaces. Keep architectural rationale
 with the owning contract and describe unverified behavior in change reviews.
 
@@ -514,7 +514,7 @@ with the owning contract and describe unverified behavior in change reviews.
 | what a note sounds like | `play/headless/audio-contracts.ts`, `play/headless/sounds/`, `play/headless/synth.ts` |
 | what is drawn | `view/core/windowing.ts`, `view/render/renderers/` |
 | what is analysed | `analyze/core/`, `analyze/headless/session.ts` |
-| a Web Component's behaviour | `<capability>/element/`, plus the `@webmusic/ui` presenter it composes |
+| a Component's behaviour | `<capability>/element/`, plus the `@webmusic/ui` presenter it composes |
 | an architectural rule | the policy sources listed in §11 and the platform ledger |
 
 ### Shared playback-source contract
@@ -527,6 +527,6 @@ Element helper; it does not move musical models into Kernel.
 
 Native observations use nominal position independent of playback rate, resolved
 Score identity, source revisions and sounding occurrence IDs. Optional nominal
-seek commands report failure. The owning [public model reference](../../apps/doc/webmusic/src/content/docs/score/api/index.mdx)
-and [Headless reference](../../apps/doc/webmusic/src/content/docs/score/headless/index.mdx)
+seek commands report failure. The owning [public model reference](../../doc/src/content/docs/score/api/index.mdx)
+and [Headless reference](../../doc/src/content/docs/score/headless/index.mdx)
 define members and composition.

@@ -1,0 +1,42 @@
+---
+// The three-level composition, written the way a reader would write it.
+//
+//   <score-player>               the only transport, for every part at once
+//     <score-rack-control>             the desk, and the rack's owner
+//       <score-rack-part>              one voice: a score and a sound, no player
+//
+import ElementDemo from './ElementDemo.astro';
+
+const SOURCE = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+const PARTS = [
+  {id: 'lead', src: SOURCE, sound: 'triangle'},
+  {id: 'bass', src: SOURCE, sound: 'sawtooth'},
+  {id: 'pad', src: SOURCE, sound: 'sine'},
+];
+---
+
+<ElementDemo tag="score-rack-control">
+  <score-player data-rc-master>
+    <score-rack-control data-rc-desk>
+      {PARTS.map((part) => (
+        <score-rack-part
+          id={part.id}
+          src={part.src}
+          sound={part.sound}
+        ></score-rack-part>
+      ))}
+    </score-rack-control>
+  </score-player>
+</ElementDemo>
+
+<script>
+  import {
+    defineRackControlElement,
+    defineRackPartElement,
+    defineScorePlayerElement,
+  } from '@webmusic/score/play/element';
+
+  defineScorePlayerElement();
+  defineRackControlElement();
+  defineRackPartElement();
+</script>

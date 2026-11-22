@@ -1,0 +1,41 @@
+---
+// BufferEngine, the low-level resident transport, on a context the demo owns
+// and closes: play schedules the buffer slightly ahead on that context.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="BufferEngine"
+  rootAttrs={{'data-hl-buffer-engine': true}}
+>
+  <HeadlessTransport />
+</HeadlessDemoFrame>
+
+<script>
+  import {BufferEngine} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-buffer-engine]', async (root, scope) => {
+    let engine: BufferEngine | undefined = undefined;
+    let context: AudioContext | undefined = undefined;
+    // The engine borrows the context: dispose it first, then close the context it was given.
+    scope.add(() => { engine?.dispose(); void context?.close(); });
+    const transport = bindTransport(root, scope, () => engine && {
+      play: async () => { await context!.resume(); await engine!.play(engine!.currentTime, context!.currentTime + 0.06); },
+      pause: () => engine!.pause(),
+      get seconds() { return engine!.currentTime; },
+      get duration() { return engine!.duration; },
+      get playing() { return engine!.playing; },
+    });
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    context = new AudioContext();
+    engine = new BufferEngine(context, clip);
+    engine.output.connect(context.destination);
+    engine.prepare();
+    transport.paint();
+  });
+</script>

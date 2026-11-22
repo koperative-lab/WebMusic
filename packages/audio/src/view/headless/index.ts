@@ -5,7 +5,7 @@
 // and meter values. They never create a surface or apply visual defaults, so a
 // framework, terminal, native shell or custom renderer can consume the same
 // results. Browser renderers are explicitly available from `/render`; styled
-// Web Components live at `/element`.
+// Components live at `/element`.
 // ============================================================================
 
 export {
@@ -117,3 +117,4 @@ export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} fro
 export {
   loadAudioClipEditor, type LoadAudioClipEditorOptions, type AudioClipEditorLoader, type AudioClipEditorLoadLimits,
 } from './load-audio-clip-editor';
+export {renderAudioClipEditor} from './buffer-editor';

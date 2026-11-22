@@ -6,7 +6,7 @@
 > current installation guide, runnable reference or work queue. The notes do
 > not share a single verified implementation date; do not treat this archive
 > classification date as the date every original claim was true.
-> Current references: [Current view API reference](../../../apps/doc/webmusic/src/content/docs/score/api/view.mdx); [Current view Web Components](../../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view); [Current view Headless reference](../../../apps/doc/webmusic/src/content/docs/score/headless/index.mdx#view).
+> Current references: [Current view API reference](../../../doc/src/content/docs/score/api/view.mdx); [Current view Web Components](../../../doc/src/content/docs/score/element/index.mdx#view); [Current view Headless reference](../../../doc/src/content/docs/score/headless/index.mdx#view).
 > See the [archive index](README.md) for scope, the
 > [contribution guide](../../../CONTRIBUTING.md) for setup and validation, and
 > [Score architecture](../ARCHITECTURE.md) for current package boundaries.
@@ -125,7 +125,7 @@ range), `white-note-width` / `white-note-height` / `black-note-width` /
 ## Documentation
 
 Full API docs live in the monorepo's documentation site
-([`apps/doc/webmusic-score`](../../../apps/doc/webmusic-score), `npm run docs:dev:score`) — see the **View API** page.
+([`apps/doc/webmusic-score`](../../../doc-score), `npm run docs:dev:score`) — see the **View API** page.
 
 ## License
 

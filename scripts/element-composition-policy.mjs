@@ -1,6 +1,6 @@
 /**
  * Reviewed Headless + UI Kit contract for the public Score and Audio
- * Web Components. Keep this list explicit: adding an element is an
+ * Components. Keep this list explicit: adding an element is an
  * architecture decision, not something a directory glob should approve.
  *
  * `ui` names the published presenter subpaths the element is expected to
@@ -46,7 +46,7 @@ export const elementCompositionPolicy = Object.freeze([
 ]);
 
 /** Main presenters available without a domain Element consumer. */
-export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'meter', 'track-list', 'patch-editor', 'timeline']);
+export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'meter', 'track-list', 'patch-editor', 'timeline', 'controls']);
 
 /**
  * Musical editing surfaces own their focus entry and keyboard interpretation.

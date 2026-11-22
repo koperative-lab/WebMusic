@@ -179,3 +179,14 @@ export interface SoundfontSynthOptions {
 export type SynthBackend = HeadlessSynth;
 export type PlayerOptions = ScorePlayerOptions;
 export type PlayerEvents = ScorePlayerEvents;
+
+/**
+ * What a Session-followed player asks of its Session through the member that
+ * joined it: pause it before a document revision is applied, as the player
+ * pauses a transport it owns, and read the member again once the revision is
+ * adopted. The player never writes the Session's clock.
+ */
+export interface ScoreSessionRequests {
+  pause(): void;
+  refresh(): void;
+}

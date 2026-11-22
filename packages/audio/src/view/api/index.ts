@@ -4,7 +4,7 @@
 // This entry exposes data contracts plus reusable colour and viewport math.
 // It does not create DOM nodes or install a visual skin. Imperative, unstyled
 // Code-only view models live at `@webmusic/audio/view/headless`; browser drawing
-// adapters live at `@webmusic/audio/view/render`; styled Web Components live at
+// adapters live at `@webmusic/audio/view/render`; styled Components live at
 // `@webmusic/audio/view/element`.
 // ============================================================================
 

@@ -1,0 +1,51 @@
+---
+// AudioPlaylist over two entries of Arabesque No. 1, the WAV and the MP3,
+// played in order on one context with an injected loader.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/play/headless"
+  name="AudioPlaylist"
+  rootAttrs={{'data-hl-playlist': true}}
+>
+  <HeadlessTransport>
+    <button class="wui-btn" data-variant="ghost" data-previous type="button">Previous</button>
+    <button class="wui-btn" data-variant="ghost" data-next type="button">Next</button>
+    <span class="wui-readout" data-track>—</span>
+  </HeadlessTransport>
+</HeadlessDemoFrame>
+
+<script>
+  import {loadClipFromUrl} from '@webmusic/audio/play';
+  import {AudioPlaylist} from '@webmusic/audio/play/headless';
+  import {mountProgrammaticDemo, programmaticFeedback} from '../programmatic/programmatic-demo-lifecycle';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-playlist]', (root, scope) => {
+    const base = import.meta.env.BASE_URL;
+    const track = root.querySelector<HTMLElement>('[data-track]')!;
+    const playlist = new AudioPlaylist({
+      entries: [
+        {id: 'wav', label: 'Arabesque No. 1 (WAV)', src: `${base}wav/Arabesque%20No.1.wav`},
+        {id: 'mp3', label: 'Arabesque No. 1 (MP3)', src: `${base}mp3/Arabesque%20No.1.mp3`},
+      ],
+      loop: true,
+      // Loading is injected: the playlist decodes on its own context through this loader.
+      loadEntry: (entry, context) => loadClipFromUrl(entry.src ?? '', {context, ...(entry.format ? {format: entry.format} : {})}),
+    });
+    scope.add(() => playlist.dispose());
+    const transport = bindTransport(root, scope, () => playlist);
+    const paintTrack = (): void => {
+      const current = playlist.current;
+      track.textContent = current ? `${playlist.index + 1}/2 · ${current.id} · ${playlist.statusOf(current.id)}` : '—';
+      transport.paint();
+    };
+    scope.add(playlist.on('trackchange', paintTrack));
+    scope.add(playlist.on('statuschange', paintTrack));
+    scope.add(playlist.on('error', (error) => programmaticFeedback(root, error.message)));
+    scope.listen(root.querySelector('[data-previous]')!, 'click', () => playlist.previous());
+    scope.listen(root.querySelector('[data-next]')!, 'click', () => playlist.next());
+    paintTrack();
+  });
+</script>

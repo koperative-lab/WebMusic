@@ -1,0 +1,21 @@
+/* WebAudio docs — documentation chrome and layout only. Visible package
+   components own their surfaces and are not re-skinned by the site. */
+
+:root {
+  --wa-edge: #b0b0b0; /* output-block borders */
+  --wa-muted: #666;
+}
+
+/* WebAudio-specific multi-column demo layout. The outer card and its title use
+   the shared `.wui-panel` kit. */
+.wa-demo__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+.wa-demo__row > * {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+

@@ -1,7 +1,7 @@
 # WebMusic agent skills
 
 The [webmusic skill](webmusic/SKILL.md) helps a coding agent develop applications
-with the public WebMusic packages. It covers Web Components, Headless behavior,
+with the public WebMusic packages. It covers Components, Headless behavior,
 API-only operations and API + UI composition. Its bundled instructions target
 Kernel, UI Kit and Score `0.1.0`; installed exports and declarations remain the
 authority for the application being changed.
@@ -124,7 +124,7 @@ instructions.
   observations; these cases are acceptance prompts, not claims of passing runs.
 - Keep copyable project instructions in their public documentation page.
 
-See the [Agent Toolkit documentation source](../apps/doc/webmusic/src/content/docs/agent-toolkit/index.mdx)
+See the [Agent Toolkit documentation source](../doc/src/content/docs/agent-toolkit/index.mdx)
 for the corresponding user-facing guide.
 
 ## Audio and Bridge additions

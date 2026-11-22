@@ -17,6 +17,8 @@ import {
 export const MIN_NOTE_LENGTH = 1;
 export const MIN_MIDI_PITCH = 0;
 export const MAX_MIDI_PITCH = 127;
+/** The pitches a renderer shows for a score with no notes: the octave from middle C. */
+export const EMPTY_PITCH_RANGE = Object.freeze({min: 60, max: 72});
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
 export type DataAttribute = [string, unknown];
@@ -195,7 +197,7 @@ export abstract class BaseVisualizer {
       noteSpacing: typeof config.noteSpacing === 'number' && Number.isFinite(config.noteSpacing) && config.noteSpacing >= 0 ? config.noteSpacing : 1,
       pixelsPerSecond: config.pixelsPerSecond || 30,
       // Headless renderers use deliberately neutral functional defaults. The
-      // styled Web Component supplies the WebScore palette from /element.
+      // styled Component supplies the WebScore palette from /element.
       noteRGB: config.noteRGB || '96, 96, 96',
       activeNoteRGB: config.activeNoteRGB || '32, 32, 32',
       noteColor: config.noteColor,
@@ -243,8 +245,11 @@ export abstract class BaseVisualizer {
 
   protected updateMinMaxPitches(noExtraPadding = false): void {
     if (this.config.minPitch !== undefined && this.config.maxPitch !== undefined) return;
-    if (this.config.minPitch === undefined) this.config.minPitch = MAX_MIDI_PITCH;
-    if (this.config.maxPitch === undefined) this.config.maxPitch = MIN_MIDI_PITCH;
+    // With no notes to measure, an unset end falls back to the octave from
+    // middle C, so an empty score still draws its rows (DEC-082).
+    const empty = this.noteSequence.notes.length === 0;
+    if (this.config.minPitch === undefined) this.config.minPitch = empty ? EMPTY_PITCH_RANGE.min : MAX_MIDI_PITCH;
+    if (this.config.maxPitch === undefined) this.config.maxPitch = empty ? EMPTY_PITCH_RANGE.max : MIN_MIDI_PITCH;
 
     for (const note of this.noteSequence.notes) {
       this.config.minPitch = Math.min(note.pitch, this.config.minPitch);

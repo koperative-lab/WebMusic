@@ -182,7 +182,7 @@ const SHEET_STYLE = `
   --ss-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   color: var(--ss-ink); background: var(--ss-surface);
-  border: var(--wm-component-border, 1px solid var(--ss-line)); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
+  border: var(--wm-component-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))); border-radius: var(--wm-component-radius, var(--wm-control-radius, 0));
 }
 :where([data-score-sheet] [part~="toolbar"]) {
   display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; height: var(--ss-control); flex: none;
@@ -216,6 +216,10 @@ const SHEET_STYLE = `
   max-height: var(--wm-score-sheet-max-height, 40rem); background: var(--ss-desk); outline: none;
 }
 :where([data-score-sheet][data-layout="flow"] [part~="viewport"]) { background: var(--ss-paper); }
+/* In a host of fixed height the sheet is as tall as the host, so its toolbar stays in place and the pages scroll under it. */
+:where([height] > [data-score-sheet]) { box-sizing: border-box; height: 100%; }
+:where([height] > [data-score-sheet] [part~="viewport"]) { max-height: none; min-height: 0; }
+:where([height] > [data-score-sheet] [part~="toolbar"]) { flex: none; }
 :where([data-score-sheet] [part~="pages"]) { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1rem; width: max-content; min-width: 100%; box-sizing: border-box; }
 :where([data-score-sheet][data-layout="flow"] [part~="pages"]) { padding: .5rem 0; gap: 0; }
 :where([data-score-sheet] [part~="page"]) { position: relative; flex: none; background: var(--ss-paper); border: 1px solid var(--ss-line); box-sizing: content-box; }
@@ -236,7 +240,7 @@ const SHEET_STYLE = `
 :where([data-score-sheet][data-editable] [data-note-id]) { cursor: pointer; }
 :where([data-score-sheet] [part~="overlay"]) {
   position: absolute; inset: var(--ss-control) 0 0 0; display: flex; justify-content: center; align-items: flex-start;
-  padding: .75rem; background: var(--wm-score-sheet-scrim, rgb(0 0 0 / .45)); z-index: 2;
+  padding: .75rem; background: var(--wm-score-sheet-scrim, var(--wm-scrim, rgb(0 0 0 / .45))); z-index: 2;
 }
 :where([data-score-sheet] [part~="card"]) {
   width: min(100%, 20rem); background: var(--ss-surface); border: 1px solid var(--ss-line); box-shadow: 0 8px 24px rgb(0 0 0 / .18);

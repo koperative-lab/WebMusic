@@ -137,7 +137,7 @@ documentation PostCSS dependency chain, tracked by STATUS DEP-02. No forced
 dependency downgrade was applied.
 
 Website deployment remains separately blocked by the eight media resources
-whose redistribution evidence is missing from the [asset inventory](../../apps/doc/webmusic/ASSETS.md).
+whose redistribution evidence is missing from the [asset inventory](../../doc/ASSETS.md).
 Those public assets are excluded from npm tarballs. Touch, screen-reader,
 file-picker/download completion and physical audio-device acceptance remain
 unverified; desktop keyboard evidence does not establish those claims.

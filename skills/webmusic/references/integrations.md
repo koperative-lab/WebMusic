@@ -4,7 +4,7 @@ Use the mode requested by the user or already used in the application. Different
 modes can share an immutable `Score`; changing the view does not require
 reparsing its file or inventing another musical state model.
 
-## Web Components
+## Components
 
 Begin with the [Quick Start](https://koperative-lab.github.io/WebMusic/quick-start/)
 and [component inventory](https://koperative-lab.github.io/WebMusic/score/element/).
@@ -37,7 +37,7 @@ documented Web Audio environment and resources.
 
 For React, consult the [React entry](https://koperative-lab.github.io/WebMusic/score/api/react/)
 when its provider/hooks/components fit the request; custom controls may instead
-bind directly to a Headless object. Preserve the application's approach.
+bind directly to a Headless instance. Preserve the application's approach.
 React components expect a `Score`; parsing remains a separate I/O step.
 Check the chosen component's imports and optional peer requirements rather
 than installing every peer listed in the Score manifest.

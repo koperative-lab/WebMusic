@@ -36,10 +36,10 @@ This rule is fixed by the repository owner. Do not weaken, reword, move or
 remove it, and do not override it from another document, decision, plan or
 review; only the owner's explicit request in the current conversation changes it.
 
-- **`apps/doc/webmusic/public/` is owner-maintained and read-only for agents.**
+- **`doc/public/` is owner-maintained and read-only for agents.**
   Do not add, delete, rename, move, regenerate, re-encode, compress or
   "repair" any file in it, and do not write a script or build step that does.
-  The same applies to `apps/doc/webmusic/public.sha256`, the owner's pin of the
+  The same applies to `doc/public.sha256`, the owner's pin of the
   folder's exact files and bytes: never regenerate or edit it. If a demo seems
   to need different media, stop and ask the owner instead of changing either.
   A local agent hook refuses such edits; do not work around it.
@@ -57,7 +57,7 @@ review; only the owner's explicit request in the current conversation changes it
 
   In URLs write the space as `%20` (`/midi/Arabesque%20No.1.mid`) and prefix
   site demos with `import.meta.env.BASE_URL`. Reuse the shared loaders in
-  `apps/doc/webmusic/src/components/headless/arabesque-score.ts` (and the audio
+  `doc/src/components/headless/arabesque-score.ts` (and the audio
   excerpt helper where present) instead of re-fetching the file per demo.
 - **Never substitute another source**: no generated studies or fixtures, no
   hand-built `ScoreBuilder` note lists, synthesized PCM, other pieces or new
@@ -70,6 +70,50 @@ review; only the owner's explicit request in the current conversation changes it
   reference in the documentation source that is not one of these four files. Keep it in those
   gates; never relax it to make a change pass.
 
+## Product layers: object, component, app
+
+This vocabulary is fixed by the repository owner (DEC-074, refined by
+DEC-081). Use it in code
+comments, documentation, Studio and Library; do not substitute Max's or
+another tool's names for the layers.
+
+| Layer | Max counterpart | Definition |
+| --- | --- | --- |
+| **Object** | object | A typed box with inlets and outlets that runs only inside a graph, backed by one Kernel module from a project plugin. |
+| **Component** | patch, or a hosted plugin | Self-contained, portable code with its own interface. A developer copies it into a web project, installs the WebMusic packages, and it runs alone on a page. It is authored in code (the packages' own Components, the official components) or as a graph of objects in Studio. |
+| **App** | — | Music software a user designs as a web page (DEC-092): boxes that lay out text, images and the components chosen in the Library, official or from the community. Its components are one project sharing one Session; what each follows or hears is chosen, not cabled. |
+
+- A layer is the contract a thing meets, not its origin or size. The test
+  between an object and a component is whether it is useful alone on a page:
+  interface objects such as `slider` and `dial` are objects.
+- Only components run in an app: its page also holds boxes, text and images,
+  which play nothing (DEC-092). A graph-authored component is made of objects
+  and other components; a code-authored component of public package entries.
+  An object behaves the same in every component; a component behaves the same
+  pasted into a project, placed in a graph or placed in an app.
+- Any component can be placed in a graph, where it is a box with ports.
+  `keys`, `scope`, `meter`, `spectrum` and `roll` are official components in
+  a graph, not another kind of object; a `buffer` holds data and its
+  waveform is `<audio-clip-view>`, a separate component. The
+  [component manifest](dev/design/DEVELOPER-TOOLS.md#component-manifest) that
+  places them, and the split `buffer`, are implemented in Bridge
+  `/component`; the Library's project-based apps are not (STATUS LAYER-01),
+  so do not describe them as delivered.
+- A component depends only on public package entries: never on Studio, private
+  source or a hosted service. Its resources are declared. Anything that would
+  break this is not a component.
+- Old names are retired in current writing: write *Component* (never *Web
+  Component*) for the packages' tags, *component* (never *patch*) for a graph
+  of objects in Studio, and *Headless class* or *Headless instance* (never
+  *Headless object* or *Headless component*). *Custom element* names the
+  browser technology. *Module*, *project*, *Element* and *presenter* keep
+  their technical meanings (see
+  [Product](dev/PRODUCT.md#objects-components-and-apps)). Dated records,
+  earlier decisions and public API names (`/element`, `define…Element`,
+  `@webmusic/ui/patch-editor`) are not renamed.
+- Component export from Studio is open work (STATUS LAYER-01); do not describe
+  it as delivered.
+
 ## Start every task
 
 1. Read the user's current request. Inspect `git status --short`, the current
@@ -79,7 +123,7 @@ review; only the owner's explicit request in the current conversation changes it
    [Demo music: Arabesque No. 1 only](#demo-music-arabesque-no-1-only).
 2. Read [dev/README.md](dev/README.md) for documentation ownership, then
    [PRODUCT.md](dev/PRODUCT.md) for the product direction. WebMusic is a music
-   interaction toolkit supporting Web Components, Headless, and API + UI
+   interaction toolkit supporting Components, Headless, and API + UI
    composition, with music software and installations as application goals.
 3. Consult [STATUS.md](dev/STATUS.md) for the relevant implementation gaps and
    [DECISIONS.md](dev/DECISIONS.md) before changing an accepted contract. The
@@ -119,11 +163,12 @@ review; only the owner's explicit request in the current conversation changes it
 | Product scope | [PRODUCT.md](dev/PRODUCT.md) | Users, scenarios, integration choices, resource reuse, long-term goals |
 | Logic, interaction, and visual philosophy | [DESIGN-PRINCIPLES.md](dev/DESIGN-PRINCIPLES.md) | State/time authority, feedback, accessibility, styling and resource principles |
 | Visual language (required for all UI) | [VISUAL-DESIGN.md](dev/design/VISUAL-DESIGN.md) | Monochrome square palette and geometry, icon toolbars, in-component adjustment cards, hidden scrollbars, no in-canvas prose, demo Parameters, acceptance checklist |
-| Accepted choices | [DECISIONS.md](dev/DECISIONS.md) | Decisions, reasons, consequences and the next-decision format |
+| Accepted choices | [DECISIONS.md](dev/DECISIONS.md), by topic in the generated [decision index](dev/DECISION-INDEX.md) | Decisions, reasons, consequences and the next-decision format; the index names each entry's owner and the later decisions that cite it |
 | Technical architecture | [ARCHITECTURE.md](dev/ARCHITECTURE.md) | Package/capability boundaries, layers, timing, ownership and executable policy |
 | Component design | [COMPONENT-DESIGN.md](dev/design/COMPONENT-DESIGN.md) | Design questions, copyable design template and acceptance scenarios |
 | Analyze/View attachment to Play | [PLAYER-BINDING.md](dev/design/PLAYER-BINDING.md) | Accepted data/state/time binding direction, target companion syntax, open contract choices and acceptance scenarios; STATUS owns delivery gaps |
 | Modular players, Racks, effects and Session composition | [MODULAR-COMPOSITION.md](dev/design/MODULAR-COMPOSITION.md) | DEC-063's opt-in contract, ownership/default-routing rules, compatibility and acceptance; consult STATUS for delivery evidence and later stages |
+| Authored DSP processors and their delivery steps | [PROCESSOR-MODULES.md](dev/design/PROCESSOR-MODULES.md) | DEC-073's processor definition, preparation and worklet-kit contract, and the development sequence; STATUS DSP-01 owns delivery |
 | Analyze component boundaries | [ANALYZE-COMPONENTS.md](dev/design/ANALYZE-COMPONENTS.md) | Live analysis surfaces, retained roles and API/Headless report ownership |
 | View component families | [VIEW-COMPONENTS.md](dev/design/VIEW-COMPONENTS.md), [Audio View](dev/design/AUDIO-VIEW-COMPONENTS.md) | Type-selected representations, independent views and notation boundaries |
 | Play component boundaries | [Score Play](dev/design/PLAY-COMPONENTS.md), [Audio Play](dev/design/AUDIO-PLAY-COMPONENTS.md) | Domain-specific playback/input/control roles, shared transport and lifecycle ownership |
@@ -133,7 +178,7 @@ review; only the owner's explicit request in the current conversation changes it
 | Contributor workflow | [DEVELOPMENT.md](dev/DEVELOPMENT.md) | Setup, commands, final acceptance, CI and build troubleshooting |
 | Documentation information architecture | [DOCS-SITE-PLAN.md](dev/docs/DOCS-SITE-PLAN.md) | Routes, page ownership, navigation and demo responsibilities |
 | Documentation checks | [DOCS-CONVENTIONS.md](dev/docs/DOCS-CONVENTIONS.md) | Authoring rules, actual gate coverage and manual acceptance boundaries |
-| Web Component reference | [COMPONENT-PAGE-TEMPLATE.md](dev/docs/COMPONENT-PAGE-TEMPLATE.md) | Tag/workflow page, live demo, attributes/properties/events and styling |
+| Component reference | [COMPONENT-PAGE-TEMPLATE.md](dev/docs/COMPONENT-PAGE-TEMPLATE.md) | Tag/workflow page, live demo, attributes/properties/events and styling |
 | Headless reference | [HEADLESS-PAGE-TEMPLATE.md](dev/docs/HEADLESS-PAGE-TEMPLATE.md) | Import, options, commands, state, events, lifecycle and Related links |
 | UI presenter reference | [UIKIT-PAGE-TEMPLATE.md](dev/docs/UIKIT-PAGE-TEMPLATE.md) | Binding, handle, interaction, styling and composition contracts |
 | Package/API reference | [API-PAGE-TEMPLATE.md](dev/docs/API-PAGE-TEMPLATE.md) | Entry maps, examples, complete API ownership and dependencies |
@@ -143,30 +188,35 @@ review; only the owner's explicit request in the current conversation changes it
 ## Find the implementation and its reference
 
 Public documentation source lives under
-[apps/doc/webmusic/src/content/docs/](apps/doc/webmusic/src/content/docs/).
+[doc/src/content/docs/](doc/src/content/docs/).
 Use each family page and its `element/` and `headless/` inventories to find the
 owning leaf page; do not copy a complete member table into another document.
 
 | Work area | Source | Technical and public references |
 |---|---|---|
-| Symbolic music: models, I/O, play, analysis, views, React | [packages/score/src/](packages/score/src/) | [Score README](packages/score/README.md), [Score architecture](packages/score/ARCHITECTURE.md), [Score docs](apps/doc/webmusic/src/content/docs/score/index.mdx) |
-| Digital audio: clips, decode, play, capture, analysis, views, React | [packages/audio/src/](packages/audio/src/) | [Audio README](packages/audio/README.md), [Audio docs](apps/doc/webmusic/src/content/docs/audio/index.mdx) |
+| Symbolic music: models, I/O, play, analysis, views, React | [packages/score/src/](packages/score/src/) | [Score README](packages/score/README.md), [Score architecture](packages/score/ARCHITECTURE.md), [Score docs](doc/src/content/docs/score/index.mdx) |
+| Digital audio: clips, decode, play, capture, analysis, views, React | [packages/audio/src/](packages/audio/src/) | [Audio README](packages/audio/README.md), [Audio docs](doc/src/content/docs/audio/index.mdx) |
 | Domain-neutral presenters and styles | [packages/ui/src/](packages/ui/src/) | [UI README](packages/ui/README.md), [generated presenter references](dev/COMPONENTS.md) |
-| Domain-neutral primitives and transport contracts | [platform/kernel/src/](platform/kernel/src/) | [Platform ledger](platform/README.md), [Kernel README](platform/kernel/README.md), [Kernel API](apps/doc/webmusic/src/content/docs/kernel/api.mdx) |
+| Domain-neutral primitives and transport contracts | [platform/kernel/src/](platform/kernel/src/) | [Platform ledger](platform/README.md), [Kernel README](platform/kernel/README.md), [Kernel API](doc/src/content/docs/kernel/api.mdx) |
 | Score/Audio coordination and conversion | [bridges/score-audio/src/](bridges/score-audio/src/) | [Bridge contracts](bridges/README.md), [Bridge README](bridges/score-audio/README.md), [generated Bridge API reference](dev/COMPONENTS.md) |
 | Session-clock design or scheduling changes | Kernel, domain engines and Bridge | [Shared-clock design](platform/shared-clock-injection.md), [Architecture](dev/ARCHITECTURE.md) and current STATUS |
 | Player bindings, readouts, analysis followers and views | Domain Play/Analyze/View and neutral UI presenters | [Player binding design](dev/design/PLAYER-BINDING.md), DEC-011, current STATUS and the owning public leaf pages |
 | Document editing, history and playback revisions | Domain Core, View editors and surfaces, and Play bindings | [Editing contracts](dev/design/EDIT-COMPONENTS.md), DEC-053, DEC-055 and STATUS EDIT-01; distinguish accepted target contracts from delivered APIs |
-| Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
+| Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](doc/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
 | Any new or changed visible UI | The owning presenter, renderer or Element | [Visual design](dev/design/VISUAL-DESIGN.md) before coding, then the [frontend workflow](.agent/workflows/frontend-review.md) for rendered acceptance |
-| Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
-| Manual device acceptance | [apps/test/src/](apps/test/src/) | [Runner README](apps/test/README.md), the current device acceptance audit and STATUS VERIFY-01; manual checks live here, not in the documentation site, and their results never enter Git |
+| Documentation site and demos | [doc/src/](doc/src/), [shared catalogs](doc/shared/) | [Doc README](doc/README.md), Site Plan, Conventions and the applicable page template |
+| Manual device acceptance | `WebMusic-studio/apps/test/src/` in the private repository | [Private runner workflow](dev/DEVELOPMENT.md#private-manual-acceptance-runner), the runner's private README, the current device acceptance audit and STATUS VERIFY-01; manual checks live in the private runner, not in the documentation site, and their results never enter Git |
 | A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
 
 Tests normally live in each owning workspace's `test/` directory. Read the
-workspace's manifest for its commands. `apps/doc/shared/` is shared site code,
+workspace's manifest for its commands. `doc/shared/` is shared site code,
 not a package workspace. Package outputs and documentation demos resolve through
 public workspace entries; inspect the actual export map before using a path.
+
+`doc/` is the public repository's only application. Website, Library, Studio
+and Test belong to the separate closed-source `WebMusic-studio` repository
+(DEC-072). Keep their source, workspaces and application checks there; do not
+import private application source into the public tree.
 
 ## Architecture rules to preserve
 
@@ -202,7 +252,10 @@ alternative specification:
 - Every visible UI follows [Visual design](dev/design/VISUAL-DESIGN.md):
   neutral monochrome tokens, square one-height controls, icon-only toolbars,
   adjustment cards inside the component over a scrim, no visible scrollbars,
-  no explanatory text in the component, and demo settings in Parameters.
+  no explanatory text in the component; Component demos show the default
+  composition without Parameters, Headless demos show the instance with its
+  defaults and no Parameters either, and only UI Kit presenter demo settings
+  go in Parameters.
 
 ## Implement a change
 
@@ -270,9 +323,9 @@ rules apply to every version an agent develops:
 
 - **Set up all three layers yourself.** Unit or regression tests that fail
   without the change; their run in CI through `npm run check`; and manual
-  checks in the [acceptance runner](apps/test/README.md) for anything audible,
+  checks in the [private acceptance runner](dev/DEVELOPMENT.md#private-manual-acceptance-runner) for anything audible,
   visible, device-dependent or assistive — English entries in
-  `apps/test/src/checks.ts`, each with a live canvas of the packages' own
+  `WebMusic-studio/apps/test/src/checks.ts`, each with a live canvas of the packages' own
   components. Mount the changed checks in a browser yourself before handing off.
 - **Hand off** the commit, the commands run and their results, and the manual
   checks the owner should run on that commit.

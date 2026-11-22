@@ -1,0 +1,69 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame entry="@webmusic/audio/view/headless" name="AudioClipEditor"
+  rootAttrs={{'data-audio-editor-demo': true}}>
+  <section aria-label="Audio document and history">
+    <p data-summary role="status">Preparing document.</p>
+    <ul data-segments aria-label="Audio segments"></ul>
+    <p data-last></p>
+    <div class="wui-row"><button class="wui-btn" data-action="edit" type="button" disabled>Insert silence</button><button class="wui-btn" data-variant="ghost" data-action="undo" type="button" disabled>Undo</button><button class="wui-btn" data-variant="ghost" data-action="redo" type="button" disabled>Redo</button></div>
+  </section>
+</HeadlessDemoFrame>
+<script>
+  import {audioSegmentLength, type AudioEditOperation} from '@webmusic/audio';
+  import {createAudioClipEditor} from '@webmusic/audio/view/headless';
+  import {mountDemos} from '../demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+
+  // A tenth of a second of silence inserted halfway through the opening second.
+  const INSERT_SILENCE: AudioEditOperation[] = [{type: 'insert-silence', frame: 22050, length: 4410, id: 'pause', rightId: 'tail'}];
+
+  mountDemos('[data-audio-editor-demo]', async (root, scope) => {
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    const segments = root.querySelector<HTMLElement>('[data-segments]')!;
+    const last = root.querySelector<HTMLElement>('[data-last]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-action]')];
+    const fail = (text: string) => { feedback.hidden = false; feedback.textContent = text; };
+    // The opening second of Arabesque No. 1; the decoded excerpt is cached.
+    const clip = await loadArabesqueAudioExcerpt(1);
+    if (!scope.active) return;
+    const editor = createAudioClipEditor(clip, {history: {limit: 100}});
+    const session = editor.createInteractionSession();
+    scope.add(() => { session.dispose(); editor.dispose(); });
+    const paint = () => {
+      if (!scope.active) return;
+      const state = editor.getState();
+      const content = state.document.content;
+      summary.textContent = `${content.length} frames · revision ${state.document.documentRevision} · ${state.history.undoCount} undo / ${state.history.redoCount} redo · ${state.history.historyOnlyBytes} history-only bytes`;
+      segments.replaceChildren(...content.segments.map((segment) => {
+        const item = document.createElement('li'); item.textContent = `${segment.id}: ${segment.kind} · ${audioSegmentLength(segment)} frames`; return item;
+      }));
+      last.textContent = state.document.change ? `${state.document.change.origin}: ${state.document.change.label}` : 'No edits yet.';
+      for (const button of buttons) {
+        const action = button.dataset.action;
+        button.disabled = action === 'undo' ? state.history.undoCount === 0 : action === 'redo' ? state.history.redoCount === 0 : false;
+      }
+    };
+    scope.add(editor.subscribeState(paint));
+    for (const button of buttons) {
+      scope.listen(button, 'click', () => {
+        feedback.hidden = true;
+        const snapshot = editor.getSnapshot();
+        const outcome = button.dataset.action === 'undo' ? editor.undo()
+          : button.dataset.action === 'redo' ? editor.redo()
+          : editor.execute({version: 1, documentId: snapshot.documentId, expectedRevision: snapshot.documentRevision, label: 'Insert silence', operations: INSERT_SILENCE});
+        if ('error' in outcome && outcome.error) fail(`${outcome.status}: ${outcome.error.message}`);
+        paint();
+      });
+    }
+    paint();
+  });
+</script>
+<style>
+  .editor-actions {display:flex; flex-wrap:wrap; gap:.5rem}
+  label {display:grid; gap:.25rem; min-width:0}
+  textarea {box-sizing:border-box; width:100%; font:inherit}
+  [data-summary], [data-segments] {overflow-wrap:anywhere}
+</style>

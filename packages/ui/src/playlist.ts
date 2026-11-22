@@ -260,7 +260,7 @@ ${hiddenScrollbarCss('.wui-playlist__bar')}${iconButtonCss('.wui-playlist__butto
 }
 
 .wui-playlist__item[data-status="error"] {
-  color: var(--wm-playlist-error, var(--wm-error, light-dark(#c0392b, #ef5350)));
+  color: var(--wm-playlist-error, var(--wm-error, var(--wm-danger, light-dark(#c0392b, #ef5350))));
   cursor: default;
 }
 

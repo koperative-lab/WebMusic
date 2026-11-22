@@ -1,0 +1,72 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Effect"
+  rootAttrs={{'data-programmatic-effect': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo} from './programmatic-demo-lifecycle';
+  import { Effect, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+
+  mountProgrammaticDemo('[data-programmatic-effect]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
+    const btn = root.querySelector('[data-play]') as HTMLButtonElement;
+    const fill = root.querySelector('[data-fill]') as HTMLElement;
+    const time = root.querySelector('[data-time]') as HTMLElement;
+
+    let playing = false;
+    let player: ScorePlayer;
+
+    const makeEffect = (kind: string): Effect | undefined => {
+      if (kind === 'reverb') return Effect.reverb({ wet: 0.4 });
+      if (kind === 'delay') return Effect.delay({ delaySeconds: 0.25, feedback: 0.35, wet: 0.4 });
+      return undefined;
+    };
+
+    const paint = () => {
+      const cur = player.currentTime.seconds;
+      const dur = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    const buildPlayer = (kind: string) => {
+      player = new ScorePlayer(score, {
+        synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
+        synthOwnership: 'owned',
+        effect: makeEffect(kind),
+      });
+      player.on('cursor', paint);
+      player.on('end', () => { playing = false; btn.textContent = '▶ Play'; player.seek(0); paint(); });
+    };
+
+    scope.add(() => player?.dispose());
+    buildPlayer('reverb');
+
+    let playGeneration = 0;
+    const startPlayer = () => {
+      const current = player;
+      const request = ++playGeneration;
+      scope.run(current.play(), () => {
+        if (current !== player || request !== playGeneration) return;
+        playing = false;
+        btn.textContent = '▶ Play';
+      });
+    };
+
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { ++playGeneration; player.pause(); btn.textContent = '▶ Play'; }
+      else { startPlayer(); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+
+  });
+</script>

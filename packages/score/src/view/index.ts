@@ -7,7 +7,7 @@
 //   @webmusic/score/view            — stateless API
 //   @webmusic/score/view/headless   — stateful code-only score views
 //   @webmusic/score/view/render     — imperative browser visualizers
-//   @webmusic/score/view/element    — styled Web Components (<score-view>,
+//   @webmusic/score/view/element    — styled Components (<score-view>,
 //                                     <score-pitch-view>, <score-sheet-view>)
 // ============================================================================
 

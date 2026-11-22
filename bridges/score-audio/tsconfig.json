@@ -18,6 +18,9 @@
       "path": "../../platform/kernel"
     },
     {
+      "path": "../../packages/ui"
+    },
+    {
       "path": "../../packages/score"
     },
     {

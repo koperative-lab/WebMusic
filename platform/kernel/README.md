@@ -92,11 +92,14 @@ Common mechanisms do not make distinct domain policies interchangeable.
 | `@webmusic/kernel/transport` | `TransportClock` affine anchor math, `TimelineMapping`, constant-tempo `TempoGrid` helpers and the read-only `TempoClock` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
 | `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |
+| `@webmusic/kernel/processor` | Authored DSP definitions, per-context `AudioWorklet` preparation, processor modules, insert effects, instruments and project plugins, and the main/audio thread protocol |
+| `@webmusic/kernel/processor-worklet` | Audio-thread authoring kit: `defineProcessor` over a reused render block |
+| `@webmusic/kernel/objects` | Max-style message objects (time, logic, message-to-sound and interface objects) as project plugins, and the object framework |
 
 Pure time math remains in `/transport` and wakeups in `/tick`. The modular
 entries build the one composition model (DEC-068) on those foundations:
-`/module` defines module handles, the five port families (audio, note, control,
-transport, source), Racks, provider scopes, sinks and the conformance kit;
+`/module` defines module handles, the six port families (audio, note, control,
+transport, source and, under DEC-075, message) with message clocks, Racks, provider scopes, sinks and the conformance kit;
 `/effect` manages effect instances; `/session` owns the single timeline every
 participant joins; and `/element` adds browser discovery and explicit `input`
 resolution. Consumers may implement the structural
@@ -133,7 +136,7 @@ does not fabricate an aggregate audio output.
 
 The [modular composition contract](../../dev/design/MODULAR-COMPOSITION.md)
 defines the ownership, routing and migration invariants. Concrete public
-signatures belong in the [Kernel API reference](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx);
+signatures belong in the [Kernel API reference](../../doc/src/content/docs/kernel/api.mdx);
 [STATUS](../../dev/STATUS.md) distinguishes delivered integration from the
 remaining sound, modulation and precision work.
 
@@ -363,7 +366,7 @@ settlement, background reconciliation and errors. Existing controls remain
 migration surfaces. Strict dispatch checks observable failures and distinguishes
 superseded commands; the engines cancel and re-arm through their existing methods,
 retaining their private clocks. See the complete
-[command contract](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx).
+[command contract](../../doc/src/content/docs/kernel/api.mdx).
 
 `FollowerOptions.positionScale` adds a positive constant local-axis scale to the
 offset, applied to both positions and rates. Optional `loop` metadata maps into

@@ -257,7 +257,7 @@ const pitchDensity: Record<HarmonyDensity, Declarations> = {
 };
 
 const pitchViewport: Declarations = {
-  ...componentSurfaceDeclarations('pitch', {padding: '0', border: '0', background: 'var(--wm-surface, transparent)'}),
+  ...componentSurfaceDeclarations('pitch', {padding: '0', background: 'var(--wm-surface, transparent)'}),
   display: 'block', 'min-width': '0', 'max-width': '100%',
   position: 'relative', 'overflow-x': 'auto', 'overscroll-behavior-x': 'contain',
   // Visual design → Scrolling surfaces: scrollable, without a visible bar.

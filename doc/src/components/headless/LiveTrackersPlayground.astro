@@ -1,0 +1,23 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+const notes = [{midi: 60, name: 'C4'}, {midi: 62, name: 'D4'}, {midi: 64, name: 'E4'}, {midi: 65, name: 'F4'}, {midi: 67, name: 'G4'}, {midi: 69, name: 'A4'}, {midi: 71, name: 'B4'}];
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="Live trackers"
+  rootAttrs={{'data-live-trackers-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Live chord and key analysis">
+    <p class="wm-hl-music__summary" data-live-chord></p>
+    <div class="wm-hl-music__chips" data-live-notes aria-label="Held pitches"></div>
+    <p data-live-key></p>
+    <div class="wm-hl-music__chips" data-live-history aria-label="Recent chord history"></div>
+    <div class="wm-hl-music__buttons" aria-label="Notes">{notes.map(({midi, name}) => <button class="wui-btn" type="button" data-live-midi={midi} aria-pressed="false">{name}</button>)}</div>
+    <div class="wm-hl-music__buttons" aria-label="Chords">{['C', 'Am', 'F', 'G7'].map((chord) => <button class="wui-btn" data-variant="ghost" type="button" data-live-preset={chord}>{chord}</button>)}<button class="wui-btn" data-variant="ghost" type="button" data-live-release>Release</button></div>
+  </section>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountLiveTrackersDemo} from './analysis-view-playgrounds-client';
+  mountDemos('[data-live-trackers-demo]', (root, scope) => { mountLiveTrackersDemo(root, scope); });
+</script>

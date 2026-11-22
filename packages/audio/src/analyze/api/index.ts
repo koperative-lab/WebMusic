@@ -2,7 +2,7 @@
 // @webmusic/audio/analyze/api — stable programmatic analysis surface.
 //
 // One-shot algorithms and worker-backed calls live here. Stateful realtime and
-// incremental engines are published at `/headless`; styled Web Components are
+// incremental engines are published at `/headless`; styled Components are
 // at `/element`.
 // ============================================================================
 

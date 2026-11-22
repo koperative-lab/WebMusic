@@ -13,6 +13,7 @@ than maintaining another member or component inventory.
 
 | Record | Purpose |
 |---|---|
+| [Status history — recorded until 2026-11-12](2026-11-12-status-history.md) | Dated checkout-profile, modular-release and retained-evidence narratives moved verbatim out of STATUS so it holds only the current work queue. |
 | [Tonal entrypoint follow-up — 2026-10-28](2026-10-28-tonal-entrypoint-follow-up.md) | Corrected upstream releases, shared lockfile reconciliation, direct package entrypoints and Node 22/24 regression verification. |
 | [Dependabot integration review — 2026-10-27](2026-10-27-dependabot-integration.md) | Three accepted updates, two deferred Tonal publication defects, minimal security patches and Node 22/24 verification. |
 | [Score analysis review corrections — 2026-10-07](2026-10-07-score-analysis-review-corrections.md) | Review findings on the four Analyze tools: wrapped-label minimum width, per-numerator beat groups, interval overlap contract, exact selection ends, nameplate accessibility, the cached demo excerpt and the PostCSS override that clears the moderate audit findings. |

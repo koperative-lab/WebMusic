@@ -42,9 +42,19 @@ boundary is not necessarily a separate npm package.
 | `packages/score` | `@webmusic/score`: immutable Score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views and React composition. |
 | `packages/audio` | `@webmusic/audio`: AudioClip, decoding, playback, recording, analysis, views and React composition; format support depends on the selected decoder. |
 | `bridges/score-audio` | `@webmusic/bridge`: Score/Audio synchronization, rendering and model conversion. |
-| `apps/doc/webmusic` | Astro documentation app with its own page shell (`src/site/`, DEC-070); content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
-| `apps/doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
+| `doc` | Astro documentation app with its own page shell (`src/site/`, DEC-070); content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
+| `doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
 | `scripts/` | Package, source, component, documentation and release-manifest checks; `release-pipeline/` preserves historical release machinery. |
+
+Under DEC-072, `doc/` is the only application in this public repository.
+Website, Library, Studio and Test (the manual acceptance runner) belong to the
+separate closed-source `WebMusic-studio` repository. Private applications use
+public package exports; they may read documentation catalogs, references and
+approved media through their configured link to this checkout. The public
+repository does not import private application source or include its workspaces
+in the public build, TypeScript solution, lockfile or CI. Package unit tests and
+documentation tests stay with their public owners. Manual device acceptance
+retains its release gate and runs from the private repository.
 
 The following table lists **workspace edges only**. Third-party dependencies are
 specified by each package manifest.
@@ -89,7 +99,7 @@ their domain owners.
 
 ## Three usage levels and source layers
 
-Consumers choose Web Components, Headless, or API + UI. These paths share domain
+Consumers choose Components, Headless, or API + UI. These paths share domain
 behavior; they are not three independent playback implementations or mandatory
 wrapper stages. Their composition rules are defined in
 [COMPONENT-DESIGN.md](design/COMPONENT-DESIGN.md).
@@ -351,9 +361,9 @@ player's state does not create another clock and is separate from the multi-engi
 shared-clock injection protocol.
 
 ```text
-domain Headless object + @webmusic/ui presenter
+domain Headless instance + @webmusic/ui presenter
                composed directly by the Element class
-                         = Web Component
+                         = Component
 ```
 
 The Element maps public attributes/properties/events, selects ownership and builds
@@ -377,8 +387,10 @@ The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 introduced modular composition;
 [DEC-068](DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
 makes it the only model: every Element and Headless runtime is a module with
-typed audio, note, control, transport and source ports. Kernel `/module`, `/session` and
-`/effect` supply the shared runtime; `/element` supplies scoped browser discovery.
+typed audio, note, control, transport and source ports; DEC-075 adds message
+ports for discrete values between objects. Kernel `/module`, `/session` and
+`/effect` supply the shared runtime, `/objects` the message object library, and
+`/element` scoped browser discovery.
 [Modular composition](design/MODULAR-COMPOSITION.md) owns the context, typed-port,
 route-lease, effect/parameter and Session invariants. DOM layout, resource
 ownership, audio routing and Session membership remain separate relationships.
@@ -400,7 +412,7 @@ Each package exports `.` and `/package.json`. Score/Audio capability roots are
 APIs; `/element` is the only element spelling. `/elements` and `/api` are not
 public aliases. Kernel exports `/events`, `/element`, `/worker`,
 `/audio-context`, `/player`, `/effect`, `/module`, `/session`, `/meter`,
-`/transport`, `/tick` and `/sync`. Domain packages have no `/session` alias.
+`/transport`, `/tick`, `/processor` and `/processor-worklet`. Domain packages have no `/session` alias.
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
 

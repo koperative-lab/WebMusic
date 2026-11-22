@@ -32,8 +32,8 @@ Their common needs are a manageable starting cost, replaceable layers, reliable 
 
 | Choice | WebMusic supplies | The application supplies | Typical use |
 |---|---|---|---|
-| Web Components | Tags, attributes and object properties, events, default interaction and presentation | Data and resources, connections, appearance, and permissions | Quick demos, embedded players, analysis tools, artwork prototypes |
-| Headless components | Stateful players, controllers, sessions, models, and lifecycle contracts | UI, framework bindings, and project workflow | Custom music software and distinctive installation interactions |
+| Components | Tags, attributes and object properties, events, default interaction and presentation | Data and resources, connections, appearance, and permissions | Quick demos, embedded players, analysis tools, artwork prototypes |
+| Headless classes | Stateful players, controllers, sessions, models, and lifecycle contracts | UI, framework bindings, and project workflow | Custom music software and distinctive installation interactions |
 | API + UI | Data operations, parsing/analysis/rendering functions, and independent presenters | Capability selection and structural bindings to application-owned state and commands | Deep customization, algorithm visualization, or replacement of one layer |
 
 These choices can coexist in one application. APIs can be used without UI; presenters can bind to the caller's own model. React and other integration adapters do not change the underlying ownership or capability contracts. Environment support remains entry-specific.
@@ -57,13 +57,83 @@ waveform View gains optional editing interaction. Applications load or create th
 Headless API and lend it to those Elements; there is no document Element.
 The [editing design](design/EDIT-COMPONENTS.md) specifies this contract;
 [STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, editor loading and piano-roll
-interaction are documented in the [Score View API](../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
-and [Score grid View](../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx).
+interaction are documented in the [Score View API](../doc/src/content/docs/score/api/view.mdx)
+and [Score grid View](../doc/src/content/docs/score/element/view/score-grid-view.mdx).
 Audio sequence editing, local processing and WAV export are documented in
-the [Audio View API](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
-[Audio Play export](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and
-[Audio View](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
+the [Audio View API](../doc/src/content/docs/audio/api/view.mdx),
+[Audio Play export](../doc/src/content/docs/audio/api/play.mdx) and
+[Audio View](../doc/src/content/docs/audio/element/view/audio-view.mdx).
 Staff and notation editing are not part of the current contract (DEC-058).
+
+## Objects, components and apps
+
+WebMusic has three product layers (DEC-074). Every maintained document, Studio
+and the Library use these names for them. A layer is the contract a thing
+meets, not where it came from or how large it is (DEC-081).
+
+| Layer | Max counterpart | Contract | Package counterpart | Who makes it | Where it runs |
+|---|---|---|---|---|---|
+| Object | Object | A typed box with inlets and outlets that runs only inside a graph, backed by one Kernel module from a project plugin | API functions, Headless classes and UI Kit presenters | The packages and Studio | Inside a component |
+| Component | Patch, or a hosted plugin | Self-contained, portable code with its own interface: copy it into a web project, install the WebMusic packages, and it runs alone on a page | Components | The packages (official components), Studio users and the community | Any web project; inside a graph, as a box with ports |
+| App | — | A web page of boxes, text, images and components chosen in the Library; its components share one Session and are connected by choice (DEC-092) | — | Users | The browser, as a page or an installation |
+
+The test between an object and a component is whether the thing is useful
+alone on a page. A slider, a dial or a button is not, so interface objects
+are objects; a keyboard, an oscilloscope or a piano roll is, so each is a
+component. `score` and `sample` are Headless players with no interface and
+are objects. A `buffer` holds named samples and shows nothing; its waveform is
+the official component `<audio-clip-view>`, bound to the buffer by name.
+
+A component is authored in one of two ways under the same contract. The
+packages' Components are written in code from a Headless class and
+presenters; they are sealed and cannot be opened in Studio. A component built
+in Studio is a graph of objects and can be opened. Only components run in an
+app, whose page also holds boxes, text and images (DEC-092); a graph-authored
+component is made of objects and of other
+components; a code-authored component is made of the packages' public
+entries.
+
+Any component can be placed in a graph, where it is a box with ports. The
+`component` object does this for graph-authored components. The official
+components — every Component of the packages, from `keys` and `roll` to the
+players, desks and the effect and part declarations (DEC-084, DEC-089) — are
+placed by their
+[component manifests](design/DEVELOPER-TOOLS.md#component-manifest), which
+declare their ports, parameters and size, so a graph holds any component
+that has one ([STATUS](STATUS.md), LAYER-01). An app's components are a project
+whose boxes are all components, with the same ports and Session as any
+graph; its page is designed as a web page is, in boxes that lay out text,
+images and those components, and what a component follows or hears is chosen
+in its inspector (DEC-092). The App editor builds apps this way, from the
+same listing of official and the user's own components as Studio's
+libraries, and places a user's own as a linked nested component (DEC-093);
+community components have no place that holds them yet.
+
+Each layer keeps its contract when it moves up: an object behaves the same in
+every component, and a component behaves the same whether it is pasted into a
+web project, placed in a graph or placed in an app.
+
+A component's portability is its defining requirement. Its code depends only
+on public package entries: no Studio runtime, private source or hosted
+service. Its media and other resources are declared, so the receiving project
+knows what to serve. The packages' own Components — `<score-player>`,
+`<audio-oscilloscope>` and the rest — are the official components. A
+component built from objects in Studio meets the same contract: Studio
+exports it as a module or a standalone page over `@webmusic/bridge/component`
+(DEC-078). Running one in a fresh project that installs only the packages is
+not yet verified ([STATUS](STATUS.md), LAYER-01).
+
+Earlier names are retired in current writing. The packages' tags are
+*Components*, not *Web Components*; a graph of objects is a *component*, not a
+*patch*; the code-only classes behind Components are *Headless classes*, and
+one running one is a *Headless instance*, never a *Headless object* or
+*Headless component*. *Custom element* names the browser technology a
+Component is built on. Some words keep a technical meaning beside the layers:
+a *module* is the Kernel runtime unit behind an object, a *project* is the
+serialized Kernel document a component's graph is saved as, an *Element* is
+the class behind a Component's tag, and a *presenter* is a UI Kit renderer.
+Dated records, earlier decisions and public API names such as `/element`,
+`define…Element` and `@webmusic/ui/patch-editor` keep their wording.
 
 ## One session's time and data
 
@@ -108,11 +178,11 @@ Current integration references are organized by the resource being connected:
 
 | Resource | Contract to start with |
 |---|---|
-| Symbolic formats and score import/export | [Score I/O](../apps/doc/webmusic/src/content/docs/score/api/io.mdx) |
-| Timbres, effects, and musical input | [Score playback](../apps/doc/webmusic/src/content/docs/score/api/play.mdx) and its Headless/driver links |
-| Audio files, decoding, playback, and capture | [Audio playback](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and its Headless links |
-| Analysis engines and transcription | [Audio analysis](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) |
-| Custom visuals and controls | [UI contracts](../packages/ui/README.md), [Score views](../apps/doc/webmusic/src/content/docs/score/api/view.mdx), and [Audio views](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) |
+| Symbolic formats and score import/export | [Score I/O](../doc/src/content/docs/score/api/io.mdx) |
+| Timbres, effects, and musical input | [Score playback](../doc/src/content/docs/score/api/play.mdx) and its Headless/driver links |
+| Audio files, decoding, playback, and capture | [Audio playback](../doc/src/content/docs/audio/api/play.mdx) and its Headless links |
+| Analysis engines and transcription | [Audio analysis](../doc/src/content/docs/audio/api/analyze.mdx) |
+| Custom visuals and controls | [UI contracts](../packages/ui/README.md), [Score views](../doc/src/content/docs/score/api/view.mdx), and [Audio views](../doc/src/content/docs/audio/api/view.mdx) |
 | Coordination and cross-domain conversion | [Bridge](../bridges/score-audio/README.md) |
 
 Those references and manifests own the supported entries and dependency details.

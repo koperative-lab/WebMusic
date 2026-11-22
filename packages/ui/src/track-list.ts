@@ -147,7 +147,7 @@ ${componentSurfaceCss('track-list', {
 }
 
 .wui-track-list__row[aria-current="true"] {
-  background: var(--wm-track-list-active, rgba(17, 17, 17, .08));
+  background: var(--wm-track-list-active, var(--wm-surface-muted, rgba(17, 17, 17, .08)));
   font-weight: 600;
 }
 

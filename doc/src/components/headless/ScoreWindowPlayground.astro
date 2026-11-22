@@ -1,0 +1,25 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/view/headless" name="createScoreView"
+  rootAttrs={{'data-score-window-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Visible score notes">
+    <p class="wm-hl-music__summary" data-window-summary></p>
+    <div class="wm-hl-music__lane" data-window-lane aria-hidden="true"></div>
+    <p data-window-time></p>
+    <div class="wm-hl-music__chips" data-window-active aria-label="Active pitches"></div>
+    <input type="range" min="0" max="2" step="0.05" value="0" data-window-position aria-label="Local position in seconds" />
+  </section>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountScoreWindowDemo} from './analysis-view-playgrounds-client';
+  import {loadArabesqueScore} from './arabesque-score';
+  mountDemos('[data-score-window-demo]', async (root, scope) => {
+    const source = await loadArabesqueScore();
+    if (scope.active) mountScoreWindowDemo(root, scope, source);
+  });
+</script>

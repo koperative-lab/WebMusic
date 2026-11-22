@@ -46,6 +46,13 @@ export interface MidiNoteSourceOptions {
   id?: string;
   /** Accept only this MIDI channel (0–15); default all channels. */
   channel?: number;
+  /**
+   * MPE (DEC-077): each channel carries one note, so a channel's pitch bend
+   * just before a note-on detunes that note, by up to `bendRange` semitones
+   * (48 by default, the MPE member-channel range). Bend during a note,
+   * pressure and slide arrive as control events from `MidiControlSource`.
+   */
+  mpe?: {bendRange?: number};
 }
 
 /**
@@ -62,6 +69,8 @@ export class MidiNoteSource extends NoteModule {
   readonly #handler: NonNullable<MidiInputLike['onmidimessage']>;
   readonly #held = new Map<string, string>();
   readonly #ports: readonly ModulePort[];
+  readonly #bend = new Map<number, number>();
+  #mpe?: {bendRange: number};
   #sequence = 0;
 
   constructor(input: MidiInputLike, options: MidiNoteSourceOptions = {}) {
@@ -71,6 +80,11 @@ export class MidiNoteSource extends NoteModule {
     }
     this.#input = input;
     this.#channel = options.channel;
+    if (options.mpe) {
+      const bendRange = options.mpe.bendRange ?? 48;
+      if (!(bendRange > 0 && bendRange <= 96)) throw new RangeError('MPE bend range must be within 0–96 semitones');
+      this.#mpe = {bendRange};
+    }
     this.notes = new NoteOutputPort({id: 'notes'});
     this.#ports = Object.freeze([this.notes]);
     this.#previous = input.onmidimessage;
@@ -93,13 +107,15 @@ export class MidiNoteSource extends NoteModule {
     if (this.disposed || data.length < 3) return;
     const status = data[0] & 0xf0;
     const channel = data[0] & 0x0f;
+    if (status === 0xe0 && this.#mpe) { this.#bend.set(channel, ((data[2] & 0x7f) << 7 | (data[1] & 0x7f)) - 8192); return; }
     if (status !== 0x90 && status !== 0x80) return;
     if (this.#channel !== undefined && channel !== this.#channel) return;
     const midi = data[1] & 0x7f;
     const velocity = data[2] & 0x7f;
     const key = `${channel}:${midi}`;
     const time = timeStamp !== undefined ? timeStamp / 1000 : now();
-    const base = {sourceId: this.id, pitch: {midi}, axis: MIDI_AXIS, time, epoch: 0};
+    const bend = this.#mpe ? (this.#bend.get(channel) ?? 0) / 8192 * this.#mpe.bendRange * 100 : 0;
+    const base = {sourceId: this.id, pitch: bend ? {midi, cents: bend} : {midi}, axis: MIDI_AXIS, time, epoch: 0};
     if (status === 0x90 && velocity > 0) {
       // A repeated note-on without a release closes the earlier occurrence first.
       const open = this.#held.get(key);

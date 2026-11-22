@@ -5,7 +5,7 @@
 //
 // Pair with:
 //   @webmusic/score/play/api      — public data/configuration facade
-//   @webmusic/score/play/element  — styled Web Components built on these engines
+//   @webmusic/score/play/element  — styled Components built on these engines
 // ============================================================================
 
 // ---- Score Player (THE playback engine: scheduling + transport surface) ----
@@ -13,6 +13,8 @@ export type {PlaybackListenerError, PlaybackOperationError} from './playback-eve
 
 export {SCORE_NOTE_INPUT, NoteInputController, type NoteInputControllerOptions} from './note-input';
 export {MidiNoteSource, MidiNoteSink, recordNoteOutput, type MidiNoteSourceOptions, type MidiNoteSinkOptions} from './note-modules';
+export {MidiControlSource, type MidiControlSourceOptions} from './control-source';
+export {MIDI_CLOCK_PPQ, MidiClockSink, MidiClockSource, MidiMessageSink, midiBytes, sendSysex, type MidiClockSinkOptions, type MidiClockSourceOptions, type MidiClockTransport} from './midi-clock';
 export type {NoteInputOccurrence, NoteInputTarget} from '../core/note-input-model';
 
 export {
@@ -29,6 +31,7 @@ export {
   playScore,
   playScoreFromUrl,
   type ScorePlayerOptions,
+  type ScoreSessionRequests,
   type ScorePlayerEvents,
   type PlayerOptions,
   type PlayerEvents,
@@ -48,6 +51,7 @@ export {
   type WavetableOptions,
   type NoiseOptions,
   type MidiOutOptions,
+  type ProcessorSoundOptions,
   type MidiOutputLike,
   type SampleZone,
   type ToneInstrumentLike,
@@ -237,3 +241,4 @@ import type {PlayerLikeKernelContract} from './playerlike-contract';
 // Keep the compile-time kernel contract reachable without emitting a bare
 // runtime import into otherwise side-effect-free bundles.
 type _PlayerLikeKernelContractAnchor = PlayerLikeKernelContract;
+export {MidiAccessSource, createMidiPlugins, type MidiAccessLike, type MidiDeviceInfo, type MidiDeviceInput, type MidiDeviceOutput, type MidiPortLike} from './midi-objects';

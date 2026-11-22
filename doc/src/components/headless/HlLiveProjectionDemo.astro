@@ -1,0 +1,45 @@
+---
+// LiveViewController projecting an AudioClipPlayer's analyser into a 4-second
+// LiveScrollBuffer. The application owns the cadence: the demo captures once
+// per animation frame and shows what the buffer holds.
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import HeadlessTransport from './HeadlessTransport.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/audio/view/headless"
+  name="LiveViewController"
+  rootAttrs={{'data-hl-live': true}}
+>
+  <HeadlessTransport />
+  <div class="wui-row"><span class="wui-readout" data-buffer>—</span></div>
+</HeadlessDemoFrame>
+
+<script>
+  import {AudioClipPlayer} from '@webmusic/audio/play/headless';
+  import {createLiveViewController} from '@webmusic/audio/view/headless';
+  import {mountProgrammaticDemo} from '../programmatic/programmatic-demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
+  import {bindTransport} from './hl-transport';
+
+  mountProgrammaticDemo('[data-hl-live]', async (root, scope) => {
+    const out = root.querySelector<HTMLElement>('[data-buffer]')!;
+    let player: AudioClipPlayer | undefined = undefined;
+    const transport = bindTransport(root, scope, () => player);
+    const clip = await loadArabesqueAudioExcerpt(30);
+    if (!scope.active) return;
+    player = new AudioClipPlayer(clip);
+    const live = createLiveViewController({analyser: player.analyser, type: 'waveform', windowSeconds: 4});
+    scope.add(() => { live.clear(); player?.dispose(); });
+    transport.paint();
+    // The application owns the cadence: one capture per animation frame.
+    let frame = 0;
+    const tick = (now: number): void => {
+      if (!scope.active) return;
+      const buffer = live.capture(now);
+      if (buffer) out.textContent = `${buffer.length} columns · latest ${buffer.latestSeconds.toFixed(2)} s`;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    scope.add(() => cancelAnimationFrame(frame));
+  });
+</script>
