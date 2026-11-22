@@ -232,7 +232,7 @@ function documentationMap(files) {
 const DECISION_TOPICS = [
   ['Foundations', [1, 2, 3, 4, 5, 6, 7, 8, 9, 74, 81]],
   ['Playback binding and transport commands', [11, 17, 18]],
-  ['Modular composition and Session', [63, 64, 65, 68, 69, 73, 75, 76, 77, 78, 79, 80, 84, 85, 86, 87, 88, 89, 90, 91, 92]],
+  ['Modular composition and Session', [63, 64, 65, 68, 69, 73, 75, 76, 77, 78, 79, 80, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93]],
   ['Editing', [53, 55, 57, 58, 60, 61]],
   ['Score components', [12, 13, 14, 15, 16, 19, 24, 32, 34, 38, 39, 40, 41, 42, 43, 47, 48, 49, 50, 54, 56, 67]],
   ['Audio components', [25, 26, 27, 28, 29, 30, 31, 35, 36, 37, 44, 51, 62]],

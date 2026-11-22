@@ -95,8 +95,9 @@ entries.
 
 Any component can be placed in a graph, where it is a box with ports. The
 `component` object does this for graph-authored components. The official
-components — `keys`, `roll`, `scope`, `meter`, `spectrum`, `level` and
-`clip` so far — are placed by their
+components — every Component of the packages, from `keys` and `roll` to the
+players, desks and the effect and part declarations (DEC-084, DEC-089) — are
+placed by their
 [component manifests](design/DEVELOPER-TOOLS.md#component-manifest), which
 declare their ports, parameters and size, so a graph holds any component
 that has one ([STATUS](STATUS.md), LAYER-01). An app's components are a project
@@ -105,7 +106,8 @@ graph; its page is designed as a web page is, in boxes that lay out text,
 images and those components, and what a component follows or hears is chosen
 in its inspector (DEC-092). The App editor builds apps this way, from the
 same listing of official and the user's own components as Studio's
-libraries; community components have no place that holds them yet.
+libraries, and places a user's own as a linked nested component (DEC-093);
+community components have no place that holds them yet.
 
 Each layer keeps its contract when it moves up: an object behaves the same in
 every component, and a component behaves the same whether it is pasted into a

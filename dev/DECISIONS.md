@@ -4816,6 +4816,64 @@ spectrum meter added from the Library into the selected box and connected;
 Preview live; the exported page holding the boxes, a place for each
 component and the project without its page.
 
+## DEC-093 — An app holds the user's own components as it holds official ones
+
+**Date / status:** 2026-11-22; accepted by the repository owner, who asked
+that apps be aligned with the layers after DEC-089 and DEC-092. It completes
+DEC-081 rule 6 for apps under DEC-092.
+
+**Problem:** DEC-092's App editor placed, listed and connected only official
+components: its list of an app's components, the Inspector's connection
+choices and the Library's "Add to app" all went through component manifests.
+A component made of objects in Studio — which DEC-089 gave every port family,
+a box of its own and a place in the listing — could not be put in an app,
+though DEC-081 rule 6 says a component exported from Studio can be placed in
+one, and DEC-092 names the components of an app as those chosen in the
+Library, official or not.
+
+**Decision:**
+
+1. **A component is read by its ports, whoever made it.** Bridge
+   `componentPorts(record)` gives an official component's ports from its
+   manifest and a graph-authored component's — a `component` object — from
+   the channel kinds its config lists, as `in<n>` and `out<n>`. A host that
+   lists or connects an app's components uses it, so it treats both alike.
+2. **The Library offers the user's own components to an app.** Its Mine
+   section adds one to the app as its official cards do: shown in the App
+   editor, the choice is handed to it; on its own, the Library opens the
+   editor with it. The choice names the Studio file.
+3. **In an app it is a linked nested component.** The App editor places it
+   as Studio does under DEC-089: a `component` object filled from the file,
+   showing what its presentation shows, following the file, and connected
+   when there is no choice to make (DEC-091 rule 4). Opening the app brings
+   it up to date with its file. Its inlets are chosen in the Inspector like
+   any component's, and the exported page places it through `place` with
+   the components it holds.
+
+**Alternatives considered:** flattening a user's component into the app's
+own graph, which loses the component boundary, its file and its ports;
+listing it in the app without connections, which leaves its source or notes
+unreachable; a second kind of page node for it, which the page builder does
+not need, since a page node names a module and a nested component is one.
+
+**Consequences:** Bridge `/component` gains `componentPorts`. The studio
+site's shared listing gains `readUserComponent`, the Library's add message may
+name a file instead of a tag, and the App editor reads Studio's component
+files to place and refresh them. Community components follow when a place
+holds them.
+
+**Owner:** [Product](PRODUCT.md#objects-components-and-apps) for what an app
+holds, [Developer tools](design/DEVELOPER-TOOLS.md#component-manifest) for
+`componentPorts`, and the private repository's README for the editor.
+
+**Verification:** a Bridge test that `componentPorts` reads an official and a
+graph-authored component and nothing else; Library tests that a user's file
+is read with what it holds and that a user choice has no official placement;
+the private suites. Browser evidence: a user's component added to an app from
+the Library's add path, drawn on the page with its roll following the app's
+player, its inlet offered in the Inspector, and, after its file changed,
+brought up to date on reopening with its cord kept.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

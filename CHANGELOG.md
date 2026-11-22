@@ -112,6 +112,9 @@ work and does not establish npm publication, a release tag or a deployment.
   waveform under the waiting indicator until its audio arrives (DEC-082).
   `mountComponent` gives a component's natural width to its box, which the
   Element fills.
+- An app holds the user's own components as it holds official ones (DEC-093).
+  Bridge `/component` adds `componentPorts`, which reads the ports of an
+  official component and of one made of objects alike.
 - A component made of objects meets the same contract as an official one
   (DEC-089). Kernel adds the edge objects `inlet.note`, `outlet.note`,
   `inlet.source` and `outlet.source`, `SourceRelay` and `sourceOrigin`, and the

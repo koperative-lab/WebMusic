@@ -241,8 +241,10 @@ from, and a part sits in a desk of its own, named by the manifest's
 its `configure` sets Element properties a config describes. Every Component of
 the packages is now placed.
 
-**The listing.** The studio site keeps one listing of components (DEC-081
-rule 6, DEC-089): the official components from these manifests and the user's
+**The listing.** `componentPorts(record)` reads any placed component's ports:
+an official one's from its manifest, a graph-authored one's from the channel
+kinds its config lists (DEC-093). The studio site keeps one listing of
+components (DEC-081 rule 6, DEC-089): the official components from these manifests and the user's
 component files. Studio's Component Library and Library both read it; a file
 placed from it is followed by reference in Studio. A component made of objects
 reaches every port family through its edge objects (see
